@@ -57,6 +57,7 @@ const gitHistory = require('./gitHistory');
 const gitSnapshot = require('./gitSnapshot');
 const previewWorktree = require('./previewWorktree');
 const { registerTerminalHandlers, cleanupTerminals } = require('./terminal');
+const { createSelfWrites } = require('./selfWrites');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
@@ -1758,7 +1759,10 @@ function resolveIdentifierDefaults(schema, source, filePath, projectPath) {
 // ---------------------------------------------------------------------------
 
 let watcher = null;
-const selfWrites = new Map(); // absolute path -> timestamp of app-made write
+// What the app itself has written, so the watcher can tell its own echo from
+// somebody else's edit — see electron/selfWrites.js for why that is a question
+// about bytes and not about elapsed time.
+const selfWrites = createSelfWrites({ read: (p) => fs.readFileSync(p, 'utf8') });
 
 // A compile error replaces the site with the dev server's own error screen, and
 // that screen carries no HMR client — so when the mistake is fixed, nothing in
@@ -1784,10 +1788,14 @@ function notePageMayHaveChanged(external = false) {
   }, 200);
 }
 
-function markSelfWrite(p) {
-  selfWrites.set(path.resolve(p), Date.now());
+function markSelfWrite(p, text = null) {
+  selfWrites.note(path.resolve(p), text);
   notePageMayHaveChanged();
 }
+
+// Whether a watcher event is the app hearing its own write come back — see
+// electron/selfWrites.js.
+const isSelfWrite = (full) => selfWrites.isEcho(path.resolve(full));
 
 ipcMain.handle('watch:start', async (_e, projectPath) => {
   openProjectRoot = path.resolve(projectPath); // scopes the asset protocol
@@ -1818,13 +1826,11 @@ ipcMain.handle('watch:start', async (_e, projectPath) => {
     // The app's own writes say it through markSelfWrite instead, which is why
     // they are skipped here.
     const changed = path.join(srcDir, name);
-    const mine = selfWrites.get(path.resolve(changed));
-    if (!(mine && Date.now() - mine < 1000)) notePageMayHaveChanged(true);
+    if (!isSelfWrite(changed)) notePageMayHaveChanged(true);
     // JSON data files feed the CMS panel, not the page model.
     if (/\.json$/i.test(name)) {
       const full = path.join(srcDir, name);
-      const wrote = selfWrites.get(path.resolve(full));
-      if (wrote && Date.now() - wrote < 1000) return;
+      if (isSelfWrite(full)) return;
       clearTimeout(cmsTimer);
       cmsTimer = setTimeout(() => send('cms:changed', {}), 200);
       return;
@@ -1833,25 +1839,22 @@ ipcMain.handle('watch:start', async (_e, projectPath) => {
     // about changes there the same way it hears about public/.
     if (MEDIA_EXT.test(name)) {
       const full = path.join(srcDir, name);
-      const wrote = selfWrites.get(path.resolve(full));
-      if (wrote && Date.now() - wrote < 1000) return;
+      if (isSelfWrite(full)) return;
       clearTimeout(srcAssetTimer);
       srcAssetTimer = setTimeout(() => send('assets:changed', {}), 200);
       return;
     }
     if (/\.css$/i.test(name)) {
       const full = path.join(srcDir, name);
-      const wrote = selfWrites.get(path.resolve(full));
-      if (wrote && Date.now() - wrote < 1000) return;
+      if (isSelfWrite(full)) return;
       clearTimeout(cssTimer);
       cssTimer = setTimeout(() => send('css:changed', {}), 200);
       return;
     }
     if (!/\.(astro|md|mdx|html)$/i.test(name)) return;
     const full = path.join(srcDir, name);
-    // Ignore events caused by the app's own recent writes.
-    const wrote = selfWrites.get(path.resolve(full));
-    if (wrote && Date.now() - wrote < 1000) return;
+    // Ignore an event that is only this app's own write coming back.
+    if (isSelfWrite(full)) return;
     pending.add(full);
     // The site changed, so its picture is out of date — but not urgently, and
     // not while the user is still typing.
@@ -1875,10 +1878,7 @@ ipcMain.handle('watch:start', async (_e, projectPath) => {
     assetsWatcher = fs.watch(publicDir, { recursive: true }, (_event, filename) => {
       if (filename && String(filename).startsWith('.')) return;
       const full = filename ? path.join(publicDir, filename.toString()) : null;
-      if (full) {
-        const wrote = selfWrites.get(path.resolve(full));
-        if (wrote && Date.now() - wrote < 1000) return;
-      }
+      if (full && isSelfWrite(full)) return;
       clearTimeout(assetsTimer);
       assetsTimer = setTimeout(() => send('assets:changed', {}), 200);
     });
@@ -2103,7 +2103,7 @@ ipcMain.handle('assets:readText', async (_e, { projectPath, rel }) => {
 
 ipcMain.handle('assets:writeText', async (_e, { projectPath, rel, text }) => {
   const abs = assetAbs(projectPath, rel);
-  markSelfWrite(abs);
+  markSelfWrite(abs, text);
   fs.writeFileSync(abs, text, 'utf8');
   return { ok: true };
 });
@@ -2336,7 +2336,7 @@ ipcMain.handle('cms:write', async (_e, { projectPath, rel, data }) => {
         : replaceCollection(source, exportName, data, scan);
     if (written == null) throw new Error(`Couldn't write ${exportName} back into src/${fileRel}.`);
     const next = page ? file.slice(0, span.start) + written + file.slice(span.end) : written;
-    markSelfWrite(abs);
+    markSelfWrite(abs, next);
     fs.writeFileSync(abs, next, 'utf8');
     // Editing a page's own frontmatter changes a file the editor may have
     // open. Our writes are invisible to the watcher, so say so directly —
@@ -2354,8 +2354,9 @@ ipcMain.handle('cms:write', async (_e, { projectPath, rel, data }) => {
   const match = before.match(/\n([ \t]+)\S/);
   if (match) indent = match[1] === '\t' ? '\t' : match[1].length;
   trailingNewline = /\n$/.test(before);
-  markSelfWrite(abs);
-  fs.writeFileSync(abs, JSON.stringify(data, null, indent) + (trailingNewline ? '\n' : ''), 'utf8');
+  const json = JSON.stringify(data, null, indent) + (trailingNewline ? '\n' : '');
+  markSelfWrite(abs, json);
+  fs.writeFileSync(abs, json, 'utf8');
   return { ok: true };
 });
 
@@ -2596,7 +2597,7 @@ ipcMain.handle('cms:delete', async (_e, { projectPath, rel }) => {
   const abs = cmsAbs(projectPath, rel);
   const hits = importersOf(projectPath, abs);
   for (const hit of hits) {
-    markSelfWrite(hit.file);
+    markSelfWrite(hit.file, hit.next);
     fs.writeFileSync(hit.file, hit.next, 'utf8');
   }
   await shell.trashItem(abs);
@@ -2634,7 +2635,7 @@ function writeChunks(model) {
           /* file missing — write it */
         }
         if (!unchanged) {
-          markSelfWrite(node.chunkFile);
+          markSelfWrite(node.chunkFile, next);
           fs.writeFileSync(node.chunkFile, next, 'utf8');
         }
       }
@@ -2672,7 +2673,7 @@ const STYLE_NUDGE_MS = 150;
 const styleNudges = new Map(); // path -> pending timer
 
 function writePageText(pagePath, text) {
-  markSelfWrite(pagePath);
+  markSelfWrite(pagePath, text);
   fs.writeFileSync(pagePath, text, 'utf8');
   if (!/<style[\s>]/i.test(text)) return;
   clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
@@ -2684,7 +2685,7 @@ function writePageText(pagePath, text) {
         // Skip it if anything has changed the file since — the nudge must never
         // resurrect text that's already been superseded.
         if (fs.readFileSync(pagePath, 'utf8') !== text) return;
-        markSelfWrite(pagePath);
+        markSelfWrite(pagePath, text);
         fs.writeFileSync(pagePath, text, 'utf8');
       } catch {
         /* file moved or deleted — nothing to flush */
@@ -2723,8 +2724,9 @@ ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
     model.imports.push({ name: layout.name, path: rel.startsWith('.') ? rel : './' + rel });
     model.nodes.push({ id: 'layout', kind: 'component', name: layout.name, props: {}, children: [] });
   }
-  markSelfWrite(pagePath);
-  fs.writeFileSync(pagePath, serializePage(model), 'utf8');
+  const created = serializePage(model);
+  markSelfWrite(pagePath, created);
+  fs.writeFileSync(pagePath, created, 'utf8');
   return { pagePath };
 });
 

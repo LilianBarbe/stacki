@@ -264,12 +264,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     );
     check(
       'and not for the app’s own writes, which say it themselves',
-      /if \(!\(mine && Date\.now\(\) - mine < 1000\)\) notePageMayHaveChanged\(true\);/.test(handler),
+      /if \(!isSelfWrite\(changed\)\) notePageMayHaveChanged\(true\);/.test(handler),
       handler.slice(0, 400)
     );
     check(
       'a write the app makes says it through markSelfWrite',
-      /function markSelfWrite\(p\) \{[\s\S]{0,160}notePageMayHaveChanged\(\);/.test(main),
+      /function markSelfWrite\(p[^)]*\) \{[\s\S]{0,160}notePageMayHaveChanged\(\);/.test(main),
       'an in-app write would go unannounced'
     );
   }

@@ -129,12 +129,12 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
   check(
     'a change the app did not make is marked as coming from outside',
-    /if \(!\(mine && Date\.now\(\) - mine < 1000\)\) notePageMayHaveChanged\(true\);/.test(main),
+    /if \(!isSelfWrite\(changed\)\) notePageMayHaveChanged\(true\);/.test(main),
     'the app cannot tell an outside edit from its own'
   );
   check(
     'and the app’s own writes are not',
-    /function markSelfWrite\(p\) \{[\s\S]*?notePageMayHaveChanged\(\);/.test(main),
+    /function markSelfWrite\(p[^)]*\) \{[\s\S]*?notePageMayHaveChanged\(\);/.test(main),
     'every keystroke would ask the canvas for a fetch of its own'
   );
   check(
