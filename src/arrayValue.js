@@ -180,6 +180,82 @@ export function arrayText(items) {
   return `[${list.map(one).join(', ')}]`;
 }
 
+/**
+ * An object literal a set of fields can edit: `{ legend: "Ministry Role",
+ * options: ["Pastors", "Staff"] }`. Every value has to be one a control can
+ * show — a word, a number, or a list of those — and every key a plain name.
+ *
+ * The difference from an item inside a list is depth: an item's fields hold
+ * words only, because a row's popup has nowhere to put anything larger. A prop
+ * whose whole value is an object has the panel to lay out, so one of its fields
+ * can be a list, and that list is the same rows as anywhere else.
+ *
+ * Null for everything else — a name, a call, an object inside an object, a
+ * spread — which is the field's cue to stay in the code editor.
+ *
+ * @returns {{key: string, keyQuote: string|null, text?: string, quote?: string|null,
+ *            items?: object[]}[] | null}
+ */
+export function objectFields(src) {
+  const text = String(src ?? '').trim();
+  if (!text.startsWith('{') || !text.endsWith('}')) return null;
+  const parts = splitTop(text.slice(1, -1));
+  if (!parts) return null;
+  const out = [];
+  for (const [i, part] of parts.entries()) {
+    if (!part.trim()) {
+      if (i === parts.length - 1) continue; // a trailing comma
+      return null;
+    }
+    const colon = topColon(part);
+    if (colon === -1) return null; // shorthand `{ legend }` names something else
+    const rawKey = part.slice(0, colon).trim();
+    const key = /^(['"`])(.*)\1$/.test(rawKey) ? rawKey.slice(1, -1) : rawKey;
+    const keyQuote = rawKey[0] === '"' || rawKey[0] === "'" ? rawKey[0] : null;
+    if (!/^[A-Za-z_$][\w$]*$/.test(key)) return null;
+    const raw = part.slice(colon + 1).trim();
+    if (raw.startsWith('[')) {
+      const items = arrayItems(raw);
+      if (!items) return null; // a list this cannot show is one it must not eat
+      out.push({ key, keyQuote, kind: 'list', items });
+      continue;
+    }
+    // A yes/no is a control of its own here — a pair of buttons rather than a
+    // box to type `true` into. Only in an object: inside a list an item is a
+    // row with a name on it, and "true" is not a name.
+    if (raw === 'true' || raw === 'false') {
+      out.push({ key, keyQuote, kind: 'boolean', text: raw, quote: null });
+      continue;
+    }
+    const value = itemFrom(raw);
+    // An object inside an object has no second level of fields to live in.
+    if (!value || value.fields) return null;
+    out.push({
+      key,
+      keyQuote,
+      kind: value.quote === null ? 'number' : 'text',
+      text: value.text,
+      quote: value.quote,
+    });
+  }
+  return out.length ? out : null;
+}
+
+/** The fields as an object literal, in the quotes the file was written with. */
+export function objectText(fields) {
+  const list = fields || [];
+  const fallback =
+    list.find((f) => f.quote)?.quote ||
+    list.flatMap((f) => f.items || []).find((i) => i.quote)?.quote ||
+    '"';
+  const one = (f) => {
+    const name = f.keyQuote ? `${f.keyQuote}${f.key}${f.keyQuote}` : f.key;
+    if (f.items) return `${name}: ${arrayText(f.items)}`;
+    return `${name}: ${f.quote === null ? String(f.text) : quoted(f, fallback)}`;
+  };
+  return `{ ${list.map(one).join(', ')} }`;
+}
+
 // What a row calls an item. An object is named by the field a person would read
 // it by — its label, its name, its title — and falls back to the first field it
 // has, because a row with nothing written on it is a row nobody can aim at.

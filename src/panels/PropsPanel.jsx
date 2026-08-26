@@ -7,7 +7,9 @@ import PropTip from '../ui/PropTip.jsx';
 import ClassInput from '../ui/ClassInput.jsx';
 import CodeEditor from '../ui/CodeEditor.jsx';
 import ListField from './ListField.jsx';
-import { arrayItems } from '../arrayValue.js';
+import ObjectField from './ObjectField.jsx';
+import SegSwitch from '../ui/SegSwitch.jsx';
+import { arrayItems, objectFields } from '../arrayValue.js';
 import { clickNote } from '../ui/sound.js';
 import { SoundHere } from '../ui/soundScope.jsx';
 import StyleEditor, { collapseDeclarations } from '../ui/StyleEditor.jsx';
@@ -3039,26 +3041,6 @@ function controlWord(field) {
 // booleans and for any two-option enum: a dropdown to pick between exactly two
 // things costs a click to see what the other one even is, and this shows both
 // at once.
-function SegSwitch({ options, current, onPick }) {
-  const at = options.findIndex((o) => o.value === current);
-  return (
-    <div className={`bool-seg ${at === 1 ? 'is-second' : 'is-first'}`} role="group">
-      {options.map((o) => (
-        <button
-          key={String(o.value)}
-          type="button"
-          className={o.value === current ? 'on' : ''}
-          aria-pressed={o.value === current}
-          title={o.label}
-          onClick={() => onPick(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function PropField({
   field,
   /** What this prop falls back to under the union branch now in force. */
@@ -3724,6 +3706,18 @@ function PropField({
   //
   // An unset one shows the empty list rather than a code field: the prop takes
   // items, and the first thing to do with it is add one.
+  // The same idea for a value that is a form rather than a list: one control
+  // per key — a box for a word, True/False for a yes-or-no, and rows for a list
+  // inside it. See ObjectField.
+  if (type === 'code' && !showExpr && str && objectFields(str)) {
+    return (
+      <div className="props-field">
+        {label}
+        <ObjectField value={str} onChange={(text, immediate) => onChange({ type: 'expr', value: text }, immediate)} />
+      </div>
+    );
+  }
+
   if (type === 'code' && !showExpr && (value === undefined || arrayItems(str))) {
     return (
       <div className="props-field">

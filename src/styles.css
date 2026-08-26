@@ -617,6 +617,43 @@ textarea { font-family: inherit; font-size: 12px; line-height: 1.5; resize: none
 /* A prop that takes a list of words, edited as a list of words. Built from the
    attribute rows above — same height, same hover, same quiet row action — since
    both are a list of little things inside one field. */
+/* A prop whose value is an object: one row per key, the key on the left and
+   whatever control that value asks for on the right. A list inside one keeps
+   its own rows, so it indents under its key rather than sitting beside it. */
+.object-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+.object-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.object-field-row:has(.list-field) {
+  display: block;
+}
+.object-field-key {
+  flex: none;
+  width: 64px;
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.object-field-row:has(.list-field) .object-field-key {
+  display: block;
+  width: auto;
+  margin-bottom: 2px;
+}
+.object-field-input {
+  flex: 1;
+  min-width: 0;
+}
+
 .list-field {
   border: 1px solid var(--border-strong);
   border-radius: 10px;
