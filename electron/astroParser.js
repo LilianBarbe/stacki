@@ -210,38 +210,75 @@ function dedentHead(text) {
 }
 
 // Splits a statement block on the semicolons that actually end statements —
-// not the ones inside strings, template literals, parens, braces or brackets.
+// not the ones inside strings, template literals, parens, braces, brackets, or
+// comments. A comment is skipped whole: prose is allowed a semicolon in it, and
+// an apostrophe in it is an apostrophe.
+// Each piece says where in `src` it began, so what is found inside it can be
+// pointed back at the file it came from.
 function topLevelStatements(src) {
   const out = [];
+  const push = (end) => out.push({ text: src.slice(start, end), at: start });
   let depth = 0;
-  let quote = null;
   let start = 0;
   for (let i = 0; i < src.length; i++) {
-    const c = src[i];
-    if (quote) {
-      if (c === '\\') i++;
-      else if (c === quote) quote = null;
+    const skipped = skipStringOrComment(src, i);
+    if (skipped !== i) {
+      i = skipped - 1;
       continue;
     }
-    if (c === '"' || c === "'" || c === '`') quote = c;
-    else if ('([{'.includes(c)) depth++;
+    const c = src[i];
+    if ('([{'.includes(c)) depth++;
     else if (')]}'.includes(c)) depth--;
     else if (c === ';' && depth === 0) {
-      out.push(src.slice(start, i));
+      push(i);
       start = i + 1;
     } else if (c === '\n' && depth === 0) {
       // Semicolons are optional. A newline ends the statement when what
       // follows starts a new one — the same call JavaScript's own insertion
       // makes, without pretending to be a parser.
       if (/^\s*(const|let|return)\b/.test(src.slice(i))) {
-        out.push(src.slice(start, i));
+        push(i);
         start = i + 1;
       }
     }
   }
-  const tail = src.slice(start);
-  if (tail.trim()) out.push(tail);
+  if (src.slice(start).trim()) push(src.length);
   return out;
+}
+
+// Where the code in a statement starts — past any comments in front of it, or
+// null if a `/*` is left open. A comment is not a statement; it is someone
+// telling the next reader why. Reading it as one turned a loop that says why it
+// exists into a loop this file refused to open.
+function afterComments(text) {
+  let i = 0;
+  for (;;) {
+    while (i < text.length && /\s/.test(text[i])) i++;
+    if (i >= text.length) return text.length;
+    if (!(text[i] === '/' && (text[i + 1] === '*' || text[i + 1] === '/'))) return i;
+    if (text[i + 1] === '*' && text.indexOf('*/', i + 2) === -1) return null;
+    const skipped = skipStringOrComment(text, i);
+    if (skipped === i) return i;
+    i = skipped;
+  }
+}
+
+// Whether a statement's last word is a comment — a `;` written after one would
+// be written inside it.
+function endsInComment(text) {
+  let inside = false;
+  for (let i = 0; i < text.length; i++) {
+    const skipped = skipStringOrComment(text, i);
+    if (skipped !== i) {
+      // A string ends a statement as well as any other word does; only a
+      // comment swallows what is written after it.
+      inside = text[i] === '/' && !text.slice(skipped).trim();
+      i = skipped - 1;
+    } else if (text[i].trim()) {
+      inside = false;
+    }
+  }
+  return inside;
 }
 
 // `(item) => { const x = …; return ( <jsx/> ); }` — the block form of a loop
@@ -250,26 +287,53 @@ function topLevelStatements(src) {
 // written back out, while the returned markup becomes the loop's children.
 // Anything else in there (an if, a side effect, more than one return) can't be
 // represented, so the whole expression stays code.
-// Returns { body: string[], markup: string } or null.
+// A comment counts as none of that. It rides on the statement it introduces —
+// including the `return` — so what it says is still there when the loop is
+// written back.
+// Returns { body: string[], markup: string, at: number } or null, where `at`
+// is where the markup starts in `block` — the returned tree is a tree of the
+// file, and every node in it has to be able to say which lines are its own.
 function splitBlockLoopBody(block) {
   const statements = topLevelStatements(block);
   if (!statements.length) return null;
   const body = [];
   for (let i = 0; i < statements.length; i++) {
-    const text = statements[i].trim();
-    if (!text) continue;
+    const lead = statements[i].text.length - statements[i].text.trimStart().length;
+    const raw = statements[i].text.trim();
+    const rawAt = statements[i].at + lead;
+    if (!raw) continue;
+    const at = afterComments(raw);
+    if (at === null) return null;
+    const after = raw.slice(at);
+    const text = after.trim();
+    if (!text) {
+      // A line of prose standing on its own, between the declarations.
+      body.push(raw);
+      continue;
+    }
     if (/^return\b/.test(text)) {
       // The return must be the last thing in the block.
-      if (statements.slice(i + 1).some((rest) => rest.trim())) return null;
-      let markup = text.slice('return'.length).trim();
+      if (statements.slice(i + 1).some((rest) => rest.text.trim())) return null;
+      let markup = text.slice('return'.length);
+      let markupAt =
+        rawAt + at + (after.length - after.trimStart().length) + 'return'.length;
+      const trimLeft = () => {
+        const space = markup.length - markup.trimStart().length;
+        markup = markup.trim();
+        markupAt += space;
+      };
+      trimLeft();
       while (markup.startsWith('(') && findMatchingParen(markup, 0) === markup.length - 1) {
-        markup = markup.slice(1, -1).trim();
+        markup = markup.slice(1, -1);
+        markupAt += 1;
+        trimLeft();
       }
       if (!markup.startsWith('<')) return null;
-      return { body, markup };
+      if (at) body.push(raw.slice(0, at).trim());
+      return { body, markup, at: markupAt };
     }
     if (!/^(const|let)\s/.test(text)) return null;
-    body.push(text.replace(/;*$/, ';'));
+    body.push(endsInComment(raw) ? raw : raw.replace(/;*$/, ';'));
   }
   return null; // no return statement — nothing is rendered
 }
@@ -369,7 +433,10 @@ function tryParseBlockMap(inner, base = null) {
   if (!/^\s*\)\s*$/.test(inner.slice(closeIdx + 1))) return null;
   const split = splitBlockLoopBody(inner.slice(openIdx + 1, closeIdx));
   if (!split) return null;
-  const parsed = parseTemplate(split.markup);
+  const parsed = parseTemplate(
+    split.markup,
+    base === null ? null : base + openIdx + 1 + split.at
+  );
   if (!parsed.clean) return null;
   return {
     id: makeId(),
