@@ -1833,6 +1833,22 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
+
+/* The arrows on a loop item's row: which entry of the list it is being read as.
+   Sized to sit inside a row rather than to be a control of its own. */
+.dp-item-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  flex: none;
+}
+.dp-item-nav .dp-step { padding: 0 2px; }
+.dp-item-count {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
 .dp-step {
   display: inline-flex;
   align-items: center;

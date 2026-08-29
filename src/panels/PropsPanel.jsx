@@ -2454,6 +2454,7 @@ function FieldDataPicker({ pos, bindCtx, current, tree, onPick, onWrite, onClose
         tree={tree || dataTree(bindCtx || {})}
         current={current}
         entries={bindCtx?.entryNav}
+        onStepItem={bindCtx?.onStepItem}
         onPick={pick}
         onExpand={(node) => node.query && bindCtx?.onNeedSample?.(node.query.collection)}
         onWrite={onWrite}
@@ -2644,6 +2645,7 @@ export function BindField({ value, field, placeholder, bindCtx, dataCtx, apiRef,
         tree={dataTree(bindCtx || {})}
         current={menu.chip?.path ?? (menu.chip ? chipPath(menu.chip) : showInput ? null : expr)}
         entries={bindCtx?.entryNav}
+        onStepItem={bindCtx?.onStepItem}
         onPick={pick}
         onExpand={(node) => node.query && bindCtx?.onNeedSample?.(node.query.collection)}
         onEdit={editTarget ? editChip : undefined}

@@ -77,6 +77,8 @@ export default function DataPicker({
   tree: rawTree,
   current,
   entries,
+  /** Steps which item of a loop's list the item row is read as. */
+  onStepItem,
   onPick,
   onExpand,
   onWrite,
@@ -168,6 +170,35 @@ export default function DataPicker({
           </span>
           <span className="dp-key">{showPath ? n.path : n.key}</span>
           {isCurrent && <CheckIcon size={11} className="dp-check" />}
+          {/* A loop hands its item one entry of a list, and the list has more
+              than one. These say which one is being read, and move it — so the
+              fields below are this service's, not always the first one's. The
+              row itself still picks the item, so the arrows stop the click. */}
+          {n.nav && onStepItem ? (
+            <span className="dp-item-nav" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="dp-step"
+                title="Previous item"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onStepItem(n.path, -1, n.nav.count)}
+              >
+                <ChevronLeftIcon size={11} />
+              </button>
+              <span className="dp-item-count">
+                {n.nav.index + 1}/{n.nav.count}
+              </span>
+              <button
+                type="button"
+                className="dp-step"
+                title="Next item"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => onStepItem(n.path, 1, n.nav.count)}
+              >
+                <ChevronRightIcon size={11} />
+              </button>
+            </span>
+          ) : null}
           <span className={`dp-val ${n.preview ? '' : 'kind'}`}>{n.preview || n.kind}</span>
         </div>
         {isOpen &&

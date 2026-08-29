@@ -643,6 +643,9 @@ export default function App() {
   const [collections, setCollections] = useState([]);
   const sampleAskedRef = useRef(new Set());
   const [dynamicIndex, setDynamicIndex] = useState(0);
+  // Which item of each loop's list the data picker reads as `service`, `post`,
+  // … — keyed by the item's own name. See bindContext below.
+  const [itemIndex, setItemIndex] = useState({});
   const [dynamicError, setDynamicError] = useState(null);
   const [leftTab, setLeftTab] = useState('navigator'); // pages | navigator | components | assets | cms | null
   const [cmsRel, setCmsRel] = useState(null); // JSON file open in the CMS editor
@@ -4008,6 +4011,17 @@ export default function App() {
   const editedEntry = insertables.find((c) => c.path === currentPage?.path) || null;
   const bindContext = loopContext && {
     ...loopContext,
+    // Which item of a loop's list the picker reads the item's values as. A loop
+    // hands `service` one entry of `times`, and the picker showed the first one
+    // forever — so the fields under it were one service's, and the others could
+    // only be taken on trust. Keyed by the item's own name, so two loops on a
+    // page are two places.
+    itemIndex,
+    onStepItem: (name, dir, count) =>
+      setItemIndex((cur) => ({
+        ...cur,
+        [name]: (((cur[name] ?? 0) + dir) % count + count) % count,
+      })),
     // A component's frontmatter is not the page's, so the page's entry is not
     // its data. What it does have is the instance it was opened from, whose
     // props are its Astro.props — the values it is rendering with right now.

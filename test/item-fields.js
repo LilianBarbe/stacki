@@ -195,6 +195,94 @@ const { posts = [] } = Astro.props;`;
     check('which is still offered by name', item?.path === 'tag', JSON.stringify(item));
   }
 
+  // --- and which item you are looking at ---------------------------------------------
+  //
+  // A loop hands its item one entry of a list. The picker showed the first one
+  // forever, so the fields under `service` were one service's values and the
+  // rest could only be taken on trust.
+  {
+    const sample = {
+      times: [
+        { day: 'Sunday', time: '9:30 AM' },
+        { day: 'Sunday', campus: 'St. Amant', time: '11 AM' },
+        { day: 'Wednesday', time: '6:30 PM' },
+      ],
+    };
+    const at = (i) =>
+      itemOf({
+        frontmatter: 'const { times } = Astro.props;',
+        propsSample: sample,
+        ancestorHeads: ['times.map((service) => ('],
+        itemIndex: { service: i },
+      });
+    const valueOf = (node, key) => (node?.children || []).find((c) => c.key === key)?.preview;
+
+    check('the item says which entry it is showing', JSON.stringify(at(0)?.nav) === '{"index":0,"count":3}', JSON.stringify(at(0)?.nav));
+    check('and stepping shows that one', valueOf(at(1), 'time') === '"11 AM"', valueOf(at(1), 'time'));
+    check('every step of the way', valueOf(at(2), 'day') === '"Wednesday"', valueOf(at(2), 'day'));
+    check(
+      'a field the shown entry lacks still says what it holds elsewhere',
+      valueOf(at(2), 'campus') === '"St. Amant"',
+      valueOf(at(2), 'campus')
+    );
+    check(
+      'and the fields are still named after the item',
+      (at(2)?.children || []).every((c) => c.path.startsWith('service.')),
+      (at(2)?.children || []).map((c) => c.path).join()
+    );
+    check('an index past the end lands on the last entry', valueOf(at(9), 'day') === '"Wednesday"', valueOf(at(9), 'day'));
+    // The eleventh entry again: the path a field is written with has to be
+    // rebased from the entry being SHOWN, not from the first one — trimming
+    // `times[10].day` by the width of `times[0]` is only right by accident
+    // while the two indices are the same number of characters wide.
+    const many = Array.from({ length: 10 }, (_, i) => ({ day: `Day ${i}` }));
+    many.push({ day: 'The eleventh' });
+    const late = itemOf({
+      frontmatter: 'const { times } = Astro.props;',
+      propsSample: { times: many },
+      ancestorHeads: ['times.map((service) => ('],
+      itemIndex: { service: 10 },
+    });
+    check(
+      'a field of the eleventh item is still named after the item',
+      late?.children?.[0]?.path === 'service.day',
+      late?.children?.[0]?.path
+    );
+    check('and holds that item’s value', valueOf(late, 'day') === '"The eleventh"', valueOf(late, 'day'));
+    // A list with one entry has nowhere to go, and arrows that cannot move are
+    // worse than none.
+    const one = itemOf({
+      frontmatter: 'const { times } = Astro.props;',
+      propsSample: { times: [{ day: 'Sunday' }] },
+      ancestorHeads: ['times.map((service) => ('],
+    });
+    check('one entry offers no arrows', !one?.nav, JSON.stringify(one?.nav));
+    const typed = itemOf({
+      frontmatter: 'interface Props { times?: { day: string }[] }\nconst { times = [] } = Astro.props;',
+      propsSchema: parsePropSchema('---\ninterface Props { times?: { day: string }[] }\nconst { times = [] } = Astro.props;\n---\n<div></div>'),
+      ancestorHeads: ['times.map((service) => ('],
+    });
+    check('and neither does a shape with no values behind it', !typed?.nav, JSON.stringify(typed?.nav));
+    check('though its fields are still there', (typed?.children || []).length === 1, JSON.stringify(typed?.children));
+  }
+  {
+    // The row draws them, and the app moves the index they show.
+    const picker = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'DataPicker.jsx'), 'utf8');
+    check('the row draws the arrows when the item has somewhere to go', /n\.nav && onStepItem/.test(picker), 'no arrows on the row');
+    check(
+      'and a press on one does not also pick the row',
+      /className="dp-item-nav" onClick=\{\(e\) => e\.stopPropagation\(\)\}/.test(picker),
+      'stepping would choose the item as the binding'
+    );
+    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    check('the app keeps a place per item name', /itemIndex,\n\s*onStepItem:/.test(app), 'the picker has nothing to step');
+    check(
+      'and stepping wraps rather than running off either end',
+      /\(\(\(cur\[name\] \?\? 0\) \+ dir\) % count \+ count\) % count/.test(app),
+      'a step past the last entry would leave the list'
+    );
+  }
+
   if (failures.length) {
     console.error(`\nitem-fields: ${failures.length} failed, ${checked - failures.length} passed\n`);
     console.error(failures.join('\n') + '\n');

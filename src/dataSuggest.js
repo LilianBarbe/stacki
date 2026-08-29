@@ -1014,20 +1014,26 @@ export function dataTree(context) {
   index(props);
   index(values);
 
-  // Every field any entry in a list has, in the order they first appear, each
-// shown with the value of the first entry that HAS it — so a field the first
-// entry left out still says what it holds somewhere.
-const everyField = (entries) => {
+  // Every field any entry in a list has, each shown with a value from the entry
+// being looked at — `at`, which the item's own arrows step — and from whichever
+// other entry has it when that one doesn't. A field the first entry left out is
+// still a field of the item; a value from another entry is better than a blank
+// row; and which entry you are reading is a thing you can move.
+const everyField = (entries, at = 0) => {
   const first = entries?.[0];
   if (!first) return null;
   const out = [];
   const seenKeys = new Set();
-  for (const entry of entries) {
+  // The entry being read leads, in its own order, so stepping to it shows what
+  // it holds rather than what the first one holds.
+  const order = entries[at] && at !== 0 ? [entries[at], ...entries] : entries;
+  for (const entry of order) {
     // Written as a field of the FIRST entry, whatever entry it came from —
     // the whole branch, not just its top: the tree is rebased onto the loop's
     // item name from there, and a path through `[3]` would name one particular
     // service rather than the item.
-    const kids = entry === first ? entry.children || [] : rebase(entry.children, entry.path, first.path) || [];
+    const home = entries[at] || first;
+    const kids = entry === home ? entry.children || [] : rebase(entry.children, entry.path, home.path) || [];
     for (const child of kids) {
       if (seenKeys.has(child.key)) continue;
       seenKeys.add(child.key);
@@ -1047,17 +1053,26 @@ const everyField = (entries) => {
     const item = m[2];
     const source = byPath.get(m[1].trim());
     const first = source?.kind === 'list' ? source.children?.[0] : null;
+    // Which entry of the list the item is being read as. One list, one place
+    // in it — the arrows on the row move it (see `nav` below).
+    const entries = source?.kind === 'list' ? source.children || [] : [];
+    const at = Math.min(Math.max(context?.itemIndex?.[item] ?? 0, 0), Math.max(entries.length - 1, 0));
+    const shown = entries[at] || first;
     add(loops, {
       path: item,
       key: item,
       kind: first ? first.kind : 'loop item',
-      preview: first ? first.preview : '',
+      preview: shown ? shown.preview : '',
+      // What the arrows on this row say, and what they have to step through.
+      // Only when there is more than one entry to look at: a list of one, or a
+      // shape with no values behind it at all, has nowhere to go.
+      ...(entries.length > 1 ? { nav: { index: at, count: entries.length } } : {}),
       // Re-rooted onto the item's name: `posts[0].title` is `post.title` here.
       // Every entry contributes: a field the first one happens not to have — a
       // campus on one service and not another — is still a field of the item,
       // and leaving it out meant typing `service.campus` from memory to reach
       // a value the picker was already holding.
-      children: first ? rebase(everyField(source.children), first.path, item) : null,
+      children: shown ? rebase(everyField(entries, at), shown.path, item) : null,
     });
     if (m[3]) add(loops, { path: m[3], key: m[3], kind: 'number', preview: '0', children: null });
   }

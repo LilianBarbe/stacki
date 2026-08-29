@@ -532,6 +532,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
             tree={dataTree(bindCtx || {})}
             current={chipMenu.current}
             entries={bindCtx?.entryNav}
+            onStepItem={bindCtx?.onStepItem}
             onPick={(path, query) => pickExpr(resolvePick(path, query, bindCtx))}
             onExpand={(node) => node.query && bindCtx?.onNeedSample?.(node.query.collection)}
             footer={false}
