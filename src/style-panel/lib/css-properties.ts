@@ -30,17 +30,38 @@ export const CSS_PROPERTIES: readonly string[] = Object.freeze(
 // Filter the property list for a typed query: prefix matches first (they're what you
 // usually want), then substring matches, each keeping alphabetical order. An empty
 // query returns the whole list so the field opens showing everything.
-export function filterCssProperties(query: string): readonly string[] {
+//
+// `custom` is the project's own custom properties — `--brand-500` and the rest,
+// which are properties too, and the ones a person typing `-` is most often
+// reaching for. They are not in the standard list (nothing knows them but this
+// project), so they are offered alongside it, and they lead once the query
+// starts with a dash: `-webkit-align-content` is a fine suggestion for someone
+// who typed `-webkit`, and a strange one for someone halfway through the name
+// of a variable they wrote themselves.
+export function filterCssProperties(
+  query: string,
+  custom: readonly string[] = [],
+): readonly string[] {
   const q = query.trim().toLowerCase()
-  if (!q) return CSS_PROPERTIES
+  if (!q) return custom.length ? [...custom, ...CSS_PROPERTIES] : CSS_PROPERTIES
+  const dashed = q.startsWith('-')
   const prefix: string[] = []
   const substring: string[] = []
+  const customPrefix: string[] = []
+  const customSubstring: string[] = []
+  for (const prop of custom) {
+    const at = prop.toLowerCase().indexOf(q)
+    if (at === 0) customPrefix.push(prop)
+    else if (at > 0) customSubstring.push(prop)
+  }
   for (const prop of CSS_PROPERTIES) {
     const at = prop.indexOf(q)
     if (at === 0) prefix.push(prop)
     else if (at > 0) substring.push(prop)
   }
-  return [...prefix, ...substring]
+  return dashed
+    ? [...customPrefix, ...prefix, ...customSubstring, ...substring]
+    : [...prefix, ...customPrefix, ...substring, ...customSubstring]
 }
 
 // ── Values a property cannot take ────────────────────────────────────────────

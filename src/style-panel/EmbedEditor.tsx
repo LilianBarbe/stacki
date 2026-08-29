@@ -28,7 +28,7 @@ import TypographySection, { GroupLabel } from './TypographySection'
 import FlexChildSection from './FlexChildSection'
 import EffectsSection from './EffectsSection'
 import ProvenanceList, { ProvenanceEmbedNav } from './ProvenanceList'
-import VariableConnect from './VariableConnect'
+import VariableConnect, { useSharedVars } from './VariableConnect'
 import { computeRuleModel, type DeclStatus, type MatchedRule, type RuleModel } from './lib/cascade'
 import { groupDeclarations, groupProps } from './lib/sections'
 import { defaultSelectorTokens, selectorToClassTokens, snapshotTokens, tokensToSelector } from './lib/element-tokens'
@@ -545,8 +545,10 @@ function DeclRow({
 // panel bottom), flipping below only when there's more room there. Arrow keys move the
 // highlight, Enter/Tab/click pick it; Enter with nothing highlighted submits the row and
 // Escape closes the list (a second Escape cancels the row).
-function PropertyCombobox({ value, busy, onChange, onPick, onEnter, onEscape }: {
+function PropertyCombobox({ value, custom, busy, onChange, onPick, onEnter, onEscape }: {
   value: string
+  /** This project's own custom properties, offered beside the standard ones. */
+  custom: readonly string[]
   busy: boolean
   onChange: (value: string) => void
   onPick: (prop: string) => void
@@ -557,7 +559,7 @@ function PropertyCombobox({ value, busy, onChange, onPick, onEnter, onEscape }: 
   const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const matches = useMemo(() => filterCssProperties(value), [value])
+  const matches = useMemo(() => filterCssProperties(value, custom), [value, custom])
   const [pos, setPos] = useState<CSSProperties>({ position: 'fixed', visibility: 'hidden' })
 
   // Reset the highlight to the top whenever the query (and so the list) changes.
@@ -658,6 +660,11 @@ function AddPropertyRow({ busy, onAdd }: { busy: boolean; onAdd: (prop: string, 
   const [value, setValue] = useState('')
   const valueRef = useRef<HTMLInputElement>(null)
   const ready = prop.trim() !== '' && value.trim() !== ''
+  // The project's own custom properties are properties here too — this row is
+  // where one gets set, and `--brand-500` is not in any list of standard CSS.
+  // Only asked for while the row is open.
+  const { vars } = useSharedVars(expanded)
+  const custom = useMemo(() => [...new Set(vars.map((v) => `--${v.name}`))].sort(), [vars])
 
   const cancel = () => { setProp(''); setValue(''); setExpanded(false) }
   const submit = () => {
@@ -681,10 +688,15 @@ function AddPropertyRow({ busy, onAdd }: { busy: boolean; onAdd: (prop: string, 
       <button className="embed-editor_icon-btn" type="button" onClick={cancel} title="Cancel" aria-label="Cancel adding property">✕</button>
       <PropertyCombobox
         value={prop}
+        custom={custom}
         busy={busy}
         onChange={setProp}
         onPick={(picked) => { setProp(picked); valueRef.current?.focus() }}
-        onEnter={submit}
+        // Enter on a name is done with the name, not done with the row: a
+        // property with no value is not a declaration, and submit had nothing
+        // to write, so the key did nothing at all. It goes where the rest of
+        // the answer has to be typed.
+        onEnter={() => { if (prop.trim() && !value.trim()) { valueRef.current?.focus(); return } submit() }}
         onEscape={cancel}
       />
       <input
