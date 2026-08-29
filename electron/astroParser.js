@@ -77,12 +77,42 @@ function parseAttrs(attrString) {
 function attrsAsWritten(node) {
   if (!node.attrSource) return null;
   const flat = (t) => t.replace(/\s+/g, ' ').trim();
-  return flat(node.attrSource) === flat(serializeAttrs(node.props)) ? node.attrSource : null;
+  return flat(node.attrSource) === flat(serializeAttrs(node.props, node.attrOrder))
+    ? node.attrSource
+    : null;
 }
 
-function serializeAttrs(props) {
+// A tag's attributes and the order the file wrote them in. An object remembers
+// the order its keys were added, which is the file's order right up until a
+// prop is taken out and put back — clearing a field and typing into it again is
+// exactly that — and then it returns at the end, behind everything it used to
+// sit in front of. One line reordered against the four like it underneath is a
+// diff about nothing. So the order is written down when the file is read.
+function tagProps(attrs) {
+  const props = parseAttrs(attrs);
+  const attrOrder = Object.keys(props);
+  return attrOrder.length ? { props, attrOrder } : { props };
+}
+
+// What the file had, where it had it, then anything added since.
+function orderedProps(props, order) {
+  const entries = Object.entries(props || {});
+  if (!order || !order.length) return entries;
+  const held = new Map(entries);
+  const out = [];
+  for (const name of order) {
+    if (held.has(name)) out.push([name, held.get(name)]);
+  }
+  const known = new Set(order);
+  for (const [name, v] of entries) {
+    if (!known.has(name)) out.push([name, v]);
+  }
+  return out;
+}
+
+function serializeAttrs(props, order) {
   const parts = [];
-  for (const [name, v] of Object.entries(props || {})) {
+  for (const [name, v] of orderedProps(props, order)) {
     if (v?.type === 'spread') {
       parts.push(`{...${v.value}}`);
     } else if (v == null || v.type === 'bare') {
@@ -797,7 +827,7 @@ function parseTemplate(str, base = null) {
         id: makeId(),
         kind,
         name,
-        props: parseAttrs(attrs),
+        ...tagProps(attrs),
         ...(attrs && attrs.includes('\n') ? { attrSource: attrs } : {}),
         // `<x/>` and `<x />` mean the same thing and are not the same text.
         ...(selfClose === '/' && !/\s\/>$/.test(full) ? { tightClose: true } : {}),
@@ -816,7 +846,7 @@ function parseTemplate(str, base = null) {
         id: makeId(),
         kind: 'raw',
         name,
-        props: parseAttrs(attrs),
+        ...tagProps(attrs),
         ...(attrs && attrs.includes('\n') ? { attrSource: attrs } : {}),
         inner: str.slice(afterOpen, close),
       }, lt, closeEnd + 1));
@@ -850,7 +880,7 @@ function parseTemplate(str, base = null) {
       name,
       ...(source === undefined ? {} : { source }),
       ...(blankAfter ? { blankAfter } : {}),
-      props: parseAttrs(attrs),
+      ...tagProps(attrs),
       ...(attrs && attrs.includes('\n') ? { attrSource: attrs } : {}),
       ...(closeText.includes('\n') ? { closeSource: closeText } : {}),
       children: innerResult.nodes,
@@ -1230,13 +1260,13 @@ function inlineString(nodes) {
     if (n.kind === 'text') out += textOut(n);
     else if (n.kind === 'expr') out += n.value;
     else if (n.children === null) {
-      out += n.name === 'br' ? '<br />' : `<${n.name}${serializeAttrs(n.props)} />`;
+      out += n.name === 'br' ? '<br />' : `<${n.name}${serializeAttrs(n.props, n.attrOrder)} />`;
     } else if (n.children.length === 0) {
       // Written as a pair with nothing between them. Closing it as `<span />`
       // says the same thing to a browser and a different thing to a diff.
-      out += `<${n.name}${serializeAttrs(n.props)}></${n.name}>`;
+      out += `<${n.name}${serializeAttrs(n.props, n.attrOrder)}></${n.name}>`;
     } else {
-      out += `<${n.name}${serializeAttrs(n.props)}>${inlineString(n.children)}</${n.name}>`;
+      out += `<${n.name}${serializeAttrs(n.props, n.attrOrder)}>${inlineString(n.children)}</${n.name}>`;
     }
   }
   return out;
@@ -1405,7 +1435,7 @@ function serializeNode(node, indent, lines) {
   // The gap the author left in front of this node.
   for (let i = 0; i < (node.blankBefore || 0); i++) lines.push('');
   if (node.chunkFile || node.chunkAggregate) {
-    lines.push(`${indent}<${node.name}${serializeAttrs(node.props)} />`);
+    lines.push(`${indent}<${node.name}${serializeAttrs(node.props, node.attrOrder)} />`);
     return;
   }
   switch (node.kind) {
@@ -1519,7 +1549,7 @@ function serializeNode(node, indent, lines) {
       lines.push(indent + node.value);
       return;
     case 'raw': {
-      const open = `${indent}<${node.name}${serializeAttrs(node.props)}>`;
+      const open = `${indent}<${node.name}${serializeAttrs(node.props, node.attrOrder)}>`;
       // Keep raw inner verbatim. Only the line break that ends the last line
       // goes, since the closing tag supplies its own — trimming all trailing
       // whitespace also took away a blank line the author left in the CSS.
@@ -1540,7 +1570,7 @@ function serializeNode(node, indent, lines) {
     }
     default: {
       const kept = attrsAsWritten(node);
-      const attrs = kept === null ? serializeAttrs(node.props) : kept;
+      const attrs = kept === null ? serializeAttrs(node.props, node.attrOrder) : kept;
       // The closing tag as written, when it was written across lines. Only
       // trusted while it still names this element: renaming the tag rebuilds
       // it the ordinary way.
@@ -1732,6 +1762,14 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
   const pathProp = carriesCaller
     ? { type: 'expr', value: `[${JSON.stringify(path)}, Astro.props["data-avb-p"]].filter(Boolean).join(" ")` }
     : { type: 'string', value: path };
+  // The path attribute is put where this function decided to put it, not where
+  // the file's order would have it — it was never in the file.
+  const markedOrder = (n, carry, fwd) =>
+    !carry || !n.attrOrder
+      ? n.attrOrder
+      : fwd && n.kind === 'element'
+        ? ['data-avb-p', ...n.attrOrder]
+        : [...n.attrOrder, 'data-avb-p'];
   const markedProps = !carryPath
     ? node.props
     : forwards && node.kind === 'element'
@@ -1746,7 +1784,7 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
     // spacing (each marker's surrounding newlines render as a space).
     !(node.children.length > 0 && isInlineRun(node.children))
   ) {
-    const attrs = serializeAttrs(markedProps);
+    const attrs = serializeAttrs(markedProps, markedOrder(node, carryPath, forwards));
     lines.push(`${indent}<${node.name}${attrs}>`);
     node.children.forEach((child, i) =>
       serializeNodeMarked(child, indent + '  ', lines, `${path}.${i}`, node.kind === 'component')
@@ -1831,7 +1869,9 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
       serializeNodeMarked(child, indent, lines, `${path}.${i}`, inSlot, atRoot)
     );
   } else {
-    const base = carryPath ? { ...node, props: markedProps } : node;
+    const base = carryPath
+      ? { ...node, props: markedProps, attrOrder: markedOrder(node, carryPath, forwards) }
+      : node;
     const inlineKids =
       (node.kind === 'component' || node.kind === 'element') &&
       !node.chunkFile &&

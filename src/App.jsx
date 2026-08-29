@@ -9,6 +9,7 @@ import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveCla
 import { setSoundEnabled } from './ui/sound.js';
 import { createPreviewWatch } from './previewRecovery.js';
 import { tellCanvas } from './canvasQuery.js';
+import { renameAttr } from './attrOrder.js';
 import PropsPanel from './panels/PropsPanel.jsx';
 import StylePanel from './panels/StylePanel.jsx';
 import PreviewPane from './panels/PreviewPane.jsx';
@@ -2794,14 +2795,7 @@ export default function App() {
     (nodeId, oldName, newName) => {
       mutateModel((model) => {
         const node = findNodeById(model.nodes, nodeId);
-        if (!node?.props || !(oldName in node.props)) return model;
-        if (!newName || newName === oldName) return model;
-        const next = {};
-        for (const [k, v] of Object.entries(node.props)) {
-          if (k === oldName) next[newName] = v;
-          else if (k !== newName) next[k] = v;
-        }
-        node.props = next;
+        renameAttr(node, oldName, newName);
         return model;
       }, true);
     },
