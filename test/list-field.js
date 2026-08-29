@@ -77,7 +77,7 @@ const check = (what, condition, detail) => {
     return { x: 0, y: top, width: 200, height: ROW, top, left: 0, right: 200, bottom: top + ROW };
   };
 
-  const mount = async (value) => {
+  const mount = async (value, placeholder = '') => {
     const host = document.createElement('div');
     document.getElementById('root').appendChild(host);
     const root = createRoot(host);
@@ -94,7 +94,7 @@ const check = (what, condition, detail) => {
         root.render(
           React.createElement(ListField, {
             value: current,
-            placeholder: '',
+            placeholder,
             onChange: (text, now) => { wrote.push(text); immediate.push(now); current = text },
           })
         );
@@ -301,6 +301,58 @@ const check = (what, condition, detail) => {
     await m.done();
   }
 
+  // --- an empty one -------------------------------------------------------------------------
+  //
+  // A list with nothing in it says so by being empty. The Add item button is the
+  // whole message; a row above it reading `[]` — the prop's declared default,
+  // printed as code — is that message a second time, worse said.
+  {
+    const f = await mount('[]', '[]');
+    check('an empty list draws no rows', f.rows().length === 0, `${f.rows().length} rows`);
+    check(
+      'and says nothing above the button',
+      f.host.querySelectorAll('.list-field-empty').length === 0,
+      f.host.querySelector('.list-field-empty')?.textContent
+    );
+    check('the way to fill it is still there', !!f.host.querySelector('.list-field-add'), 'no Add item');
+    check(
+      'and it is the only thing in the box',
+      f.host.querySelector('.list-field')?.children.length === 1,
+      `${f.host.querySelector('.list-field')?.children.length} children`
+    );
+    await f.done();
+  }
+  {
+    // Written with a space in it, or as no default at all: the same nothing.
+    for (const spelling of ['[ ]', '', '  ']) {
+      const f = await mount('[]', spelling);
+      check(
+        `nothing to say, spelled ${JSON.stringify(spelling)}`,
+        f.host.querySelectorAll('.list-field-empty').length === 0,
+        f.host.querySelector('.list-field-empty')?.textContent
+      );
+      await f.done();
+    }
+  }
+  {
+    // A default that fills the list in IS worth saying: empty here does not
+    // mean empty on the page.
+    const f = await mount('[]', '["Pastors"]');
+    const note = f.host.querySelector('.list-field-empty');
+    check('a default that puts something there is still said', note?.textContent === '["Pastors"]', note?.textContent);
+    await f.done();
+  }
+  {
+    const f = await mount('["Designer"]', '[]');
+    check('a list with something in it is unaffected', f.labels().join() === 'Designer', f.labels().join());
+    check(
+      'and draws no empty note either',
+      f.host.querySelectorAll('.list-field-empty').length === 0,
+      f.host.querySelector('.list-field-empty')?.textContent
+    );
+    await f.done();
+  }
+
   // --- the quote the file used ------------------------------------------------------------
   {
     const m = await mount("['a', 'b']");
@@ -333,6 +385,14 @@ const check = (what, condition, detail) => {
     'coming back from the code editor would drop the prop'
   );
   check('the toggle calls it a list', /field\.type === 'code'\) return 'list'/.test(panel));
+
+  // Alone in the box, the button's own top rule would double the box's edge.
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
+  check(
+    'a button alone in the box draws no line above itself',
+    /\.list-field-add:first-child\s*\{[^}]*border-top:\s*0/.test(css),
+    'the empty box would have two lines across its top'
+  );
 
   if (failures.length) {
     console.error(`\nlist-field: ${failures.length} failed, ${checked - failures.length} passed\n`);

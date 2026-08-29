@@ -87,6 +87,16 @@ function ItemEditor({ item, pos, onChange, onClose }) {
   );
 }
 
+// What an empty list has to say for itself, if anything. The Add item button
+// under it already says that the list is empty and what to do about it, so a
+// note is drawn only when it adds something the button doesn't. A declared
+// default of `[]` adds nothing: it is the same sentence a second time, written
+// in code, over the button that says it in words.
+export function emptyNote(placeholder) {
+  const text = String(placeholder ?? '').trim();
+  return !text || /^\[\s*\]$/.test(text) ? '' : text;
+}
+
 export default function ListField({ value, placeholder, onChange }) {
   const items = arrayItems(value) || [];
   const [open, setOpen] = useState(null); // {index, pos}
@@ -152,8 +162,8 @@ export default function ListField({ value, placeholder, onChange }) {
 
   return (
     <div className="list-field" onDragOver={(e) => e.preventDefault()} onDrop={drop}>
-      {items.length === 0 ? (
-        <div className="list-field-empty">{placeholder || 'No items yet'}</div>
+      {items.length === 0 && emptyNote(placeholder) ? (
+        <div className="list-field-empty">{emptyNote(placeholder)}</div>
       ) : null}
       {items.map((item, i) => (
         <div

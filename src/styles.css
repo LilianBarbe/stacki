@@ -764,6 +764,9 @@ textarea { font-family: inherit; font-size: 12px; line-height: 1.5; resize: none
 }
 .list-field-row:first-child + .list-field-add,
 .list-field-empty + .list-field-add { border-top: 1px solid var(--border); }
+/* Alone in the box — an empty list is just the way to fill it — the rule above
+   the button would be a second line under the box's own edge. */
+.list-field-add:first-child { border-top: 0; }
 .list-field-add:hover { background: var(--bg-hover); color: var(--text); }
 
 .attr-editor {

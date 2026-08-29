@@ -38,7 +38,6 @@ export default function ObjectField({ value, onChange }) {
           {field.kind === 'list' ? (
             <ListField
               value={arrayText(field.items)}
-              placeholder="No items yet"
               onChange={(text, immediate) =>
                 set(i, { items: arrayItems(text) || [] }, immediate !== false)
               }
