@@ -830,6 +830,27 @@ export function dataTree(context) {
     list.push(node);
   };
 
+  // What a prop's declared type says one of these is made of. A component has
+  // no entry on the canvas to read real values from, so its own `interface
+  // Props` is the only description of its data there is — and a loop over
+  // `times?: ServiceTime[]` offered nothing at all without it.
+  const fromShape = (field, base) => {
+    if (!field?.shape?.length) return null;
+    const fields = (at) =>
+      field.shape.map((f) => ({
+        path: `${at}.${f.name}`,
+        key: f.name,
+        kind: f.type === 'code' ? 'value' : f.type || 'value',
+        preview: '',
+        children: null,
+      }));
+    // A list is written the way a sample of one is, so everything downstream —
+    // the loop item's fields, the picker's own walk — reads it the same way.
+    return field.shapeIsList
+      ? [{ path: `${base}[0]`, key: '0', kind: 'object', preview: '', children: fields(`${base}[0]`) }]
+      : fields(base);
+  };
+
   // 1. This file's own props. Real values when the canvas is showing an entry
   //    that carries them; the declared type otherwise.
   for (const d of destructures) {
@@ -840,12 +861,17 @@ export function dataTree(context) {
       continue;
     }
     const field = schema.find((f) => f.name === d.name);
+    const shape = fromShape(field, d.name);
     add(props, {
       path: d.name,
       key: d.name,
-      kind: d.kind === 'rest' ? 'rest props' : field?.type || d.kind || 'prop',
+      kind: shape && field.shapeIsList
+        ? 'list'
+        : d.kind === 'rest'
+          ? 'rest props'
+          : field?.type || d.kind || 'prop',
       preview: field?.default !== undefined ? String(field.default) : '',
-      children: null,
+      children: shape,
     });
   }
   // A prop the file declares but destructures elsewhere (or reads off
@@ -860,9 +886,9 @@ export function dataTree(context) {
         : {
             path: f.name,
             key: f.name,
-            kind: f.type || 'prop',
+            kind: f.shape && f.shapeIsList ? 'list' : f.type || 'prop',
             preview: f.default !== undefined ? String(f.default) : '',
-            children: null,
+            children: fromShape(f, f.name),
           }
     );
   }
@@ -988,7 +1014,30 @@ export function dataTree(context) {
   index(props);
   index(values);
 
-  // Innermost first: the loop you are standing in is the one whose item you
+  // Every field any entry in a list has, in the order they first appear, each
+// shown with the value of the first entry that HAS it — so a field the first
+// entry left out still says what it holds somewhere.
+const everyField = (entries) => {
+  const first = entries?.[0];
+  if (!first) return null;
+  const out = [];
+  const seenKeys = new Set();
+  for (const entry of entries) {
+    // Written as a field of the FIRST entry, whatever entry it came from —
+    // the whole branch, not just its top: the tree is rebased onto the loop's
+    // item name from there, and a path through `[3]` would name one particular
+    // service rather than the item.
+    const kids = entry === first ? entry.children || [] : rebase(entry.children, entry.path, first.path) || [];
+    for (const child of kids) {
+      if (seenKeys.has(child.key)) continue;
+      seenKeys.add(child.key);
+      out.push(child);
+    }
+  }
+  return out.length ? out : null;
+};
+
+// Innermost first: the loop you are standing in is the one whose item you
   // are most likely reaching for, and an outer loop is further away in every
   // sense.
   const loops = [];
@@ -1004,7 +1053,11 @@ export function dataTree(context) {
       kind: first ? first.kind : 'loop item',
       preview: first ? first.preview : '',
       // Re-rooted onto the item's name: `posts[0].title` is `post.title` here.
-      children: first ? rebase(first.children, first.path, item) : null,
+      // Every entry contributes: a field the first one happens not to have — a
+      // campus on one service and not another — is still a field of the item,
+      // and leaving it out meant typing `service.campus` from memory to reach
+      // a value the picker was already holding.
+      children: first ? rebase(everyField(source.children), first.path, item) : null,
     });
     if (m[3]) add(loops, { path: m[3], key: m[3], kind: 'number', preview: '0', children: null });
   }

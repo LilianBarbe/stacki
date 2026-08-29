@@ -2422,14 +2422,44 @@ function parsePropSchema(source, prelude = '') {
     }
   }
 
+  // The fields of the thing a prop HOLDS: an item of `times?: ServiceTime[]`,
+  // or the members of an object type. A component's props are the only
+  // description of its data there is — it has no entry on the canvas to read
+  // real values from — and without this a loop over one offered nothing at all.
+  // Every field had to be typed from memory, spelling included, into a field
+  // whose whole point is not having to.
+  const shapeOf = (parts) => {
+    // A union of two different shapes has no one shape to offer.
+    if (parts.length !== 1) return null;
+    const only = parts[0].trim();
+    const arr = only.match(/^([\s\S]*)\[\]$/) || only.match(/^Array<([\s\S]*)>$/);
+    const inner = (arr ? arr[1] : only).trim().replace(/^\((.*)\)$/s, '$1').trim();
+    const body = inner.startsWith('{') ? inner : aliases.get(inner);
+    if (!body || !body.trim().startsWith('{')) return null;
+    // Inside the braces: a member's `;` is only a separator out here, and with
+    // the braces still on, a whole one-line type reads as a single member whose
+    // type is the rest of the interface.
+    const inside = body.trim().replace(/^\{/, '').replace(/\}$/, '');
+    const members = [...memberEntries(inside)].map(([memberName, memberType]) => ({
+      name: memberName,
+      type: normalizeType(memberType).type,
+    }));
+    if (!members.length) return null;
+    return { list: !!arr, members };
+  };
+
   for (const [name, rec] of rawTypes) {
     const { type, options, numeric } = normalizeType(rec.parts.join(' | '));
+    const shape = shapeOf(rec.parts);
     schema.set(name, {
       name,
       type,
       options,
       numeric,
       optional: rec.optional,
+      // What one of these is made of, when the type says. `list` distinguishes
+      // `ServiceTime[]` (a loop over it hands you one) from a plain object.
+      ...(shape ? { shape: shape.members, shapeIsList: shape.list } : {}),
       default: undefined,
       doc: sharedDoc.get(name) ?? noted.get(name),
       // Range and step, for the fields that can be typed into freely. A list
