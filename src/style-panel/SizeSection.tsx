@@ -8,6 +8,7 @@ import { type SegmentedOption, HoverTooltip } from './components/SegmentedContro
 import Select, { type SelectOption } from './components/Select'
 import useScrub, { type ScrubHandlers } from './components/useScrub'
 import { handleArrowStep } from './lib/number-step'
+import { useFieldDraft } from './lib/field-draft'
 import ProvenanceList from './ProvenanceList'
 import VariableConnect from './VariableConnect'
 import type { Contributor, ResolvedProp } from './lib/resolved'
@@ -106,11 +107,8 @@ function LivePropField({ prop, label, placeholder, read, busy, setProp, clearPro
 } & Props) {
   const d = displayOf(read(prop))
   const external = d.present ? (d.important ? `${d.value} !important` : d.value) : ''
-  const [draft, setDraft] = useState(external)
-  const focused = useRef(false)
+  const { draft, setDraft, focused, cleared } = useFieldDraft(external, busy)
   const liveTimer = useRef<number | null>(null)
-
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
 
   const cancelLive = () => {
     if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null }
@@ -148,7 +146,7 @@ function LivePropField({ prop, label, placeholder, read, busy, setProp, clearPro
 
   return (
     <>
-      <SizeLabel label={label} prop={prop} d={d} contributors={read(prop)?.contributors ?? []} busy={busy} scrubProps={scrub.label} onClear={() => clearProp(prop)} onProvenance={onProvenance} onSelectSelector={onSelectSelector} />
+      <SizeLabel label={label} prop={prop} d={d} contributors={read(prop)?.contributors ?? []} busy={busy} scrubProps={scrub.label} onClear={() => { cleared(); clearProp(prop) }} onProvenance={onProvenance} onSelectSelector={onSelectSelector} />
       <VariableConnect code ariaLabel={`Connect ${label} to a variable`} disabled={busy} prop={prop} onPick={(binding) => setProp(prop, binding, false)}>
       <input
         {...scrub.input}

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
+import { useFieldDraft } from './lib/field-draft'
 import FieldLabel from './components/FieldLabel'
 import { PropTip, ProvenanceLabel } from './components/PropTip'
 import SegmentedControl, { type SegmentedOption } from './components/SegmentedControl'
@@ -107,12 +108,9 @@ function BgField({ prop, label, placeholder, prefix, swatchLabel, read, busy, se
 } & Props) {
   const d = displayOf(read(prop))
   const external = d.present ? (d.important ? `${d.value} !important` : d.value) : ''
-  const [draft, setDraft] = useState(external)
+  const { draft, setDraft, focused, cleared } = useFieldDraft(external, busy)
   const [shown, noteLive] = useLiveColor(draft)
-  const focused = useRef(false)
   const liveTimer = useRef<number | null>(null)
-
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
   const cancelLive = () => { if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null } }
   useEffect(() => cancelLive, [])
   // Undelayed live write for the scrub, which throttles its own — see useScrub.
@@ -188,7 +186,7 @@ function BgField({ prop, label, placeholder, prefix, swatchLabel, read, busy, se
 
   return (
     <>
-      <BgLabel label={label} prop={prop} d={d} contributors={read(prop)?.contributors ?? []} busy={busy} scrubProps={scrub.label} onClear={() => clearProp(prop)} onProvenance={onProvenance} onSelectSelector={onSelectSelector} />
+      <BgLabel label={label} prop={prop} d={d} contributors={read(prop)?.contributors ?? []} busy={busy} scrubProps={scrub.label} onClear={() => { cleared(); clearProp(prop) }} onProvenance={onProvenance} onSelectSelector={onSelectSelector} />
       {before ? <div className="embed-editor_bg-inline">{before}{input}</div> : input}
     </>
   )

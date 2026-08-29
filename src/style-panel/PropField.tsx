@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import FieldLabel from './components/FieldLabel'
 import useScrub from './components/useScrub'
+import { useFieldDraft } from './lib/field-draft'
 import { handleArrowStep } from './lib/number-step'
 import { parseImportant, readProp, withImportant } from './lib/prop-read'
 import type { ParsedRule } from './lib/types'
@@ -33,11 +34,8 @@ export default function PropField({
 }) {
   const found = readProp(rule, prop)
   const external = found ? withImportant(found) : ''
-  const [draft, setDraft] = useState(external)
-  const focused = useRef(false)
+  const { draft, setDraft, focused, cleared } = useFieldDraft(external, busy)
   const liveTimer = useRef<number | null>(null)
-
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
 
   const cancelLive = () => {
     if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null }
@@ -76,7 +74,7 @@ export default function PropField({
 
   return (
     <>
-      <FieldLabel className={labelClassName} active={Boolean(found)} disabled={busy} onReset={() => onClearProp(prop)} resetLabel="Clear" scrubProps={scrub.label}>
+      <FieldLabel className={labelClassName} active={Boolean(found)} disabled={busy} onReset={() => { cleared(); onClearProp(prop) }} resetLabel="Clear" scrubProps={scrub.label}>
         {label}
       </FieldLabel>
       <input
