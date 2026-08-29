@@ -204,6 +204,24 @@ function parseValue(src, i) {
   }
   const num = /^-?(?:0[xX][\da-fA-F]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|\.\d+)/.exec(src.slice(i));
   if (num) return { value: Number(num[0].replace(/_/g, '')), next: i + num[0].length };
+  // A name standing for something else — `image: dailyDevotionals`, the way an
+  // imported asset is written. It is not a literal and never will be, so it
+  // travels as the source it is (the same `{ __expr }` a computed constant
+  // uses) and is written back the same name. Nothing is evaluated and nothing
+  // is flattened; what the name refers to is the file's business, not this
+  // file's.
+  //
+  // Only a name that IS the whole value: the next thing after it has to end
+  // the value. `getTags()`, `a ? b : c` and `x + 1` all fail that test and
+  // leave the collection read-only, which is where a value this cannot write
+  // back belongs.
+  const name = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*/.exec(src.slice(i));
+  if (name) {
+    const after = skipTrivia(src, i + name[0].length);
+    if (after >= src.length || src[after] === ',' || src[after] === ']' || src[after] === '}') {
+      return { value: { [EXPR]: name[0] }, next: i + name[0].length };
+    }
+  }
   throw new Unsupported('not a literal');
 }
 
@@ -260,6 +278,12 @@ function findCollections(source, opts = {}) {
 // Serializing
 // ---------------------------------------------------------------------------
 
+// Prettier's default print width, which is what the comment in `literal` below
+// has always said this is measured against — but the number itself was never
+// written down, so every record long enough to ask the question threw a
+// ReferenceError instead of answering it, and the save failed.
+const WIDTH = 80;
+
 const quote = (s) =>
   `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
 
@@ -306,12 +330,26 @@ function serializeCollection(data, indent = '  ') {
   return `[\n${data.map((row) => indent + literal(row, indent, indent)).join(',\n')},\n]`;
 }
 
+// How far a step in is, in this file. The collection's own rows answer it best:
+// they are the lines being rewritten, so whatever they are indented by is what
+// the file indents by. Asking the file at large gets the first indented line of
+// anything — and in a page whose frontmatter opens with a block comment, that
+// line is ` * …`, so a two-space file was rewritten one space in.
+function indentOf(text, fallback) {
+  const re = /\n([ \t]+)(\S)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[2] === '*') continue; // the middle of a /* … */ block
+    return m[1][0] === '\t' ? '\t' : ' '.repeat(m[1].length);
+  }
+  return fallback;
+}
+
 /** Replace one collection's array in `source`, leaving everything else alone. */
 function replaceCollection(source, name, data, opts) {
   const found = findCollections(source, opts).find((c) => c.name === name);
   if (!found || found.data === null) return null;
-  const indentMatch = /\n([ \t]+)\S/.exec(source);
-  const indent = indentMatch ? (indentMatch[1][0] === '\t' ? '\t' : ' '.repeat(indentMatch[1].length)) : '  ';
+  const indent = indentOf(source.slice(found.start, found.end), indentOf(source, '  '));
   return source.slice(0, found.start) + serializeCollection(data, indent) + source.slice(found.end);
 }
 

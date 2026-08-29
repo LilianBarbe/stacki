@@ -1839,6 +1839,7 @@ contextBridge.exposeInMainWorld('avb', {
   createCms: invoke('cms:create'),
   deleteCms: invoke('cms:delete'),
   cmsUsage: invoke('cms:usage'),
+  cmsAssetRef: invoke('cms:assetRef'),
   resolveImport: invoke('project:resolveImport'),
   cmsMeta: invoke('cms:meta'),
   contentConfig: invoke('content:config'),

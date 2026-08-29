@@ -40,6 +40,13 @@ const {
   writeGeneral,
   GENERAL,
 } = require('./jsCollections');
+const {
+  defaultImports,
+  addImport,
+  importName,
+  importSpecFor,
+  withAssets,
+} = require('./assetRefs.js');
 const { aliasMap, importersOf, resolveImport } = require('./cmsRefs');
 const { readContentConfig, validateEntry, stopAllServices } = require('./contentConfig');
 const thumbs = require('./thumbs');
@@ -2310,7 +2317,59 @@ ipcMain.handle('cms:read', async (_e, { projectPath, rel }) => {
     );
   }
   if (!col.data) throw new Error(`${exportName} isn't plain data — ${col.reason}.`);
-  return { data: col.data };
+  return { data: withAssets(col.data, assetOfImport(projectPath, abs, source)) };
+});
+
+// What a name in a data file is bound to, when it is bound to a picture: the
+// project-relative file, or null for anything else. Only imports are read —
+// `image: dailyDevotionals` says nothing on its own, and the import above it
+// says everything.
+function assetOfImport(projectPath, abs, source) {
+  const imports = defaultImports(source);
+  return (name) => {
+    const imp = imports.find((i) => i.name === name);
+    if (!imp) return null;
+    const target = resolveImportPath(projectPath, abs, imp.spec);
+    if (!target || !MEDIA_EXT.test(target)) return null;
+    const rel = toPosix(path.relative(projectPath, target));
+    return rel && !rel.startsWith('..') ? rel : null;
+  };
+}
+
+// Points a data file's field at a picture. A file under public/ is served as it
+// is and needs nothing written; one under src/ is imported, so the import is
+// made — or the file's existing one for that image reused, since importing the
+// same picture twice under two names is noise — and the name handed back for
+// the value.
+ipcMain.handle('cms:assetRef', async (_e, { projectPath, rel, assetRel }) => {
+  const { fileRel } = splitCmsRel(rel);
+  const abs = cmsAbs(projectPath, fileRel);
+  const clean = String(assetRel || '').replace(/^\/+/, '');
+  const root = clean.split('/')[0];
+  if (root === 'public') return { value: '/' + clean.split('/').slice(1).join('/') };
+  if (root !== 'src') throw new Error('Invalid asset path');
+  const target = path.resolve(projectPath, clean);
+  if (!fs.existsSync(target)) throw new Error(`${clean} no longer exists.`);
+  const file = fs.readFileSync(abs, 'utf8');
+  const page = isAstroRel(fileRel);
+  const span = page ? frontmatterSpan(file) : null;
+  if (page && !span) throw new Error(`src/${fileRel} has no frontmatter.`);
+  const source = page ? file.slice(span.start, span.end) : file;
+  const imports = defaultImports(source);
+  const already = imports.find((i) => resolveImportPath(projectPath, abs, i.spec) === target);
+  if (already) return { name: already.name, asset: clean };
+  const fromHere = toPosix(path.relative(path.dirname(abs), target));
+  const spec = importSpecFor({
+    imports,
+    srcRelative: toPosix(path.relative(path.join(projectPath, 'src'), target)),
+    relative: fromHere.startsWith('.') ? fromHere : './' + fromHere,
+  });
+  const name = importName(clean, imports.map((i) => i.name));
+  const next = addImport(source, name, spec);
+  const written = page ? file.slice(0, span.start) + next + file.slice(span.end) : next;
+  markSelfWrite(abs, written);
+  fs.writeFileSync(abs, written, 'utf8');
+  return { name, asset: clean };
 });
 
 // Writes the collection back, matching the file's existing indentation so

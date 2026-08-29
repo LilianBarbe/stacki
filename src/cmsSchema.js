@@ -41,7 +41,10 @@ const TYPE_RANK = [
 ];
 
 export function inferType(value) {
-  if (isExpr(value)) return 'code';
+  // A name bound to a picture is a picture. The file says which one — the CMS
+  // is handed that beside the name — so the field can show it and swap it,
+  // rather than showing the word `dailyDevotionals` in a code box.
+  if (isExpr(value)) return typeof value.__asset === 'string' && IMAGE_RE.test(value.__asset) ? 'image' : 'code';
   if (value === null || value === undefined || value === '') return 'empty';
   if (typeof value === 'boolean') return 'boolean';
   if (typeof value === 'number') return 'number';

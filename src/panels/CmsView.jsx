@@ -111,6 +111,24 @@ export default function CmsView({
   // newly picked one has to point back from.
   const baseDir = `src/${rel}`.replace(/\/[^/]*$/, '');
 
+  // What a picked picture becomes in a data file. A file under public/ is
+  // served as it is, so the value is its URL; one under src/ has to be
+  // imported, so the main process writes the import and hands back the name to
+  // store. A JSON collection can hold neither an import nor a name, so it keeps
+  // writing paths — the field falls back to that when this is absent.
+  const canImport = String(rel).includes('#');
+  const pickAsset = useCallback(
+    async (picked) => {
+      const res = await window.avb.cmsAssetRef({
+        projectPath: project.path,
+        rel,
+        assetRel: picked.rel,
+      });
+      return res.value !== undefined ? res.value : { [EXPR_KEY]: res.name, __asset: res.asset };
+    },
+    [project.path, rel]
+  );
+
   const saveTimer = useRef(null);
   const pending = useRef(null); // items waiting to be written
   // The data currently on disk, so a save can record what it replaced for undo.
@@ -457,6 +475,7 @@ export default function CmsView({
                 value={item}
                 projectPath={project.path}
                 baseDir={baseDir}
+                pickAsset={canImport ? pickAsset : undefined}
                 onChange={(v) => commit(items.map((it, i) => (i === sel ? v : it)))}
               />
             </div>
@@ -477,6 +496,7 @@ export default function CmsView({
                   value={item[field.key]}
                   projectPath={project.path}
                   baseDir={baseDir}
+                  pickAsset={canImport ? pickAsset : undefined}
                   onChange={(v) => setItemValue(field.key, v)}
                 />
               ))}
@@ -749,7 +769,7 @@ function bestType(collectionType, value) {
 // Fields
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, type, value, onChange, projectPath, baseDir, depth = 0 }) {
+function FieldRow({ label, type, value, onChange, projectPath, baseDir, pickAsset, depth = 0 }) {
   // Typing an 81st character turns a text field into a paragraph one, and
   // swapping <input> for <textarea> mid-word would take the caret with it.
   // The control only changes shape while the field is idle.
@@ -770,6 +790,7 @@ function FieldRow({ label, type, value, onChange, projectPath, baseDir, depth = 
         type={shown.current}
         value={value}
         onChange={onChange}
+        pickAsset={pickAsset}
         projectPath={projectPath}
         baseDir={baseDir}
         depth={depth}
@@ -778,7 +799,7 @@ function FieldRow({ label, type, value, onChange, projectPath, baseDir, depth = 
   );
 }
 
-function FieldControl({ type, value, onChange, projectPath, baseDir, depth }) {
+function FieldControl({ type, value, onChange, projectPath, baseDir, pickAsset, depth }) {
   // A computed value — shown as the code it is, in the same JS editor the
   // props panel uses. Committed on blur or Enter rather than per keystroke:
   // this text lands in a real source file, and half-typed code would break
@@ -819,10 +840,17 @@ function FieldControl({ type, value, onChange, projectPath, baseDir, depth }) {
   }
 
   if (type === 'image') {
+    // A value that is a name — `image: dailyDevotionals` — has no path in it to
+    // show; the file it is bound to comes alongside it, and the card shows that.
+    const ref = isExpr(value) && typeof value.__asset === 'string' ? value : null;
     return (
       <AssetField
-        value={value ?? ''}
+        value={ref ? '' : (value ?? '')}
+        srcRel={ref ? ref.__asset : undefined}
         onChange={onChange}
+        // Picking writes this field: what a picture becomes in a data file is
+        // one decision (an import, or a URL), and where it goes is this row.
+        onPickEntry={pickAsset && ((picked) => pickAsset(picked).then(onChange))}
         mediaKind="image"
         projectPath={projectPath}
         baseDir={baseDir}
@@ -889,6 +917,7 @@ function FieldControl({ type, value, onChange, projectPath, baseDir, depth }) {
         onChange={onChange}
         projectPath={projectPath}
         baseDir={baseDir}
+        pickAsset={pickAsset}
         depth={depth + 1}
       />
     );
@@ -940,7 +969,7 @@ function ListEditor({ value, onChange }) {
 }
 
 // A nested object: its keys become fields one level in.
-function GroupEditor({ value, onChange, projectPath, baseDir, depth }) {
+function GroupEditor({ value, onChange, projectPath, baseDir, pickAsset, depth }) {
   const fields = fieldsOf([value]);
   return (
     <div className="cms-group-box">
@@ -952,6 +981,7 @@ function GroupEditor({ value, onChange, projectPath, baseDir, depth }) {
           value={value[field.key]}
           projectPath={projectPath}
           baseDir={baseDir}
+          pickAsset={pickAsset}
           depth={depth}
           onChange={(v) => onChange({ ...value, [field.key]: v })}
         />
