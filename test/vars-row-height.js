@@ -139,6 +139,19 @@ const STYLESHEET = `:root {
        const win = new BrowserWindow({ show: false, width: 1000, height: 800 });
        await win.loadFile(${JSON.stringify(path.join(buildDir, 'index.html'))});
        const js = (code) => win.webContents.executeJavaScript(code);
+       // A drag ends in an async request, and how long that takes is the
+       // runner's business rather than this test's: a fixed wait that is
+       // comfortable on a laptop is a coin toss on a loaded CI machine. So the
+       // answer is waited FOR, up to a limit, instead of waited out.
+       const settleFor = async (expr, ms = 4000) => {
+         const until = Date.now() + ms;
+         for (;;) {
+           const value = await js(expr);
+           if (value != null) return value;
+           if (Date.now() > until) return null;
+           await new Promise((r) => setTimeout(r, 50));
+         }
+       };
        await new Promise((r) => setTimeout(r, 600));
        const out = {};
        // The invariant the whole sheet rests on: line n of the names and line n
@@ -193,7 +206,7 @@ const STYLESHEET = `:root {
          win.webContents.sendInputEvent({ type: 'mouseUp', x: drop.x, y: drop.y, button: 'left', clickCount: 1 });
          await new Promise((r) => setTimeout(r, 200));
        }
-       out.drag = { grabbed: !!grab, dropped: !!drop, moves: await js('window.__moves || null') };
+       out.drag = { grabbed: !!grab, dropped: !!drop, moves: await settleFor('window.__moves || null') };
 
        // And the heading, dragged by its name for the same reason: the heading's
        // text is a button too.
@@ -210,7 +223,7 @@ const STYLESHEET = `:root {
          win.webContents.sendInputEvent({ type: 'mouseUp', x: dropHead.x, y: dropHead.y, button: 'left', clickCount: 1 });
          await new Promise((r) => setTimeout(r, 200));
        }
-       out.headingDrag = { grabbed: !!grabHead, asked: await js('window.__heading || null') };
+       out.headingDrag = { grabbed: !!grabHead, asked: await settleFor('window.__heading || null') };
 
        console.log(JSON.stringify(out));
        app.quit();
