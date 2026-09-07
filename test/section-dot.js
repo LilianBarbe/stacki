@@ -100,10 +100,30 @@ const check = (what, condition, detail) => {
   const root = createRoot(panel);
   const wait = (ms) => new Promise((r) => dom.window.setTimeout(r, ms));
 
+  // React renders the panel, and an effect then resolves the styles that decide
+  // what colour each dot is. A flat wait for the pair reads the dot mid-flight
+  // whenever the machine is busy — which the suite made routine by running in
+  // parallel — and a dot read too early is simply the wrong colour. So the
+  // panel is watched until it stops changing instead of timed.
+  const settled = async (ms = 4000) => {
+    let last = panel.innerHTML;
+    let stableSince = Date.now();
+    const until = Date.now() + ms;
+    for (;;) {
+      await wait(50);
+      const now = panel.innerHTML;
+      if (now !== last) {
+        last = now;
+        stableSince = Date.now();
+      } else if (Date.now() - stableSince >= 150) return;
+      if (Date.now() > until) return;
+    }
+  };
+
   const select = async (id) => {
     setHost({ projectPath: '/p', nodes: NODES, selectedId: id, files: [SHEET], astroFiles: [], renderedClasses: [], pathOf: () => '0.1' });
     root.render(React.createElement(EmbedEditor));
-    await wait(400);
+    await settled();
   };
 
   // The section by its title, and whether its header carries the dot.
