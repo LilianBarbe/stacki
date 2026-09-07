@@ -7,6 +7,7 @@ import { javascript } from '@codemirror/lang-javascript';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { LanguageDescription } from '@codemirror/language';
 import { appTheme, appHighlight } from './CodeEditor.jsx';
+import { astro } from './astroLanguage.js';
 
 // Code, shown rather than edited.
 //
@@ -34,6 +35,7 @@ export function languageFor(filePath) {
     case 'mdx':
       return 'markdown';
     case 'astro':
+      return 'astro';
     case 'html':
     case 'svg':
     case 'vue':
@@ -54,9 +56,9 @@ export function languageFor(filePath) {
 /** The CodeMirror language extension for a `languageFor()` answer, or null. */
 export function extensionFor(language) {
   if (language === 'css') return css();
-  // An .astro file is markup with a fenced script at the top and expressions
-  // inside it. The HTML parser is the one that gets the tags and attributes
-  // right, which is the bulk of what is on screen in this editor's files.
+  // An .astro file is markup with a fenced script at the top: HTML, with
+  // the fence parsed as TypeScript (see astroLanguage.js).
+  if (language === 'astro') return astro();
   if (language === 'html') return html({ matchClosingTags: false });
   if (language === 'markdown') {
     return markdown({
