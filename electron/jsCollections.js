@@ -14,6 +14,9 @@
 
 const ID_KEY = /^[A-Za-z_$][\w$]*$/;
 
+// Prettier's default printWidth, which is what these files are formatted to.
+const WIDTH = 80;
+
 /**
  * How a value that isn't a literal travels through the CMS: `{ __expr: "…" }`
  * holding the declaration's own source. The editor shows it in a code field
