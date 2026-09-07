@@ -78,6 +78,7 @@
     "test:slotmove": "node test/slot-move.js",
     "test:movingpage": "node test/moving-page.js",
     "test:pageorder": "node test/page-order.js",
+    "test:routesyntax": "node test/route-syntax.js",
     "test:closeproject": "node test/close-project.js",
     "test:outsideedit": "node test/outside-edit.js",
     "test:hovercost": "node test/hover-cost.js",
