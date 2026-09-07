@@ -125,8 +125,18 @@ const check = (what, condition, detail) => {
        // A box that really does outgrow the screen still scrolls — the reason the
        // overflow was there in the first place.
        await js('window.__setTall(true)');
-       await new Promise((r) => setTimeout(r, 200));
-       out.tall = await js("(() => { const b = document.querySelector('.embed-editor_layer-popover-box'); return { overflow: getComputedStyle(b).overflowY, scrollingClass: b.className.includes('is-scrolling') } })()");
+       // The class arrives after a measure that follows the re-render, so how
+       // long that takes belongs to the machine, not to this test: four Electron
+       // windows sharing a runner's cores do not finish it inside a flat 200ms,
+       // and the miss reads as the scrolling having been lost. So the state is
+       // waited FOR, with a ceiling that still lets a real regression fail.
+       const readTall = () => js("(() => { const b = document.querySelector('.embed-editor_layer-popover-box'); return { overflow: getComputedStyle(b).overflowY, scrollingClass: b.className.includes('is-scrolling') } })()");
+       const tallBy = Date.now() + 4000;
+       for (;;) {
+         out.tall = await readTall();
+         if ((out.tall.scrollingClass && out.tall.overflow === 'auto') || Date.now() > tallBy) break;
+         await new Promise((r) => setTimeout(r, 50));
+       }
 
        console.log(JSON.stringify(out));
        app.quit();
