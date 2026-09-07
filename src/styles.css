@@ -2016,7 +2016,20 @@ body > .embed-editor_provenance {
 .asset-tile.selected { background: var(--accent-soft); }
 
 /* Folder heading in the components list (layouts, component subfolders). */
+/* A button now, so the folder can be folded shut. The app's global button rule
+   centres its contents and gives it a surface, so both are undone here — a
+   heading that suddenly looked like a control would read as one more thing to
+   do rather than the label it still is. */
 .palette-folder {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  justify-content: flex-start;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
   padding: 10px 8px 4px;
   font-size: 10.5px;
   font-weight: 600;
@@ -2025,6 +2038,28 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
 }
 .palette-folder:first-child { padding-top: 2px; }
+.palette-folder:hover { color: var(--text-secondary); }
+
+.palette-folder-caret {
+  display: flex;
+  align-items: center;
+  opacity: 0.75;
+}
+
+.palette-folder-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Pushed to the far edge, and only worth reading when the folder is shut —
+   which is exactly when it is the only thing left of what is inside. */
+.palette-folder-count {
+  margin-left: auto;
+  font-weight: 500;
+  letter-spacing: 0;
+  opacity: 0.55;
+}
 
 .palette-item {
   display: flex;

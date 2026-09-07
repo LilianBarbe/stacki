@@ -125,6 +125,7 @@
     "test:errorboundary": "node test/error-boundary.js",
     "test:jscollections": "node test/js-collections.js",
     "test:starteridentity": "node test/starter-identity.js",
+    "test:palettefolds": "node test/palette-folds.js",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",

@@ -1,5 +1,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { CloseIcon, ComponentPlusIcon, ElementComponentIcon, FileIcon, LayoutIcon } from '../ui/Icons.jsx';
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  ComponentPlusIcon,
+  ElementComponentIcon,
+  FileIcon,
+  LayoutIcon,
+} from '../ui/Icons.jsx';
 import { rankInsertItems } from '../insertRank.js';
 import { setDrag, clearDrag } from '../dragState.js';
 import { componentNameError, toComponentName } from '../componentName.js';
@@ -11,6 +19,35 @@ const TOOLTIP_DELAY = 500;
 
 // PascalCase → spaced display name (ButtonArrow → Button Arrow).
 const prettyName = (name) => name.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+
+// Which folders are folded shut.
+//
+// Kept on disk rather than in state, because this panel unmounts whenever the
+// left rail changes tab — and starting a drag switches to the Navigator, so the
+// gesture the palette exists for is itself one of the things that would forget.
+//
+// Stored by folder name and shared across projects, which is deliberate: a
+// project's components are filed under Form, Layout, Cards much the same way in
+// all of them, and a fold that follows the name is closer to what was meant
+// than one that starts over per path.
+const COLLAPSED_KEY = 'stacki.palette.collapsed';
+
+const readCollapsed = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]');
+    return new Set(Array.isArray(raw) ? raw.filter((f) => typeof f === 'string') : []);
+  } catch {
+    return new Set();
+  }
+};
+
+const storeCollapsed = (folders) => {
+  try {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...folders]));
+  } catch {
+    /* private mode / quota — the folds just won't outlive the window */
+  }
+};
 
 export default function PalettePanel({
   components,
@@ -32,6 +69,7 @@ export default function PalettePanel({
   createRequest = 0,
 }) {
   const [query, setQuery] = useState('');
+  const [collapsed, setCollapsed] = useState(readCollapsed);
   const [creating, setCreating] = useState(false);
   // The create button's tooltip, once the pointer has rested on it.
   const [tip, setTip] = useState(null); // {left, top}
@@ -107,6 +145,21 @@ export default function PalettePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [components, query]);
 
+  const toggleFolder = (folder) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(folder)) next.delete(folder);
+      else next.add(folder);
+      storeCollapsed(next);
+      return next;
+    });
+
+  // A folded folder still answers a search. Hiding a match behind a fold would
+  // make the field lie about what the project has, and the person searching is
+  // the least able to know that a fold is what they are looking past.
+  const searching = query.trim() !== '';
+  const isFolded = (folder) => !!folder && !searching && collapsed.has(folder);
+
   const schedulePreview = (comp) => (e) => {
     clearTimeout(hoverTimer.current);
     const rect = e.currentTarget.getBoundingClientRect();
@@ -159,8 +212,29 @@ export default function PalettePanel({
       <div className="panel-body" onMouseLeave={cancelPreview}>
         {groups.map(([folder, items]) => (
           <React.Fragment key={folder || '__root'}>
-            {folder && <div className="palette-folder">{folder}</div>}
-            {items.map((comp) => (
+            {folder && (
+              <button
+                type="button"
+                className="palette-folder"
+                aria-expanded={!isFolded(folder)}
+                title={
+                  searching
+                    ? 'Folders stay open while searching'
+                    : isFolded(folder)
+                      ? `Show ${folder}`
+                      : `Hide ${folder}`
+                }
+                onClick={() => toggleFolder(folder)}
+              >
+                <span className="palette-folder-caret">
+                  {isFolded(folder) ? <ChevronRightIcon size={11} /> : <ChevronDownIcon size={11} />}
+                </span>
+                <span className="palette-folder-name">{folder}</span>
+                {/* The count is what a folded folder has left to say. */}
+                <span className="palette-folder-count">{items.length}</span>
+              </button>
+            )}
+            {!isFolded(folder) && items.map((comp) => (
           <div
             key={comp.path}
             className="palette-item"
