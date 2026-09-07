@@ -4390,6 +4390,7 @@ export default function App() {
                 pageState={pageState}
                 flushSave={flushSave}
                 onWritten={reloadOpenDocument}
+                onOpenComponent={(name) => openComponent(name)}
                 locked={!!previewRef}
                 showToast={showToast}
               />

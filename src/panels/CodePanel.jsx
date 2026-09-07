@@ -5,6 +5,7 @@ import { search } from '@codemirror/search';
 import { appTheme, appHighlight } from '../ui/CodeEditor.jsx';
 import { extensionFor, languageFor } from '../ui/Code.jsx';
 import { codeFocus, setDimmed, setFocusRange } from '../ui/codeFocus.js';
+import { cmdLinks } from '../ui/cmdLink.js';
 import { cleanError } from '../cleanError.js';
 
 // The Code panel: the file behind the canvas selection, open at the lines
@@ -16,6 +17,10 @@ import { cleanError } from '../cleanError.js';
 // typed here goes to disk on the same 300 ms debounce as every other edit,
 // and the model is read back from the file so the navigator, the canvas and
 // the panels follow.
+//
+// ⌘-hover a component's tag name and it underlines; ⌘-click and the app
+// drills into that component (see cmdLink.js) — the panel then follows the
+// selection into its file, the way it follows any other.
 //
 // `selectionKey` is the innermost of the "<file>#<path>" keys ⇧⌘C copies —
 // the open file and the tree position of the selection in it. A key that
@@ -40,6 +45,7 @@ export default function CodePanel({
   pageState,
   flushSave,
   onWritten,
+  onOpenComponent,
   locked,
   showToast,
 }) {
@@ -64,7 +70,7 @@ export default function CodePanel({
   const projectPath = project?.path || null;
 
   const propsRef = useRef({});
-  propsRef.current = { flushSave, onWritten, showToast, projectPath };
+  propsRef.current = { flushSave, onWritten, onOpenComponent, showToast, projectPath };
 
   // Writes the editor's text to the file it came from. Pending model edits
   // land first, or they would overwrite this a moment later.
@@ -125,6 +131,7 @@ export default function CodePanel({
           appTheme,
           appHighlight,
           codeFocus(),
+          cmdLinks((name) => propsRef.current.onOpenComponent?.(name)),
           EditorView.updateListener.of((u) => {
             if (u.docChanged && !applyingRef.current) scheduleWrite(rel, u.state.doc.toString());
           }),

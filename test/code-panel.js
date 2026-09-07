@@ -37,7 +37,8 @@ const check = (what, condition, detail) => {
       contents:
         `export { default as CodePanel } from './src/panels/CodePanel.jsx';\n` +
         `export { EditorView } from '@codemirror/view';\n` +
-        `export { focusRangeOf, isDimmed } from './src/ui/codeFocus.js';\n`,
+        `export { focusRangeOf, isDimmed } from './src/ui/codeFocus.js';\n` +
+        `export { componentTagAt, setCmdLink } from './src/ui/cmdLink.js';\n`,
       resolveDir: path.join(__dirname, '..'),
       loader: 'js',
     },
@@ -126,7 +127,7 @@ const check = (what, condition, detail) => {
   const React = require('react');
   const { createRoot } = require('react-dom/client');
   const { act } = React;
-  const { CodePanel, EditorView, focusRangeOf, isDimmed } = require(bundle);
+  const { CodePanel, EditorView, focusRangeOf, isDimmed, componentTagAt, setCmdLink } = require(bundle);
 
   const host = document.createElement('div');
   document.getElementById('root').appendChild(host);
@@ -138,6 +139,7 @@ const check = (what, condition, detail) => {
   const settled = () => ({ editable: true, dirty: false, model: { nodes: [] } });
   let pageState = settled();
   const toasts = [];
+  const opened = [];
   const render = async (props) => {
     await act(async () => {
       root.render(
@@ -146,6 +148,7 @@ const check = (what, condition, detail) => {
           pageState,
           flushSave: async () => events.push('flush'),
           onWritten: async () => events.push('reload'),
+          onOpenComponent: (name) => opened.push(name),
           locked: false,
           showToast: (m) => toasts.push(m),
           ...props,
@@ -228,6 +231,37 @@ const check = (what, condition, detail) => {
   await render({ selectionKey: BARE });
   await render({ selectionKey: THIRD });
   check('selecting again turns the dim back on', editor()?.classList.contains('cm-dimmed'), editor()?.className);
+
+  // ── ⌘ over a component's tag ─────────────────────────────────────────────
+  // jsdom lays nothing out, so the pointer cannot be put over a word; the
+  // lookup that turns a position into a tag is checked directly, and the
+  // link is set the way the hover would set it before the click is fired.
+  {
+    const st = view().state;
+    const text = st.doc.toString();
+    const at = (needle, offset = 1) => text.indexOf(needle) + offset;
+    const open = componentTagAt(st, at('<Layout title'));
+    check('the name in an opening tag is a component', open?.name === 'Layout', JSON.stringify(open));
+    check('and its range is the name alone', open && text.slice(open.from, open.to) === 'Layout', open && text.slice(open.from, open.to));
+    check('the closing tag too', componentTagAt(st, at('</Layout>', 3))?.name === 'Layout', JSON.stringify(componentTagAt(st, at('</Layout>', 3))));
+    check('an element is not', componentTagAt(st, at('<section class', 2)) === null, JSON.stringify(componentTagAt(st, at('<section class', 2))));
+    check('nor a word in an attribute', componentTagAt(st, at('title="Home"', 8)) === null, JSON.stringify(componentTagAt(st, at('title="Home"', 8))));
+    check('nor text', componentTagAt(st, at('Write to us', 2)) === null);
+    check("nor the import's own name", componentTagAt(st, at('import Layout', 8)) === null, JSON.stringify(componentTagAt(st, at('import Layout', 8))));
+
+    await act(async () => { view().dispatch({ effects: setCmdLink.of(open) }) });
+    const link = host.querySelector('.cm-cmd-link');
+    check('the ⌘-hovered name is underlined as a link', link?.textContent === 'Layout', link?.textContent);
+    // A plain click on it is a plain click.
+    await act(async () => { link.dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true })) });
+    check('a click without the modifier opens nothing', opened.length === 0, opened.join(','));
+    await act(async () => { view().dispatch({ effects: setCmdLink.of(open) }) });
+    await act(async () => {
+      host.querySelector('.cm-cmd-link').dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true, metaKey: true, ctrlKey: true }));
+    });
+    check('a ⌘-click hands the component to the app', opened.join(',') === 'Layout', opened.join(','));
+    check('and the underline goes with it', !host.querySelector('.cm-cmd-link'));
+  }
 
   // ── Nothing selected, file still open ────────────────────────────────────
   await render({ selectionKey: BARE });

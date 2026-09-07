@@ -5820,4 +5820,11 @@ textarea::selection {
 /* The selection's lines at full strength, the rest turned down — until the
    first click into the editor takes the dim off (see codeFocus.js). */
 .code-panel-editor .cm-line { transition: opacity 0.15s ease; }
-.code-panel-editor .cm-dimmed .cm-line:not(.cm-focus-line) { opacity: 0.7; }
+.code-panel-editor .cm-dimmed .cm-line:not(.cm-focus-line) { opacity: 0.4; }
+/* ⌘-hover on a component's tag name: a link to its file (see cmdLink.js). */
+.code-panel-editor .cm-cmd-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  color: #82aaff;
+}
