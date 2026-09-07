@@ -658,6 +658,10 @@ export default function App() {
   const [contentName, setContentName] = useState(null);
   // Which stylesheet group the variables sheet is showing: { file, index }.
   const [varsGroup, setVarsGroup] = useState(null);
+  // And whether it is pinned across the canvas rather than floating over it.
+  // It opens floating — a variable is judged by what it does to the page — and
+  // the choice, once made, holds for the rest of the session.
+  const [varsPinned, setVarsPinned] = useState(false);
   const [cmsTick, setCmsTick] = useState(0); // bumped on save, refreshes counts
   const [cmsSettings, setCmsSettings] = useState(false); // editing that collection's fields
   const [inPreview, setInPreview] = useState(false); // interactive full-site preview
@@ -2525,7 +2529,7 @@ export default function App() {
       if (
         t instanceof HTMLElement &&
         (t.closest('input, textarea, select, [contenteditable="true"]') ||
-          t.closest('.modal-overlay, .dd-popup, .insert-overlay, .code-window'))
+          t.closest('.modal-overlay, .dd-popup, .insert-overlay, .float-win'))
       ) {
         return;
       }
@@ -4608,6 +4612,8 @@ export default function App() {
               project={project}
               selected={varsGroup}
               hidden={leftTab !== 'variables'}
+              pinned={varsPinned}
+              onTogglePin={setVarsPinned}
               showToast={showToast}
               onRecordUndo={pushCommand}
               onClose={() => setVarsGroup(null)}

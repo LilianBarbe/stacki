@@ -550,6 +550,16 @@ export const ExternalIcon = (p) => (
   </I>
 );
 
+// A pushpin: what holds the variables sheet open across the whole canvas
+// instead of leaving it floating over it.
+export const PinIcon = (p) => (
+  <I {...p}>
+    <path d="M9.6 1.8 14.2 6.4" />
+    <path d="M12.5 4.1 10.4 6.2c-.35.35-.5.85-.4 1.35l.35 1.75c.1.5-.05 1-.4 1.35l-.5.5-5-5 .5-.5c.35-.35.85-.5 1.35-.4l1.75.35c.5.1 1-.05 1.35-.4L11.9 3.5" />
+    <path d="M5.45 10.55 2.3 13.7" />
+  </I>
+);
+
 export const MaximizeIcon = (p) => (
   <I {...p}>
     <path d="M2.5 5.5v-3h3M13.5 5.5v-3h-3M2.5 10.5v3h3M13.5 10.5v3h-3" />

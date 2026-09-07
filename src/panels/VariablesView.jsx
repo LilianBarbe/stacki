@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CloseIcon, CheckIcon, CopyIcon, DragIcon, EaseIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from '../ui/Icons.jsx';
+import { CloseIcon, CheckIcon, CopyIcon, DragIcon, EaseIcon, MoreIcon, PencilIcon, PinIcon, PlusIcon, TrashIcon, VariableIcon } from '../ui/Icons.jsx';
+import FloatWindow from '../ui/FloatWindow.jsx';
 import useListReorder from '../ui/useListReorder.js';
 import useDismiss from '../ui/useDismiss.js';
 import MoreMenu from '../ui/MoreMenu.jsx';
@@ -330,7 +331,17 @@ function Cell({ cell, onSave, fluidOf, onDraft }) {
   );
 }
 
-export default function VariablesView({ project, selected, hidden, onClose, showToast, onRecordUndo }) {
+export default function VariablesView({
+  project,
+  selected,
+  hidden,
+  onClose,
+  showToast,
+  onRecordUndo,
+  // Floating over the canvas unless pinned — see the two returns at the end.
+  pinned = false,
+  onTogglePin,
+}) {
   const [files, setFiles] = useState([]);
   const [values, setValues] = useState({});
   const [saved, setSaved] = useState(false);
@@ -715,46 +726,95 @@ export default function VariablesView({ project, selected, hidden, onClose, show
 
   if (!group) return <div className={`cms-view vars-view ${hidden ? 'hidden' : ''}`} />;
 
+  const sheet = (
+    <Sheet
+      blocks={blocks}
+      group={group}
+      onSave={save}
+      onMove={move}
+      onMoveGroup={moveGroup}
+      onAdd={add}
+      onRename={rename}
+      onRetitle={retitle}
+      onDuplicateSection={duplicateSection}
+      onDeleteSection={deleteSection}
+      fluidOf={fluidOf}
+      onDraft={noteDraft}
+    />
+  );
 
-  return (
-    <div className={`cms-view vars-view ${hidden ? 'hidden' : ''}`}>
-      <div className="cms-detail">
-        <div className="cms-detail-head">
-          <button className="ghost cms-back" title="Close" onClick={onClose}>
-            <CloseIcon size={13} />
-          </button>
-          <span className="cms-detail-title">{group.label}</span>
-          <span className={`cms-saved ${saved ? 'on' : ''}`}>
-            <CheckIcon size={11} /> Saved
-          </span>
-          <input
-            className="vars-search"
-            value={query}
-            placeholder="Search variables"
-            spellCheck={false}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <span className="cms-detail-path">{file.rel}</span>
-        </div>
+  const savedChip = (
+    <span className={`cms-saved ${saved ? 'on' : ''}`}>
+      <CheckIcon size={11} /> Saved
+    </span>
+  );
+  const search = (
+    <input
+      className="vars-search"
+      value={query}
+      placeholder="Search variables"
+      spellCheck={false}
+      onChange={(e) => setQuery(e.target.value)}
+    />
+  );
+  // The same button in both states, so the way back is where the way out was.
+  const pinButton = (
+    <button
+      className={`ghost vars-pin ${pinned ? 'on' : ''}`}
+      title={pinned ? 'Float this over the canvas' : 'Pin the sheet over the canvas'}
+      aria-pressed={pinned}
+      onClick={() => onTogglePin?.(!pinned)}
+    >
+      <PinIcon size={13} />
+    </button>
+  );
 
-        <div className="cms-detail-body vars-body">
-          <Sheet
-            blocks={blocks}
-            group={group}
-            onSave={save}
-            onMove={move}
-            onMoveGroup={moveGroup}
-            onAdd={add}
-            onRename={rename}
-            onRetitle={retitle}
-            onDuplicateSection={duplicateSection}
-            onDeleteSection={deleteSection}
-            fluidOf={fluidOf}
-            onDraft={noteDraft}
-          />
+  // Pinned: the full sheet, covering the canvas — as much of the file on screen
+  // at once as there is room for.
+  if (pinned) {
+    return (
+      <div className={`cms-view vars-view ${hidden ? 'hidden' : ''}`}>
+        <div className="cms-detail">
+          <div className="cms-detail-head">
+            <button className="ghost cms-back" title="Close" onClick={onClose}>
+              <CloseIcon size={13} />
+            </button>
+            <span className="cms-detail-title">{group.label}</span>
+            {savedChip}
+            {search}
+            <span className="cms-detail-path">{file.rel}</span>
+            {pinButton}
+          </div>
+
+          <div className="cms-detail-body vars-body">{sheet}</div>
         </div>
       </div>
-    </div>
+    );
+  }
+
+  // Floating: the sheet opens over the canvas rather than across it, because a
+  // variable is only worth changing for what it does to the page — and a sheet
+  // that covers the page hides exactly that. Same window the code editor uses.
+  return (
+    <FloatWindow
+      className="vars-view vars-window"
+      hidden={hidden}
+      icon={<VariableIcon size={14} />}
+      title={group.label}
+      titleHint={file.rel}
+      head={
+        <>
+          {savedChip}
+          {search}
+        </>
+      }
+      actions={pinButton}
+      onClose={onClose}
+      closeHint="Close (edits are saved live)"
+      size={{ width: 0.46, maxW: 900, minW: 380, minH: 240 }}
+    >
+      <div className="cms-detail-body vars-body">{sheet}</div>
+    </FloatWindow>
   );
 }
 

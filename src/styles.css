@@ -1332,19 +1332,21 @@ textarea { font-family: inherit; font-size: 12px; line-height: 1.5; resize: none
 }
 .asset-picker-body .asset-tile.folder .asset-thumb { color: var(--text-dim); }
 
-/* Floating code editor window */
-.code-window {
+/* Floating windows — the code editor, the variables sheet. Non-modal: they
+   float over the canvas so what they change can be watched changing. */
+.float-win {
   position: fixed;
   z-index: 250;
   display: flex;
   flex-direction: column;
-  background: #161616;
+  background: var(--bg);
   border: 1px solid var(--border-strong);
   border-radius: 12px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
   overflow: hidden;
 }
-.code-window-header {
+.float-win.hidden { display: none; }
+.float-win-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1356,25 +1358,37 @@ textarea { font-family: inherit; font-size: 12px; line-height: 1.5; resize: none
   color: var(--text-dim);
   user-select: none;
 }
-.code-window-header:active { cursor: grabbing; }
-.code-window-title { font-size: 12px; font-weight: 600; color: var(--text); }
-.code-window-body {
+.float-win-header:active { cursor: grabbing; }
+.float-win-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.float-win-body {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
-.code-window-body .cm-host { height: 100%; }
-.code-window-body .cm-host .cm-editor { height: 100%; }
 
-.cw-rz { position: absolute; z-index: 2; }
-.cw-rz-n { top: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.cw-rz-s { bottom: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.cw-rz-e { right: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
-.cw-rz-w { left: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
-.cw-rz-se { right: -3px; bottom: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
-.cw-rz-nw { left: -3px; top: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
-.cw-rz-sw { left: -3px; bottom: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
-.cw-rz-ne { right: -3px; top: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
+/* Code is read on its own ground, a shade off the app's. */
+.code-window { background: #161616; }
+.float-win-body .cm-host { height: 100%; }
+.float-win-body .cm-host .cm-editor { height: 100%; }
+
+.fw-rz { position: absolute; z-index: 2; }
+.fw-rz-n { top: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.fw-rz-s { bottom: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+.fw-rz-e { right: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.fw-rz-w { left: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+.fw-rz-se { right: -3px; bottom: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
+.fw-rz-nw { left: -3px; top: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
+.fw-rz-sw { left: -3px; bottom: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
+.fw-rz-ne { right: -3px; top: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
 
 /* Breadcrumbs (canvas toolbar) */
 .crumbs {
@@ -1689,7 +1703,7 @@ body > .embed-editor_provenance {
    long selector chip can't push the whole panel sideways. */
 /* The panel kit runs its own z-index scale (--z-modal: 1000, --z-tooltip: 10000)
    which is unrelated to this app's (max ~600), so its sticky header at
-   --z-modal + 1 would paint over app chrome like the floating .code-window
+   --z-modal + 1 would paint over app chrome like the floating .float-win
    (250). `isolation` makes the host a stacking context, keeping those values
    internal — panel vs app order is then decided here, in app terms. Its
    popovers are unaffected: every one of them portals to <body>. */
@@ -4636,6 +4650,29 @@ body > .embed-editor_provenance {
   padding: 0 8px;
   font-size: 11px;
 }
+
+/* Floating, which is how the sheet opens: over the canvas rather than across
+   it, so a value and what it changes are on screen together. The window's own
+   header does the work the sheet's head does when pinned, so there is one bar
+   rather than two — the search goes in it, and the stylesheet's path is the
+   title's tooltip. */
+.vars-window .vars-search { margin-left: 0; width: 140px; }
+/* A window is narrower than the canvas: the sheet's inset and its name column
+   both give ground so a value column still fits beside a name. */
+.vars-window .vars-body {
+  --vars-inset: 14px;
+  --vars-name-col: 150px;
+  --vars-col: 220px;
+  padding-left: 0;
+  padding-right: 0;
+}
+/* The sticky heads paint over the rows sliding under them, so they have to be
+   the window's own ground, not the canvas's. */
+.vars-window .vars-sheet-head,
+.vars-window .vars-fixed-head,
+.vars-window .vars-scroll-head { background: var(--bg); }
+/* Pressed, it is holding the sheet open across the canvas. */
+.vars-pin.on { color: var(--accent); }
 
 /* A group heading is a row too: same height, lined up with the names under it,
    lights up on hover, and drags by the same grip. The space between groups is
