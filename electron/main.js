@@ -48,6 +48,7 @@ const { readInjectedRoutes } = require('./injectedRoutes.js');
 const { pageFileName } = require('./pageName');
 const { createStarter } = require('./starter');
 const { openingBounds } = require('./windowBounds');
+const { devServerEnv } = require('./devEnv');
 const { componentFile } = require('./componentFile');
 const { inlineComponent } = require('./inlineComponent');
 const { componentUsage, instancesIn } = require('./componentUsage');
@@ -1198,7 +1199,9 @@ async function withTemporaryServer(projectPath, fn) {
     cwd: projectPath,
     shell: isWin && cmd === localBin,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+    // Keeps Astro in the foreground, where its output is readable — see
+    // electron/devEnv.js.
+    env: { ...devServerEnv(process.env), FORCE_COLOR: '0', NO_COLOR: '1' },
   });
   let log = '';
   proc.stdout.on('data', (d) => (log = (log + d).slice(-4000)));
@@ -3879,7 +3882,10 @@ async function spawnDevServer(projectPath, localBin, force, bare) {
     // No stdin pipe — the daemon child can inherit CLI stdio, and a pipe
     // that closes when the CLI exits has been observed to kill it.
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+    // Keeps Astro in the foreground: daemonised, this pipe carries one line
+    // and then nothing, which is the preview's health check and the dock's
+    // Astro tab both — see electron/devEnv.js.
+    env: { ...devServerEnv(process.env), FORCE_COLOR: '0', NO_COLOR: '1' },
   });
 
   const url = `http://127.0.0.1:${port}`;
@@ -4766,7 +4772,9 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
     cwd: dir,
     shell: isWin && cmd === localBin,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+    // Keeps Astro in the foreground, where its output is readable — see
+    // electron/devEnv.js.
+    env: { ...devServerEnv(process.env), FORCE_COLOR: '0', NO_COLOR: '1' },
   });
   const url = `http://127.0.0.1:${port}`;
   let log = '';
