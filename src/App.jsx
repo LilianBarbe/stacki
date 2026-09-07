@@ -1051,6 +1051,7 @@ export default function App() {
         if (start) setSelectedId(start.id);
       }
       dropPageHistory(); // page snapshots don't apply to another page; commands stay
+      return result;
     },
     [flushSave]
   );
@@ -1233,13 +1234,29 @@ export default function App() {
   );
 
   // Back out one level: to the parent component if nested, else to the page.
-  const closeComponent = useCallback(async () => {
-    const stack = editStackRef.current;
-    if (stack.length < 2) return;
-    const next = stack.slice(0, -1);
-    setEditStack(next);
-    await openFile(next[next.length - 1]);
-  }, [openFile]);
+  //
+  // `selectPath` is the node the click that closed the component landed on.
+  // Leaving because you clicked something else means you want THAT thing, so
+  // it is selected once the page is back — a page path names a node in the
+  // page, so only when it is the page that is being returned to.
+  const closeComponent = useCallback(
+    async (selectPath = null) => {
+      const stack = editStackRef.current;
+      if (stack.length < 2) return;
+      const next = stack.slice(0, -1);
+      const back = next[next.length - 1];
+      setEditStack(next);
+      const result = await openFile(back);
+      if (selectPath && back.kind === 'page' && !String(selectPath).includes('|') && result?.model) {
+        const node = nodeAtPath(result.model.nodes, String(selectPath).split('.').map(Number));
+        if (node) {
+          setSelectedId(node.id);
+          setRevealTick((t) => t + 1);
+        }
+      }
+    },
+    [openFile]
+  );
 
   // ----------------------------------------------------------------
   // Undo / redo
@@ -4390,7 +4407,20 @@ export default function App() {
                 pageState={pageState}
                 flushSave={flushSave}
                 onWritten={reloadOpenDocument}
-                onOpenComponent={(name) => openComponent(name)}
+                onOpenComponent={(name) => {
+                  // From an instance on the page when there is one — the one
+                  // inside the selection first, since that is the tag that
+                  // was clicked — so the canvas lights it the way a
+                  // double-click there would. A component the open file
+                  // doesn't place (a layout, a nested use) opens by name.
+                  const instances = pageInstancesOf(name);
+                  const inSelection =
+                    selectedNode?.kind === 'component' && selectedNode.name === name
+                      ? { id: selectedNode.id }
+                      : instances.find((i) => findNodeById(selectedNode?.children || [], i.id));
+                  const host = inSelection || instances[0];
+                  void openComponent(name, host ? pathFor(host.id) : undefined);
+                }}
                 locked={!!previewRef}
                 showToast={showToast}
               />
@@ -4594,7 +4624,7 @@ export default function App() {
                 scope: editedRel ? `${editedRel}|` : '',
               });
               if (kind === 'nothing') return;
-              if (kind === 'close') { closeComponent(); return; }
+              if (kind === 'close') { closeComponent(p); return; }
               if (kind === 'layout') { reveal(model && findNodeById(model.nodes, 'layout')); return; }
               reveal(model && nodeAtPath(model.nodes, trailOf(p)));
             }}
