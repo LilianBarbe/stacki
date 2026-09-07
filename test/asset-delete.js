@@ -184,12 +184,25 @@ const check = (what, condition, detail) => {
 
   // --- the file goes somewhere it can be got back from --------------------------------
   const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
-  const handler = main.slice(main.indexOf("ipcMain.handle('assets:delete'"), main.indexOf("// Text assets (css/js"));
+  // Bounded by the next handler rather than by a comment further down the file:
+  // the handler has moved once already, and a slice that reads backwards
+  // silently becomes the empty string, which passes nothing and explains less.
+  const from = main.indexOf("ipcMain.handle('assets:delete'");
+  const handler = from === -1 ? '' : main.slice(from, main.indexOf('\nipcMain.handle(', from + 1));
+  check('the delete handler is registered', from !== -1 && handler.length > 0, `index ${from}`);
   check('deleting sends the file to the bin', /shell\.trashItem\(abs\)/.test(handler), handler.slice(0, 300));
   check('never unlinks it outright', !/unlinkSync|rmSync/.test(handler), handler.slice(0, 300));
   check('and only inside the asset roots', /assetAbs\(projectPath, rel\)/.test(handler), handler.slice(0, 200));
+  check(
+    'and it is registered only once',
+    main.split("ipcMain.handle('assets:delete'").length - 1 === 1,
+    'Electron throws on a second handler for the same channel'
+  );
   const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'AssetsPanel.jsx'), 'utf8');
-  check('the dialog says where it went', /moves to your Bin/.test(panel), 'the confirm does not say what happens');
+  // The wording is the Trash rather than the Bin since the folder delete landed,
+  // but the promise being tested is the same one: the confirm has to name the
+  // place the file can be fetched back from.
+  check('the dialog says where it went', /goes to the Trash/.test(panel), 'the confirm does not say what happens');
 
   if (failures.length) {
     console.error(`\nasset-delete: ${failures.length} failed, ${checked - failures.length} passed\n`);
