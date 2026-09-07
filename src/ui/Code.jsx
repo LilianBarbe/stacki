@@ -51,7 +51,8 @@ export function languageFor(filePath) {
   }
 }
 
-function extensionFor(language) {
+/** The CodeMirror language extension for a `languageFor()` answer, or null. */
+export function extensionFor(language) {
   if (language === 'css') return css();
   // An .astro file is markup with a fenced script at the top and expressions
   // inside it. The HTML parser is the one that gets the tags and attributes

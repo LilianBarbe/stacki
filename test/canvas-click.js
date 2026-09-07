@@ -85,6 +85,20 @@ const check = (what, condition, detail) => {
   check('including another instance of the same component', act('0.3.2') === 'close');
   check('and a node above it', act('0') === 'close');
 
+  // --- in a component opened by name --------------------------------------------
+  //
+  // From the palette's usage list, or a ⌘-click on its tag in the Code panel:
+  // the file is open but no instance on the page is lit, so there is nothing
+  // for a page-side path to be inside of. The component's markup — every
+  // instance of it — selects inside; anything else the canvas could place is
+  // the page, and a click there leaves. Before this the page-side rules ran,
+  // and a click on the page selected nothing the component's tree could name.
+  const byName = { focusPath: null, scope: COMPONENT };
+  check('opened by name, its own markup still selects inside', act(`${COMPONENT}1.0`, byName) === 'inner', act(`${COMPONENT}1.0`, byName));
+  check('a click on the page leaves', act('0.4', byName) === 'close', act('0.4', byName));
+  check('so does one on the page around it', canvasClickAction({ path: null, outside: true, ...byName }).kind === 'close');
+  check('and one the canvas could not place still changes nothing', act(null, byName) === 'nothing', act(null, byName));
+
   // --- not in a component -------------------------------------------------------
   const page = { focusPath: null, scope: '' };
   check('on a page, a mapped path selects', act('0.1', page) === 'select', act('0.1', page));
@@ -114,6 +128,8 @@ const check = (what, condition, detail) => {
     (app.match(/kind === 'close'/g) || []).length === 1 &&
       /if \(kind === 'nothing'\) return;/.test(app)
   );
+  // Leaving by clicking something else means wanting that thing.
+  check('the click that closes a component selects what it landed on', /closeComponent\(p\)/.test(app));
 
   if (failures.length) {
     console.error(`\ncanvas-click: ${failures.length} failed, ${checked - failures.length} passed\n`);

@@ -36,10 +36,21 @@
  *   nothing — the canvas couldn't say; leave everything as it is
  */
 export function canvasClickAction({ path, outside = false, focusPath, scope = '' }) {
+  // The open file's own markup is marked in its namespace, so a path in that
+  // namespace is a node in the file being edited.
+  if (scope && path && path.startsWith(scope)) return { kind: 'inner' };
+  if (scope && !focusPath) {
+    // A component opened by name rather than from an instance — from the
+    // palette's usage list, or a ⌘-click on its tag in the Code panel — has
+    // no lit region on the page. Every instance of it is its markup and
+    // selects inside; anything else the canvas could place is the page, and
+    // a click there is somebody done in here. Without this the page-side
+    // rules below took over, and a click on the page selected nothing the
+    // component's own tree could name — the canvas went dead.
+    if (!path) return { kind: outside ? 'close' : 'nothing' };
+    return { kind: 'close' };
+  }
   if (focusPath) {
-    // The open file's own markup is marked in its namespace, so a path in that
-    // namespace is a node in the file being edited.
-    if (scope && path && path.startsWith(scope)) return { kind: 'inner' };
     // Nothing to go on. `outside` is the canvas saying it DID find something,
     // just not in this file or this instance — that is somebody looking away.
     // Without it, the click was inside on something the canvas couldn't name,
