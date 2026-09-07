@@ -128,10 +128,25 @@ async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog }
   // its first commit is the one to keep.
   if (!fs.existsSync(path.join(dir, '.git'))) {
     onLog?.('\n> starting a history for this site\n');
+    const message = `Start ${folder} from ${template.label}`;
     try {
       await run('git', ['init', '-b', 'main'], dir);
       await run('git', ['add', '-A'], dir);
-      await run('git', ['commit', '-m', `Start ${folder} from ${template.label}`], dir);
+      try {
+        await run('git', ['commit', '-m', message], dir);
+      } catch {
+        // git refuses to commit when it can neither read an identity from the
+        // config nor invent one from the machine — a hostname with no domain is
+        // enough for it to give up. Retrying with a stand-in only happens once
+        // that has already failed, so a real identity is never overridden; and
+        // a first commit under a stand-in name is worth more than the empty
+        // repository the failure would otherwise leave behind.
+        await run(
+          'git',
+          ['-c', 'user.name=Stacki', '-c', 'user.email=stacki@localhost', 'commit', '-m', message],
+          dir
+        );
+      }
     } catch (err) {
       // A site with no git still runs; say so rather than throwing it away.
       onLog?.(`\n(could not start a git history: ${err.message})\n`);
