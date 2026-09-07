@@ -209,67 +209,148 @@ function dedentHead(text) {
   return lines.map((l) => (l.trim() ? l.slice(common) : '')).join('\n').trimEnd();
 }
 
-// Splits a statement block on the semicolons that actually end statements —
-// not the ones inside strings, template literals, parens, braces or brackets.
-function topLevelStatements(src) {
-  const out = [];
+// Walks JavaScript source a character at a time. `onCode(i, c, depth, quoted)`
+// hears every character that is not part of a comment, with the bracket depth
+// it sits at and whether it is inside a string or template literal;
+// `onComment(from, to)` hears every comment. A comment is skipped whole: an
+// apostrophe in its prose opens no string, and a brace in it opens nothing.
+function walkCode(src, onCode, onComment) {
   let depth = 0;
   let quote = null;
-  let start = 0;
   for (let i = 0; i < src.length; i++) {
     const c = src[i];
     if (quote) {
       if (c === '\\') i++;
       else if (c === quote) quote = null;
+      if (onCode) onCode(i, c, depth, true);
+      continue;
+    }
+    if (c === '/' && (src[i + 1] === '/' || src[i + 1] === '*')) {
+      const line = src[i + 1] === '/';
+      const found = line ? src.indexOf('\n', i) : src.indexOf('*/', i + 2);
+      // A line comment ends before its newline — the newline is still code,
+      // and a statement may end on it.
+      const end = found === -1 ? src.length : line ? found : found + 2;
+      if (onComment) onComment(i, end);
+      i = end - 1;
       continue;
     }
     if (c === '"' || c === "'" || c === '`') quote = c;
     else if ('([{'.includes(c)) depth++;
     else if (')]}'.includes(c)) depth--;
-    else if (c === ';' && depth === 0) {
-      out.push(src.slice(start, i));
-      start = i + 1;
-    } else if (c === '\n' && depth === 0) {
-      // Semicolons are optional. A newline ends the statement when what
-      // follows starts a new one — the same call JavaScript's own insertion
-      // makes, without pretending to be a parser.
-      if (/^\s*(const|let|return)\b/.test(src.slice(i))) {
-        out.push(src.slice(start, i));
-        start = i + 1;
-      }
-    }
+    if (onCode) onCode(i, c, depth, false);
   }
-  const tail = src.slice(start);
-  if (tail.trim()) out.push(tail);
+}
+
+// Splits a statement block on the semicolons that actually end statements —
+// not the ones inside strings, template literals, parens, braces, brackets or
+// comments. A comment on a line of its own is a statement of its own, so the
+// declarations around it still read as declarations; one trailing a statement
+// on the same line stays with that statement. Each entry is the text and the
+// offset it starts at in `src`.
+function topLevelStatements(src) {
+  const out = [];
+  let start = 0;
+  const push = (end) => {
+    out.push({ text: src.slice(start, end), at: start });
+    start = end;
+  };
+  walkCode(
+    src,
+    (i, c, depth, quoted) => {
+      if (quoted || depth !== 0) return;
+      if (c === ';') {
+        push(i);
+        start = i + 1;
+      } else if (c === '\n') {
+        // Semicolons are optional. A newline ends the statement when what
+        // follows starts a new one — the same call JavaScript's own insertion
+        // makes, without pretending to be a parser.
+        if (/^\s*(const|let|return)\b/.test(src.slice(i))) {
+          push(i);
+          start = i + 1;
+        }
+      }
+    },
+    (from, to) => {
+      const before = src.slice(start, from);
+      if (before.trim()) return; // mid-statement: part of it
+      if (out.length && !before.includes('\n')) {
+        // `const x = 1; // why` — the note belongs to the line it ends.
+        out[out.length - 1].text += src.slice(start, to);
+        start = to;
+        return;
+      }
+      start = from;
+      push(to);
+    }
+  );
+  if (src.slice(start).trim()) push(src.length);
   return out;
 }
+
+// `const x = 1 // why` → `const x = 1; // why`: the semicolon goes after the
+// code, not after a comment that trails it.
+function withSemicolon(text) {
+  let end = 0;
+  walkCode(text, (i, c) => {
+    if (!/\s/.test(c)) end = i + 1;
+  });
+  return text.slice(0, end).replace(/;*$/, ';') + text.slice(end);
+}
+
+// A statement's continuation lines with the indentation of its first line
+// removed, so the serializer can lay them out under whatever indent the loop
+// ends up at. `at` is where the statement starts in `block`.
+function dedentStatement(block, at, text) {
+  const lineStart = block.lastIndexOf('\n', at - 1) + 1;
+  const column = block.slice(lineStart, at).match(/^[ \t]*/)[0].length;
+  return text
+    .split('\n')
+    .map((l, i) => (i === 0 ? l : l.slice(0, column).trim() ? l : l.slice(column)))
+    .join('\n');
+}
+
+const isComment = (text) => text.startsWith('//') || text.startsWith('/*');
 
 // `(item) => { const x = …; return ( <jsx/> ); }` — the block form of a loop
 // body. It's a loop like any other as long as the statements before the
 // `return` are plain declarations: they're kept verbatim on the node and
 // written back out, while the returned markup becomes the loop's children.
+// Comments between them are kept the same way — a note explaining a
+// declaration is part of what was written, not a reason to give up on it.
 // Anything else in there (an if, a side effect, more than one return) can't be
 // represented, so the whole expression stays code.
-// Returns { body: string[], markup: string } or null.
+// Returns { body: string[], markup: string, markupAt: number } or null. Each
+// body entry is one statement or comment, possibly spanning lines, with its
+// continuation lines indented relative to its first; markupAt is where the
+// returned markup starts in `block`.
 function splitBlockLoopBody(block) {
   const statements = topLevelStatements(block);
   if (!statements.length) return null;
   const body = [];
   for (let i = 0; i < statements.length; i++) {
-    const text = statements[i].trim();
+    const text = statements[i].text.trim();
     if (!text) continue;
+    const at = statements[i].at + statements[i].text.search(/\S/);
+    if (isComment(text)) {
+      body.push(dedentStatement(block, at, text));
+      continue;
+    }
     if (/^return\b/.test(text)) {
       // The return must be the last thing in the block.
-      if (statements.slice(i + 1).some((rest) => rest.trim())) return null;
+      if (statements.slice(i + 1).some((rest) => rest.text.trim())) return null;
       let markup = text.slice('return'.length).trim();
       while (markup.startsWith('(') && findMatchingParen(markup, 0) === markup.length - 1) {
         markup = markup.slice(1, -1).trim();
       }
       if (!markup.startsWith('<')) return null;
-      return { body, markup };
+      // Trimming only took characters off the ends, so the markup is still a
+      // piece of the block, at an offset selection can be mapped back through.
+      return { body, markup, markupAt: at + text.indexOf(markup) };
     }
     if (!/^(const|let)\s/.test(text)) return null;
-    body.push(text.replace(/;*$/, ';'));
+    body.push(withSemicolon(dedentStatement(block, at, text)));
   }
   return null; // no return statement — nothing is rendered
 }
@@ -369,7 +450,11 @@ function tryParseBlockMap(inner, base = null) {
   if (!/^\s*\)\s*$/.test(inner.slice(closeIdx + 1))) return null;
   const split = splitBlockLoopBody(inner.slice(openIdx + 1, closeIdx));
   if (!split) return null;
-  const parsed = parseTemplate(split.markup);
+  // inner starts one char into exprText, the block one char past the '{'.
+  const parsed = parseTemplate(
+    split.markup,
+    base === null ? null : base + openIdx + 1 + split.markupAt
+  );
   if (!parsed.clean) return null;
   return {
     id: makeId(),
@@ -1384,7 +1469,9 @@ function serializeNode(node, indent, lines) {
       // declarations, then the markup inside `return ( … )`.
       if (node.body && node.body.length) {
         lines.push(indent + '  ' + blockHead(node.head));
-        for (const line of node.body) lines.push(indent + '    ' + line);
+        for (const statement of node.body) {
+          for (const line of statement.split('\n')) lines.push(line ? indent + '    ' + line : '');
+        }
         lines.push(indent + '    return (');
         for (const child of node.children || []) {
           serializeNode(child, indent + '      ', lines);
