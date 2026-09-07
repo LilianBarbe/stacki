@@ -12,7 +12,10 @@ concurrency:
 
 jobs:
   test:
-    name: Test (${{ matrix.os }})${{ matrix.os == 'macos-latest' && '' || ' — informational' }}
+    # Both branches are non-empty on purpose: an empty string is falsy in a
+    # GitHub expression, so `cond && '' || 'x'` yields 'x' either way — which
+    # labelled the gating job informational, the one thing the name must not say.
+    name: Test (${{ matrix.os }}) — ${{ matrix.os == 'macos-latest' && 'gate' || 'informational' }}
     strategy:
       fail-fast: false
       matrix:
