@@ -228,6 +228,13 @@ function definitionOf(model, node, insertables) {
   return (base && insertables.find((c) => c.name === base)) || null;
 }
 
+// Whether the page still places a component anywhere. An import stays until
+// the last instance of it goes — a page can hold more than one.
+const usesComponent = (nodes, name) =>
+  (nodes || []).some(
+    (n) => (n.kind === 'component' && n.name === name) || usesComponent(n.children, name)
+  );
+
 // ---------------------------------------------------------------------------
 // Renaming a loop variable
 //
@@ -1695,6 +1702,58 @@ export default function App() {
       );
     },
     [mutateModel, propsNeededFor, rescan, showToast]
+  );
+
+  // The other direction: an instance becomes the markup it stood for, so a
+  // component made by mistake — or one that only ever had a single use — can be
+  // undone without going to the files.
+  //
+  // What may come back is decided in electron/inlineComponent.js, which refuses
+  // far more than it accepts. A refusal is the interesting answer, so it is
+  // said out loud: a menu item that silently does nothing teaches the person
+  // that the feature is broken rather than that this component is not eligible.
+  const giveComponentBack = useCallback(
+    async (nodeId) => {
+      const page = pageStateRef.current.currentPage;
+      const model = pageStateRef.current.pageState?.model;
+      const node = model ? findNodeById(model.nodes, nodeId) : null;
+      if (!page || !model || !node || node.kind !== 'component') return;
+      const definition = definitionOf(model, node, insertables);
+      if (!definition?.path) {
+        showToast(`${node.name} has no file to read.`, 'error');
+        return;
+      }
+      let result;
+      try {
+        result = await window.avb.inlineComponent({
+          componentPath: definition.path,
+          pagePath: page.path,
+          instance: node,
+        });
+      } catch (err) {
+        showToast(cleanError(err), 'error');
+        return;
+      }
+      if (!result.ok) {
+        showToast(`${node.name} can't be given back — ${result.reason}.`, 'error');
+        return;
+      }
+      mutateModel((m) => {
+        const found = findParentList(m, nodeId);
+        if (!found) return m;
+        found.list.splice(found.index, 1, ...result.nodes);
+        for (const imp of result.imports) {
+          if (!m.imports.some((i) => i.name === imp.name)) m.imports.push(imp);
+        }
+        if (!usesComponent(m.nodes, node.name)) {
+          m.imports = m.imports.filter((i) => i.name !== node.name);
+        }
+        return m;
+      }, true);
+      setSelectedId(null);
+      showToast(`${node.name} is part of the page now.`);
+    },
+    [insertables, mutateModel, showToast]
   );
 
   const moveNode = useCallback(
@@ -4248,6 +4307,7 @@ export default function App() {
                 onCopyNode={copyNode}
                 onDuplicateNode={duplicateNode}
                 onPasteNode={pasteNode}
+                onGiveComponentBack={giveComponentBack}
                 hasClipboard={() => !!nodeClipboardRef.current}
                 onRawChange={setRawSource}
               />

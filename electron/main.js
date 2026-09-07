@@ -49,6 +49,7 @@ const { pageFileName } = require('./pageName');
 const { createStarter } = require('./starter');
 const { openingBounds } = require('./windowBounds');
 const { componentFile } = require('./componentFile');
+const { inlineComponent } = require('./inlineComponent');
 const { componentUsage, instancesIn } = require('./componentUsage');
 const { listEntries, writeEntry, countEntries, coveredPaths } = require('./contentEntries');
 const { planRename, applyRename } = require('./contentRefs');
@@ -3015,6 +3016,20 @@ ipcMain.handle('component:create', async (_e, opts) => {
   markSelfWrite(target);
   fs.writeFileSync(target, text, 'utf8');
   return { path: target, rel, name: opts.name };
+});
+
+// The other direction: what an instance would become if it were given back to
+// the page. Decides only — the nodes come back for the renderer to splice into
+// its own model, so the page is written by the one path that writes pages.
+// A refusal names its reason and nothing is touched.
+ipcMain.handle('component:inline', async (_e, { componentPath, pagePath, instance }) => {
+  let source;
+  try {
+    source = fs.readFileSync(componentPath, 'utf8');
+  } catch {
+    return { ok: false, reason: 'its file could not be read' };
+  }
+  return inlineComponent({ componentSource: source, componentPath, pagePath, instance });
 });
 
 // Which files hold instances of a component — the list behind the palette's

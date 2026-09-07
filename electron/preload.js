@@ -1898,6 +1898,7 @@ contextBridge.exposeInMainWorld('avb', {
   importPathFor: invoke('page:importPathFor'),
   rebaseImport: invoke('page:rebaseImport'),
   createComponent: invoke('component:create'),
+  inlineComponent: invoke('component:inline'),
   componentUsage: invoke('component:usage'),
   dynamicPaths: invoke('page:dynamicPaths'),
   injectedRoutes: invoke('project:injectedRoutes'),

@@ -55,6 +55,7 @@ export default function StructurePanel({
   onCopyNode,
   onDuplicateNode,
   onPasteNode,
+  onGiveComponentBack,
   hasClipboard,
   onRawChange,
 }) {
@@ -323,9 +324,9 @@ export default function StructurePanel({
           onSelect={onSelect}
           onRemoveNode={onRemoveNode}
           toggleCollapse={toggleCollapse}
-          openContextMenu={(x, y, nodeId) => {
+          openContextMenu={(x, y, nodeId, kind) => {
             onSelect(nodeId);
-            setCtxMenu({ x, y, nodeId });
+            setCtxMenu({ x, y, nodeId, kind });
           }}
         />
 
@@ -348,6 +349,7 @@ export default function StructurePanel({
       {ctxMenu && (
         <ContextMenu
           pos={ctxMenu}
+          isComponent={ctxMenu.kind === 'component'}
           canPaste={hasClipboard ? hasClipboard() : false}
           onClose={() => setCtxMenu(null)}
           onAction={(action) => {
@@ -355,6 +357,7 @@ export default function StructurePanel({
             if (action === 'copy') onCopyNode(ctxMenu.nodeId);
             else if (action === 'duplicate') onDuplicateNode(ctxMenu.nodeId);
             else if (action === 'paste') onPasteNode();
+            else if (action === 'giveBack') onGiveComponentBack?.(ctxMenu.nodeId);
             else if (action === 'delete') onRemoveNode(ctxMenu.nodeId);
           }}
         />
@@ -364,7 +367,7 @@ export default function StructurePanel({
 }
 
 // Right-click menu for navigator nodes.
-function ContextMenu({ pos, canPaste, onClose, onAction }) {
+function ContextMenu({ pos, canPaste, isComponent, onClose, onAction }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -392,7 +395,7 @@ function ContextMenu({ pos, canPaste, onClose, onAction }) {
 
   // Keep the menu on-screen.
   const width = 200;
-  const itemCount = 4;
+  const itemCount = isComponent ? 5 : 4;
   const height = itemCount * 26 + 18;
   const left = Math.min(pos.x, window.innerWidth - width - 8);
   const top = Math.min(pos.y, window.innerHeight - height - 8);
@@ -412,6 +415,11 @@ function ContextMenu({ pos, canPaste, onClose, onAction }) {
       <Item action="copy" label="Copy" shortcut="⌘C" />
       <Item action="paste" label="Paste" shortcut="⌘V" disabled={!canPaste} />
       <Item action="duplicate" label="Duplicate" shortcut="⌘D" />
+      {/* Only for a component: it is the one thing on the page that stands for
+          markup kept somewhere else, and so the only thing that can be given
+          back. Whether THIS one can is answered after the click, because the
+          answer is in its file. */}
+      {isComponent && <Item action="giveBack" label="Give back to page" />}
       <div className="ctx-divider" />
       <Item action="delete" label="Delete" shortcut="⌫" />
     </div>
@@ -628,7 +636,7 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          openContextMenu(e.clientX, e.clientY, node.id);
+          openContextMenu(e.clientX, e.clientY, node.id, node.kind);
         }}
       >
         {showChildren ? (
