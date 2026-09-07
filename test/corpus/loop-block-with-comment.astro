@@ -1,0 +1,23 @@
+---
+import CardSite from '../components/CardSite.astro';
+const sites = [{ nom: 'Un', image: 'un.png' }];
+const siteImage = (name) => ({ src: name, width: 800, height: 600 });
+---
+<ul>
+  {
+    sites.map((site, index) => {
+      const shot = site.image ? siteImage(site.image) : undefined;
+      /* Ce qui est à l'écran au chargement : la slide présentée (0) et sa
+         voisine de droite (1). */
+      const visible =
+        index === 0 || index === 1; // l'apostrophe d'un commentaire de ligne
+      return (
+        <CardSite
+          heading={site.nom}
+          image={shot?.src}
+          loading={visible ? "eager" : "lazy"}
+        />
+      );
+    })
+  }
+</ul>

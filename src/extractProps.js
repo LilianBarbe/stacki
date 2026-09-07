@@ -26,6 +26,11 @@ function loopHead(head) {
   return m ? { data: m[1].trim(), item: m[2], index: m[3] || '' } : null;
 }
 
+const stripComments = (code) =>
+  String(code || '')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+
 /** Every expression a node states in its OWN scope (its children may differ). */
 function expressionsOf(node) {
   const out = [];
@@ -72,10 +77,12 @@ export function propsForExtraction(node, scope) {
       // declares — all of it travels with the markup.
       const head = loopHead(n.head);
       const bound = [head?.item, head?.index].filter(Boolean);
-      const body = Array.isArray(n.body) ? n.body.join('\n') : '';
+      // A comment in the body is prose, not something the loop reads.
+      const statements = (Array.isArray(n.body) ? n.body : []).map(stripComments);
+      const body = statements.join('\n');
       const declared = body ? [...parseDeclarations(body).keys()] : [];
       // A loop's own body lines read from OUTSIDE it (that's how it gets data).
-      for (const line of Array.isArray(n.body) ? n.body : []) {
+      for (const line of statements) {
         take(line, new Set([...shadowed, ...bound]));
       }
       if (bound.length || declared.length) inner = new Set([...shadowed, ...bound, ...declared]);
