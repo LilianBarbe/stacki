@@ -175,8 +175,7 @@
       "node_modules/node-pty/**/*"
     ],
     "asarUnpack": [
-      "electron/astroParser.js",
-      "electron/htmlText.js",
+      "electron/**",
       "**/node_modules/node-pty/**"
     ],
     "npmRebuild": false,
