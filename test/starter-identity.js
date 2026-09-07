@@ -55,9 +55,13 @@ console.log('Ready.');
   // Required after the env is set: starter.js reads process.env when it spawns.
   const { createStarter } = require('../electron/starter.js');
 
-  const npm = path.join(root, 'npm-fake');
+  // Named rather than pathed, and on PATH — see the same helper in
+  // test/starter.js: Windows spawns neither a shebang script nor a bare .cmd,
+  // and the app only reaches for a shell when the command looks like npm.
+  const npm = 'npm-fake';
+  const npmFile = path.join(root, npm);
   fs.writeFileSync(
-    npm,
+    npmFile,
     `#!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
@@ -66,6 +70,10 @@ ${SCAFFOLD}
 `,
     { mode: 0o755 }
   );
+  if (process.platform === 'win32') {
+    fs.writeFileSync(`${npmFile}.cmd`, `@echo off\r\nnode "%~dp0${npm}" %*\r\n`);
+  }
+  process.env.PATH = `${root}${path.delimiter}${process.env.PATH}`;
 
   const parent = path.join(root, 'sites');
   fs.mkdirSync(parent);

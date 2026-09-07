@@ -51,6 +51,11 @@ const sh = async (cwd, ...args) => (await git(cwd, args)).stdout.trim();
 async function repo(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `stacki-git-${name}-`));
   await sh(dir, 'init', '-q', '-b', 'main', '.');
+  // Git for Windows converts line endings on checkout by default, which
+  // changes how a merge splits its conflict hunks and what a restore
+  // writes back. These repositories exist to measure git's behaviour, not
+  // the platform's line-ending policy, so the policy is pinned.
+  await sh(dir, 'config', 'core.autocrlf', 'false');
   await sh(dir, 'config', 'user.email', 'test@example.com');
   await sh(dir, 'config', 'user.name', 'Test');
   fs.writeFileSync(path.join(dir, 'a.txt'), 'base\n');

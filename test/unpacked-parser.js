@@ -55,7 +55,11 @@ function closureOf(rel, seen = new Set()) {
   return seen;
 }
 
-const covers = (pattern, rel) => {
+const covers = (pattern, path_rel) => {
+  // electron-builder's globs are written with forward slashes on every
+  // platform, while these paths come from path.join — so on Windows they arrive
+  // as electron\astroParser.js and match nothing, however right the pattern is.
+  const rel = path_rel.split(path.sep).join('/');
   if (pattern === rel) return true;
   // The globs electron-builder takes, as far as this needs to read them.
   const re = new RegExp(

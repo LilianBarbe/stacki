@@ -46,7 +46,18 @@ ${body}
 `,
     { mode: 0o755 }
   );
-  return file;
+  // Windows can spawn neither a shebang script nor, without a shell, a .cmd.
+  // The app already asks for a shell when the command looks like npm — that is
+  // how the real one, itself a .cmd shim, is found there — so the stand-in is
+  // put on PATH and handed over by NAME rather than by path. That keeps the
+  // Windows branch of run() under test instead of stepping around it.
+  if (process.platform === 'win32') {
+    fs.writeFileSync(`${file}.cmd`, `@echo off\r\nnode "%~dp0${name}" %*\r\n`);
+  }
+  if (!process.env.PATH.split(path.delimiter).includes(root)) {
+    process.env.PATH = `${root}${path.delimiter}${process.env.PATH}`;
+  }
+  return name;
 };
 
 const SCAFFOLD = `
