@@ -13,7 +13,7 @@ import { ArrowDownIcon } from '../ui/Icons.jsx';
 // Stacki is dark-only, so the palette is fixed rather than themed. Backgrounds
 // track the dock's own surfaces (--bg-panel / --text) so the pane doesn't read
 // as a foreign box dropped into the app.
-const THEME = {
+export const THEME = {
   background: '#111111',
   foreground: '#f5f5f5',
   cursor: '#f5f5f5',

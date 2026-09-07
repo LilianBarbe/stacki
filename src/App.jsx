@@ -4809,6 +4809,9 @@ export default function App() {
           projectPath={project.path}
           open={termOpen}
           onClose={() => setTermOpen(false)}
+          devLogRef={devLogRef}
+          devStatus={devStatus}
+          onRestartDev={() => startPreview(project.path)}
         />
       </ErrorBoundary>
 

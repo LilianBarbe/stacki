@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import TerminalPane from './TerminalPane.jsx';
+import DevLogPane from './DevLogPane.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
 import { PlusIcon, CloseIcon, ChevronDownIcon } from '../ui/Icons.jsx';
 
@@ -17,6 +18,11 @@ const MIN_HEIGHT = 120;
 const DEFAULT_HEIGHT = 280;
 // Leave the canvas usable however hard the handle is dragged.
 const MIN_TOP_GAP = 180;
+
+// The Astro tab is pinned rather than a real terminal: it has no pty, it
+// can't be closed, and it always sits first. Its id only has to be something
+// no `${projectPath}:term-N` can collide with.
+const ASTRO_ID = '__astro__';
 
 const HEIGHT_KEY = 'stacki.terminal.height';
 const MODE_KEY = 'stacki.terminal.autoLaunch';
@@ -94,9 +100,16 @@ export function tabLabels(tabs) {
 
 // ---------------------------------------------------------------------------
 
-export default function TerminalDock({ projectPath, open, onClose }) {
+export default function TerminalDock({
+  projectPath,
+  open,
+  onClose,
+  devLogRef,
+  devStatus,
+  onRestartDev,
+}) {
   const [tabs, setTabs] = useState([]);
-  const [activeId, setActiveId] = useState(null);
+  const [activeId, setActiveId] = useState(ASTRO_ID);
   const nextNumber = useRef(1);
   // The project-switch cleanup below has to see the tabs as they are when it
   // runs, not as they were on the render that registered it.
@@ -119,11 +132,16 @@ export default function TerminalDock({ projectPath, open, onClose }) {
   const autoLaunch =
     mode === 'claude' ? 'claude' : mode === 'codex' ? 'codex' : mode === 'custom' ? custom : '';
 
-  const createTab = useCallback(() => {
-    const id = `${projectPath}:term-${nextNumber.current++}`;
-    setTabs((prev) => [...prev, { id, oscTitle: '', processName: '' }]);
-    setActiveId(id);
-  }, [projectPath]);
+  // `activate` is what separates a click on "+" (show me the new shell) from
+  // the dock's own seeding below (have one ready, but leave Astro on screen).
+  const createTab = useCallback(
+    (activate = true) => {
+      const id = `${projectPath}:term-${nextNumber.current++}`;
+      setTabs((prev) => [...prev, { id, oscTitle: '', processName: '' }]);
+      if (activate) setActiveId(id);
+    },
+    [projectPath]
+  );
 
   const closeTab = useCallback(
     (id) => {
@@ -133,7 +151,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
       const next = tabs.filter((t) => t.id !== id);
       setTabs(next);
       // Fall through to whichever tab slid into the closed one's place.
-      if (activeId === id) setActiveId(next[Math.min(index, next.length - 1)]?.id ?? null);
+      if (activeId === id) setActiveId(next[Math.min(index, next.length - 1)]?.id ?? ASTRO_ID);
     },
     [tabs, activeId]
   );
@@ -148,7 +166,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
       nextNumber.current = 1;
       seeded.current = false;
       setTabs([]);
-      setActiveId(null);
+      setActiveId(ASTRO_ID);
     };
   }, [projectPath]);
 
@@ -158,7 +176,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
   useEffect(() => {
     if (!open || seeded.current) return;
     seeded.current = true;
-    createTab();
+    createTab(false);
   }, [open, createTab]);
 
   // Foreground process name for every pty, pushed by main only when it changes
@@ -242,6 +260,14 @@ export default function TerminalDock({ projectPath, open, onClose }) {
 
       <div className="term-bar">
         <div className="term-tabs">
+          <button
+            className={`term-tab pinned ${ASTRO_ID === activeId ? 'on' : ''}`}
+            onClick={() => setActiveId(ASTRO_ID)}
+            title="Astro dev server output"
+          >
+            <span className={`status-dot ${devStatus}`} />
+            <span className="term-tab-label">Astro</span>
+          </button>
           {tabs.map((tab, i) => (
             <button
               key={tab.id}
@@ -250,21 +276,22 @@ export default function TerminalDock({ projectPath, open, onClose }) {
               title={tab.oscTitle || tab.processName || undefined}
             >
               <span className="term-tab-label">{labels[i]}</span>
-              {tabs.length > 1 && (
-                <span
-                  className="term-tab-x"
-                  title="Close terminal"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTab(tab.id);
-                  }}
-                >
-                  <CloseIcon size={10} />
-                </span>
-              )}
+              {/* Every shell closes, the last one included: the pinned Astro
+                  tab is the floor now, so an empty dock is no longer the
+                  thing on the other side of closing it. */}
+              <span
+                className="term-tab-x"
+                title="Close terminal"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeTab(tab.id);
+                }}
+              >
+                <CloseIcon size={10} />
+              </span>
             </button>
           ))}
-          <button className="ghost term-add" title="New terminal" onClick={createTab}>
+          <button className="ghost term-add" title="New terminal" onClick={() => createTab()}>
             <PlusIcon size={13} />
           </button>
         </div>
@@ -299,6 +326,17 @@ export default function TerminalDock({ projectPath, open, onClose }) {
       </div>
 
       <div className="term-panes">
+        <div
+          className="term-pane-wrap"
+          style={{ display: activeId === ASTRO_ID ? 'block' : 'none' }}
+        >
+          <DevLogPane
+            ref={(ref) => setPaneRef(ASTRO_ID, ref)}
+            logRef={devLogRef}
+            status={devStatus}
+            onRestart={onRestartDev}
+          />
+        </div>
         {tabs.map((tab) => (
           <div
             key={tab.id}

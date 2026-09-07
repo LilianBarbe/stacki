@@ -1,0 +1,31 @@
+/* The Astro tab's own trimmings. Kept out of styles.css so the pane brings
+   its own styling with it. */
+
+/* Floats over the log rather than taking a toolbar row: the dock is short and
+   every line of it is log the user asked to see. */
+.devlog-actions {
+  position: absolute;
+  top: 6px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: rgba(17, 17, 17, 0.82);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
+}
+.devlog-restart {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 5px;
+  color: var(--text-dim);
+}
+.devlog-restart:hover:not(:disabled) { background: var(--bg-active); color: var(--text); }
+.devlog-restart:disabled { opacity: 0.4; }
+
+/* The pinned tab keeps its label when the shell tabs are cramped — it has no
+   close affordance to fall back on. */
+.term-tab.pinned .term-tab-label { white-space: nowrap; }
