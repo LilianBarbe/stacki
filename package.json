@@ -121,6 +121,7 @@
     "test:variantoptions": "node test/variant-options.js",
     "test:panelsections": "node test/panel-sections.js",
     "test:htmltext": "node test/html-text.js",
+    "test:errorboundary": "node test/error-boundary.js",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",
