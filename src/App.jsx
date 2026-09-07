@@ -33,6 +33,7 @@ import CmsView from './panels/CmsView.jsx';
 import ContentView from './panels/ContentView.jsx';
 import VariablesPanel from './panels/VariablesPanel.jsx';
 import VariablesView from './panels/VariablesView.jsx';
+import CodePanel from './panels/CodePanel.jsx';
 import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS, canContainTag } from './elementSchemas.js';
 import { insertTargetFor as placeInsert } from './insertTarget.js';
 import { isInlineOnly } from './ui/RichContent.jsx';
@@ -1488,6 +1489,33 @@ export default function App() {
   // External file changes → refresh panels
   // ----------------------------------------------------------------
 
+  // Reads the open document back from disk and swaps the model in — what an
+  // edit made to the file itself asks for, whether it came from outside the
+  // app or from the Code panel. The selection stays on the node at the same
+  // tree position (ids regenerate), and goes if there is no such node.
+  const reloadOpenDocument = useCallback(async () => {
+    const { currentPage: page, pageState: state } = pageStateRef.current;
+    if (!page?.path) return;
+    let result;
+    try {
+      result = await window.avb.readPage(page.path);
+    } catch {
+      return;
+    }
+    const selId = selectedIdRef.current;
+    let nextSelected = selId;
+    if (selId && selId !== 'layout' && selId !== 'frontmatter') {
+      if (state?.editable && result.editable) {
+        const trail = pathOfNode(state.model.nodes, selId);
+        nextSelected = trail ? (nodeAtPath(result.model.nodes, trail)?.id ?? null) : null;
+      } else {
+        nextSelected = null;
+      }
+    }
+    setPageState({ ...result, dirty: false });
+    setSelectedId(nextSelected);
+  }, []);
+
   useEffect(() => {
     const off = window.avb.onFsChanged(async ({ files }) => {
       const proj = projectRef.current;
@@ -1515,30 +1543,10 @@ export default function App() {
       // Hot-reload the current page's model unless the user has unsaved
       // edits in flight (their pending save would win anyway).
       if (state?.dirty) return;
-
-      let result;
-      try {
-        result = await window.avb.readPage(page.path);
-      } catch {
-        return;
-      }
-
-      // Re-select the node at the same tree position (ids regenerate).
-      const selId = selectedIdRef.current;
-      let nextSelected = selId;
-      if (selId && selId !== 'layout' && selId !== 'frontmatter') {
-        if (state?.editable && result.editable) {
-          const trail = pathOfNode(state.model.nodes, selId);
-          nextSelected = trail ? (nodeAtPath(result.model.nodes, trail)?.id ?? null) : null;
-        } else {
-          nextSelected = null;
-        }
-      }
-      setPageState({ ...result, dirty: false });
-      setSelectedId(nextSelected);
+      await reloadOpenDocument();
     });
     return off;
-  }, [rescan]);
+  }, [rescan, reloadOpenDocument]);
 
   // ----------------------------------------------------------------
   // Model operations
@@ -3997,7 +4005,7 @@ export default function App() {
     abs && project?.path ? abs.replace(project.path + '/', '') : null;
   const openRel = relOf(currentPage?.path);
   const leafTrail = model && selectedId ? pathOfNode(model.nodes, selectedId) : null;
-  selectionKeysRef.current = !openRel
+  const selectionKeys = !openRel
     ? []
     : [
         ...editStack
@@ -4013,6 +4021,10 @@ export default function App() {
             ? `${openRel}#${leafTrail.join('.')}`
             : `${openRel}#`,
       ];
+  selectionKeysRef.current = selectionKeys;
+  // The innermost key is the one the Code panel opens: the file being edited,
+  // at the selection in it.
+  const codeSelectionKey = selectionKeys.length ? selectionKeys[selectionKeys.length - 1] : null;
 
   // Position the Style/Settings highlight: on tab change, when the panel first
   // appears, and whenever the tab strip's width changes.
@@ -4266,7 +4278,7 @@ export default function App() {
         />
 
         {leftTab && (
-          <div className="panel left">
+          <div className={`panel left${leftTab === 'code' ? ' code' : ''}`}>
             {/* Keyed on the tab: switching to another panel is itself the way
                 out of a crashed one, not a view of its wreckage. */}
             <ErrorBoundary
@@ -4370,6 +4382,17 @@ export default function App() {
             )}
             {leftTab === 'variables' && (
               <VariablesPanel project={project} selected={varsGroup} onSelect={setVarsGroup} />
+            )}
+            {leftTab === 'code' && (
+              <CodePanel
+                project={project}
+                selectionKey={codeSelectionKey}
+                pageState={pageState}
+                flushSave={flushSave}
+                onWritten={reloadOpenDocument}
+                locked={!!previewRef}
+                showToast={showToast}
+              />
             )}
             {leftTab === 'history' && (
               <HistoryPanel
@@ -4557,8 +4580,10 @@ export default function App() {
               const reveal = (node) => {
                 if (!node) return;
                 setSelectedId(node.id);
-                // Selecting from the canvas jumps to the node in the tree.
-                setLeftTab('navigator');
+                // Selecting from the canvas jumps to the node in the tree —
+                // unless the Code panel is open, where the click is what
+                // picks the code to show and the panel has to stay to show it.
+                setLeftTab((t) => (t === 'code' ? t : 'navigator'));
                 setRevealTick((t) => t + 1);
               };
               const { kind } = canvasClickAction({

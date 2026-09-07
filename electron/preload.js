@@ -1833,6 +1833,7 @@ contextBridge.exposeInMainWorld('avb', {
 
   // ⇧⌘C — the canvas selection as file:line pointers, for an AI chat.
   copySelection: invoke('selection:copy'),
+  locateSelection: invoke('selection:locate'),
 
   // CMS (JSON data under src/)
   listCms: invoke('cms:list'),

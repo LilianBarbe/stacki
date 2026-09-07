@@ -127,6 +127,7 @@
     "test:starteridentity": "node test/starter-identity.js",
     "test:palettefolds": "node test/palette-folds.js",
     "test:inlinecomponent": "node test/inline-component.js",
+    "test:codepanel": "node test/code-panel.js",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",

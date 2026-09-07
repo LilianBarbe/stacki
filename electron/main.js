@@ -3083,6 +3083,19 @@ ipcMain.handle('page:rebaseImport', async (_e, { fromPagePath, toPagePath, spec 
 // stored here and nothing is written to the user's project.
 // ---------------------------------------------------------------------------
 
+// Where one "<file>#<path>" node key lands: the file (absolute — not always
+// the one named, a chunk's children live in the imported .html) and, when the
+// path names a node with markup of its own, its line range. Null for a key
+// that isn't one, points outside the project, or names a file that isn't there.
+function locateKey(root, key) {
+  const hash = typeof key === 'string' ? key.indexOf('#') : -1;
+  if (hash === -1) return null;
+  // The key's file half is renderer input; keep it inside the project.
+  const abs = path.resolve(root, key.slice(0, hash));
+  if (abs !== root && !abs.startsWith(root + path.sep)) return null;
+  return locateSelection(abs, key.slice(hash + 1));
+}
+
 // Turns "<file>#<path>" node keys into "<file>:<line>" / "<file>:<from>-<to>"
 // pointers, project-relative. Returns null when there's nothing to point at.
 function selectionTrail(state) {
@@ -3090,12 +3103,7 @@ function selectionTrail(state) {
   const root = path.resolve(state.projectPath);
   const trail = [];
   for (const key of state.keys) {
-    const hash = typeof key === 'string' ? key.indexOf('#') : -1;
-    if (hash === -1) continue;
-    // The key's file half is renderer input; keep it inside the project.
-    const abs = path.resolve(root, key.slice(0, hash));
-    if (abs !== root && !abs.startsWith(root + path.sep)) continue;
-    const at = locateSelection(abs, key.slice(hash + 1));
+    const at = locateKey(root, key);
     if (!at) continue;
     const file = toPosix(path.relative(root, at.file));
     if (at.startLine == null) trail.push(file);
@@ -3110,6 +3118,29 @@ ipcMain.handle('selection:copy', async (_e, state) => {
   if (!trail) return { ok: false };
   clipboard.writeText(trail.join('\n'));
   return { ok: true, count: trail.length };
+});
+
+// The Code panel: the file the selection is written in, whole, and the lines
+// in it that are the selection — so the panel can open the file and turn the
+// rest of it down. One key, the innermost of the trail ⇧⌘C copies; a bare
+// "<file>#" (nothing selected) answers with the file and no range.
+ipcMain.handle('selection:locate', async (_e, { projectPath, key } = {}) => {
+  if (!projectPath || typeof key !== 'string') return null;
+  const root = path.resolve(projectPath);
+  const at = locateKey(root, key);
+  if (!at) return null;
+  let text;
+  try {
+    text = fs.readFileSync(at.file, 'utf8');
+  } catch {
+    return null;
+  }
+  return {
+    rel: toPosix(path.relative(root, at.file)),
+    text,
+    startLine: at.startLine ?? null,
+    endLine: at.endLine ?? null,
+  };
 });
 
 // ---------------------------------------------------------------------------
