@@ -8,6 +8,7 @@ import {
   VariableIcon,
   HistoryIcon,
   CodeIcon,
+  SparkleIcon,
 } from './Icons.jsx';
 
 const TABS = [
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'cms', title: 'CMS', shortcut: '⌥C', Icon: CmsIcon },
   { id: 'variables', title: 'Variables', shortcut: '⌥V', Icon: VariableIcon },
   { id: 'code', title: 'Code', shortcut: '⌥E', Icon: CodeIcon },
+  { id: 'agent', title: 'Agent', shortcut: '⌥A', Icon: SparkleIcon },
   { id: 'history', title: 'History', shortcut: '⌥H', Icon: HistoryIcon },
 ];
 
@@ -45,7 +47,7 @@ export default function LeftRail({ active, onSelect }) {
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  // P / Z / ⇧A / J / ⌥C / ⌥E / ⌥H toggle the panels (ignored while typing in a field).
+  // P / Z / ⇧A / J / ⌥C / ⌥E / ⌥A / ⌥H toggle the panels (ignored while typing in a field).
   useEffect(() => {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey) return;
@@ -65,6 +67,9 @@ export default function LeftRail({ active, onSelect }) {
         } else if (e.code === 'KeyE') {
           e.preventDefault();
           onSelect('code');
+        } else if (e.code === 'KeyA') {
+          e.preventDefault();
+          onSelect('agent');
         } else if (e.code === 'KeyH') {
           e.preventDefault();
           onSelect('history');

@@ -60,6 +60,8 @@ const gitHistory = require('./gitHistory');
 const gitSnapshot = require('./gitSnapshot');
 const previewWorktree = require('./previewWorktree');
 const { registerTerminalHandlers, cleanupTerminals } = require('./terminal');
+const { registerAcpHandlers } = require('./acp');
+let acp = null; // the agent panel's host, once the IPC is registered
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
@@ -417,6 +419,7 @@ app.whenReady().then(() => {
   // Terminals open in the project the app has open — same reach as the asset
   // protocol, which is what `openProjectRoot` already scopes.
   registerTerminalHandlers({ send, projectRoot: () => openProjectRoot });
+  acp = registerAcpHandlers(ipcMain, { send, resolveNodeBin, version: app.getVersion() });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -433,6 +436,8 @@ ipcMain.handle('project:close', async (_e, next) => {
   stopAllServices();
   stopAllPreviews();
   cleanupTerminals();
+  // The agent was talking about this project; the next one gets its own.
+  acp?.cleanup();
   if (watcher) {
     watcher.close();
     watcher = null;
@@ -458,6 +463,7 @@ app.on('window-all-closed', () => {
   // The pty ids are keyed to the window that opened them, so a surviving shell
   // could never be reached again — and on macOS the app stays running.
   cleanupTerminals();
+  acp?.cleanup();
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -470,6 +476,8 @@ app.on('before-quit', () => stopAllServices());
 app.on('before-quit', () => stopAllPreviews());
 // A pty outlives the window that opened it unless it is killed.
 app.on('before-quit', () => cleanupTerminals());
+// So does the agent process behind the Agent panel.
+app.on('before-quit', () => acp?.cleanup());
 
 // ---------------------------------------------------------------------------
 // Auto update

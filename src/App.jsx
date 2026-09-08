@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import WelcomeScreen from './panels/WelcomeScreen.jsx';
 import PagesPanel from './panels/PagesPanel.jsx';
 import PalettePanel from './panels/PalettePanel.jsx';
-import StructurePanel from './panels/StructurePanel.jsx';
+import StructurePanel, { describeNode } from './panels/StructurePanel.jsx';
 import { isInlineRun, noteIndexAbove, noteText, noteValue, selectionAfterDelete } from './treeSelection.js';
 import { canvasClickAction } from './canvasClick.js';
 import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveClasses.js';
@@ -34,6 +34,7 @@ import ContentView from './panels/ContentView.jsx';
 import VariablesPanel from './panels/VariablesPanel.jsx';
 import VariablesView from './panels/VariablesView.jsx';
 import CodePanel from './panels/CodePanel.jsx';
+import AgentPanel from './panels/AgentPanel.jsx';
 import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS, canContainTag } from './elementSchemas.js';
 import { insertTargetFor as placeInsert } from './insertTarget.js';
 import { isInlineOnly } from './ui/RichContent.jsx';
@@ -4083,6 +4084,13 @@ export default function App() {
   // The innermost key is the one the Code panel opens: the file being edited,
   // at the selection in it.
   const codeSelectionKey = selectionKeys.length ? selectionKeys[selectionKeys.length - 1] : null;
+  // The name the canvas and the navigator show for the selection — what the
+  // Agent panel's chip says beside the file, so "Step" reads as Step.
+  const selectionLabel = !selectedNode
+    ? null
+    : selectedNode.kind === 'frontmatter'
+      ? 'Frontmatter'
+      : describeNode(selectedNode, liveClassesById?.get(selectedNode.id)).label || null;
 
   // Position the Style/Settings highlight: on tab change, when the panel first
   // appears, and whenever the tab strip's width changes.
@@ -4400,10 +4408,12 @@ export default function App() {
 
         {leftTab && (
           <div
-            className={`panel left${leftTab === 'code' ? ' code' : ''}`}
-            style={leftTab === 'code' ? { width: codeWidth } : undefined}
+            className={`panel left${leftTab === 'code' ? ' code' : leftTab === 'agent' ? ' agent' : ''}`}
+            style={leftTab === 'code' || leftTab === 'agent' ? { width: codeWidth } : undefined}
           >
-            {leftTab === 'code' && (
+            {/* The Agent panel is a conversation, read in lines like code —
+                so it shares the Code panel's width, and its handle. */}
+            {(leftTab === 'code' || leftTab === 'agent') && (
               <div
                 className={`code-resize${codeDrag ? ' on' : ''}`}
                 onPointerDown={startCodeResize}
@@ -4538,6 +4548,9 @@ export default function App() {
                 locked={!!previewRef}
                 showToast={showToast}
               />
+            )}
+            {leftTab === 'agent' && (
+              <AgentPanel project={project} selectionKey={codeSelectionKey} selectionLabel={selectionLabel} />
             )}
             {leftTab === 'history' && (
               <HistoryPanel
@@ -4727,8 +4740,10 @@ export default function App() {
                 setSelectedId(node.id);
                 // Selecting from the canvas jumps to the node in the tree —
                 // unless the Code panel is open, where the click is what
-                // picks the code to show and the panel has to stay to show it.
-                setLeftTab((t) => (t === 'code' ? t : 'navigator'));
+                // picks the code to show and the panel has to stay to show it,
+                // or the Agent panel, where the click is what picks the
+                // selection the next message is about.
+                setLeftTab((t) => (t === 'code' || t === 'agent' ? t : 'navigator'));
                 setRevealTick((t) => t + 1);
               };
               const { kind } = canvasClickAction({
