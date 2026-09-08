@@ -19,7 +19,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { AcpAgent, openSession, agentEnv, insideRoot } = require('../electron/acp.js');
+const { AcpAgent, openSession, agentEnv, findClaudeCli, insideRoot } = require('../electron/acp.js');
 
 const failures = [];
 let checked = 0;
@@ -101,6 +101,19 @@ readline.createInterface({ input: process.stdin }).on('line', async (line) => {
   check('CLAUDECODE is stripped, so Claude Code does not refuse a nested start', !('CLAUDECODE' in env));
   check('npm_* vars are stripped', !('npm_config_x' in env));
   check('the rest of the environment is kept', env.PATH === '/usr/bin' && env.HOME === '/h');
+
+  // --- Finding Claude Code ----------------------------------------------------
+  const fakeHome = path.join(dir, 'home');
+  const onPath = path.join(dir, 'bin');
+  fs.mkdirSync(onPath, { recursive: true });
+  fs.mkdirSync(path.join(fakeHome, '.claude', 'local', 'bin'), { recursive: true });
+  check('no CLI anywhere means none', findClaudeCli({ PATH: onPath }, fakeHome) === null);
+  fs.writeFileSync(path.join(fakeHome, '.claude', 'local', 'bin', 'claude'), '');
+  check('the local install is found when PATH has none', findClaudeCli({ PATH: onPath }, fakeHome) === path.join(fakeHome, '.claude', 'local', 'bin', 'claude'));
+  fs.writeFileSync(path.join(onPath, 'claude'), '');
+  check('one on PATH wins', findClaudeCli({ PATH: onPath }, fakeHome) === path.join(onPath, 'claude'));
+  fs.mkdirSync(path.join(dir, 'dirnamed', 'claude'), { recursive: true });
+  check('a directory called claude is not it', findClaudeCli({ PATH: path.join(dir, 'dirnamed') }, path.join(dir, 'nohome')) === null);
 
   // --- Containment ----------------------------------------------------------
   check('a path inside the project resolves', insideRoot(root, path.join(root, 'a.txt')) === path.join(root, 'a.txt'));

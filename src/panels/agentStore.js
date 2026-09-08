@@ -85,6 +85,7 @@ function makeThread(id, extra = {}) {
     configOptions: [],
     permissions: [], // requests the agent is waiting on, oldest first
     running: false, // a prompt is in flight
+    effort: null, // low | medium | high | max, once picked here; unknown before
     unread: false, // an answer landed while another thread was on screen
     archived: local.archived.includes(id),
     ...extra,
@@ -429,6 +430,23 @@ export async function setConfig(configId, value) {
   try {
     const result = await avb().acpSetConfig({ sessionId: t.id, configId, value });
     if (result?.configOptions) patchThread(t.id, { configOptions: result.configOptions });
+  } catch (err) {
+    set({ error: cleanError(err) });
+  }
+}
+
+// Effort is not a config option the adapter advertises, but Claude Code has
+// a /effort command, and a command goes down the prompt channel like anything
+// typed — answered at once, without a turn. The level is remembered on the
+// thread; the record Claude keeps of the command is filtered out of a replay
+// like every other one.
+export const EFFORT_LEVELS = ['low', 'medium', 'high', 'max'];
+export async function setEffort(level) {
+  const t = current();
+  if (!t || t.running || !t.loaded || !EFFORT_LEVELS.includes(level)) return;
+  patchThread(t.id, { effort: level });
+  try {
+    await avb().acpPrompt({ sessionId: t.id, prompt: [{ type: 'text', text: `/effort ${level}` }] });
   } catch (err) {
     set({ error: cleanError(err) });
   }

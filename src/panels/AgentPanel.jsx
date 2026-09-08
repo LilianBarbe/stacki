@@ -7,7 +7,7 @@ import AutoTextarea from '../ui/AutoTextarea.jsx';
 import { PlusIcon, CheckIcon, ChevronDownIcon, HistoryIcon } from '../ui/Icons.jsx';
 import { relativeTime } from './HistoryPanel.jsx';
 import * as store from './agentStore.js';
-import { parseUserText, titleOf } from './agentStore.js';
+import { EFFORT_LEVELS, parseUserText, titleOf } from './agentStore.js';
 
 // The Agent panel: a coding agent in the left rail, at the same rank as Code
 // or the CMS, talking about the open project.
@@ -48,6 +48,8 @@ const storeFollow = (on) => {
     /* private mode / quota */
   }
 };
+
+const EFFORT_OPTIONS = EFFORT_LEVELS.map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }));
 
 const shorten = (text) => (text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX - 1).trimEnd()}…` : text);
 
@@ -472,7 +474,10 @@ export default function AgentPanel({ project, selectionKey, selectionLabel }) {
     };
     return [...list].filter((o) => o.type === 'select').sort((a, b) => rank(a) - rank(b));
   }, [thread?.configOptions]);
+  // Effort: the agent's own option when it advertises one; else Claude Code's
+  // /effort command, when the agent lists it; else a place kept for it.
   const hasEffort = options.some((o) => o.category === 'thought_level');
+  const canEffort = !hasEffort && state.commands.some((c) => c.name === 'effort');
 
   const title = view === 'history' ? 'Threads' : shorten(titleOf(thread));
   const menuItems = [
@@ -610,8 +615,18 @@ export default function AgentPanel({ project, selectionKey, selectionLabel }) {
               livePreview={false}
             />
           ))}
-          {!hasEffort && (
-            <button type="button" className="dd-trigger agent-config" disabled title="Effort — the Claude Agent adapter does not offer it yet">
+          {canEffort && (
+            <Dropdown
+              className={`agent-config${running ? ' agent-config-off' : ''}`}
+              value={thread?.effort || ''}
+              placeholder="Effort"
+              options={EFFORT_OPTIONS}
+              onChange={(v) => !running && store.setEffort(v)}
+              livePreview={false}
+            />
+          )}
+          {!hasEffort && !canEffort && (
+            <button type="button" className="dd-trigger agent-config" disabled title="Effort — this agent does not offer it">
               <span className="dd-label dim">Effort</span>
               <span className="dd-chevron">
                 <ChevronDownIcon size={11} />

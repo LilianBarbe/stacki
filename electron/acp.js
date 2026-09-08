@@ -17,8 +17,11 @@
 
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const readline = require('node:readline');
+
+const isWin = process.platform === 'win32';
 
 const PROTOCOL_VERSION = 1;
 const STDERR_KEEP = 4000; // the tail of stderr, for the error a dead agent left
@@ -302,6 +305,32 @@ function claudeAdapterEntry() {
     .replace(`${path.sep}app.asar${path.sep}`, `${path.sep}app.asar.unpacked${path.sep}`);
 }
 
+// Claude Code itself. The adapter ships a copy of the CLI for when there is
+// none, but that copy is whatever the adapter was built against — it offered
+// Opus 4.6 and Sonnet 4.6 when the installed CLI offered Opus 5, Fable and
+// Sonnet 5, and knew no /effort. The one the person installed and logs into
+// is the one that knows the models of the day, so it goes first, through the
+// adapter's CLAUDE_CODE_EXECUTABLE.
+function findClaudeCli(env = process.env, home = os.homedir()) {
+  const exe = isWin ? 'claude.exe' : 'claude';
+  const candidates = [
+    ...(env.PATH || '')
+      .split(path.delimiter)
+      .filter(Boolean)
+      .map((dir) => path.join(dir, exe)),
+    path.join(home, '.claude', 'local', 'bin', exe),
+    path.join(home, '.local', 'bin', exe),
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (fs.statSync(candidate).isFile()) return candidate;
+    } catch {
+      /* not here */
+    }
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // IPC
 // ---------------------------------------------------------------------------
@@ -336,11 +365,14 @@ function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
     if (!node) throw new Error('Node was not found on your PATH — Claude Agent runs on it.');
     const entry = claudeAdapterEntry();
     const thisGen = ++gen;
+    const env = agentEnv();
+    const cli = findClaudeCli(env);
+    if (cli) env.CLAUDE_CODE_EXECUTABLE = cli;
     const agent = new AcpAgent({
       command: node,
       args: [entry],
       cwd: root,
-      env: agentEnv(),
+      env,
       projectRoot: root,
       onUpdate: (params) => send('acp:update', params),
       onPermission: (request) => send('acp:permission', request),
@@ -441,6 +473,7 @@ module.exports = {
   RpcError,
   openSession,
   agentEnv,
+  findClaudeCli,
   insideRoot,
   registerAcpHandlers,
   METHOD_NOT_FOUND,
