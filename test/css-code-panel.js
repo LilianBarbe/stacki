@@ -76,6 +76,7 @@ const check = (what, condition, detail) => {
   });
 
   const SOURCE = [
+    ':root { --brand: #f04; --space-4: 1rem }',
     '.hero { padding: 1rem }',
     '.card { color: red }',
     '.card:hover { color: blue }',
@@ -197,6 +198,24 @@ const check = (what, condition, detail) => {
     check('picking it shows that selector\'s CSS', text() === '.card:hover {\n  color: blue;\n}\n', JSON.stringify(text()));
   }
 
+  // ── Completion ──
+
+  // Typing `var(--sp` in a value opens the project's variables.
+  if (chip) {
+    const insertAt = text().indexOf('blue;') + 'blue;'.length;
+    view().dispatch({ changes: { from: insertAt, insert: '\n  padding: var(--sp' }, selection: { anchor: insertAt + '\n  padding: var(--sp'.length }, userEvent: 'input.type' });
+    let list = null;
+    for (let i = 0; i < 40 && !list; i++) {
+      await wait(50);
+      list = document.body.querySelector('.cm-tooltip-autocomplete');
+    }
+    check('typing var(-- opens the completion list', !!list, 'no .cm-tooltip-autocomplete on the page');
+    const rows = list ? [...list.querySelectorAll('li')].map((li) => li.textContent) : [];
+    check('with the project\'s variables that match, value beside the name', rows.some((r) => r.includes('--space-4') && r.includes('1rem')), JSON.stringify(rows));
+    check('and not the ones that do not', !rows.some((r) => r.includes('--brand')), JSON.stringify(rows));
+    check('and the half-typed rule is not written meanwhile', writes.length === 3, `${writes.length} writes`);
+  }
+
   root.unmount();
   panel.remove();
 
@@ -204,7 +223,7 @@ const check = (what, condition, detail) => {
     console.error(`css-code-panel: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
     process.exit(1);
   }
-  console.log(`css-code-panel: ${checked} passed  [first section, writes on debounce, keeps typed text, waits on bad CSS]`);
+  console.log(`css-code-panel: ${checked} passed  [first section, writes on debounce, keeps typed text, waits on bad CSS, completes variables]`);
   process.exit(0);
 })().catch((err) => {
   console.error(err);

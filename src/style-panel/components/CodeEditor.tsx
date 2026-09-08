@@ -4,6 +4,7 @@ import { css } from '@codemirror/lang-css'
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { search } from '@codemirror/search'
 import { Decoration, EditorView } from '@codemirror/view'
+import type { Extension } from '@codemirror/state'
 import { tags } from '@lezer/highlight'
 import './CodeEditor.css'
 
@@ -23,6 +24,8 @@ type CodeEditorProps = {
   className?: string
   minHeight?: string
   tokenHighlights?: CodeEditorTokenHighlight[]
+  /** Anything an editor wants beyond the language: completion, say. */
+  extensions?: Extension[]
   onChange?: (value: string) => void
   onSelectionChange?: (position: number) => void
 }
@@ -72,9 +75,41 @@ const codeEditorTheme = EditorView.theme({
     outlineOffset: '-1px',
   },
   '.cm-content ::selection': {
-    color: 'var(--selection-text)',
     backgroundColor: 'var(--selection)',
     color: 'var(--color-text-primary)',
+  },
+  // The completion list, drawn like the panel's own menus: a raised surface,
+  // the panel's border and shadow, the selection colour on the current row,
+  // and the value beside each variable in the muted voice of a hint.
+  '.cm-tooltip': {
+    backgroundColor: 'var(--color-bg-surface-raised)',
+    border: 'var(--border-width-thin) solid var(--color-border-strong)',
+    borderRadius: 'var(--radius-sm)',
+    boxShadow: 'var(--shadow-md)',
+    color: 'var(--color-text-primary)',
+    fontFamily: 'var(--font-family-mono)',
+    fontSize: 'var(--font-size-xs)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+    fontFamily: 'var(--font-family-mono)',
+    maxHeight: '14em',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+    padding: '3px 8px',
+    lineHeight: '1.4',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: 'var(--selection)',
+    color: 'var(--color-text-primary)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail': {
+    marginLeft: '1em',
+    fontStyle: 'normal',
+    color: 'var(--color-text-tertiary)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete .cm-completionMatchedText': {
+    textDecoration: 'none',
+    color: 'var(--color-info)',
   },
 }, { dark: true })
 
@@ -106,6 +141,7 @@ export function CodeEditor({
   className,
   minHeight = '124px',
   tokenHighlights = [],
+  extensions: extra = [],
   onChange,
   onSelectionChange,
 }: CodeEditorProps) {
@@ -142,10 +178,11 @@ export function CodeEditor({
       ]
       : []
 
-    if (!highlights.length) return [...codeEditorExtensions[language], ...selectionExtensions]
+    if (!highlights.length) return [...codeEditorExtensions[language], ...extra, ...selectionExtensions]
 
     return [
       ...codeEditorExtensions[language],
+      ...extra,
       EditorView.decorations.of((view) => {
         const docLength = view.state.doc.length
         const ranges = highlights
@@ -156,7 +193,7 @@ export function CodeEditor({
       }),
       ...selectionExtensions,
     ]
-  }, [language, onSelectionChange, tokenHighlights, value.length])
+  }, [language, onSelectionChange, tokenHighlights, value.length, extra])
 
   return (
     <ReactCodeMirror
