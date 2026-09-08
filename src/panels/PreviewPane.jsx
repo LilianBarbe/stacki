@@ -80,6 +80,20 @@ export function deviceForWidth(px) {
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
+// A pinned width is shown for real: a frame that doesn't fit the pane is
+// scaled down rather than cut off, so the page inside still lays out at the
+// width that was asked for — 3000px really is 3000px to its media queries.
+// The bounds are what you can type or drag to.
+const MIN_FRAME_W = 240;
+const MAX_FRAME_W = 8000;
+// The gutter a pinned frame keeps either side of itself, and top and bottom.
+const FRAME_GUTTER = 12;
+const FRAME_INSET = 16;
+// A frame always fits the pane, so the zoom is never more than 1:1 — asking
+// for a smaller one is asking for a wider page, which is the same thing said
+// the other way round.
+const MIN_ZOOM_PCT = 1;
+
 export default function PreviewPane({
   spacingHover,
   devUrl,
@@ -361,10 +375,14 @@ export default function PreviewPane({
   const wrapRef = React.useRef(null);
   const frameRef = React.useRef(null);
   const [wrapWidth, setWrapWidth] = React.useState(null);
+  const [wrapHeight, setWrapHeight] = React.useState(null);
   React.useLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
-    const measure = () => setWrapWidth(el.clientWidth);
+    const measure = () => {
+      setWrapWidth(el.clientWidth);
+      setWrapHeight(el.clientHeight);
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -373,20 +391,127 @@ export default function PreviewPane({
 
   const selectDevice = (key) => setDevice(key);
 
-  // Which breakpoint the canvas is actually sitting in. Picking Tablet or
-  // Phone pins a width, so those agree with themselves; Desktop fills the
-  // pane and a drag sets its own width, and in both cases the window is what
-  // decides — resize it narrow enough and the page is being shown at phone
-  // width whatever button was last clicked. Highlight what's true, not what
-  // was asked for. Canvas is every breakpoint at once, so it stays put.
-  // What the page inside actually gets: a pinned width, but never more than
-  // the pane can give it — squeeze the window with Tablet selected and the
-  // frame is narrower than 768, so the page is laying out as a phone.
-  const shownWidth = Math.min(width ?? Infinity, wrapWidth ?? Infinity);
+  // Which breakpoint the canvas is actually sitting in. A pinned width —
+  // Tablet, Phone, a typed size, a drag — is honoured whatever the pane can
+  // spare, by scaling the frame down, so it agrees with itself. Desktop
+  // fills the pane, and there the window is what decides: squeeze it narrow
+  // enough and the page really is laying out as a phone whatever button was
+  // last clicked. Highlight what's true, not what was asked for. Canvas is
+  // every breakpoint at once, so it stays put.
+  const shownWidth = width ?? wrapWidth;
   const activeDevice = React.useMemo(() => {
     if (device === 'canvas') return 'canvas';
     return deviceForWidth(shownWidth) || device;
   }, [device, shownWidth]);
+
+  // The frame always fits the pane: a width past what the pane can show at
+  // 1:1 is drawn smaller, never cropped and never scrolled to. So the width
+  // and the zoom are one value seen twice — the pane can show availW pixels
+  // at 1:1, and asking for more of them makes them smaller in proportion.
+  // Both fields below write the same thing, which is why changing either
+  // one still fits.
+  const availW = wrapWidth == null ? null : Math.max(120, wrapWidth - FRAME_GUTTER * 2);
+  const scale = width && availW ? Math.min(1, availW / width) : 1;
+  const scaleRef = React.useRef(1);
+  scaleRef.current = scale;
+  // Overlays live inside the scaled frame, so their chrome — outlines,
+  // labels, drag handles — would shrink with it. Counter-scaling keeps them
+  // the size they always are on screen (up to a point: at 20% a label
+  // blown up 5× would cover the page it names).
+  const frameZoom = Math.min(1 / scale, 3);
+  // Scaled from the top-left corner, then placed by hand at the offset that
+  // centres it. The height moves against the scale so the same slab of pane
+  // is filled at any zoom — which is also the truth of it, since a page
+  // shrunk to fit is showing you more of itself.
+  const framePlaced = wrapWidth != null && wrapHeight != null;
+  // Filling the pane means exactly that — no gutter, no inset, no zoom — but
+  // it is placed by the same rule as a pinned width, so that switching
+  // between the two is one animation and not a jump.
+  const inset = width ? FRAME_INSET : 0;
+  const scaledW = (width ?? wrapWidth ?? 0) * scale;
+  const offsetX =
+    width && framePlaced ? Math.max(FRAME_GUTTER, Math.round((wrapWidth - scaledW) / 2)) : 0;
+  const frameHeight =
+    customH ?? (framePlaced ? Math.round((wrapHeight - inset * 2) / scale) : null);
+
+  // The width readout doubles as the way in: type a size, or nudge it with
+  // the arrow keys. It follows the frame — a breakpoint click, a drag, or
+  // just a resized window while Desktop fills the pane — except while it is
+  // being typed into, which must not fight the person typing.
+  const readWidth = Math.round(shownWidth || 0);
+  const [sizeText, setSizeText] = React.useState('');
+  const [sizeTyping, setSizeTyping] = React.useState(false);
+  React.useEffect(() => {
+    if (!sizeTyping) setSizeText(readWidth ? String(readWidth) : '');
+  }, [readWidth, sizeTyping]);
+
+  const applyWidth = (px) => {
+    setCustomW(clamp(Math.round(px), MIN_FRAME_W, MAX_FRAME_W));
+    setDevice('custom');
+  };
+
+  const commitSize = () => {
+    const n = parseInt(sizeText, 10);
+    if (Number.isFinite(n) && n > 0) applyWidth(n);
+    else setSizeText(readWidth ? String(readWidth) : '');
+  };
+  const onSizeKey = (e) => {
+    if (e.key === 'Enter') {
+      commitSize();
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      setSizeText(readWidth ? String(readWidth) : '');
+      e.currentTarget.blur();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const step = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1);
+      const base = parseInt(sizeText, 10);
+      const next = clamp((Number.isFinite(base) ? base : readWidth) + step, MIN_FRAME_W, MAX_FRAME_W);
+      setSizeText(String(next));
+      applyWidth(next);
+    }
+  };
+
+  // Same deal for the zoom, except that it writes through the width: at 50%
+  // the pane shows twice the pixels it does at 1:1, so that is the width it
+  // sets. Past 100% would mean a frame smaller than the pane, which is a
+  // narrower page — say that with the px field instead.
+  const readZoom = Math.round(scale * 100);
+  const [zoomText, setZoomText] = React.useState('');
+  const [zoomTyping, setZoomTyping] = React.useState(false);
+  React.useEffect(() => {
+    if (!zoomTyping) setZoomText(String(readZoom));
+  }, [readZoom, zoomTyping]);
+
+  const applyZoom = (pct) => {
+    if (!availW) return;
+    applyWidth(availW / (clamp(pct, MIN_ZOOM_PCT, 100) / 100));
+  };
+  const commitZoom = () => {
+    const n = parseInt(zoomText, 10);
+    if (Number.isFinite(n) && n > 0) applyZoom(n);
+    else setZoomText(String(readZoom));
+  };
+  const onZoomKey = (e) => {
+    if (e.key === 'Enter') {
+      commitZoom();
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      setZoomText(String(readZoom));
+      e.currentTarget.blur();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const step = (e.shiftKey ? 10 : 1) * (e.key === 'ArrowUp' ? 1 : -1);
+      const base = parseInt(zoomText, 10);
+      const next = clamp((Number.isFinite(base) ? base : readZoom) + step, MIN_ZOOM_PCT, 100);
+      setZoomText(String(next));
+      applyZoom(next);
+    }
+  };
+
+  // The way back, one click, and only there when there is a way back: at 1:1
+  // the pane is already showing every pixel it has.
+  const atOneToOne = scale > 0.995;
 
   // Any breakpoint change drops the drag-resize override — a click, a 1–4
   // keypress, or App resetting the pane to desktop when a project opens.
@@ -431,26 +556,30 @@ export default function PreviewPane({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Drag-resize from the edge handles. The frame is horizontally centered,
-  // so a side handle changes the width by twice the pointer movement.
+  // so a side handle changes the width by twice the pointer movement — and
+  // once the frame is zoomed to fit, a screen pixel is worth more than a
+  // page pixel, so each step is measured against the scale it happened at
+  // (which the drag itself keeps changing).
   const startResize = (edge) => (e) => {
     e.preventDefault();
     const frame = frameRef.current;
-    const wrap = wrapRef.current;
-    if (!frame || !wrap) return;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startW = frame.offsetWidth;
-    const startH = frame.offsetHeight;
+    if (!frame) return;
+    let lastX = e.clientX;
+    let lastY = e.clientY;
+    let w = frame.offsetWidth;
+    let h = frame.offsetHeight;
     setResizing(true);
     document.body.style.cursor = edge === 's' ? 'row-resize' : 'col-resize';
     const onMove = (ev) => {
+      const k = scaleRef.current || 1;
       if (edge === 's') {
-        const h = Math.round(startH + (ev.clientY - startY));
-        setCustomH(clamp(h, 160, Math.max(160, wrap.clientHeight - 32)));
+        h = clamp(h + (ev.clientY - lastY) / k, 160, 20000);
+        lastY = ev.clientY;
+        setCustomH(Math.round(h));
       } else {
-        const dx = ev.clientX - startX;
-        const w = Math.round(startW + (edge === 'e' ? 2 : -2) * dx);
-        setCustomW(clamp(w, 280, Math.max(280, wrap.clientWidth - 24)));
+        w = clamp(w + ((edge === 'e' ? 2 : -2) * (ev.clientX - lastX)) / k, MIN_FRAME_W, MAX_FRAME_W);
+        lastX = ev.clientX;
+        setCustomW(Math.round(w));
         setDevice('custom');
       }
     };
@@ -520,6 +649,60 @@ export default function PreviewPane({
             </button>
           ))}
         </div>
+        {/* The size the page is actually being laid out at and how big it is
+            being drawn — both readouts, both editable. Hidden on the canvas,
+            which is every size at once and has its own zoom, and when there
+            is no preview to measure. */}
+        {url && device !== 'canvas' && (
+          <div className="size-field">
+            <input
+              className="size-w"
+              value={sizeText}
+              onChange={(e) => setSizeText(e.target.value.replace(/[^0-9]/g, ''))}
+              onFocus={(e) => {
+                setSizeTyping(true);
+                e.target.select();
+              }}
+              onBlur={() => {
+                setSizeTyping(false);
+                commitSize();
+              }}
+              onKeyDown={onSizeKey}
+              inputMode="numeric"
+              title="Width the page is laid out at — type a size, ↑↓ to nudge"
+              aria-label="Preview width in pixels"
+            />
+            <span className="size-unit">px</span>
+            <span className="size-sep" />
+            <input
+              className="size-z"
+              value={zoomText}
+              onChange={(e) => setZoomText(e.target.value.replace(/[^0-9]/g, ''))}
+              onFocus={(e) => {
+                setZoomTyping(true);
+                e.target.select();
+              }}
+              onBlur={() => {
+                setZoomTyping(false);
+                commitZoom();
+              }}
+              onKeyDown={onZoomKey}
+              inputMode="numeric"
+              title="How big that is drawn — type a zoom, ↑↓ to nudge"
+              aria-label="Preview zoom percentage"
+            />
+            <span className="size-unit">%</span>
+            {!atOneToOne && (
+              <button
+                className="size-reset"
+                title="Back to 1:1 — the widest the pane can show at full size"
+                onClick={() => selectDevice('desktop')}
+              >
+                100%
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="preview-frame-wrap" ref={wrapRef}>
@@ -531,8 +714,18 @@ export default function PreviewPane({
             className={`frame-sized ${width ? '' : 'full'} ${resizing ? 'resizing' : ''}`}
             style={{
               width: width ?? wrapWidth ?? '100%',
-              maxWidth: width ? 'calc(100% - 24px)' : '100%',
-              ...(customH != null ? { height: customH, bottom: 'auto' } : {}),
+              '--frame-zoom': frameZoom,
+              // Placed by hand rather than by the stylesheet's centering, so
+              // that a frame too big for the pane spills to the right, where
+              // scrolling can reach it, instead of off both edges at once.
+              ...(framePlaced
+                ? {
+                    left: 0,
+                    transform: `translateX(${offsetX}px) scale(${scale})`,
+                    transformOrigin: 'top left',
+                  }
+                : null),
+              ...(frameHeight != null ? { height: frameHeight, bottom: 'auto' } : {}),
             }}
           >
             <div className="frame-clip">

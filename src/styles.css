@@ -2909,6 +2909,52 @@ body > .embed-editor_provenance {
   pointer-events: none;
 }
 
+/* Two readouts next to the breakpoints they agree with, both editable: the
+   width the page is laid out at — so a size with no button (3000px, a
+   client's odd laptop) is one you can simply type — and the zoom it is drawn
+   at, with one button back to the two sizes worth returning to. */
+.size-field {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 5px 3px 8px;
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.size-field:focus-within { color: var(--text); }
+.size-field input {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.size-field input:focus { outline: none; }
+.size-field input.size-w { width: 4ch; }
+.size-field input.size-z { width: 3ch; }
+.size-unit { color: var(--text-faint); }
+.size-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 4px;
+  background: var(--border);
+}
+.size-reset {
+  margin-left: 2px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-faint);
+  background: transparent;
+}
+.size-reset:hover:not(:disabled) { color: var(--text); background: rgba(255, 255, 255, 0.08); }
+
 .frame-sized {
   position: absolute;
   top: 16px; bottom: 16px;
@@ -2918,6 +2964,7 @@ body > .embed-editor_provenance {
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.55);
   transition:
     width 0.3s cubic-bezier(0.3, 0.7, 0.3, 1),
+    transform 0.3s cubic-bezier(0.3, 0.7, 0.3, 1),
     top 0.3s cubic-bezier(0.3, 0.7, 0.3, 1),
     bottom 0.3s cubic-bezier(0.3, 0.7, 0.3, 1),
     border-radius 0.3s cubic-bezier(0.3, 0.7, 0.3, 1);
@@ -3018,9 +3065,9 @@ body > .embed-editor_provenance {
 }
 .preview-frame-wrap:hover .rz-handle { opacity: 1; }
 .rz-handle:hover, .frame-sized.resizing .rz-handle { background: var(--accent); opacity: 1; }
-.rz-w { left: -12px; top: 50%; transform: translateY(-50%); width: 5px; height: 56px; cursor: col-resize; }
-.rz-e { right: -12px; top: 50%; transform: translateY(-50%); width: 5px; height: 56px; cursor: col-resize; }
-.rz-s { bottom: -12px; left: 50%; transform: translateX(-50%); height: 5px; width: 56px; cursor: row-resize; }
+.rz-w { left: calc(-12px * var(--frame-zoom, 1)); top: 50%; transform: translateY(-50%) scale(var(--frame-zoom, 1)); width: 5px; height: 56px; cursor: col-resize; }
+.rz-e { right: calc(-12px * var(--frame-zoom, 1)); top: 50%; transform: translateY(-50%) scale(var(--frame-zoom, 1)); width: 5px; height: 56px; cursor: col-resize; }
+.rz-s { bottom: calc(-12px * var(--frame-zoom, 1)); left: 50%; transform: translateX(-50%) scale(var(--frame-zoom, 1)); height: 5px; width: 56px; cursor: row-resize; }
 /* In Fill mode the frame touches the canvas edges, so keep the handles inside. */
 .frame-sized.full .rz-w { left: 5px; }
 .frame-sized.full .rz-e { right: 5px; }
@@ -3028,9 +3075,10 @@ body > .embed-editor_provenance {
 
 .rz-readout {
   position: absolute;
-  bottom: 10px;
+  bottom: calc(10px * var(--frame-zoom, 1));
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) scale(var(--frame-zoom, 1));
+  transform-origin: bottom center;
   z-index: 6;
   background: #232323;
   border: 1px solid var(--border-strong);
@@ -3697,6 +3745,7 @@ body > .embed-editor_provenance {
    with either would say they were the same kind of space. */
 .spacing-band.is-gap { --band: #a855f7; }
 .spacing-band-label {
+  transform: scale(var(--frame-zoom, 1));
   padding: 1px 5px 2px;
   border-radius: 4px;
   background: var(--band);
@@ -3711,19 +3760,21 @@ body > .embed-editor_provenance {
 /* Canvas node outlines — overlaid on the preview, never in the page   */
 /* ------------------------------------------------------------------ */
 
+/* Widths and label sizes are in screen pixels, not page ones: a frame zoomed
+   out to fit still gets a hairline outline and a readable name chip. */
 .node-outline {
   position: absolute;
   z-index: 4;
   pointer-events: none;
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+  outline: calc(1px * var(--frame-zoom, 1)) solid var(--accent);
+  outline-offset: calc(-1px * var(--frame-zoom, 1));
 }
 .node-outline.component { outline-color: var(--green); }
 /* Data-bound elements read as dynamic, same as loops. */
 .node-outline.map,
 .node-outline.bound { outline-color: #8b5cf6; }
 /* Selected: transparent inside, solid name chip above. */
-.node-outline.sel { outline-width: 2px; }
+.node-outline.sel { outline-width: calc(2px * var(--frame-zoom, 1)); }
 /* Hover: bare colored label above (no chip). Only components get a
    translucent fill — plain elements stay clear so their content reads, and a
    loop covers so much of the page that tinting it washes out everything
@@ -3733,7 +3784,8 @@ body > .embed-editor_provenance {
   position: absolute;
   top: 0;
   left: 0;
-  transform: translateY(-100%);
+  transform: translateY(-100%) scale(var(--frame-zoom, 1));
+  transform-origin: bottom left;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -3750,7 +3802,8 @@ body > .embed-editor_provenance {
 .node-outline.map .node-outline-tag,
 .node-outline.bound .node-outline-tag { background: #8b5cf6; }
 .node-outline-tag.inside {
-  transform: none;
+  transform: scale(var(--frame-zoom, 1));
+  transform-origin: top left;
   border-radius: 0 0 4px 0;
 }
 .node-outline.hover .node-outline-tag {
