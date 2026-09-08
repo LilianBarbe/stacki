@@ -1,7 +1,6 @@
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react'
-import { CodeEditor } from './components/CodeEditor'
 import FieldLabel from './components/FieldLabel'
 import { PropTip, ProvenanceLabel } from './components/PropTip'
 import Select, { type SelectOption } from './components/Select'
@@ -11,7 +10,9 @@ import DisplayControl, { DISPLAY_VALUES } from './DisplayControl'
 import DirectionControl from './DirectionControl'
 import AlignControl from './AlignControl'
 import ElementTokenPicker from './ElementTokenPicker'
-import { loadEmbedSource, saveEmbedSource } from './shared/tool-prefs'
+import { loadCssCodeOpen, loadEmbedSource, saveCssCodeOpen, saveEmbedSource } from './shared/tool-prefs'
+import CssCodeSection, { cssCodeKey, type CssCodeModel, type CssCodeSave } from './CssCodeSection'
+import { applyCssCode, collectCssCodeLeaves, cssCodeSkeleton, renderCssCode, ruleMatchesSelector } from './lib/css-code-sync'
 import { handleArrowStep } from './lib/number-step'
 import { hslaToRgba } from './lib/color'
 import { clampNonNegative, filterCssProperties } from './lib/css-properties'
@@ -57,7 +58,6 @@ import {
   queryKey,
   splitQuery,
   reorderDeclarations,
-  replaceRuleCss,
   setDeclarationValue,
   splitRuleSelectorAt,
 } from './lib/css'
@@ -94,6 +94,7 @@ import {
   type EmbedScan,
   type NativeWriteTarget,
 } from './lib/webflow'
+import { previewLiveCss, settleLiveCss } from './lib/live-css'
 import type { BreakpointId, ElementSnapshot, NativeModel, ParsedDeclaration, ParsedRule, Specificity } from './lib/types'
 import './embed-editor.css'
 import { splitTopLevelSpaces } from './lib/background'
@@ -705,10 +706,11 @@ function AddPropertyRow({ busy, onAdd }: { busy: boolean; onAdd: (prop: string, 
 // ─────────────────────────── Section block ───────────────────────────
 
 // A collapsible section header (Webflow's chevron + label) wrapping a group of
-// controls. Open by default; collapse state is local to the block.
-function SectionBlock({ label, headerAction, defaultOpen = true, mark = null, children }: { label: string; headerAction?: ReactNode; defaultOpen?: boolean; mark?: 'own' | 'other' | null; children: ReactNode }) {
+// controls. Open by default; collapse state is local to the block, and told to
+// `onOpenChange` for a block that remembers it.
+function SectionBlock({ label, headerAction, defaultOpen = true, mark = null, onOpenChange, children }: { label: string; headerAction?: ReactNode; defaultOpen?: boolean; mark?: 'own' | 'other' | null; onOpenChange?: (open: boolean) => void; children: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen)
-  const toggle = () => setOpen((value) => !value)
+  const toggle = () => setOpen((value) => { onOpenChange?.(!value); return !value })
   return (
     <div className={`embed-editor_section-block ${open ? '' : 'is-collapsed'}`}>
       {/* A row (not one big button) so an optional action can sit next to the chevron
@@ -1866,9 +1868,8 @@ function StyleCard({
   liveSetProp,
   onSelectSelector,
   onAdd,
-  rawOpen,
-  onToggleRaw,
-  onSaveRaw,
+  cssCode,
+  onSaveCssCode,
   onRemoveRule,
 }: {
   snapshot: ElementSnapshot | undefined
@@ -1911,9 +1912,10 @@ function StyleCard({
   liveSetProp: (prop: string, value: string | null, important: boolean) => void
   onSelectSelector: (selector: string, prop?: string) => void
   onAdd: (prop: string, value: string, important: boolean) => void
-  rawOpen: boolean
-  onToggleRaw: () => void
-  onSaveRaw: (rule: ParsedRule, css: string) => void
+  /** The picked selector's rules as text, for the CSS Code section — null with
+   *  no selector picked. */
+  cssCode: CssCodeModel | null
+  onSaveCssCode: CssCodeSave
   onRemoveRule: (rule: ParsedRule) => void
 }) {
   const selectedRule = resolved.selectedRule
@@ -1935,13 +1937,9 @@ function StyleCard({
   }, [])
   const closeProvenance = useCallback(() => setProvenance(null), [])
   const suppressProvenanceReopen = useCallback((prop: string) => { suppressProvenance.current = prop }, [])
-  const [rawDraft, setRawDraft] = useState('')
-
-  const beginRaw = () => {
-    if (!selectedRule) return
-    setRawDraft(selectedRule.node.toString())
-    onToggleRaw()
-  }
+  // Read once: the section keeps its own open state from there and writes
+  // each change back, so this is only where it starts.
+  const [cssCodeOpen] = useState(() => loadCssCodeOpen())
 
   // Always show Layout + Size so the panel is consistent across elements, not
   // only those that already set a property in that section.
@@ -2078,23 +2076,20 @@ function StyleCard({
       </div>
       {sourceNote ? <p className="embed-editor_source-note">{sourceNote}</p> : null}
 
-      {rawOpen && selectedRule ? (
-        <div className="embed-editor_rule-edit">
-          <CodeEditor
-            value={rawDraft}
-            language="css"
-            ariaLabel={`CSS for ${selectedRule.selectorText}`}
-            minHeight="90px"
-            onChange={setRawDraft}
-            className="embed-editor_rule-code"
-          />
-          <div className="embed-editor_rule-actions">
-            <button className="u-button is-ghost is-small" type="button" onClick={onToggleRaw} disabled={busy}>Cancel</button>
-            <button className="u-button is-primary is-small" type="button" onClick={() => onSaveRaw(selectedRule, rawDraft)} disabled={busy}>Save rule</button>
-          </div>
-        </div>
-      ) : (
-        <div className="embed-editor_decls">
+      <div className="embed-editor_decls">
+          {/* The picked selector's CSS as text, ahead of the fields: every rule
+              for it in the file, editable as one. Keyed on selector + file so a
+              new pick starts a new document (and flushes the old one's typing). */}
+          {cssCode ? (
+            <SectionBlock
+              label="CSS Code"
+              defaultOpen={cssCodeOpen}
+              onOpenChange={saveCssCodeOpen}
+              headerAction={cssCode.fileLabel ? <span className="embed-editor_css-code-file" title="The file this CSS is written in">{cssCode.fileLabel}</span> : undefined}
+            >
+              <CssCodeSection key={cssCodeKey(cssCode.target)} model={cssCode} onSave={onSaveCssCode} />
+            </SectionBlock>
+          ) : null}
           {groups.map((group) => (
             <SectionBlock
               key={group.def.id}
@@ -2213,8 +2208,7 @@ function StyleCard({
               })()}
             </SectionBlock>
           ))}
-        </div>
-      )}
+      </div>
 
       <div className="embed-editor_rule-foot">
         <AddPropertyRow busy={busy} onAdd={onAdd} />
@@ -2246,7 +2240,12 @@ const BG_REFRESH_THROTTLE_MS = 4000
 /** Which stylesheets the host is offering, as a comparable string. */
 function sheetSignature(): string {
   const host = getHost()
-  return [...host.files, ...host.astroFiles].map((f) => f.path).join('|')
+  // The open file is part of it: opening a component moves that component's
+  // `<style is:global>` from the file list to the page model, and the panel
+  // has to change where it reads (and writes) it the moment that happens —
+  // not on the next background poll, during which an edit would have gone to
+  // the file behind the model's back.
+  return [host.openFilePath || '', ...host.files.map((f) => f.path), ...host.astroFiles.map((f) => f.path)].join('|')
 }
 // How often to poll the Designer for out-of-app edits (classes / attributes /
 // native styles). The API has no change events, so we re-read on this cadence and
@@ -2448,13 +2447,6 @@ export function withoutClasses(snapshot: ElementSnapshot | undefined, hidden: Re
   return { ...snapshot, classes, classList, attributes: { ...snapshot.attributes, class: classList.join(' ') } }
 }
 
-// Cache the component embed SOURCES (the expensive part: the per-component tree
-// DFS to find embeds) at module scope, reused across page switches and reopens.
-// The CODE is re-read on every build, so external edits to a component embed are
-// picked up (our own edits are saved, so a fresh read reflects them too). A forced
-// Rescan re-DFSes to catch added/removed component embeds.
-let cachedComponentSources: EmbedDoc['source'][] | null = null
-
 // Native class styles are determined by an element's class signature, so cache the
 // read NativeModel by that signature (module scope → survives reopen). A re-selected
 // element serves instantly from here while a background re-read reconciles; cleared
@@ -2534,7 +2526,6 @@ export default function EmbedEditor() {
   const [refreshing, setRefreshing] = useState(false)
   // True between showing page-level rules and the component embeds finishing.
   const [scanningMore, setScanningMore] = useState(false)
-  const [rawRuleId, setRawRuleId] = useState<string | null>(null)
   // The tokens (tag / classes / attrs) chosen in the header ClassPicker, defaulted
   // to the element's classes and re-defaulted when the selected element changes.
   const [selectedTokens, setSelectedTokens] = useState<string[]>([])
@@ -2628,7 +2619,7 @@ export default function EmbedEditor() {
   // resolve ancestor chains and show page-level rules) render first via
   // onPartial, then component embeds fill in. Reads within each phase run
   // concurrently (bounded by the read limiter in webflow.ts).
-  const buildContent = useCallback(async (onPartial?: (content: Content) => void, rescanComponents = false): Promise<Content> => {
+  const buildContent = useCallback(async (onPartial?: (content: Content) => void): Promise<Content> => {
     const page = await scanPage()
     pageInstancesRef.current = page.instances
     const pageScan: EmbedScan = {
@@ -2666,25 +2657,36 @@ export default function EmbedEditor() {
 
     // Page and component embeds both re-read their CODE fresh so out-of-app edits
     // show up; only the component tree DFS (finding which embeds exist) is cached.
-    const pagePromise = loadEmbedDocs(page.pageEmbeds, onDoc)
+    //
+    // A re-read that crosses one of the panel's own writes is not fresh, it is
+    // older than what the panel holds — so those hand back the held doc (see
+    // loadEmbedDocs). This is what kept a drag's value on the canvas but not in
+    // the field, and let the edit after it write the drag out of the file.
+    const held = new Map(docsRef.current.map((doc) => [doc.source.key, doc]))
+    const keep = (key: string) => held.get(key)
+    const pagePromise = loadEmbedDocs(page.pageEmbeds, onDoc, keep)
     const componentPromise = (async () => {
-      // Warm cache (and not a forced rescan): skip the DFS, just re-read the known
-      // component embeds' code — that's what catches external edits.
-      if (cachedComponentSources && !rescanComponents) {
-        return loadEmbedDocs(cachedComponentSources, onDoc)
-      }
-      // Cold / forced: DFS every component for its embeds (streamed) and cache the
-      // sources for next time.
-      const sources: EmbedDoc['source'][] = []
+      // Listed afresh on every build, never cached. The component sources used
+      // to be remembered at module scope from the first scan, and a source is
+      // not a fixed thing: a component's `<style is:global>` is read from its
+      // FILE while the page is open, and from the page MODEL once that
+      // component is opened — the file is then the model's to write, and
+      // styleSources leaves it out. The cache kept the file copy anyway, so
+      // an open component was styled through two docs at once. Edits landed
+      // in the file behind the model's back; the model never heard, showed
+      // the old values, and its next save would have written them back.
+      //
+      // What the page scan already lists is not read a second time.
+      const pageKeys = new Set(page.pageEmbeds.map((embed) => embed.key))
       const docs: EmbedDoc[] = []
       const errors: Content['errors'] = []
       await scanAllComponents(async (embeds) => {
-        sources.push(...embeds)
-        const res = await loadEmbedDocs(embeds, onDoc)
+        const extra = embeds.filter((embed) => !pageKeys.has(embed.key))
+        if (!extra.length) return
+        const res = await loadEmbedDocs(extra, onDoc, keep)
         docs.push(...res.docs)
         errors.push(...res.errors)
       })
-      cachedComponentSources = sources
       return { docs, errors }
     })()
     const [pageResult, componentResult] = await Promise.all([pagePromise, componentPromise])
@@ -2769,7 +2771,7 @@ export default function EmbedEditor() {
   // the component was closed (so the fresh page read reflects them). onPartial
   // (foreground only) renders the page-level rules as soon as they're ready,
   // before component embeds finish loading.
-  const rebuildAndStore = useCallback(async (onPartial?: (content: Content) => void, rescanComponents = false): Promise<Content> => {
+  const rebuildAndStore = useCallback(async (onPartial?: (content: Content) => void): Promise<Content> => {
     const wasInComponent = inComponentRef.current
     const emitPartial = onPartial
       ? (partial: Content) => {
@@ -2777,10 +2779,10 @@ export default function EmbedEditor() {
           onPartial(partial)
         }
       : undefined
-    let content = await buildContent(emitPartial, rescanComponents)
+    let content = await buildContent(emitPartial)
     if (wasInComponent && !content.scan.inComponentContext && pendingKeysRef.current.size) {
       await flushPending()
-      content = await buildContent(undefined, rescanComponents)
+      content = await buildContent()
     }
     storeContent(content)
     return content
@@ -2988,7 +2990,7 @@ export default function EmbedEditor() {
       if (cached) showContent(cached)
       setScanningMore(true)
       try {
-        const content = await rebuildAndStore((partial) => showContent(partial), opts.force)
+        const content = await rebuildAndStore((partial) => showContent(partial))
         showContent(content)
       } catch (error) {
         if (seq !== seqRef.current || selectedRef.current) return
@@ -3021,10 +3023,9 @@ export default function EmbedEditor() {
     try {
       const content = await rebuildAndStore((partial) => {
         if (seq === seqRef.current) void applyResolve(element, partial, seq)
-      }, opts.force)
+      })
       if (seq !== seqRef.current) return
       await applyResolve(element, content, seq)
-      setRawRuleId(null)
     } catch (error) {
       if (seq !== seqRef.current) return
       setPhase('ready')
@@ -3238,6 +3239,9 @@ export default function EmbedEditor() {
       // first put a full model rebuild (and, for a <style> node, the page save behind it)
       // between the click and the canvas, so the edit showed up seconds late.
       const res = await writeEmbedDoc(doc)
+      // The canvas was shown the live values ahead of the file; the file has
+      // them now, so the preview can go once the page has caught up.
+      settleLiveCss()
       await refreshDerived()
       if (!res.ok) {
         // A page-level embed can't be written while a component is open. Keep the
@@ -3275,6 +3279,9 @@ export default function EmbedEditor() {
     if (!doc) return
     decl.node.value = value
     decl.node.important = important
+    // The canvas first — it is told the rule outright, and moves this frame.
+    // The file write behind it is what the dev server will eventually show.
+    previewLiveCss(rule)
     void writeEmbedDoc(doc, true).then((res) => {
       if (!res.ok && inComponentRef.current && !doc.source.fromComponent) markPending(doc.source.key)
     })
@@ -3340,6 +3347,8 @@ export default function EmbedEditor() {
     }
     if (target) { target.value = value; target.important = important }
     else appendDecl(rule.node, prop, value, important)
+    // The canvas first, this frame; the file write follows (see onLiveCommitValue).
+    previewLiveCss(rule)
     void writeEmbedDoc(doc, true).then((res) => {
       if (!res.ok && inComponentRef.current && !doc.source.fromComponent) markPending(doc.source.key)
     })
@@ -3361,7 +3370,11 @@ export default function EmbedEditor() {
     } else if (target) {
       target.remove()
     }
+    // Put back on the canvas at once too, then let the preview go: this is the
+    // end of the burst, and the write below is what the page will settle on.
+    previewLiveCss(rule)
     void writeEmbedDoc(doc, true).then((res) => {
+      settleLiveCss()
       if (!res.ok && inComponentRef.current && !doc.source.fromComponent) markPending(doc.source.key)
     })
   }, [docByKey, markPending])
@@ -3371,14 +3384,39 @@ export default function EmbedEditor() {
   const onRemoveRule = useCallback((rule: ParsedRule) => {
     void applyEdit(rule, () => removeRule(splitForEdit(rule).rule))
   }, [applyEdit, splitForEdit])
-  const onSaveRaw = useCallback((rule: ParsedRule, css: string) => {
-    void applyEdit(rule, () => {
-      const result = replaceRuleCss(rule, css)
-      if (!result.ok) { setSaveError(`Invalid CSS: ${result.error}`); return false }
-      setRawRuleId(null)
-      return true
-    })
-  }, [applyEdit])
+
+  // The CSS Code section's write: the picked selector's rules in one file,
+  // brought in line with the text. Everything is looked up at write time —
+  // the section keys its writes on (selector, file), not on rule objects,
+  // since a write of its own rebuilds those.
+  const saveCssCode = useCallback<CssCodeSave>(async (text, target) => {
+    const doc = target.docKey ? docsRef.current.find((d) => d.source.key === target.docKey) : null
+    if (!doc) return { ok: false, error: 'No stylesheet to write to.' }
+    const rules = (contentRef.current?.rules ?? []).filter((rule) => rule.embedKey === doc.source.key && ruleMatchesSelector(rule, target.selector))
+    const leaves = collectCssCodeLeaves(rules)
+    const region = rules.length ? doc.regions[rules[0].regionIndex] : doc.regions.find((r) => r.root)
+    if (!region?.root) return { ok: false, error: region?.parseError ? `The file has a CSS error: ${region.parseError}` : 'No <style> block to write into.' }
+    const result = applyCssCode(region.root, leaves, text)
+    if (!result.ok) return result
+    if (!result.changed) return { ok: true }
+    setStatus('Saving…')
+    const res = await writeEmbedDoc(doc)
+    await refreshDerived()
+    if (!res.ok) {
+      if (inComponentRef.current && !doc.source.fromComponent) {
+        markPending(doc.source.key)
+        setStatus('Held — this rule lives in the page, so the canvas shows it once you leave the component.')
+        return { ok: true }
+      }
+      setSaveError(res.error)
+      return { ok: false, error: res.error }
+    }
+    clearPending(doc.source.key)
+    setStatus(doc.source.fromComponent
+      ? `Saved. This embed is shared by every instance of ${doc.source.componentName ?? 'the component'}.`
+      : 'Saved to embed.')
+    return { ok: true }
+  }, [clearPending, markPending, refreshDerived])
 
   // Scaffold: create the rule inside its query, then persist — mirrors applyEdit's
   // optimistic-refresh + deferred-save-in-component behavior.
@@ -3422,10 +3460,6 @@ export default function EmbedEditor() {
       if (!res.ok) setStatus(`Couldn't open it on the canvas: ${res.error}`)
     })
   }, [docByKey])
-
-  const toggleRaw = useCallback((ruleId: string) => {
-    setRawRuleId((cur) => (cur === ruleId ? null : ruleId))
-  }, [])
 
   // Keep the resolved view at module scope so the next mount starts from it (see
   // persistedView). Written as it changes rather than on unmount, which React skips
@@ -4625,6 +4659,32 @@ export default function EmbedEditor() {
     return map
   }, [sourceOptions])
 
+  // What the CSS Code section shows: every rule for the picked selector in ONE
+  // file, as text. The file is the source picked above when it has any, else
+  // the one the current context's rule lives in, else the first that styles
+  // the selector; with none, the picked source, where the first declaration
+  // typed will create the rule. Rules are re-read whenever `scan` settles —
+  // that is when contentRef's rules were last rebuilt.
+  const cssCode = useMemo<CssCodeModel | null>(() => {
+    const selector = activeSelector.trim()
+    if (!selector) return null
+    const matched = (contentRef.current?.rules ?? []).filter((rule) => ruleMatchesSelector(rule, selector))
+    const docKeys: string[] = []
+    for (const rule of matched) if (!docKeys.includes(rule.embedKey)) docKeys.push(rule.embedKey)
+    const docKey = (sourceDoc && docKeys.includes(sourceDoc.source.key)) ? sourceDoc.source.key
+      : (selectedRule && docKeys.includes(selectedRule.embedKey)) ? selectedRule.embedKey
+        : docKeys[0] ?? sourceDoc?.source.key ?? null
+    const leaves = docKey ? collectCssCodeLeaves(matched.filter((rule) => rule.embedKey === docKey)) : []
+    const label = (key: string) => embedLabelByKey.get(key) ?? docByKey.get(key)?.source.label ?? key
+    return {
+      target: { selector, docKey },
+      text: leaves.length ? renderCssCode(leaves) : cssCodeSkeleton(selector),
+      fileLabel: docKey ? label(docKey) : null,
+      alsoIn: docKeys.filter((key) => key !== docKey).map(label),
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scan, activeSelector, sourceDoc, selectedRule, docByKey, embedLabelByKey])
+
   // Provided to every ProvenanceList so its embed chips can name (full label) and
   // navigate to the source embed on the canvas.
   const embedNav = useMemo(
@@ -4708,9 +4768,8 @@ export default function EmbedEditor() {
               liveSetProp={liveSetProp}
               onSelectSelector={onSelectSelector}
               onAdd={setProp}
-              rawOpen={selectedRule != null && rawRuleId === selectedRule.ruleId}
-              onToggleRaw={() => selectedRule && toggleRaw(selectedRule.ruleId)}
-              onSaveRaw={onSaveRaw}
+              cssCode={cssCode}
+              onSaveCssCode={saveCssCode}
               onRemoveRule={onRemoveRule}
             />
           </div>

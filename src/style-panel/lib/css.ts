@@ -778,19 +778,6 @@ export function reorderDeclarations(rule: ParsedRule, orderedDeclIds: string[]) 
   nodes.forEach((node) => rule.node.append(node))
 }
 
-/** Replace a rule's entire body by re-parsing edited CSS text for that rule. */
-export function replaceRuleCss(rule: ParsedRule, ruleCss: string): { ok: true } | { ok: false; error: string } {
-  try {
-    const parsed = postcss.parse(ruleCss)
-    const nodes = parsed.nodes.filter((n): n is Rule => n.type === 'rule')
-    if (!nodes.length) return { ok: false, error: 'No CSS rule found in the edited text.' }
-    rule.node.replaceWith(...parsed.nodes)
-    return { ok: true }
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) }
-  }
-}
-
 // ─────────────────────────── Renaming a query ───────────────────────────
 // A breakpoint is written once per block but meant once per file: a component
 // with four `@media (width >= 64rem)` blocks has one breakpoint in it, spelled

@@ -207,6 +207,61 @@ const LIVE_TABS = (labels, active) =>
   );
 }
 
+// --- a component's own CSS has to come across in the patch --------------------
+//
+// The style panel writes a rule into a component's `<style is:global>` block,
+// and the canvas did not move. Astro has no HMR module for that CSS — it is
+// rendered into the page — so the only news of the change is the full reload
+// this file turns into a patch, and the patch was skipping it: a
+// `<style data-vite-dev-id>` was pinned, on the grounds that Vite swaps its
+// own stylesheets in. Vite does, for a real .css file; for CSS that lives in
+// an .astro file nobody did, and the edit showed up only on refresh.
+{
+  const sheet = (id, css) => `<style data-vite-dev-id="${id}">${css}</style>`;
+  const FOOTER = '/src/components/Footer.astro?astro&type=style&index=0&lang.css';
+  const NAV = '/src/components/Nav.astro?astro&type=style&index=0&lang.css';
+
+  const prev = tree(sheet(NAV, '.nav{gap:1rem}') + sheet(FOOTER, '.footer_links{padding-bottom:2rem}'));
+  const next = tree(sheet(NAV, '.nav{gap:1rem}') + sheet(FOOTER, '.footer_links{padding-bottom:4rem}'));
+  const live = tree(sheet(NAV, '.nav{gap:1rem}') + sheet(FOOTER, '.footer_links{padding-bottom:2rem}'));
+
+  const threw = patch(live, prev, next);
+  check('a stylesheet the server rewrote can be patched', threw === null, threw);
+  // Found by hand: jsdom's selector engine will not take a `?` in an attribute
+  // value, and these ids are query strings.
+  const sheetIn = (root, id) => [...root.querySelectorAll('style')].find((s) => s.getAttribute('data-vite-dev-id') === id);
+  const css = (id) => sheetIn(live, id).textContent;
+  check('the edited rule reaches the page', css(FOOTER) === '.footer_links{padding-bottom:4rem}', css(FOOTER));
+  check('and the stylesheet next to it is untouched', css(NAV) === '.nav{gap:1rem}', css(NAV));
+
+  // Vite's own update got there first: the live text is neither rendering, and
+  // the newer one is Vite's. Same rule as any other text the client rewrote.
+  {
+    const held = tree(sheet(FOOTER, '.footer_links{padding-bottom:9rem}'));
+    patch(held, tree(sheet(FOOTER, '.footer_links{padding-bottom:2rem}')), tree(sheet(FOOTER, '.footer_links{padding-bottom:4rem}')));
+    check(
+      'a stylesheet Vite has already updated is left alone',
+      held.querySelector('style').textContent === '.footer_links{padding-bottom:9rem}',
+      held.querySelector('style').textContent
+    );
+  }
+
+  // Reading their contents makes their identity matter. The head carries one
+  // <style> per rendered component, none with an id or a class, so they lined
+  // up by position alone — and a rendering that drops one would have shifted
+  // the rest along, writing a component's CSS into its neighbour's tag.
+  {
+    const before = tree(sheet(NAV, '.nav{gap:1rem}') + sheet(FOOTER, '.footer_links{padding-bottom:2rem}'));
+    const after = tree(sheet(FOOTER, '.footer_links{padding-bottom:4rem}'));
+    const page = tree(sheet(NAV, '.nav{gap:1rem}') + sheet(FOOTER, '.footer_links{padding-bottom:2rem}'));
+    const fell = patch(page, before, after);
+    check('a component no longer rendered takes its stylesheet with it', fell === null, fell);
+    const left = [...page.querySelectorAll('style')];
+    check('the one that stayed is the right one', left.length === 1 && left[0].getAttribute('data-vite-dev-id') === FOOTER, left.map((s) => s.getAttribute('data-vite-dev-id')).join('|'));
+    check('carrying its own CSS, not its neighbour’s', left[0].textContent === '.footer_links{padding-bottom:4rem}', left[0].textContent);
+  }
+}
+
 // --- switching a variant is a different set of stylesheets -------------------
 //
 // The flicker at the top of this file had a second cause, found the same way:

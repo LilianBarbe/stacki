@@ -937,7 +937,18 @@ if (!process.isMainFrame) {
         const cs = window.getComputedStyle(el);
         const box = (kind) =>
           Object.fromEntries(SIDES.map((s) => [s, parseFloat(cs.getPropertyValue(`${kind}-${s}`)) || 0]));
-        return { padding: box('padding'), margin: box('margin'), gaps: gapBandsFor(el, cs) };
+        // What a length is worth here, so a value being dragged in the panel
+        // can be drawn in pixels before the page has laid it out (see
+        // withLiveSpacing in the app): em is this element's font, rem the
+        // root's, vw and vh the frame.
+        const rootFont = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+        const units = {
+          em: parseFloat(cs.fontSize) || rootFont,
+          rem: rootFont,
+          vw: window.innerWidth / 100,
+          vh: window.innerHeight / 100,
+        };
+        return { padding: box('padding'), margin: box('margin'), gaps: gapBandsFor(el, cs), units };
       } catch {
         // Whatever went wrong measuring one element, the boxes everything else
         // depends on still have to be reported.
@@ -1475,7 +1486,17 @@ if (!process.isMainFrame) {
     // body alone meant the element moved under an outline that had no idea
     // anything had happened — the outline only caught up when something else
     // (a scroll, an edit to the markup) asked for a fresh measurement.
-    new MutationObserver(remeasure).observe(document.documentElement, {
+    // The style panel's live preview (see applyLiveCss) rewrites one <style>
+    // per tick of a drag. That moves boxes, not markup: the rects are asked
+    // for again, but not the whole-page walk behind `remeasure` — which is
+    // most of a second on a large page, and would have been paid sixty times
+    // a second while the pointer moved.
+    new MutationObserver((records) => {
+      const liveOnly =
+        !!liveSheet && records.every((r) => r.target === liveSheet || liveSheet.contains(r.target));
+      if (liveOnly) queueRects();
+      else remeasure();
+    }).observe(document.documentElement, {
       childList: true,
       subtree: true,
       attributes: true,
@@ -1611,6 +1632,72 @@ if (!process.isMainFrame) {
     ),
   });
 
+  // --- the style panel's live preview ----------------------------------------
+  //
+  // A value being dragged or typed reaches the page here first, as the rule it
+  // belongs to re-spelled in full (see lib/live-css.ts), and is held in a
+  // <style> of its own at the end of <head> — after every stylesheet the dev
+  // server put there, so it wins the ties the written rule would win. The file
+  // write follows behind; when the panel says the edit has landed (`settle`),
+  // the sheet stays only until the page has caught up with the file — the next
+  // patch, or the next change to a stylesheet in <head> — and then goes, so the
+  // real rule is what shows and an undo is never masked by a preview. A page
+  // that never catches up drops it anyway, a moment later.
+  //
+  // It carries a class so the patcher never mistakes it for one of the
+  // server's own class-less <style> tags (see morphClient's findLive).
+  let liveSheet = null;
+  let liveSettle = null; // undoes the arming below
+  const dropLiveSheet = () => {
+    if (liveSettle) liveSettle();
+    liveSettle = null;
+    if (liveSheet) liveSheet.remove();
+    liveSheet = null;
+  };
+  const applyLiveCss = (d) => {
+    if (liveSettle) {
+      liveSettle(); // a new value while settling: the preview is live again
+      liveSettle = null;
+    }
+    if (typeof d.css === 'string') {
+      if (!liveSheet) {
+        liveSheet = document.createElement('style');
+        liveSheet.className = 'avb-live-css';
+      }
+      if (liveSheet.textContent !== d.css) liveSheet.textContent = d.css;
+      // Last in <head>, and put back there if anything has been added since.
+      const head = document.head || document.documentElement;
+      if (liveSheet !== head.lastElementChild) head.appendChild(liveSheet);
+    }
+    if (!d.settle || !liveSheet) return;
+    const sheet = liveSheet;
+    const done = () => {
+      if (liveSheet === sheet) dropLiveSheet();
+    };
+    const onMorphed = () => done();
+    // A real .css file is swapped in by the dev server's own client, with no
+    // patch: that shows up as a change to one of the <style>s in <head>.
+    const observer = new MutationObserver((records) => {
+      if (records.some((r) => r.target !== sheet && !sheet.contains(r.target))) done();
+    });
+    const timer = setTimeout(done, 1500);
+    document.addEventListener('avb:morphed', onMorphed);
+    try {
+      observer.observe(document.head || document.documentElement, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    } catch {
+      /* no head to watch: the timer still ends it */
+    }
+    liveSettle = () => {
+      clearTimeout(timer);
+      observer.disconnect();
+      document.removeEventListener('avb:morphed', onMorphed);
+    };
+  };
+
   window.addEventListener('message', (e) => {
     if (e.source !== window.parent) return;
     const d = e.data;
@@ -1700,6 +1787,10 @@ if (!process.isMainFrame) {
         },
         '*'
       );
+      return;
+    }
+    if (d?.type === 'avb:live-css') {
+      applyLiveCss(d);
       return;
     }
     if (d?.type === 'avb:track' && Array.isArray(d.paths)) {

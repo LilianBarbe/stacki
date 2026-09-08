@@ -512,6 +512,20 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     await enter(band('bottom'));
     check('the margin box reports margin', last()?.kind === 'margin', JSON.stringify(last()));
     await leave(band('bottom'));
+
+    // A drag tells the canvas its value as it goes — the number under the
+    // pointer, labelled and sized (`live`) from the drag itself, not from the
+    // file, which still says what it said before the press. On release the
+    // value stays on the label and the size goes back to being measured.
+    await showBox('padding');
+    hovers.length = 0;
+    const dragged = await dragOn(band('top'), { dy: -40 });
+    const written = value(dragged);
+    const during = hovers.filter((h) => h && h.live);
+    check('dragging reports the value under the pointer', during.length > 0 && during.every((h) => h.labels.top === written), JSON.stringify(hovers));
+    check('sized from that value, ahead of the page', during.every((h) => h.live.top === written && h.kind === 'padding' && h.sides.join() === 'top'), JSON.stringify(during));
+    check('never the value the file still has', !hovers.some((h) => h?.labels?.top === '3rem'), JSON.stringify(hovers));
+    check('and on release the label stays, the size is measured again', last()?.labels?.top === written && !last()?.live, JSON.stringify(last()));
   }
 
   // --- where those sides are on the page --------------------------------------

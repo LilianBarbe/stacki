@@ -23,6 +23,13 @@ export type SpacingHover = {
   /** Edges for padding and margin; axes for gap. */
   sides: Array<'top' | 'right' | 'bottom' | 'left' | 'row' | 'column'>
   labels: Record<string, string>
+  /**
+   * The values a drag is writing right now, per side — the authored length
+   * ("4.8rem"), so the canvas can size the band from it on the same frame as
+   * the number, instead of waiting for the page to lay out and be measured.
+   * Absent outside a drag; the band is then the measured one.
+   */
+  live?: Record<string, string>
 }
 
 export type HostState = {

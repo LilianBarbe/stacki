@@ -4,6 +4,7 @@
  *   - toolOrder:   the user's drag-reordered order of tool ids
  *   - lastTool:    the tool that was open when the app last closed (view state)
  *   - embedSource: the embed the Style Editor last targeted for new styles
+ *   - cssCodeOpen: whether the CSS Code section was left open
  * All best-effort: any read/parse failure falls back to a sensible default rather
  * than throwing, so a corrupt value never blocks the app from loading.
  */
@@ -90,4 +91,25 @@ export function orderTools<T extends { id: string }>(tools: T[], savedOrder: str
     if (remaining.has(tool.id)) result.push(tool)
   }
   return result
+}
+
+// Whether the style panel's CSS Code section was left open. It starts closed
+// — most edits go through the fields — and stays however it was last put.
+const CSS_CODE_OPEN_KEY = 'moden.embedEditor.cssCodeOpen'
+
+export function loadCssCodeOpen(): boolean {
+  try {
+    return localStorage.getItem(CSS_CODE_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function saveCssCodeOpen(open: boolean) {
+  try {
+    if (open) localStorage.setItem(CSS_CODE_OPEN_KEY, '1')
+    else localStorage.removeItem(CSS_CODE_OPEN_KEY)
+  } catch {
+    /* noop */
+  }
 }

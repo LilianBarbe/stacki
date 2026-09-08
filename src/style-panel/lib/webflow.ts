@@ -393,6 +393,120 @@ function serializeDoc(doc: EmbedDoc): string {
   return doc.regions[0]?.root?.toString() ?? doc.regions[0]?.css ?? ''
 }
 
+// ─────────────────────────── Reads that overlap writes ───────────────────────────
+//
+// The panel re-reads every source on a timer, to pick up edits made outside
+// it. It also writes those same sources — on every tick of a drag. The two ran
+// unaware of each other: a re-read that began before a write and landed after
+// it handed back the file as it was BEFORE the write, and that copy replaced
+// the panel's own. From then on the panel showed the old value while the
+// canvas showed the new one; and the next edit, made on that stale copy,
+// serialised it and wrote the previous edit out of the file again. On a drag,
+// which writes for a second or two straight, the window was hard to miss.
+//
+// So every write is noted here, per source, and a read is trusted only if no
+// write to that source was issued after it began, none was in flight when it
+// began, and the last one had settled a moment before. Anything else keeps the
+// doc the panel already holds — which is what it just wrote, so nothing is
+// lost by keeping it. The grace period is for a <style> node, whose write goes
+// into the page model and is only visible to a read once React has rendered
+// it; a file write is on disk before its IPC call returns.
+let writeGen = 0
+const lastWriteGen = new Map<string, number>()
+const writesInFlight = new Map<string, number>()
+const settledAt = new Map<string, number>()
+const WRITE_SETTLE_MS = 300
+
+function noteWriteStart(key: string) {
+  lastWriteGen.set(key, ++writeGen)
+  writesInFlight.set(key, (writesInFlight.get(key) || 0) + 1)
+}
+
+function noteWriteEnd(key: string) {
+  writesInFlight.set(key, Math.max(0, (writesInFlight.get(key) || 0) - 1))
+  settledAt.set(key, Date.now() + WRITE_SETTLE_MS)
+}
+
+/** Whether a read of `key` that began at `startGen` / `startedAt` can be believed. */
+function readIsFresh(key: string, startGen: number, startedAt: number, busyAtStart: boolean): boolean {
+  if (busyAtStart) return false
+  if ((lastWriteGen.get(key) ?? -1) > startGen) return false
+  return startedAt >= (settledAt.get(key) ?? 0)
+}
+
+// A stylesheet is written once per tick of a drag — sixty times a second on a
+// fast mouse — and each write was its own IPC call, sent without waiting for
+// the one before. They queued up in the main process and the file was still
+// being rewritten well after the pointer had stopped. Serialised per file, and
+// a call that finds one already in flight only records what it wants written:
+// whoever runs next writes the newest text and the rest are never sent. Every
+// caller's promise still resolves once its text, or something newer, is on
+// disk — so a committed edit awaits a real write, as before.
+//
+// Live writes are also spaced out. The canvas no longer waits on them — it is
+// told the value directly (lib/live-css.ts) — so what they are for is keeping
+// the file current, and every one of them still costs a dev-server round trip:
+// a page fetched and diffed. Once every quarter second is plenty for that. A
+// committed edit queued behind a live one goes at once.
+const LIVE_WRITE_GAP_MS = 250
+
+type QueuedWrite = {
+  css: string
+  /** False as soon as any caller waiting on it is a committed write. */
+  live: boolean
+  settle: Array<{ resolve: () => void; reject: (err: unknown) => void }>
+  /** The wait before a live write goes, when one is pending. */
+  timer: ReturnType<typeof setTimeout> | null
+}
+const writeInFlight = new Set<string>()
+const writeQueued = new Map<string, QueuedWrite>()
+
+function writeStyleFileSerial(path: string, css: string, live: boolean): Promise<void> {
+  if (!writeInFlight.has(path)) return sendStyleFile(path, css, live)
+  return new Promise<void>((resolve, reject) => {
+    const q = writeQueued.get(path) ?? { css, live: true, settle: [], timer: null }
+    q.css = css
+    q.live = q.live && live
+    q.settle.push({ resolve, reject })
+    writeQueued.set(path, q)
+    if (!live && q.timer != null) {
+      clearTimeout(q.timer)
+      q.timer = null
+      flushQueued(path)
+    }
+  })
+}
+
+function flushQueued(path: string) {
+  const q = writeQueued.get(path)
+  if (!q) {
+    writeInFlight.delete(path)
+    return
+  }
+  writeQueued.delete(path)
+  sendStyleFile(path, q.css, q.live).then(
+    () => q.settle.forEach((s) => s.resolve()),
+    (err) => q.settle.forEach((s) => s.reject(err)),
+  )
+}
+
+async function sendStyleFile(path: string, css: string, live: boolean): Promise<void> {
+  writeInFlight.add(path)
+  const startedAt = Date.now()
+  try {
+    await window.avb.writeStyleFile({ filePath: path, css })
+  } finally {
+    const q = writeQueued.get(path)
+    if (!q) {
+      writeInFlight.delete(path)
+    } else {
+      const wait = q.live && live ? Math.max(0, LIVE_WRITE_GAP_MS - (Date.now() - startedAt)) : 0
+      if (wait > 0) q.timer = setTimeout(() => { q.timer = null; flushQueued(path) }, wait)
+      else flushQueued(path)
+    }
+  }
+}
+
 /**
  * Read each source's code and parse it into live regions. The reads run
  * concurrently — each is an IPC round trip to the main process, and waiting
@@ -400,15 +514,28 @@ function serializeDoc(doc: EmbedDoc): string {
  * stylesheets and global-style components the project has. `onDoc` fires as
  * each lands so callers can stream; the returned arrays stay in source order,
  * which is cascade order.
+ *
+ * `keep` answers with the doc the caller already holds for a source. It is
+ * handed back in place of a read that overlapped a write to that source (see
+ * readIsFresh) — a read that may predate the panel's own edit must not replace
+ * the copy that has it.
  */
 export async function loadEmbedDocs(
   sources: EmbedSource[],
   onDoc?: (doc: EmbedDoc) => void,
+  keep?: (key: string) => EmbedDoc | undefined,
 ): Promise<{ docs: EmbedDoc[]; errors: Array<{ label: string; error: string }> }> {
   const loaded = await Promise.all(
     sources.map(async (source) => {
       try {
-        const doc = docForSource(source, await readSource(source))
+        const startGen = writeGen
+        const startedAt = Date.now()
+        const busyAtStart = (writesInFlight.get(source.key) || 0) > 0
+        const code = await readSource(source)
+        const held = keep?.(source.key)
+        const doc = held && !readIsFresh(source.key, startGen, startedAt, busyAtStart)
+          ? held
+          : docForSource(source, code)
         onDoc?.(doc)
         return { doc, error: null }
       } catch (err) {
@@ -436,10 +563,11 @@ export async function writeEmbedDoc(
   // What the file held before this write — the undo target, captured before
   // doc.code is advanced below.
   const before = doc.code
+  noteWriteStart(doc.source.key)
   try {
     if (doc.source.origin.kind === 'file' || doc.source.origin.kind === 'astro') {
       const { path } = doc.source.origin
-      await window.avb.writeStyleFile({ filePath: path, css: code })
+      await writeStyleFileSerial(path, code, live)
       // A <style> node's write goes through the page model, which the app
       // already snapshots — only stylesheets need their own history entry.
       if (before !== code) {
@@ -466,6 +594,8 @@ export async function writeEmbedDoc(
     return { ok: true, code }
   } catch (err) {
     return { ok: false, error: String((err as Error)?.message || err) }
+  } finally {
+    noteWriteEnd(doc.source.key)
   }
 }
 
@@ -479,7 +609,12 @@ export function onDocsReloaded(fn: () => void): () => void {
 }
 
 async function writeStyleFileAndReload(doc: EmbedDoc, path: string, text: string): Promise<void> {
-  await window.avb.writeStyleFile({ filePath: path, css: text })
+  noteWriteStart(doc.source.key)
+  try {
+    await writeStyleFileSerial(path, text, false)
+  } finally {
+    noteWriteEnd(doc.source.key)
+  }
   // Re-derive the doc from what the file now holds, the same way it was first
   // read — for a component file that means re-splitting its markup, not
   // treating the whole file as one region of CSS.
