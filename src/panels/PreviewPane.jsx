@@ -4,7 +4,7 @@ import { setCanvasFrame, receiveCanvasReply, noteCanvasReady } from '../canvasQu
 import { forgetComputedColors } from '../style-panel/lib/computed-color';
 import { forgetComputedStyles } from '../style-panel/lib/computed-style';
 import { hoverIsSelection, onePerPlace, sameCopy } from '../outlineBoxes.js';
-import { spacingBands } from '../spacingBands.js';
+import { spacingBands, withLiveSpacing } from '../spacingBands.js';
 import { setModifiers } from '../style-panel/lib/host.ts';
 import {
   DesktopIcon,
@@ -756,11 +756,19 @@ export default function PreviewPane({
               {/* What the style panel's spacing box is pointing at: the strip of
                   the page that side is holding open, in the colour of the box it
                   belongs to. Under the outlines, over the page. */}
+              {/* A side being dragged is sized from the value under the
+                  pointer, not from the last measurement — the page will lay
+                  it out and be measured a few frames later, and the band
+                  would otherwise skip the numbers in between. */}
               {spacingHover &&
                 selPath &&
                 spacingBands(
                   (rects[selPath] || [])[selOcc ?? 0] || (rects[selPath] || [])[0],
-                  (spacing[selPath] || [])[selOcc ?? 0] || (spacing[selPath] || [])[0],
+                  withLiveSpacing(
+                    (spacing[selPath] || [])[selOcc ?? 0] || (spacing[selPath] || [])[0],
+                    spacingHover.kind,
+                    spacingHover.live
+                  ),
                   spacingHover.kind,
                   spacingHover.sides
                 ).map((b, i) => (

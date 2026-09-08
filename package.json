@@ -100,6 +100,7 @@
     "test:stylewriterace": "node test/style-write-race.js",
     "test:openfilesource": "node test/open-file-source.js",
     "test:livecss": "node test/live-css.js",
+    "test:spacinglive": "node test/spacing-live.js",
     "test:openedclass": "node test/opened-class.js",
     "test:openedclick": "node test/opened-click.js",
     "test:instanceroot": "node test/instance-root.js",

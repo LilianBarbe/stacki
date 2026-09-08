@@ -198,6 +198,8 @@ type FillProps = {
 type SideDragOptions = {
   propFor: (side: Side) => string
   inward: boolean
+  /** The box the drag is drawn in on the canvas — see useSideHover. */
+  kind: 'padding' | 'margin'
   read: Read
   busy: boolean
   setProp: SetProp
@@ -207,9 +209,15 @@ type SideDragOptions = {
   threshold?: number
 }
 
+// While a drag is on, the canvas hears its value from the drag (below) and not
+// from the hover, which would report what the file still says. One drag at a
+// time, so one flag.
+let dragReporting = false
+
 function useSideDrag({
   propFor,
   inward,
+  kind,
   read,
   busy,
   setProp,
@@ -289,8 +297,26 @@ function useSideDrag({
     const value = valueAt()
     // Update the labels every time (cheap setState); throttle the canvas write to rAF.
     onLive(d.props, d.important ? `${value} !important` : value)
+    // And the canvas, on the same event: the band it draws for these sides is
+    // labelled and sized from this value, so it passes through every number
+    // the panel shows rather than the ones the page had time to lay out.
+    reportDrag(affectedSides(d.side, d), value)
     pending.current = value
     if (raf.current == null) raf.current = requestAnimationFrame(flush)
+  }
+
+  // Only a real padding or margin side can be sized ahead of the page; an
+  // inset (`top` on a positioned element) is labelled but measured.
+  const sizable = (side: Side) => /^(padding|margin)-/.test(propFor(side))
+  const reportDrag = (sides: Side[], value: string, live = true) => {
+    dragReporting = live
+    const labels: Record<string, string> = {}
+    const ahead: Record<string, string> = {}
+    for (const s of sides) {
+      labels[s] = value
+      if (live && sizable(s)) ahead[s] = value
+    }
+    getHost().onSpacingHover?.({ kind, sides, labels, ...(Object.keys(ahead).length ? { live: ahead } : {}) })
   }
 
   // While a drag is live, Shift and Option are read as they are pressed rather
@@ -383,12 +409,16 @@ function useSideDrag({
     const value = d.active ? valueAt() : null
     const props = d.props
     const important = d.important
+    const sides = affectedSides(d.side, d)
     drag.current = null
     pending.current = null
     // Pressed and let go without moving: that was a click, and the click handler
     // is the one that should hear about it.
     if (value == null) return
     onLiveEnd()
+    // The last value stays on the band; its size goes back to being measured,
+    // which by now is the same number. The hover takes over from here.
+    reportDrag(sides, value, false)
     props.forEach((prop) => setProp(prop, value, important))
   }
 
@@ -403,6 +433,7 @@ function useSideHover({ propFor, kind, read }: { propFor: (side: Side) => string
   const over = useRef<null | { side: Side; shiftKey: boolean; altKey: boolean }>(null)
 
   const report = () => {
+    if (dragReporting) return // the drag is saying what the band shows
     const o = over.current
     if (!o) { getHost().onSpacingHover?.(null); return }
     const sides = affectedSides(o.side, o)
@@ -492,9 +523,11 @@ function useSideHover({ propFor, kind, read }: { propFor: (side: Side) => string
 export function SpacingFill({ frame, propFor, inward = false, read, busy, setProp, liveSetProp, onLive, onLiveEnd }: FillProps) {
   const f = FRAMES[frame]
   const maskId = 'sp-' + useId().replace(/:/g, '')
+  const kind = inward ? 'padding' : 'margin'
   const { onPointerDown, onPointerMove, onPointerUp } = useSideDrag({
     propFor,
     inward,
+    kind,
     read,
     busy,
     setProp,
@@ -502,7 +535,7 @@ export function SpacingFill({ frame, propFor, inward = false, read, busy, setPro
     onLive,
     onLiveEnd,
   })
-  const hover = useSideHover({ propFor, kind: inward ? 'padding' : 'margin', read })
+  const hover = useSideHover({ propFor, kind, read })
 
   return (
     <svg
@@ -643,6 +676,7 @@ export function SpacingLabel({
   const { onPointerDown, onPointerMove, onPointerUp, wasDrag } = useSideDrag({
     propFor: propForSide,
     inward: prop.startsWith('padding'),
+    kind: prop.startsWith('padding') ? 'padding' : 'margin',
     read,
     busy,
     setProp,

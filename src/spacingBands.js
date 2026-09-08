@@ -79,4 +79,38 @@ export function spacingBands(box, spacing, kind, sides) {
   }));
 }
 
+// A value the panel is dragging, in pixels — or null when only the laid-out
+// page can say (a percentage, a variable, a calc()). Units come from the page
+// with its measurements: em is the element's own font size, rem the root's.
+export function lengthToPx(value, units) {
+  const m = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|rem|em|vw|vh)?\s*(?:!important)?\s*$/i.exec(String(value ?? ''));
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  const unit = (m[2] || '').toLowerCase();
+  if (!unit) return n === 0 ? 0 : null; // a bare number is only a length when it is 0
+  if (unit === 'px') return n;
+  const per = Number(units?.[unit]);
+  return per > 0 ? n * per : null;
+}
+
+/**
+ * `spacing` with the sides a drag is writing replaced by the dragged values —
+ * so the band on the canvas is the number in the panel, on the same frame,
+ * rather than the page as it was last measured. A value that cannot be turned
+ * into pixels here keeps its measurement.
+ */
+export function withLiveSpacing(spacing, kind, live) {
+  if (!spacing || !live || (kind !== 'padding' && kind !== 'margin')) return spacing;
+  const size = { ...(spacing[kind] || {}) };
+  let changed = false;
+  for (const side of SIDES) {
+    if (!(side in live)) continue;
+    const px = lengthToPx(live[side], spacing.units);
+    if (px == null) continue;
+    size[side] = px;
+    changed = true;
+  }
+  return changed ? { ...spacing, [kind]: size } : spacing;
+}
+
 export default spacingBands;

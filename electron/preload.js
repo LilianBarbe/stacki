@@ -937,7 +937,18 @@ if (!process.isMainFrame) {
         const cs = window.getComputedStyle(el);
         const box = (kind) =>
           Object.fromEntries(SIDES.map((s) => [s, parseFloat(cs.getPropertyValue(`${kind}-${s}`)) || 0]));
-        return { padding: box('padding'), margin: box('margin'), gaps: gapBandsFor(el, cs) };
+        // What a length is worth here, so a value being dragged in the panel
+        // can be drawn in pixels before the page has laid it out (see
+        // withLiveSpacing in the app): em is this element's font, rem the
+        // root's, vw and vh the frame.
+        const rootFont = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+        const units = {
+          em: parseFloat(cs.fontSize) || rootFont,
+          rem: rootFont,
+          vw: window.innerWidth / 100,
+          vh: window.innerHeight / 100,
+        };
+        return { padding: box('padding'), margin: box('margin'), gaps: gapBandsFor(el, cs), units };
       } catch {
         // Whatever went wrong measuring one element, the boxes everything else
         // depends on still have to be reported.
