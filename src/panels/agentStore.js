@@ -56,6 +56,16 @@ function appendChunk(turn, type, content) {
   }
 }
 
+// Claude Code records a slash command — a model switch, say — as a user
+// message wrapped in tags, and its output as another. A loaded thread replays
+// them like anything the person typed; they were never that, so they go.
+const COMMAND_NOISE =
+  /<(command-name|command-message|command-args|local-command-stdout|local-command-stderr|system-reminder)>[\s\S]*?<\/\1>/g;
+export function stripCommandNoise(text) {
+  const clean = String(text || '').replace(COMMAND_NOISE, '');
+  return clean.trim() ? clean : '';
+}
+
 // Only the fields an update actually carries replace the ones on the block:
 // a tool_call_update that says just `status` must not blank out the title.
 const defined = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null));
@@ -104,6 +114,20 @@ export function applyUpdate(turns, update) {
           t.blocks[i] = { ...t.blocks[i], ...patch };
         }
       });
+    case 'user_message_chunk': {
+      // Only seen when a thread is loaded back: the person's side of it,
+      // replayed chunk by chunk like the agent's.
+      const text = update.content?.type === 'text' ? stripCommandNoise(update.content.text) : '';
+      if (!text) return turns;
+      if (last && last.role === 'user') {
+        const blocks = [...last.blocks];
+        const tail = blocks[blocks.length - 1];
+        if (tail?.type === 'text') blocks[blocks.length - 1] = { ...tail, text: tail.text + text };
+        else blocks.push({ id: nextId(), type: 'text', text });
+        return [...turns.slice(0, -1), { ...last, blocks }];
+      }
+      return [...turns, { id: nextId(), role: 'user', blocks: [{ id: nextId(), type: 'text', text }], attached: null }];
+    }
     case 'plan':
       return withTurn((t) => {
         const block = { id: 'plan', type: 'plan', entries: update.entries || [] };
@@ -157,7 +181,9 @@ function wire() {
     if (mine(request.sessionId)) set({ permissions: [...snapshot.permissions, request] });
   });
   api.onAcpExit((info) => {
-    if (!snapshot.session && snapshot.status !== 'starting') return;
+    // A restart kills the agent before it: that exit is the old session's,
+    // not this one's, and must not be read as the new agent dying.
+    if (!mine(info?.sessionId)) return;
     const why = info?.error || (info?.stderr ? info.stderr.split('\n').slice(-3).join('\n') : '');
     set({
       status: 'exited',
@@ -267,6 +293,49 @@ export async function answerPermission(requestId, optionId) {
     await avb().acpPermission({ requestId, optionId });
   } catch {
     /* the agent has gone; its exit says so */
+  }
+}
+
+// A fresh thread on the agent already running; a restart only when there is
+// nothing running to ask.
+export async function newThread() {
+  const { projectPath, session, status } = snapshot;
+  if (!projectPath) return;
+  if (!session || status !== 'ready') return start(projectPath);
+  set({ status: 'starting', turns: [], permissions: [], error: null, running: false });
+  try {
+    const next = await avb().acpNew();
+    set({ session: { ...session, ...next }, status: 'ready' });
+  } catch (err) {
+    set({ status: 'error', error: cleanError(err) });
+  }
+}
+
+// The threads the agent remembers for this project, newest first. A thread
+// exists from its first message, so a fresh one is not in the list yet.
+export async function listThreads() {
+  if (!snapshot.session) return [];
+  try {
+    const result = await avb().acpList();
+    return (result?.sessions || []).slice().sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  } catch (err) {
+    set({ error: cleanError(err) });
+    return [];
+  }
+}
+
+// Loads a thread back. The agent replays it as updates under the loaded id,
+// so that id is the live one from here on — set before the request goes, or
+// the replay would be filtered out as some other session's.
+export async function loadThread(sessionId) {
+  const { session, status, running } = snapshot;
+  if (!session || running || status !== 'ready' || sessionId === session.sessionId) return;
+  set({ session: { ...session, sessionId }, status: 'starting', turns: [], permissions: [], error: null });
+  try {
+    const next = await avb().acpLoad({ sessionId });
+    set({ session: { ...snapshot.session, ...next }, status: 'ready' });
+  } catch (err) {
+    set({ status: 'error', error: cleanError(err) });
   }
 }
 

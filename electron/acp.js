@@ -270,6 +270,13 @@ async function openSession(agent, { cwd, version }) {
     agentInfo: init.agentInfo || null,
     agentCapabilities: init.agentCapabilities || {},
     authMethods: init.authMethods || [],
+    ...sessionResult(session),
+  };
+}
+
+// What a session/new or session/load answer carries that the panel keeps.
+function sessionResult(session) {
+  return {
     sessionId: session.sessionId,
     configOptions: session.configOptions || [],
     modes: session.modes || null,
@@ -332,14 +339,17 @@ function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
       projectRoot: root,
       onUpdate: (params) => send('acp:update', params),
       onPermission: (request) => send('acp:permission', request),
+      // The exit names the session it ends, so a restart's renderer can tell
+      // the old agent going from the new one failing.
       onExit: (info) => {
         if (current && current.agent === agent) current = null;
-        send('acp:exit', info);
+        send('acp:exit', { ...info, sessionId: agent.sessionId || null });
       },
     }).start();
     current = { agent, root, sessionId: null };
     try {
       const session = await openSession(agent, { cwd: root, version });
+      agent.sessionId = session.sessionId;
       if (current && current.agent === agent) current.sessionId = session.sessionId;
       return session;
     } catch (err) {
@@ -385,6 +395,43 @@ function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
     if (!current) return { ok: false };
     const outcome = optionId ? { outcome: 'selected', optionId } : { outcome: 'cancelled' };
     return { ok: current.agent.answerPermission(requestId, outcome) };
+  });
+
+  // A fresh thread on the agent already running — cheaper than a restart, and
+  // the thread it leaves stays where the history can find it.
+  ipcMain.handle('acp:new', async () => {
+    const agent = live();
+    const session = await agent.request('session/new', { cwd: current.root, mcpServers: [] });
+    agent.sessionId = session.sessionId;
+    current.sessionId = session.sessionId;
+    return sessionResult(session);
+  });
+
+  // The threads the agent remembers for this project, newest first is the
+  // renderer's business.
+  ipcMain.handle('acp:list', async () => {
+    const agent = live();
+    const result = await agent.request('session/list', { cwd: current.root });
+    return { sessions: (result && result.sessions) || [] };
+  });
+
+  // Loads a thread back: the agent replays it as session/update notifications
+  // under that id BEFORE answering, so the id has to be the live one first.
+  ipcMain.handle('acp:load', async (_e, { sessionId } = {}) => {
+    const agent = live();
+    const before = current.sessionId;
+    agent.sessionId = sessionId;
+    current.sessionId = sessionId;
+    try {
+      const result = await agent.request('session/load', { sessionId, cwd: current.root, mcpServers: [] });
+      return sessionResult({ ...(result || {}), sessionId });
+    } catch (err) {
+      if (current && current.agent === agent) {
+        agent.sessionId = before;
+        current.sessionId = before;
+      }
+      throw err;
+    }
   });
 
   ipcMain.handle('acp:stop', async () => {

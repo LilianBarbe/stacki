@@ -30,7 +30,7 @@ const check = (what, condition, detail) => {
   const bundle = path.join(buildDir, 'agent-store.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { applyUpdate, withConfigValue } from './src/panels/agentStore.js';\n`,
+      contents: `export { applyUpdate, withConfigValue, stripCommandNoise } from './src/panels/agentStore.js';\n`,
       resolveDir: path.join(__dirname, '..'),
       loader: 'js',
     },
@@ -40,7 +40,7 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { applyUpdate, withConfigValue } = require(bundle);
+  const { applyUpdate, withConfigValue, stripCommandNoise } = require(bundle);
 
   const text = (t) => ({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: t } });
   const thought = (t) => ({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: t } });
@@ -92,6 +92,31 @@ const check = (what, condition, detail) => {
   turns = applyUpdate(turns, { sessionUpdate: 'plan', entries: [{ content: 'a', status: 'completed' }, { content: 'b', status: 'pending' }] });
   const plans = turns[1].blocks.filter((b) => b.type === 'plan');
   check('a new plan replaces the old one rather than stacking', plans.length === 1 && plans[0].entries.length === 2);
+
+  // --- A thread loaded back ------------------------------------------------------
+  const userChunk = (t) => ({ sessionUpdate: 'user_message_chunk', content: { type: 'text', text: t } });
+  let replay = [];
+  replay = applyUpdate(replay, userChunk('fix '));
+  replay = applyUpdate(replay, userChunk('the header'));
+  replay = applyUpdate(replay, text('Done.'));
+  replay = applyUpdate(replay, userChunk('thanks'));
+  check(
+    'a replayed user message is a user turn, and its chunks one block',
+    replay.length === 3 && replay[0].role === 'user' && replay[0].blocks[0].text === 'fix the header'
+  );
+  check('a user chunk after the agent opens a new user turn', replay[2].role === 'user' && replay[2].blocks[0].text === 'thanks');
+
+  // Claude Code's own record of a slash command comes back through the same
+  // channel; it was never typed, so it must not show as a message.
+  const noise = [
+    userChunk('<command-name>/model</command-name>\n  <command-message>model</command-message>\n  <command-args>haiku</command-args>'),
+    userChunk('<local-command-stdout>Set model to haiku</local-command-stdout>'),
+    userChunk('Reply with pong'),
+  ];
+  let loaded = [];
+  for (const u of noise) loaded = applyUpdate(loaded, u);
+  check('a replayed slash command is not a user turn', loaded.length === 1 && loaded[0].blocks[0].text === 'Reply with pong');
+  check('the tags are stripped from text that also carries words', stripCommandNoise('<system-reminder>x</system-reminder>hello') === 'hello');
 
   // --- Unknown updates ---------------------------------------------------------
   const before = turns;

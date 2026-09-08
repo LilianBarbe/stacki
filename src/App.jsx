@@ -4733,8 +4733,10 @@ export default function App() {
                 setSelectedId(node.id);
                 // Selecting from the canvas jumps to the node in the tree —
                 // unless the Code panel is open, where the click is what
-                // picks the code to show and the panel has to stay to show it.
-                setLeftTab((t) => (t === 'code' ? t : 'navigator'));
+                // picks the code to show and the panel has to stay to show it,
+                // or the Agent panel, where the click is what picks the
+                // selection the next message is about.
+                setLeftTab((t) => (t === 'code' || t === 'agent' ? t : 'navigator'));
                 setRevealTick((t) => t + 1);
               };
               const { kind } = canvasClickAction({

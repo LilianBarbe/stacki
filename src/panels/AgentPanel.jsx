@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import Dropdown from '../ui/Dropdown.jsx';
 import MoreMenu from '../ui/MoreMenu.jsx';
 import AutoTextarea from '../ui/AutoTextarea.jsx';
-import { PlusIcon, CheckIcon, ChevronDownIcon } from '../ui/Icons.jsx';
+import { PlusIcon, CheckIcon, ChevronDownIcon, HistoryIcon } from '../ui/Icons.jsx';
+import { relativeTime } from './HistoryPanel.jsx';
 import * as store from './agentStore.js';
 
 // The Agent panel: a coding agent in the left rail, at the same rank as Code
@@ -79,6 +82,32 @@ const CrosshairIcon = () => (
 );
 
 // --- Pieces of a turn ---------------------------------------------------------
+
+// The agent writes Markdown. Rendered to elements, never to HTML strings —
+// what the model says is not the app's to trust as markup — and a link opens
+// in the browser rather than steering the app's own window.
+const mdComponents = {
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      onClick={(e) => {
+        e.preventDefault();
+        if (href) void window.avb?.openExternal?.(href);
+      }}
+    >
+      {children}
+    </a>
+  ),
+};
+function Markdown({ text }) {
+  return (
+    <div className="agent-md">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 function ThoughtBlock({ text }) {
   const [open, setOpen] = useState(false);
@@ -167,7 +196,7 @@ function Turn({ turn, projectPath }) {
   return (
     <div className="agent-turn agent">
       {turn.blocks.map((b) => {
-        if (b.type === 'text') return <div key={b.id} className="agent-text">{b.text}</div>;
+        if (b.type === 'text') return <Markdown key={b.id} text={b.text} />;
         if (b.type === 'thought') return <ThoughtBlock key={b.id} text={b.text} />;
         if (b.type === 'tool') return <ToolBlock key={b.id} block={b} projectPath={projectPath} />;
         if (b.type === 'plan') return <PlanBlock key={b.id} entries={b.entries} />;
@@ -215,6 +244,10 @@ export default function AgentPanel({ project, selectionKey }) {
   const projectPath = project?.path || null;
   const [draft, setDraft] = useState('');
   const [follow, setFollow] = useState(readFollow);
+  // 'thread' or 'history': the list of past threads takes the thread's place
+  // while it is open, the way Zed's does.
+  const [view, setView] = useState('thread');
+  const [threads, setThreads] = useState(null); // null while the list is on its way
   const threadRef = useRef(null);
   const stickRef = useRef(true); // scrolled to the bottom, so new text should keep it there
 
@@ -308,24 +341,78 @@ export default function AgentPanel({ project, selectionKey }) {
   const ready = state.status === 'ready';
   const busy = state.status === 'starting';
 
+  const openHistory = () => {
+    if (view === 'history') {
+      setView('thread');
+      return;
+    }
+    setView('history');
+    setThreads(null);
+    void store.listThreads().then(setThreads);
+  };
+  const pickThread = (sessionId) => {
+    setView('thread');
+    stickRef.current = true;
+    void store.loadThread(sessionId);
+  };
+  // A thread picked while the agent is off is nothing to show; back to the
+  // thread the moment the project changes, too.
+  useEffect(() => {
+    setView('thread');
+  }, [projectPath]);
+
   return (
     <div className="agent-panel">
       <div className="panel-header">
-        <h2 title={title}>{title}</h2>
+        <h2 title={view === 'history' ? 'Threads' : title}>{view === 'history' ? 'Threads' : title}</h2>
         <div className="agent-header-actions">
           <button
             type="button"
             title="New thread"
             disabled={!projectPath || busy}
-            onClick={() => projectPath && store.start(projectPath)}
+            onClick={() => {
+              setView('thread');
+              void store.newThread();
+            }}
           >
             <PlusIcon size={14} />
+          </button>
+          <button
+            type="button"
+            className={view === 'history' ? 'on' : ''}
+            title={view === 'history' ? 'Back to the thread' : 'Threads'}
+            disabled={!ready && view !== 'history'}
+            onClick={openHistory}
+          >
+            <HistoryIcon size={14} />
           </button>
           <MoreMenu items={menuItems} title="Agent options" width={170} />
         </div>
       </div>
 
-      <div className="agent-thread" ref={threadRef} onScroll={onThreadScroll}>
+      {view === 'history' && (
+        <div className="agent-history">
+          {threads === null && <div className="props-empty agent-empty">Loading threads…</div>}
+          {threads && !threads.length && (
+            <div className="props-empty agent-empty">No threads yet — the first message starts one.</div>
+          )}
+          {threads &&
+            threads.map((t) => (
+              <button
+                key={t.sessionId}
+                type="button"
+                className={`agent-thread-row${t.sessionId === state.session?.sessionId ? ' on' : ''}`}
+                title={t.title || 'Untitled'}
+                onClick={() => pickThread(t.sessionId)}
+              >
+                <span className="agent-thread-title">{t.title || 'Untitled'}</span>
+                <span className="agent-thread-when">{relativeTime(t.updatedAt)}</span>
+              </button>
+            ))}
+        </div>
+      )}
+
+      <div className="agent-thread" ref={threadRef} onScroll={onThreadScroll} hidden={view === 'history'}>
         {!projectPath && <div className="props-empty agent-empty">Open a project to talk to {AGENT_NAME} about it.</div>}
         {projectPath && busy && <div className="props-empty agent-empty">Starting {AGENT_NAME}…</div>}
         {projectPath && ready && !turns.length && (
@@ -353,7 +440,7 @@ export default function AgentPanel({ project, selectionKey }) {
         )}
       </div>
 
-      <div className="agent-composer">
+      <div className="agent-composer" hidden={view === 'history'}>
         {follow && selection && (
           <div className="agent-context" title={selection.key}>
             <CrosshairIcon />

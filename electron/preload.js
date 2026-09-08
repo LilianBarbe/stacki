@@ -1981,6 +1981,9 @@ contextBridge.exposeInMainWorld('avb', {
   acpSetConfig: invoke('acp:setConfig'),
   acpPermission: invoke('acp:permission'),
   acpStop: invoke('acp:stop'),
+  acpNew: invoke('acp:new'),
+  acpList: invoke('acp:list'),
+  acpLoad: invoke('acp:load'),
   onAcpUpdate: (cb) => {
     const listener = (_e, data) => cb(data);
     ipcRenderer.on('acp:update', listener);

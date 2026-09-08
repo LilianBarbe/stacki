@@ -6042,3 +6042,60 @@ textarea::selection {
 .agent-send:hover:not(:disabled) { background: var(--accent); filter: brightness(1.1); }
 .agent-send:disabled { background: var(--bg-input); color: var(--text-faint); opacity: 1; }
 .agent-send.stop { background: var(--bg-active); color: var(--text); }
+.agent-header-actions button.on { background: var(--bg-active); color: var(--text); }
+/* The list of past threads, in the thread's place while it is open. */
+.agent-history {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 8px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.agent-thread-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: none;
+  font-weight: 400;
+  text-align: left;
+}
+.agent-thread-row.on { background: var(--bg-active); }
+.agent-thread-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-thread-when { flex: none; font-size: 10.5px; color: var(--text-faint); }
+/* What the agent writes, as Markdown. Tight: it sits in a 480px column. */
+.agent-md { word-break: break-word; }
+.agent-md > :first-child { margin-top: 0; }
+.agent-md > :last-child { margin-bottom: 0; }
+.agent-md p, .agent-md ul, .agent-md ol, .agent-md pre, .agent-md blockquote, .agent-md table { margin: 0 0 8px; }
+.agent-md ul, .agent-md ol { padding-left: 18px; }
+.agent-md li { margin: 2px 0; }
+.agent-md li > p { margin: 0; }
+.agent-md h1, .agent-md h2, .agent-md h3, .agent-md h4 { margin: 10px 0 4px; font-size: 12px; font-weight: 600; }
+.agent-md h1 { font-size: 13px; }
+.agent-md code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-input);
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+.agent-md pre {
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--bg-input);
+  overflow-x: auto;
+}
+.agent-md pre code { padding: 0; background: none; font-size: 10.5px; }
+.agent-md blockquote { padding-left: 8px; border-left: 2px solid var(--border); color: var(--text-dim); }
+.agent-md a { color: #82aaff; text-decoration: underline; text-underline-offset: 2px; }
+.agent-md hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; }
+.agent-md table { border-collapse: collapse; font-size: 11.5px; display: block; overflow-x: auto; }
+.agent-md th, .agent-md td { padding: 3px 8px; border: 1px solid var(--border); text-align: left; }
+.agent-md th { background: var(--bg-input); font-weight: 600; }
+.agent-md input[type='checkbox'] { margin: 0 4px 0 0; vertical-align: middle; }
