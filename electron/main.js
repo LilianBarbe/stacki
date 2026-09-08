@@ -220,6 +220,24 @@ function createWindow() {
   });
 }
 
+// The File > Open Recent Project submenu. Projects whose folder has gone —
+// moved, deleted, or no longer an Astro project — are left out rather than
+// offered and failing on the click; `recents:list` drops them from the welcome
+// screen for the same reason. Names repeat often enough (every other project is
+// called `site`), so a repeated one carries the folder it sits in.
+function recentProjectItems() {
+  const list = liveRecents();
+  if (!list.length) return [{ label: 'No Recent Projects', enabled: false }];
+  const named = list.map((r) => ({ ...r, name: r.name || path.basename(r.path) }));
+  const seen = new Map();
+  for (const r of named) seen.set(r.name, (seen.get(r.name) || 0) + 1);
+  return named.map((r) => ({
+    label: seen.get(r.name) > 1 ? `${r.name} — ${path.basename(path.dirname(r.path))}` : r.name,
+    toolTip: r.path,
+    click: () => send('menu:openRecent', r.path),
+  }));
+}
+
 // Custom menu: on macOS the native menu consumes ⌘Z/⌘C/⌘V before the page
 // sees them, so Undo/Redo/Copy/Paste forward to the renderer, which decides
 // between app-level actions (nodes) and native ones (text fields).
@@ -255,6 +273,13 @@ function buildMenu() {
           label: 'Open Project…',
           accelerator: 'CmdOrCtrl+O',
           click: () => send('menu:openProject'),
+        },
+        {
+          // The same list the welcome screen shows, reachable without closing
+          // the project you are in first — which was the only way to get back
+          // to that screen.
+          label: 'Open Recent Project',
+          submenu: recentProjectItems(),
         },
         {
           label: 'Close Project',
@@ -1089,15 +1114,19 @@ function writeRecents(list) {
   }
 }
 
-ipcMain.handle('recents:list', async () => {
-  // Drop entries whose folder is gone or no longer looks like an Astro project.
-  const list = readRecents().filter((r) => {
+// Remembered projects that are still there to open.
+function liveRecents() {
+  return readRecents().filter((r) => {
     try {
       return fs.existsSync(r.path) && isAstroProject(r.path);
     } catch {
       return false;
     }
   });
+}
+
+ipcMain.handle('recents:list', async () => {
+  const list = liveRecents();
   const userData = app.getPath('userData');
   return list.map((r) => {
     // `stale` compares the picture against the files it was taken from, so a
@@ -1131,6 +1160,10 @@ ipcMain.handle('recents:add', async (_e, projectPath) => {
     openedAt: Date.now(),
   });
   writeRecents(list.slice(0, 12));
+  // The submenu is built from the list rather than watching it, so it is
+  // rebuilt whenever the list moves — otherwise the project just opened is
+  // missing from it until the next launch.
+  buildMenu();
   return { ok: true };
 });
 
@@ -1138,6 +1171,7 @@ ipcMain.handle('recents:remove', async (_e, projectPath) => {
   writeRecents(readRecents().filter((r) => r.path !== projectPath));
   // The picture and the note about when it was taken both go.
   thumbs.forget(app.getPath('userData'), projectPath);
+  buildMenu();
   return { ok: true };
 });
 
