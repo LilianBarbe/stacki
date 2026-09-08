@@ -295,6 +295,13 @@ export async function start(projectPath) {
   wire();
   local = readLocal(projectPath);
   set({ ...EMPTY, projectPath, status: 'starting' });
+  // The preload is read once, when the window opens; in development, a branch
+  // switch with the app running hot-reloads this panel into a window whose
+  // bridge predates it. Say so, rather than fail on a missing function.
+  if (typeof avb()?.acpStart !== 'function') {
+    set({ status: 'error', error: 'This window was opened before the Agent panel existed — restart the app.' });
+    return;
+  }
   try {
     const r = await avb().acpStart({ projectPath });
     // A later start may have superseded this one while it was on its way.
