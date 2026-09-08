@@ -96,9 +96,20 @@ function syncAnchors(liveRoot, serverRoot) {
   walk(liveRoot, serverRoot);
 }
 
-// Never looked inside. A dev stylesheet belongs to Vite, which swaps it in by
-// data-vite-dev-id; an external script re-runs if it is re-inserted, which is
-// the reload this exists to avoid.
+// Never looked inside. An external script re-runs if it is re-inserted, which
+// is the reload this exists to avoid.
+//
+// A dev stylesheet used to be pinned too, on the grounds that it belongs to
+// Vite, which swaps it in by data-vite-dev-id. That is only true of a real
+// .css file: Vite has a module for it, so it sends a css-update and rewrites
+// the tag itself. A <style> block inside an .astro component has no such
+// module — its CSS is rendered into the page, and the only news of a change
+// is the full reload this file replaces. Pinning it meant that edit never
+// reached the canvas at all: the panel wrote the file, the page was patched,
+// and the CSS stayed as it was until someone pressed refresh. So a style tag
+// is patched like anything else, and the text rule below (only when the
+// server changed it, and only if the live copy still says what the server
+// last said) leaves Vite's own updates alone.
 //
 // <noscript> is here for a different and less obvious reason. Whether its
 // markup is parsed at all depends on whether scripting is enabled in the
@@ -115,8 +126,7 @@ const pinned = (n) =>
   n.nodeType === 1 &&
   (n.tagName === 'NOSCRIPT' ||
     n.tagName === 'TEMPLATE' ||
-    (n.tagName === 'SCRIPT' && !!n.getAttribute('src')) ||
-    (n.tagName === 'STYLE' && n.hasAttribute('data-vite-dev-id')));
+    (n.tagName === 'SCRIPT' && !!n.getAttribute('src')));
 
 // An id, and deliberately nothing else. `data-avb-p` looks like a better key —
 // it is the editor's own node path — but the canvas stamps it onto live
@@ -124,7 +134,18 @@ const pinned = (n) =>
 // attribute. Reading it here compared a stamped path against an id, decided
 // every element was a different element, and fell back to reloading the page
 // on every keystroke: the exact thing this was written to stop.
-const keyOf = (n) => (n && n.nodeType === 1 ? n.getAttribute('id') || null : null);
+//
+// A dev stylesheet is the one exception, and it is an id in all but name: the
+// head carries one <style> per rendered component, none of them with an id or
+// a class, so they are all interchangeable to the matcher and line up by
+// position alone. That was harmless while their contents were never read; now
+// that they are, a rendering that adds or drops a component's stylesheet would
+// otherwise shift the rest along and write one component's CSS into another's
+// tag. data-vite-dev-id is the file it came from, and Vite leaves it alone.
+const keyOf = (n) =>
+  n && n.nodeType === 1
+    ? n.getAttribute('id') || (n.tagName === 'STYLE' && n.getAttribute('data-vite-dev-id')) || null
+    : null;
 
 // What makes two nodes the same kind of thing for the purpose of lining up two
 // lists: a tag, and an id if it has one. Every text node is interchangeable

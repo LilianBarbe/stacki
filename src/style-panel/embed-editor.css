@@ -2927,23 +2927,47 @@ textarea.embed-editor_value-input.is-expanded {
   cursor: not-allowed;
 }
 
-/* ── Raw rule editor ── */
+/* ── CSS Code section ── */
 
-.embed-editor_rule-edit {
+/* The picked selector's rules as text, ahead of the fields. The editor is the
+   panel's CodeMirror, on the page ground so it reads as a well in the surface;
+   a line under it says which file the text is written to, in the same muted
+   voice as the other notes here. */
+.embed-editor_css-code {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
-.embed-editor_rule-code {
+.embed-editor_css-code-editor .cm-editor {
   border-radius: var(--radius-sm);
   background: var(--color-bg-page);
 }
 
-.embed-editor_rule-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
+.embed-editor_css-code-editor .cm-content {
+  padding: var(--space-3) var(--space-4);
+}
+
+.embed-editor_css-code-foot {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.embed-editor_css-code-foot.is-error {
+  color: var(--color-danger);
+}
+
+/* The file's name at the header's right edge, so a collapsed section still
+   says where its text would go. */
+.embed-editor_css-code-file {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
 }
 
 /* ── Empty / errors ── */
