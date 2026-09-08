@@ -1972,6 +1972,31 @@ contextBridge.exposeInMainWorld('avb', {
     return () => ipcRenderer.removeListener('terminal:process', listener);
   },
 
+  // Agent panel (ACP, see electron/acp.js): one agent process at a time,
+  // started in the open project. Updates, permission requests and the exit
+  // arrive as events; everything else is a round trip.
+  acpStart: invoke('acp:start'),
+  acpPrompt: invoke('acp:prompt'),
+  acpCancel: invoke('acp:cancel'),
+  acpSetConfig: invoke('acp:setConfig'),
+  acpPermission: invoke('acp:permission'),
+  acpStop: invoke('acp:stop'),
+  onAcpUpdate: (cb) => {
+    const listener = (_e, data) => cb(data);
+    ipcRenderer.on('acp:update', listener);
+    return () => ipcRenderer.removeListener('acp:update', listener);
+  },
+  onAcpPermission: (cb) => {
+    const listener = (_e, data) => cb(data);
+    ipcRenderer.on('acp:permission', listener);
+    return () => ipcRenderer.removeListener('acp:permission', listener);
+  },
+  onAcpExit: (cb) => {
+    const listener = (_e, data) => cb(data);
+    ipcRenderer.on('acp:exit', listener);
+    return () => ipcRenderer.removeListener('acp:exit', listener);
+  },
+
   // Events
   onPageMaybeChanged: (cb) => {
     const listener = () => cb();

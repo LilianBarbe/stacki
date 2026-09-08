@@ -34,6 +34,7 @@ import ContentView from './panels/ContentView.jsx';
 import VariablesPanel from './panels/VariablesPanel.jsx';
 import VariablesView from './panels/VariablesView.jsx';
 import CodePanel from './panels/CodePanel.jsx';
+import AgentPanel from './panels/AgentPanel.jsx';
 import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS, canContainTag } from './elementSchemas.js';
 import { insertTargetFor as placeInsert } from './insertTarget.js';
 import { isInlineOnly } from './ui/RichContent.jsx';
@@ -4400,10 +4401,12 @@ export default function App() {
 
         {leftTab && (
           <div
-            className={`panel left${leftTab === 'code' ? ' code' : ''}`}
-            style={leftTab === 'code' ? { width: codeWidth } : undefined}
+            className={`panel left${leftTab === 'code' ? ' code' : leftTab === 'agent' ? ' agent' : ''}`}
+            style={leftTab === 'code' || leftTab === 'agent' ? { width: codeWidth } : undefined}
           >
-            {leftTab === 'code' && (
+            {/* The Agent panel is a conversation, read in lines like code —
+                so it shares the Code panel's width, and its handle. */}
+            {(leftTab === 'code' || leftTab === 'agent') && (
               <div
                 className={`code-resize${codeDrag ? ' on' : ''}`}
                 onPointerDown={startCodeResize}
@@ -4538,6 +4541,9 @@ export default function App() {
                 locked={!!previewRef}
                 showToast={showToast}
               />
+            )}
+            {leftTab === 'agent' && (
+              <AgentPanel project={project} selectionKey={codeSelectionKey} />
             )}
             {leftTab === 'history' && (
               <HistoryPanel
