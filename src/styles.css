@@ -5899,21 +5899,13 @@ textarea::selection {
 .agent-turn.user {
   align-self: flex-end;
   max-width: 92%;
+  min-width: 0;
   padding: 6px 10px;
   border-radius: 10px 10px 2px 10px;
   background: var(--bg-active);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 .agent-turn.agent { display: flex; flex-direction: column; gap: 6px; user-select: text; }
 .agent-text { white-space: pre-wrap; word-break: break-word; }
-.agent-attached {
-  display: flex;
-  margin-top: 4px;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  color: var(--text-dim);
-}
 /* Thinking is there to be looked at, not read past: folded, in the dim. */
 .agent-thought { color: var(--text-dim); font-size: 11.5px; }
 .agent-thought-toggle {
@@ -6015,17 +6007,22 @@ textarea::selection {
   max-height: 200px;
 }
 .agent-composer textarea:focus { outline: none; border-color: var(--border-strong); }
-.agent-context {
+/* The selection chip: "src/pages/index.astro Step (164:167)" — above the
+   composer before a message goes, on the message once it has. */
+.agent-chip {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
   font-family: var(--mono);
   font-size: 10.5px;
   color: var(--text-dim);
 }
-.agent-context-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
-.agent-context-where { flex: none; padding: 1px 5px; border-radius: 4px; background: var(--bg-active); color: var(--text); }
+.agent-chip-file { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.agent-chip-label { flex: none; padding: 1px 5px; border-radius: 4px; background: var(--bg-active); color: var(--text); }
+.agent-chip-lines { flex: none; }
+.agent-attached { margin-bottom: 4px; }
+.agent-user-text { white-space: pre-wrap; word-break: break-word; }
 .agent-toolbar { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .agent-toolbar .dd-trigger.agent-config { max-width: 130px; }
 .agent-follow { width: 24px; height: 24px; padding: 0; background: none; color: var(--text-dim); }
@@ -6099,3 +6096,39 @@ textarea::selection {
 .agent-md th, .agent-md td { padding: 3px 8px; border: 1px solid var(--border); text-align: left; }
 .agent-md th { background: var(--bg-input); font-weight: 600; }
 .agent-md input[type='checkbox'] { margin: 0 4px 0 0; vertical-align: middle; }
+
+/* A thread's dot: grey at rest, orange while the agent works in it, green
+   once an answer landed that nobody has looked at. */
+.agent-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); flex: none; }
+.agent-dot.is-active { background: #f5a623; animation: agent-dot-pulse 1.2s ease-in-out infinite; }
+.agent-dot.is-unread { background: #5cc48a; }
+@keyframes agent-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.agent-thread-row { cursor: pointer; }
+.agent-thread-row .more-menu-button { flex: none; opacity: 0; }
+.agent-thread-row:hover .more-menu-button, .agent-thread-row .more-menu-button.is-open { opacity: 1; }
+.agent-history-foot {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 400;
+}
+.agent-history-foot:hover:not(:disabled) { background: none; color: var(--text-dim); }
+/* A title being typed over, in the header or a row. */
+.agent-rename {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.agent-rename:focus { outline: none; }
+.agent-rename-title { font-size: 11.5px; font-weight: 600; }

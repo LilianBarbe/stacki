@@ -7,22 +7,25 @@ import AutoTextarea from '../ui/AutoTextarea.jsx';
 import { PlusIcon, CheckIcon, ChevronDownIcon, HistoryIcon } from '../ui/Icons.jsx';
 import { relativeTime } from './HistoryPanel.jsx';
 import * as store from './agentStore.js';
+import { parseUserText, titleOf } from './agentStore.js';
 
 // The Agent panel: a coding agent in the left rail, at the same rank as Code
 // or the CMS, talking about the open project.
 //
 // Laid out the way Zed lays out its agent panel — the thread above, the
-// composer below with its controls on one line — but in Stacki's clothes.
-// The agent is spoken to over ACP (see electron/acp.js), which is what makes
-// the controls generic: the composer shows one dropdown per config option the
-// agent advertises (mode and model today; effort the day the adapter offers
-// it, under the category the protocol reserves for it), so nothing here knows
+// composer below with its controls on one line, the list of threads in the
+// thread's place while it is open — but in Stacki's clothes. The agent is
+// spoken to over ACP (see electron/acp.js), which is what makes the controls
+// generic: the composer shows one dropdown per config option the agent
+// advertises (mode and model today; effort the day the adapter offers it,
+// under the category the protocol reserves for it), so nothing here knows
 // which agent is on the other end. Only Claude Agent is offered for now.
 //
 // The one thing a sidebar can do that the terminal dock can't: with the
-// crosshair on, the canvas selection travels with every message — the file
-// and the lines the person is looking at, so the agent lands on the markup
-// they mean rather than some other use of the same component.
+// crosshair on, the canvas selection travels with every message — the file,
+// the name the canvas shows for it, and the lines it lands on — so the agent
+// reads the markup the person means rather than some other use of the same
+// component.
 
 const AGENT_NAME = 'Claude Agent';
 const FOLLOW_KEY = 'stacki.agent.followSelection';
@@ -45,6 +48,8 @@ const storeFollow = (on) => {
     /* private mode / quota */
   }
 };
+
+const shorten = (text) => (text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX - 1).trimEnd()}…` : text);
 
 // --- Icons the rest of the app has no use for ------------------------------
 
@@ -125,14 +130,13 @@ const STATUS_LABEL = { pending: 'waiting', in_progress: 'running', completed: 'd
 
 function ToolBlock({ block, projectPath }) {
   const [open, setOpen] = useState(false);
-  const where = block.locations?.[0]?.path;
-  const rel = where && projectPath && where.startsWith(projectPath + '/') ? where.slice(projectPath.length + 1) : where;
+  const relOf = (p) => (p && projectPath && p.startsWith(projectPath + '/') ? p.slice(projectPath.length + 1) : p);
+  const rel = relOf(block.locations?.[0]?.path);
   const outputs = (block.content || []).map((c, i) => {
     if (c.type === 'diff') {
-      const p = c.path && projectPath && c.path.startsWith(projectPath + '/') ? c.path.slice(projectPath.length + 1) : c.path;
       return (
         <div key={i} className="agent-tool-out">
-          {c.oldText == null ? `created ${p}` : `edited ${p}`}
+          {c.oldText == null ? `created ${relOf(c.path)}` : `edited ${relOf(c.path)}`}
         </div>
       );
     }
@@ -178,18 +182,29 @@ function PlanBlock({ entries }) {
   );
 }
 
+// "src/pages/index.astro Step (164:167)": the file, the name the canvas
+// shows, the lines. The same chip above the composer and on the message.
+function SelectionChip({ rel, label, startLine, endLine, className = '', title }) {
+  return (
+    <span className={`agent-chip ${className}`} title={title}>
+      <span className="agent-chip-file">{rel}</span>
+      {label && <span className="agent-chip-label">{label}</span>}
+      {startLine && endLine && <span className="agent-chip-lines">({startLine}:{endLine})</span>}
+    </span>
+  );
+}
+
 function Turn({ turn, projectPath }) {
   if (turn.role === 'user') {
-    const a = turn.attached;
+    const raw = turn.blocks.map((b) => b.text || '').join('');
+    // A message sent from here knows what it attached; one replayed from the
+    // agent's record carries it inside the words, and is taken apart.
+    const parsed = parseUserText(raw);
+    const attached = turn.attached || parsed.attached;
     return (
       <div className="agent-turn user">
-        {turn.blocks.map((b) => b.text).join('')}
-        {a && (
-          <div className="agent-attached">
-            {a.rel}
-            {a.startLine && (a.startLine === a.endLine ? ` L${a.startLine}` : ` L${a.startLine}–${a.endLine}`)}
-          </div>
-        )}
+        {attached && <SelectionChip {...attached} className="agent-attached" />}
+        <div className="agent-user-text">{parsed.text}</div>
       </div>
     );
   }
@@ -237,44 +252,174 @@ function PermissionCard({ request }) {
   );
 }
 
+// A name being typed in place of a title — in the header or a list row.
+function RenameField({ value, onDone, className = '' }) {
+  const [draft, setDraft] = useState(value);
+  const ref = useRef(null);
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
+  const commit = () => onDone(draft);
+  return (
+    <input
+      ref={ref}
+      className={`agent-rename ${className}`}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          commit();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          onDone(null);
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+}
+
+// --- The list of threads ----------------------------------------------------------
+
+// Grey when nothing is happening, orange while the agent works in it, green
+// once an answer has landed that nobody has looked at.
+const dotOf = (t) => (t.running ? 'active' : t.unread ? 'unread' : 'idle');
+
+function ThreadList({ state, onPick }) {
+  const [renaming, setRenaming] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const all = Object.values(state.threads);
+  const archivedCount = all.filter((t) => t.archived).length;
+  const rows = all
+    .filter((t) => (showArchived ? t.archived : !t.archived))
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  return (
+    <div className="agent-history">
+      {state.listing && !rows.length && <div className="props-empty agent-empty">Loading threads…</div>}
+      {!state.listing && !rows.length && (
+        <div className="props-empty agent-empty">
+          {showArchived ? 'Nothing archived.' : 'No threads yet — the first message starts one.'}
+        </div>
+      )}
+      {rows.map((t) => {
+        const name = titleOf(t);
+        return (
+          <div
+            key={t.id}
+            className={`agent-thread-row${t.id === state.currentId ? ' on' : ''}`}
+            title={name}
+            role="button"
+            tabIndex={0}
+            onClick={() => renaming !== t.id && onPick(t.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && renaming !== t.id) onPick(t.id);
+            }}
+          >
+            <span className={`agent-dot is-${dotOf(t)}`} />
+            {renaming === t.id ? (
+              <RenameField
+                value={name}
+                className="agent-thread-title"
+                onDone={(v) => {
+                  setRenaming(null);
+                  if (v !== null) store.renameThread(t.id, v);
+                }}
+              />
+            ) : (
+              <span className="agent-thread-title">{name}</span>
+            )}
+            <span className="agent-thread-when">{relativeTime(t.updatedAt)}</span>
+            <MoreMenu
+              title="Thread options"
+              width={150}
+              items={[
+                { label: 'Rename', onSelect: () => setRenaming(t.id) },
+                t.archived
+                  ? { label: 'Unarchive', onSelect: () => store.archiveThread(t.id, false) }
+                  : { label: 'Archive', onSelect: () => store.archiveThread(t.id, true) },
+              ]}
+            />
+          </div>
+        );
+      })}
+      {(archivedCount > 0 || showArchived) && (
+        <button type="button" className="agent-history-foot" onClick={() => setShowArchived((s) => !s)}>
+          {showArchived ? 'Back to threads' : `${archivedCount} archived`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // --- The panel ------------------------------------------------------------------
 
-export default function AgentPanel({ project, selectionKey }) {
+export default function AgentPanel({ project, selectionKey, selectionLabel }) {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const projectPath = project?.path || null;
+  const thread = store.current(state);
+  const turns = thread?.turns || [];
+  const permissions = thread?.permissions || [];
+  const running = !!thread?.running;
+
   const [draft, setDraft] = useState('');
   const [follow, setFollow] = useState(readFollow);
-  // 'thread' or 'history': the list of past threads takes the thread's place
+  // 'thread' or 'history': the list of threads takes the thread's place
   // while it is open, the way Zed's does.
   const [view, setView] = useState('thread');
-  const [threads, setThreads] = useState(null); // null while the list is on its way
+  const [renaming, setRenaming] = useState(false);
   const threadRef = useRef(null);
   const stickRef = useRef(true); // scrolled to the bottom, so new text should keep it there
 
   useEffect(() => {
     store.ensure(projectPath);
+    setView('thread');
   }, [projectPath]);
 
   // Follow the conversation down unless the person has scrolled up to read.
-  const { turns, permissions, running } = state;
   useEffect(() => {
     const el = threadRef.current;
     if (el && stickRef.current) el.scrollTop = el.scrollHeight;
-  }, [turns, permissions, running]);
+  }, [turns, permissions, running, state.currentId]);
   const onThreadScroll = () => {
     const el = threadRef.current;
     if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
   };
 
-  // The selection as the chip shows it — from the key alone, no round trip.
-  // The lines are only fetched when a message actually goes.
+  // The selection as the chip shows it. The file and the name come from the
+  // key and the canvas at once; the lines take a round trip, made a moment
+  // after the selection settles rather than on every hop through the tree.
   const selection = useMemo(() => {
     if (!selectionKey) return null;
     const hash = selectionKey.indexOf('#');
     const file = hash < 0 ? selectionKey : selectionKey.slice(0, hash);
     const where = hash < 0 ? '' : selectionKey.slice(hash + 1);
-    return { key: selectionKey, file, where };
-  }, [selectionKey]);
+    return { key: selectionKey, file, where, label: where ? selectionLabel : null };
+  }, [selectionKey, selectionLabel]);
+  const [located, setLocated] = useState(null); // { key, rel, startLine, endLine }
+  useEffect(() => {
+    if (!selection || !projectPath) {
+      setLocated(null);
+      return undefined;
+    }
+    let alive = true;
+    const timer = setTimeout(async () => {
+      let at = null;
+      try {
+        at = await window.avb.locateSelection({ projectPath, key: selection.key });
+      } catch {
+        at = null;
+      }
+      if (alive) setLocated(at ? { key: selection.key, rel: at.rel, startLine: at.startLine, endLine: at.endLine } : null);
+    }, 120);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [selection, projectPath]);
+  const lines = located && located.key === selection?.key ? located : null;
 
   const attachment = async () => {
     if (!follow || !selection || !projectPath) return null;
@@ -286,16 +431,20 @@ export default function AgentPanel({ project, selectionKey }) {
     }
     if (!at) return null;
     const uri = `file://${projectPath}/${at.rel}`;
+    const label = selection.label || null;
     if (at.startLine && at.endLine) {
       const text = at.text.split('\n').slice(at.startLine - 1, at.endLine).join('\n');
-      return { rel: at.rel, uri, startLine: at.startLine, endLine: at.endLine, text };
+      return { rel: at.rel, uri, label, startLine: at.startLine, endLine: at.endLine, text };
     }
-    return { rel: at.rel, uri, startLine: null, endLine: null, text: null };
+    return { rel: at.rel, uri, label, startLine: null, endLine: null, text: null };
   };
+
+  const ready = state.status === 'ready';
+  const canSend = ready && !!thread?.loaded && !running;
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || running || state.status !== 'ready') return;
+    if (!text || !canSend) return;
     setDraft('');
     stickRef.current = true;
     void store.sendPrompt(text, await attachment());
@@ -315,31 +464,24 @@ export default function AgentPanel({ project, selectionKey }) {
     });
   };
 
-  const title = useMemo(() => {
-    const first = turns.find((t) => t.role === 'user');
-    if (!first) return 'New thread';
-    const text = first.blocks.map((b) => b.text).join('').replace(/\s+/g, ' ').trim();
-    return text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX - 1).trimEnd()}…` : text;
-  }, [turns]);
-
   const options = useMemo(() => {
-    const list = state.session?.configOptions || [];
+    const list = thread?.configOptions || [];
     const rank = (o) => {
       const i = CATEGORY_ORDER.indexOf(o.category);
       return i < 0 ? CATEGORY_ORDER.length : i;
     };
     return [...list].filter((o) => o.type === 'select').sort((a, b) => rank(a) - rank(b));
-  }, [state.session]);
+  }, [thread?.configOptions]);
   const hasEffort = options.some((o) => o.category === 'thought_level');
 
+  const title = view === 'history' ? 'Threads' : shorten(titleOf(thread));
   const menuItems = [
     { label: 'Agent', disabled: true },
     { label: AGENT_NAME, icon: <CheckIcon size={12} /> },
+    thread && { label: 'Rename thread', onSelect: () => setRenaming(true) },
+    thread && { label: 'Archive thread', onSelect: () => store.archiveThread(thread.id, true) },
     { label: 'Restart agent', onSelect: () => projectPath && store.start(projectPath) },
   ];
-
-  const ready = state.status === 'ready';
-  const busy = state.status === 'starting';
 
   const openHistory = () => {
     if (view === 'history') {
@@ -347,24 +489,32 @@ export default function AgentPanel({ project, selectionKey }) {
       return;
     }
     setView('history');
-    setThreads(null);
-    void store.listThreads().then(setThreads);
+    void store.listThreads();
   };
-  const pickThread = (sessionId) => {
+  const pickThread = (id) => {
     setView('thread');
     stickRef.current = true;
-    void store.loadThread(sessionId);
+    void store.openThread(id);
   };
-  // A thread picked while the agent is off is nothing to show; back to the
-  // thread the moment the project changes, too.
-  useEffect(() => {
-    setView('thread');
-  }, [projectPath]);
+
+  const busy = state.status === 'starting';
+  const loading = !!thread?.loading;
 
   return (
     <div className="agent-panel">
       <div className="panel-header">
-        <h2 title={view === 'history' ? 'Threads' : title}>{view === 'history' ? 'Threads' : title}</h2>
+        {renaming && thread ? (
+          <RenameField
+            value={titleOf(thread)}
+            className="agent-rename-title"
+            onDone={(v) => {
+              setRenaming(false);
+              if (v !== null) store.renameThread(thread.id, v);
+            }}
+          />
+        ) : (
+          <h2 title={title}>{title}</h2>
+        )}
         <div className="agent-header-actions">
           <button
             type="button"
@@ -390,32 +540,13 @@ export default function AgentPanel({ project, selectionKey }) {
         </div>
       </div>
 
-      {view === 'history' && (
-        <div className="agent-history">
-          {threads === null && <div className="props-empty agent-empty">Loading threads…</div>}
-          {threads && !threads.length && (
-            <div className="props-empty agent-empty">No threads yet — the first message starts one.</div>
-          )}
-          {threads &&
-            threads.map((t) => (
-              <button
-                key={t.sessionId}
-                type="button"
-                className={`agent-thread-row${t.sessionId === state.session?.sessionId ? ' on' : ''}`}
-                title={t.title || 'Untitled'}
-                onClick={() => pickThread(t.sessionId)}
-              >
-                <span className="agent-thread-title">{t.title || 'Untitled'}</span>
-                <span className="agent-thread-when">{relativeTime(t.updatedAt)}</span>
-              </button>
-            ))}
-        </div>
-      )}
+      {view === 'history' && <ThreadList state={state} onPick={pickThread} />}
 
       <div className="agent-thread" ref={threadRef} onScroll={onThreadScroll} hidden={view === 'history'}>
         {!projectPath && <div className="props-empty agent-empty">Open a project to talk to {AGENT_NAME} about it.</div>}
         {projectPath && busy && <div className="props-empty agent-empty">Starting {AGENT_NAME}…</div>}
-        {projectPath && ready && !turns.length && (
+        {projectPath && ready && loading && <div className="props-empty agent-empty">Loading the thread…</div>}
+        {projectPath && ready && !loading && thread?.loaded && !turns.length && (
           <div className="props-empty agent-empty">
             Ask {AGENT_NAME} about the page you are looking at. With the crosshair on, the canvas selection travels with each message.
           </div>
@@ -442,18 +573,20 @@ export default function AgentPanel({ project, selectionKey }) {
 
       <div className="agent-composer" hidden={view === 'history'}>
         {follow && selection && (
-          <div className="agent-context" title={selection.key}>
-            <CrosshairIcon />
-            <span className="agent-context-file">{selection.file}</span>
-            {selection.where === 'frontmatter' && <span className="agent-context-where">frontmatter</span>}
-            {selection.where && selection.where !== 'frontmatter' && <span className="agent-context-where">selection</span>}
-          </div>
+          <SelectionChip
+            rel={lines?.rel || selection.file}
+            label={selection.label}
+            startLine={lines?.startLine}
+            endLine={lines?.endLine}
+            className="agent-context"
+            title={selection.key}
+          />
         )}
         <AutoTextarea
           value={draft}
           minRows={2}
           placeholder={`Message ${AGENT_NAME}…`}
-          disabled={!ready}
+          disabled={!ready || !thread?.loaded}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
         />
@@ -478,12 +611,7 @@ export default function AgentPanel({ project, selectionKey }) {
             />
           ))}
           {!hasEffort && (
-            <button
-              type="button"
-              className="dd-trigger agent-config"
-              disabled
-              title="Effort — the Claude Agent adapter does not offer it yet"
-            >
+            <button type="button" className="dd-trigger agent-config" disabled title="Effort — the Claude Agent adapter does not offer it yet">
               <span className="dd-label dim">Effort</span>
               <span className="dd-chevron">
                 <ChevronDownIcon size={11} />
@@ -495,7 +623,7 @@ export default function AgentPanel({ project, selectionKey }) {
               <StopIcon />
             </button>
           ) : (
-            <button type="button" className="agent-send" title="Send (Enter)" disabled={!ready || !draft.trim()} onClick={send}>
+            <button type="button" className="agent-send" title="Send (Enter)" disabled={!canSend || !draft.trim()} onClick={send}>
               <SendIcon />
             </button>
           )}

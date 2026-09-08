@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import WelcomeScreen from './panels/WelcomeScreen.jsx';
 import PagesPanel from './panels/PagesPanel.jsx';
 import PalettePanel from './panels/PalettePanel.jsx';
-import StructurePanel from './panels/StructurePanel.jsx';
+import StructurePanel, { describeNode } from './panels/StructurePanel.jsx';
 import { isInlineRun, noteIndexAbove, noteText, noteValue, selectionAfterDelete } from './treeSelection.js';
 import { canvasClickAction } from './canvasClick.js';
 import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveClasses.js';
@@ -4084,6 +4084,13 @@ export default function App() {
   // The innermost key is the one the Code panel opens: the file being edited,
   // at the selection in it.
   const codeSelectionKey = selectionKeys.length ? selectionKeys[selectionKeys.length - 1] : null;
+  // The name the canvas and the navigator show for the selection — what the
+  // Agent panel's chip says beside the file, so "Step" reads as Step.
+  const selectionLabel = !selectedNode
+    ? null
+    : selectedNode.kind === 'frontmatter'
+      ? 'Frontmatter'
+      : describeNode(selectedNode, liveClassesById?.get(selectedNode.id)).label || null;
 
   // Position the Style/Settings highlight: on tab change, when the panel first
   // appears, and whenever the tab strip's width changes.
@@ -4543,7 +4550,7 @@ export default function App() {
               />
             )}
             {leftTab === 'agent' && (
-              <AgentPanel project={project} selectionKey={codeSelectionKey} />
+              <AgentPanel project={project} selectionKey={codeSelectionKey} selectionLabel={selectionLabel} />
             )}
             {leftTab === 'history' && (
               <HistoryPanel

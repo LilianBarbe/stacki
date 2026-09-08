@@ -307,7 +307,11 @@ function claudeAdapterEntry() {
 // ---------------------------------------------------------------------------
 
 function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
-  let current = null; // { agent, root, sessionId }
+  let current = null; // { agent, root, sessionId, gen }
+  // Counts agent processes. A restart kills one and starts the next, and the
+  // exit of the first arrives while the second is coming up — the renderer
+  // tells them apart by this.
+  let gen = 0;
 
   const stopCurrent = () => {
     if (!current) return;
@@ -317,10 +321,10 @@ function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
     agent.kill();
   };
 
-  const live = (sessionId) => {
-    if (!current || (sessionId && current.sessionId !== sessionId)) {
-      throw new Error('That agent session is no longer running.');
-    }
+  // Every thread opened on the live agent stays open on it, so any of their
+  // ids may be spoken to; the agent itself refuses one it does not know.
+  const live = () => {
+    if (!current) throw new Error('The agent is not running.');
     return current.agent;
   };
 
@@ -331,6 +335,7 @@ function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
     const node = resolveNodeBin();
     if (!node) throw new Error('Node was not found on your PATH — Claude Agent runs on it.');
     const entry = claudeAdapterEntry();
+    const thisGen = ++gen;
     const agent = new AcpAgent({
       command: node,
       args: [entry],
@@ -339,19 +344,17 @@ function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
       projectRoot: root,
       onUpdate: (params) => send('acp:update', params),
       onPermission: (request) => send('acp:permission', request),
-      // The exit names the session it ends, so a restart's renderer can tell
-      // the old agent going from the new one failing.
       onExit: (info) => {
         if (current && current.agent === agent) current = null;
-        send('acp:exit', { ...info, sessionId: agent.sessionId || null });
+        send('acp:exit', { ...info, gen: thisGen });
       },
     }).start();
-    current = { agent, root, sessionId: null };
+    current = { agent, root, sessionId: null, gen: thisGen };
     try {
       const session = await openSession(agent, { cwd: root, version });
       agent.sessionId = session.sessionId;
       if (current && current.agent === agent) current.sessionId = session.sessionId;
-      return session;
+      return { ...session, gen: thisGen };
     } catch (err) {
       const tail = agent.stderrTail();
       if (current && current.agent === agent) stopCurrent();
@@ -360,12 +363,12 @@ function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
   });
 
   ipcMain.handle('acp:prompt', async (_e, { sessionId, prompt } = {}) => {
-    const agent = live(sessionId);
+    const agent = live();
     return agent.request('session/prompt', { sessionId, prompt });
   });
 
   ipcMain.handle('acp:cancel', async (_e, { sessionId } = {}) => {
-    const agent = live(sessionId);
+    const agent = live();
     agent.notify('session/cancel', { sessionId });
     agent.cancelPermissions();
     return { ok: true };
@@ -374,7 +377,7 @@ function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
   // Config options first; the older per-thing methods for an agent that
   // predates them.
   ipcMain.handle('acp:setConfig', async (_e, { sessionId, configId, value } = {}) => {
-    const agent = live(sessionId);
+    const agent = live();
     try {
       return await agent.request('session/set_config_option', { sessionId, configId, value });
     } catch (err) {
@@ -415,23 +418,14 @@ function registerAcpHandlers(ipcMain, { send, resolveNodeBin, version }) {
     return { sessions: (result && result.sessions) || [] };
   });
 
-  // Loads a thread back: the agent replays it as session/update notifications
-  // under that id BEFORE answering, so the id has to be the live one first.
+  // Loads a thread back. The agent replays it as session/update notifications
+  // under that id BEFORE answering — the renderer has the thread ready for them.
   ipcMain.handle('acp:load', async (_e, { sessionId } = {}) => {
     const agent = live();
-    const before = current.sessionId;
+    const result = await agent.request('session/load', { sessionId, cwd: current.root, mcpServers: [] });
     agent.sessionId = sessionId;
     current.sessionId = sessionId;
-    try {
-      const result = await agent.request('session/load', { sessionId, cwd: current.root, mcpServers: [] });
-      return sessionResult({ ...(result || {}), sessionId });
-    } catch (err) {
-      if (current && current.agent === agent) {
-        agent.sessionId = before;
-        current.sessionId = before;
-      }
-      throw err;
-    }
+    return sessionResult({ ...(result || {}), sessionId });
   });
 
   ipcMain.handle('acp:stop', async () => {

@@ -722,7 +722,7 @@ function defaultCollapsed(node) {
 
 // The row's icon already says what kind a node is, so no trailing kind badge
 // ("comment", "loop", …) — it only repeated the icon in words.
-function describeNode(node, live) {
+export function describeNode(node, live) {
   switch (node.kind) {
     case 'text':
       return { icon: <TextIcon size={12} />, label: truncate(node.value, 34) };

@@ -30,7 +30,7 @@ const check = (what, condition, detail) => {
   const bundle = path.join(buildDir, 'agent-store.bundle.js');
   await esbuild.build({
     stdin: {
-      contents: `export { applyUpdate, withConfigValue, stripCommandNoise } from './src/panels/agentStore.js';\n`,
+      contents: `export { applyUpdate, withConfigValue, stripCommandNoise, parseUserText } from './src/panels/agentStore.js';\n`,
       resolveDir: path.join(__dirname, '..'),
       loader: 'js',
     },
@@ -40,7 +40,7 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { applyUpdate, withConfigValue, stripCommandNoise } = require(bundle);
+  const { applyUpdate, withConfigValue, stripCommandNoise, parseUserText } = require(bundle);
 
   const text = (t) => ({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: t } });
   const thought = (t) => ({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: t } });
@@ -117,6 +117,23 @@ const check = (what, condition, detail) => {
   for (const u of noise) loaded = applyUpdate(loaded, u);
   check('a replayed slash command is not a user turn', loaded.length === 1 && loaded[0].blocks[0].text === 'Reply with pong');
   check('the tags are stripped from text that also carries words', stripCommandNoise('<system-reminder>x</system-reminder>hello') === 'hello');
+
+  // --- The selection, back out of a replayed message -----------------------------
+  // What Claude Code records is the whole prompt: the words, the tagged
+  // selection, then the adapter's rendering of the attached lines.
+  const recorded =
+    'Make it blue\n\n<stacki-selection file="src/pages/index.astro" label="Step" lines="164:167">\n' +
+    "The user is looking at src/pages/index.astro, lines 164–167, on Stacki's canvas.\n</stacki-selection>" +
+    ' [@index.astro](file:///p/src/pages/index.astro) <context ref="file:///p/src/pages/index.astro"><div>x</div></context>';
+  const parsed = parseUserText(recorded);
+  check('the words come back alone', parsed.text === 'Make it blue');
+  check(
+    'the chip comes back from the tag',
+    parsed.attached && parsed.attached.rel === 'src/pages/index.astro' && parsed.attached.label === 'Step' && parsed.attached.startLine === 164 && parsed.attached.endLine === 167
+  );
+  check('a message with nothing attached is left as it is', parseUserText('plain words').text === 'plain words' && parseUserText('plain words').attached === null);
+  const legacy = parseUserText("Fix it\n\n(The user is looking at src/a.astro, lines 1–2, on Stacki's canvas — that selection is what this message is about.) [@a.astro](file:///p/src/a.astro)");
+  check('the untagged note of earlier threads is dropped too', legacy.text === 'Fix it');
 
   // --- Unknown updates ---------------------------------------------------------
   const before = turns;

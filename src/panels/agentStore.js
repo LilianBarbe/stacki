@@ -1,12 +1,21 @@
-// The agent conversation, kept outside the panel.
+// The agent conversations, kept outside the panel.
 //
 // The left panel unmounts whenever another rail tab opens, and a thread that
 // vanished the moment you glanced at the navigator would be no thread at all.
-// So the session, the turns and the questions the agent is waiting on live
+// So the threads, their turns and the questions the agent is waiting on live
 // here, and the panel is a view of them: it mounts, subscribes, and finds the
 // conversation where it left it — including whatever the agent said while the
 // panel was closed. The agent process in main outlives the panel the same way;
-// a project switch, a New Thread, or the app closing retires it.
+// a project switch, a restart, or the app closing retires it.
+//
+// Every thread the agent has opened in this process stays loaded, so coming
+// back to one is a switch, not a reload; a thread that is only known from the
+// agent's own list is loaded the first time it is opened. A thread keeps
+// running when another is on screen, and says so with a dot in the list —
+// orange while the agent works, green once an answer has landed unread.
+//
+// Names and archiving are the app's: ACP has no word for either, so they live
+// in localStorage per project, over the agent's own titles.
 //
 // The pure part — how a stream of session/update notifications becomes turns
 // and blocks — is `applyUpdate`, exported so it can be tested without a DOM.
@@ -18,13 +27,14 @@ const nextId = () => `t${++seq}`;
 
 const EMPTY = {
   projectPath: null,
-  status: 'idle', // idle | starting | ready | error | exited
+  status: 'idle', // idle | starting | ready | error | exited — the agent process
   error: null,
-  session: null, // { sessionId, agentInfo, configOptions, ... } from main
-  turns: [], // [{ id, role: 'user' | 'agent', blocks, attached? }]
-  permissions: [], // requests the agent is waiting on, oldest first
+  gen: 0, // which agent process; an exit from an older one is not news
+  agentInfo: null,
+  currentId: null,
+  threads: {}, // sessionId -> thread, see makeThread
+  listing: false, // the agent's list is on its way
   commands: [], // slash commands the agent advertises
-  running: false, // a prompt is in flight
 };
 
 let snapshot = EMPTY;
@@ -41,7 +51,67 @@ export const subscribe = (fn) => {
 };
 export const getSnapshot = () => snapshot;
 
-// --- Turning updates into turns -------------------------------------------
+// --- What the app remembers about threads ---------------------------------------
+
+const LOCAL_KEY = (projectPath) => `stacki.agent.threads:${projectPath}`;
+let local = { names: {}, archived: [] };
+
+function readLocal(projectPath) {
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY(projectPath));
+    const data = raw ? JSON.parse(raw) : {};
+    return { names: data.names || {}, archived: Array.isArray(data.archived) ? data.archived : [] };
+  } catch {
+    return { names: {}, archived: [] };
+  }
+}
+function writeLocal() {
+  try {
+    localStorage.setItem(LOCAL_KEY(snapshot.projectPath), JSON.stringify(local));
+  } catch {
+    /* private mode / quota — the names just won't outlive the session */
+  }
+}
+
+function makeThread(id, extra = {}) {
+  return {
+    id,
+    agentTitle: '', // what the agent's list calls it
+    title: local.names[id] || '', // the app's name for it, else the agent's
+    updatedAt: new Date().toISOString(),
+    loaded: false, // its turns are here (opened in this process)
+    loading: false, // being replayed
+    turns: [], // [{ id, role: 'user' | 'agent', blocks, attached? }]
+    configOptions: [],
+    permissions: [], // requests the agent is waiting on, oldest first
+    running: false, // a prompt is in flight
+    unread: false, // an answer landed while another thread was on screen
+    archived: local.archived.includes(id),
+    ...extra,
+  };
+}
+
+const threadOf = (id) => (id && snapshot.threads[id]) || null;
+export const current = (s = snapshot) => (s.currentId && s.threads[s.currentId]) || null;
+
+function patchThread(id, patch) {
+  const t = snapshot.threads[id];
+  if (!t) return;
+  const next = typeof patch === 'function' ? patch(t) : patch;
+  set({ threads: { ...snapshot.threads, [id]: { ...t, ...next } } });
+}
+
+// What a thread is called: the app's name, the agent's, the first thing said
+// in it, or nothing yet.
+export function titleOf(t) {
+  if (!t) return 'New thread';
+  if (t.title) return t.title;
+  const first = t.turns.find((turn) => turn.role === 'user');
+  const text = first ? parseUserText(first.blocks.map((b) => b.text || '').join('')).text.replace(/\s+/g, ' ').trim() : '';
+  return text || 'New thread';
+}
+
+// --- Turning updates into turns -------------------------------------------------
 
 // A text-like chunk lands on the last block of its type when that block is
 // the last one, so streamed text stays one block rather than one per chunk.
@@ -64,6 +134,34 @@ const COMMAND_NOISE =
 export function stripCommandNoise(text) {
   const clean = String(text || '').replace(COMMAND_NOISE, '');
   return clean.trim() ? clean : '';
+}
+
+// A user message as a loaded thread replays it is the whole prompt that went:
+// the words, then the selection tag above, then what the adapter made of the
+// attached resource (an @-link and a <context> block holding the file's
+// lines). This takes it apart again: the words alone, and the chip.
+const SELECTION_TAG = /\s*<stacki-selection([^>]*)>[\s\S]*?<\/stacki-selection>/g;
+const LEGACY_NOTE = /\s*\(The user is looking at [^)]*\)/g;
+const AT_LINK = /\s*\[@[^\]]*\]\(file:\/\/[^)]*\)/g;
+const CONTEXT_BLOCK = /\s*<context\b[^>]*>[\s\S]*?<\/context>/g;
+const attr = (attrs, name) => {
+  const m = new RegExp(`\\b${name}="([^"]*)"`).exec(attrs);
+  return m ? m[1].replace(/&quot;/g, '"') : null;
+};
+export function parseUserText(raw) {
+  let attached = null;
+  const text = String(raw || '')
+    .replace(SELECTION_TAG, (_m, attrs) => {
+      const lines = attr(attrs, 'lines');
+      const [a, b] = lines ? lines.split(':').map((n) => parseInt(n, 10)) : [];
+      attached = { rel: attr(attrs, 'file') || '', label: attr(attrs, 'label'), startLine: a || null, endLine: b || a || null };
+      return '';
+    })
+    .replace(LEGACY_NOTE, '')
+    .replace(AT_LINK, '')
+    .replace(CONTEXT_BLOCK, '')
+    .trim();
+  return { text, attached };
 }
 
 // Only the fields an update actually carries replace the ones on the block:
@@ -146,13 +244,16 @@ export function withConfigValue(options, configId, value) {
   return (options || []).map((o) => (o.id === configId ? { ...o, currentValue: value } : o));
 }
 
-function handleUpdate(update) {
+// An update goes to the thread it names, on screen or not.
+function handleUpdate(sessionId, update) {
+  const t = threadOf(sessionId);
+  if (!t) return;
   switch (update?.sessionUpdate) {
     case 'config_option_update':
-      set({ session: { ...snapshot.session, configOptions: update.configOptions || [] } });
+      patchThread(sessionId, { configOptions: update.configOptions || [] });
       return;
     case 'current_mode_update':
-      set({ session: { ...snapshot.session, configOptions: withConfigValue(snapshot.session?.configOptions, 'mode', update.currentModeId) } });
+      patchThread(sessionId, { configOptions: withConfigValue(t.configOptions, 'mode', update.currentModeId) });
       return;
     case 'available_commands_update':
       set({ commands: update.availableCommands || [] });
@@ -160,49 +261,46 @@ function handleUpdate(update) {
     case 'usage_update':
       return;
     default:
-      set({ turns: applyUpdate(snapshot.turns, update) });
+      patchThread(sessionId, { turns: applyUpdate(t.turns, update) });
   }
 }
 
-// --- The bridge to main -----------------------------------------------------
+// --- The bridge to main ---------------------------------------------------------
 
 const avb = () => (typeof window !== 'undefined' ? window.avb : null);
-const mine = (sessionId) => !!snapshot.session && snapshot.session.sessionId === sessionId;
 
 let wired = false;
 function wire() {
   const api = avb();
   if (wired || !api?.onAcpUpdate) return;
   wired = true;
-  api.onAcpUpdate(({ sessionId, update }) => {
-    if (mine(sessionId)) handleUpdate(update);
-  });
+  api.onAcpUpdate(({ sessionId, update }) => handleUpdate(sessionId, update));
   api.onAcpPermission((request) => {
-    if (mine(request.sessionId)) set({ permissions: [...snapshot.permissions, request] });
+    patchThread(request.sessionId, (t) => ({ permissions: [...t.permissions, request] }));
   });
   api.onAcpExit((info) => {
-    // A restart kills the agent before it: that exit is the old session's,
+    // A restart kills the agent before it: that exit is the old process's,
     // not this one's, and must not be read as the new agent dying.
-    if (!mine(info?.sessionId)) return;
-    const why = info?.error || (info?.stderr ? info.stderr.split('\n').slice(-3).join('\n') : '');
-    set({
-      status: 'exited',
-      running: false,
-      permissions: [],
-      error: why ? `The agent exited.\n${why}` : 'The agent exited.',
-    });
+    if (!info || info.gen !== snapshot.gen || snapshot.status === 'idle') return;
+    const why = info.error || (info.stderr ? info.stderr.split('\n').slice(-3).join('\n') : '');
+    const threads = {};
+    for (const [id, t] of Object.entries(snapshot.threads)) threads[id] = { ...t, running: false, permissions: [] };
+    set({ status: 'exited', threads, error: why ? `The agent exited.\n${why}` : 'The agent exited.' });
   });
 }
 
-// Starts a fresh session in the project — also what New Thread does.
+// Starts the agent afresh in the project, with one new thread — the first
+// open, a Restart, and the way back from an error.
 export async function start(projectPath) {
   wire();
+  local = readLocal(projectPath);
   set({ ...EMPTY, projectPath, status: 'starting' });
   try {
-    const session = await avb().acpStart({ projectPath });
+    const r = await avb().acpStart({ projectPath });
     // A later start may have superseded this one while it was on its way.
     if (snapshot.projectPath !== projectPath || snapshot.status !== 'starting') return;
-    set({ session, status: 'ready' });
+    const t = makeThread(r.sessionId, { loaded: true, configOptions: r.configOptions || [] });
+    set({ status: 'ready', gen: r.gen || 0, agentInfo: r.agentInfo || null, currentId: t.id, threads: { [t.id]: t } });
   } catch (err) {
     if (snapshot.projectPath !== projectPath) return;
     set({ status: 'error', error: cleanError(err) });
@@ -217,11 +315,48 @@ export function ensure(projectPath) {
   void start(projectPath);
 }
 
+// A fresh thread on the agent already running; a restart only when there is
+// nothing running to ask.
+export async function newThread() {
+  const { projectPath, status } = snapshot;
+  if (!projectPath) return;
+  if (status !== 'ready') return start(projectPath);
+  try {
+    const r = await avb().acpNew();
+    const t = makeThread(r.sessionId, { loaded: true, configOptions: r.configOptions || [] });
+    set({ currentId: t.id, threads: { ...snapshot.threads, [t.id]: t }, error: null });
+  } catch (err) {
+    set({ error: cleanError(err) });
+  }
+}
+
+// Puts a thread on screen. One opened before in this process is just shown;
+// one the agent only listed is loaded first — it replays as updates under its
+// own id, which is why the entry exists before the request goes.
+export async function openThread(id) {
+  const t = threadOf(id);
+  if (!t || snapshot.status !== 'ready') return;
+  if (t.loaded || t.loading) {
+    set({ currentId: id, threads: { ...snapshot.threads, [id]: { ...t, unread: false } } });
+    return;
+  }
+  set({ currentId: id, error: null });
+  patchThread(id, { loading: true, turns: [], unread: false });
+  try {
+    const r = await avb().acpLoad({ sessionId: id });
+    patchThread(id, { loading: false, loaded: true, configOptions: r?.configOptions || [] });
+  } catch (err) {
+    patchThread(id, { loading: false });
+    set({ error: cleanError(err) });
+  }
+}
+
 // `attachment` is the canvas selection, resolved to a file and lines by the
-// panel: { rel, uri, startLine, endLine, text }.
+// panel: { rel, uri, label, startLine, endLine, text }.
 export async function sendPrompt(text, attachment) {
-  const { session, running } = snapshot;
-  if (!session || running || !text.trim()) return;
+  const t = current();
+  if (!t || !t.loaded || t.running || snapshot.status !== 'ready' || !text.trim()) return;
+  const id = t.id;
   const prompt = [{ type: 'text', text }];
   let attached = null;
   if (attachment) {
@@ -231,64 +366,73 @@ export async function sendPrompt(text, attachment) {
           ? `line ${attachment.startLine}`
           : `lines ${attachment.startLine}–${attachment.endLine}`
         : null;
+    const shown = attachment.label ? `, the element the canvas shows as “${attachment.label}”` : '';
+    // Tagged, because Claude Code records the whole prompt and replays it as
+    // the user's words when the thread is loaded back — parseUserText turns
+    // this back into the chip it came from rather than showing it as typed.
+    const attrs =
+      ` file="${attachment.rel}"` +
+      (attachment.label ? ` label="${attachment.label.replace(/"/g, '&quot;')}"` : '') +
+      (attachment.startLine && attachment.endLine ? ` lines="${attachment.startLine}:${attachment.endLine}"` : '');
     prompt.push({
       type: 'text',
       text:
-        `\n\n(The user is looking at ${attachment.rel}${lines ? `, ${lines},` : ''} on Stacki's canvas — ` +
-        `that selection is what this message is about.)`,
+        `\n\n<stacki-selection${attrs}>\nThe user is looking at ${attachment.rel}${lines ? `, ${lines}` : ''}${shown}, ` +
+        `on Stacki's canvas — that selection is what this message is about.\n</stacki-selection>`,
     });
     if (attachment.text != null) {
-      prompt.push({
-        type: 'resource',
-        resource: { uri: attachment.uri, mimeType: 'text/plain', text: attachment.text },
-      });
+      prompt.push({ type: 'resource', resource: { uri: attachment.uri, mimeType: 'text/plain', text: attachment.text } });
     } else {
       prompt.push({ type: 'resource_link', uri: attachment.uri, name: attachment.rel });
     }
-    attached = { rel: attachment.rel, startLine: attachment.startLine, endLine: attachment.endLine };
+    attached = { rel: attachment.rel, label: attachment.label || null, startLine: attachment.startLine, endLine: attachment.endLine };
   }
-  set({
-    turns: [...snapshot.turns, { id: nextId(), role: 'user', blocks: [{ id: nextId(), type: 'text', text }], attached }],
+  patchThread(id, (th) => ({
+    turns: [...th.turns, { id: nextId(), role: 'user', blocks: [{ id: nextId(), type: 'text', text }], attached }],
     running: true,
-    error: null,
-  });
+    updatedAt: new Date().toISOString(),
+  }));
+  set({ error: null });
   try {
-    await avb().acpPrompt({ sessionId: session.sessionId, prompt });
+    await avb().acpPrompt({ sessionId: id, prompt });
   } catch (err) {
-    if (mine(session.sessionId)) set({ error: cleanError(err) });
+    if (threadOf(id)) set({ error: cleanError(err) });
   } finally {
-    if (mine(session.sessionId)) set({ running: false, permissions: [] });
+    // An answer that landed while another thread was on screen is unread.
+    patchThread(id, { running: false, permissions: [], unread: snapshot.currentId !== id, updatedAt: new Date().toISOString() });
   }
 }
 
 export async function cancel() {
-  const { session } = snapshot;
-  if (!session) return;
+  const t = current();
+  if (!t) return;
   try {
-    await avb().acpCancel({ sessionId: session.sessionId });
+    await avb().acpCancel({ sessionId: t.id });
   } catch {
     /* the prompt's own rejection reports it */
   }
 }
 
 export async function setConfig(configId, value) {
-  const { session } = snapshot;
-  if (!session) return;
+  const t = current();
+  if (!t) return;
   // Optimistic: the dropdown shows the pick at once; the agent's answer, when
   // it carries the list, is what stays.
-  set({ session: { ...session, configOptions: withConfigValue(session.configOptions, configId, value) } });
+  patchThread(t.id, { configOptions: withConfigValue(t.configOptions, configId, value) });
   try {
-    const result = await avb().acpSetConfig({ sessionId: session.sessionId, configId, value });
-    if (result?.configOptions && mine(session.sessionId)) {
-      set({ session: { ...snapshot.session, configOptions: result.configOptions } });
-    }
+    const result = await avb().acpSetConfig({ sessionId: t.id, configId, value });
+    if (result?.configOptions) patchThread(t.id, { configOptions: result.configOptions });
   } catch (err) {
-    if (mine(session.sessionId)) set({ error: cleanError(err) });
+    set({ error: cleanError(err) });
   }
 }
 
 export async function answerPermission(requestId, optionId) {
-  set({ permissions: snapshot.permissions.filter((p) => p.requestId !== requestId) });
+  for (const t of Object.values(snapshot.threads)) {
+    if (t.permissions.some((p) => p.requestId === requestId)) {
+      patchThread(t.id, { permissions: t.permissions.filter((p) => p.requestId !== requestId) });
+    }
+  }
   try {
     await avb().acpPermission({ requestId, optionId });
   } catch {
@@ -296,47 +440,46 @@ export async function answerPermission(requestId, optionId) {
   }
 }
 
-// A fresh thread on the agent already running; a restart only when there is
-// nothing running to ask.
-export async function newThread() {
-  const { projectPath, session, status } = snapshot;
-  if (!projectPath) return;
-  if (!session || status !== 'ready') return start(projectPath);
-  set({ status: 'starting', turns: [], permissions: [], error: null, running: false });
-  try {
-    const next = await avb().acpNew();
-    set({ session: { ...session, ...next }, status: 'ready' });
-  } catch (err) {
-    set({ status: 'error', error: cleanError(err) });
-  }
-}
-
-// The threads the agent remembers for this project, newest first. A thread
-// exists from its first message, so a fresh one is not in the list yet.
+// Asks the agent what it remembers for this project and folds it in: a thread
+// already here keeps its turns and its name, one only the agent knows joins.
 export async function listThreads() {
-  if (!snapshot.session) return [];
+  if (snapshot.status !== 'ready') return;
+  set({ listing: true });
   try {
-    const result = await avb().acpList();
-    return (result?.sessions || []).slice().sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+    const r = await avb().acpList();
+    const threads = { ...snapshot.threads };
+    for (const s of r?.sessions || []) {
+      const have = threads[s.sessionId];
+      const later = have && have.updatedAt > s.updatedAt ? have.updatedAt : s.updatedAt;
+      threads[s.sessionId] = have
+        ? { ...have, agentTitle: s.title || '', title: local.names[s.sessionId] || s.title || '', updatedAt: later || have.updatedAt }
+        : makeThread(s.sessionId, { agentTitle: s.title || '', title: local.names[s.sessionId] || s.title || '', updatedAt: s.updatedAt });
+    }
+    set({ threads, listing: false });
   } catch (err) {
-    set({ error: cleanError(err) });
-    return [];
+    set({ listing: false, error: cleanError(err) });
   }
 }
 
-// Loads a thread back. The agent replays it as updates under the loaded id,
-// so that id is the live one from here on — set before the request goes, or
-// the replay would be filtered out as some other session's.
-export async function loadThread(sessionId) {
-  const { session, status, running } = snapshot;
-  if (!session || running || status !== 'ready' || sessionId === session.sessionId) return;
-  set({ session: { ...session, sessionId }, status: 'starting', turns: [], permissions: [], error: null });
-  try {
-    const next = await avb().acpLoad({ sessionId });
-    set({ session: { ...snapshot.session, ...next }, status: 'ready' });
-  } catch (err) {
-    set({ status: 'error', error: cleanError(err) });
-  }
+export function renameThread(id, name) {
+  const t = threadOf(id);
+  if (!t) return;
+  const clean = String(name || '').replace(/\s+/g, ' ').trim();
+  if (clean) local.names[id] = clean;
+  else delete local.names[id];
+  writeLocal();
+  patchThread(id, { title: clean || t.agentTitle || '' });
+}
+
+// Archiving the thread on screen opens a fresh one in its place.
+export function archiveThread(id, on = true) {
+  const t = threadOf(id);
+  if (!t) return;
+  local.archived = local.archived.filter((x) => x !== id);
+  if (on) local.archived.push(id);
+  writeLocal();
+  patchThread(id, { archived: on });
+  if (on && snapshot.currentId === id) void newThread();
 }
 
 export function clearError() {
