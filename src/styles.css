@@ -5785,8 +5785,48 @@ textarea::selection {
 .term-scroll-btn:hover:not(:disabled) { background: var(--bg-active); color: var(--text); }
 
 /* Code panel (left rail → Code): a file, open at the selection. Wider than
-   the other left panels — a line of markup needs the room. */
-.panel.left.code { width: min(480px, 42vw); }
+   the other left panels — a line of markup needs the room — and the only one
+   that resizes, so its width arrives inline from the remembered drag. */
+.panel.left.code {
+  width: 480px;
+  min-width: 320px;
+  /* A width remembered on a big screen must not swallow the canvas on a
+     small one — the same floor the drag clamps to. */
+  max-width: calc(100vw - 420px);
+  position: relative;
+}
+
+/* Wider than it looks: the canvas iframe starts at the panel's edge, and a
+   5px target between two things that both want the pointer is a fiddle. The
+   grab area is 9px straddling the edge; the line that lights up is the 3px in
+   the middle of it. */
+.code-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -4px;
+  width: 9px;
+  z-index: 3;
+  cursor: ew-resize;
+}
+.code-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 3px;
+}
+.code-resize:hover::after, .code-resize.on::after { background: var(--accent); }
+
+/* Held over the whole window while a panel edge is being dragged, so the
+   pointer can't land in the canvas iframe and take the drag with it. */
+.drag-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+}
+.drag-shield.ew { cursor: ew-resize; }
 .code-panel { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .code-panel .panel-header { gap: 10px; }
 .code-panel-where {

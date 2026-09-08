@@ -79,6 +79,30 @@ import {
 let idCounter = 1000;
 const newId = () => `c${idCounter++}`;
 
+// The code panel's width, in pixels. The floor keeps a line of code readable;
+// the ceiling is worked out against the window at drag time, so the canvas is
+// never squeezed out of sight.
+const CODE_MIN_WIDTH = 320;
+const CODE_DEFAULT_WIDTH = 480;
+const CODE_MIN_CANVAS = 420;
+const CODE_WIDTH_KEY = 'stacki.code.width';
+
+const readCodeWidth = () => {
+  try {
+    const n = Number(localStorage.getItem(CODE_WIDTH_KEY));
+    return Number.isFinite(n) && n >= CODE_MIN_WIDTH ? n : CODE_DEFAULT_WIDTH;
+  } catch {
+    return CODE_DEFAULT_WIDTH;
+  }
+};
+const storeCodeWidth = (n) => {
+  try {
+    localStorage.setItem(CODE_WIDTH_KEY, String(n));
+  } catch {
+    /* private mode / quota — the width just won't outlive the session */
+  }
+};
+
 // HTML elements that can never have children.
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
@@ -653,6 +677,11 @@ export default function App() {
   const [dynamicIndex, setDynamicIndex] = useState(0);
   const [dynamicError, setDynamicError] = useState(null);
   const [leftTab, setLeftTab] = useState('navigator'); // pages | navigator | components | assets | cms | null
+  // How wide the code panel is. Code is read in lines, not in a column of
+  // controls, so the one panel that shows a file gets a drag handle and
+  // remembers where it was left — the other tabs keep their fixed width.
+  const [codeWidth, setCodeWidth] = useState(readCodeWidth);
+  const [codeDrag, setCodeDrag] = useState(false);
   const [cmsRel, setCmsRel] = useState(null); // JSON file open in the CMS editor
   // Content collection open in the schema-driven editor. Only one of the two
   // is ever open: they edit the same kind of thing in two different ways.
@@ -1024,9 +1053,21 @@ export default function App() {
       }
       void leaveProject(next);
     });
+    // A project picked from File > Open Recent Project: same trip as the dialog
+    // above, minus the picking. Choosing the project already open is a no-op
+    // rather than a reload of what is on screen.
+    const offRecent = window.avb.onMenu('openRecent', (next) => {
+      if (!next || next === projectRef.current?.path) return;
+      if (!projectRef.current) {
+        loadProject(next);
+        return;
+      }
+      void leaveProject(next);
+    });
     return () => {
       offClose?.();
       offOpen?.();
+      offRecent?.();
     };
   }, [leaveProject, loadProject]);
 
@@ -4173,6 +4214,69 @@ export default function App() {
   // editor is on, so switching in and out is a like-for-like comparison.
   const oldVersionUrl = previewInfo && pageUrlPath ? previewInfo.url + pageUrlPath : null;
 
+  // Dragging the code panel's right edge. The width is clamped against the
+  // window as it moves, so a drag past the far side stops at a usable canvas
+  // instead of burying it.
+  //
+  // Widening means dragging OVER the canvas, and the canvas is an iframe on
+  // the dev server — another document, and in Chromium another process. Left
+  // to itself it swallows every move and the release: the panel freezes
+  // mid-drag, and because the release never arrives it is still following the
+  // pointer when it comes back, so the panel then shrinks under a mouse that
+  // is only travelling home. Two things stop that. The pointer is captured,
+  // which routes its events here whatever they pass over; and while the drag
+  // is live a shield covers the window, so there is nothing under the pointer
+  // to hit-test into in the first place.
+  const startCodeResize = (e) => {
+    e.preventDefault();
+    const handle = e.currentTarget;
+    const pointerId = e.pointerId;
+    const startX = e.clientX;
+    const startWidth = codeWidth;
+    const max = Math.max(CODE_MIN_WIDTH, window.innerWidth - CODE_MIN_CANVAS);
+    setCodeDrag(true);
+    try {
+      // Synchronous, so it also covers the frame between here and the shield
+      // appearing — the shield is state, and state lands a render later.
+      handle.setPointerCapture(pointerId);
+    } catch {
+      /* no capture — the shield alone still keeps the drag on this document */
+    }
+    const widthAt = (ev) =>
+      Math.min(max, Math.max(CODE_MIN_WIDTH, startWidth + (ev.clientX - startX)));
+    let last = startWidth;
+    const onMove = (ev) => {
+      // A move with no button held means the release happened somewhere this
+      // window never saw it — off the app entirely, say. Finish the drag on
+      // the spot rather than letting the panel trail a pointer that has long
+      // since let go.
+      if (!ev.buttons) return end(ev);
+      setCodeWidth((last = widthAt(ev)));
+    };
+    const end = (ev) => {
+      // pointercancel carries no meaningful position — keep the width the last
+      // move left, rather than snapping to wherever the cancelled pointer is.
+      const w = ev.type === 'pointerup' ? widthAt(ev) : last;
+      setCodeWidth(w);
+      setCodeDrag(false);
+      storeCodeWidth(w);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      try {
+        handle.releasePointerCapture(pointerId);
+      } catch {
+        /* already released */
+      }
+    };
+    // Listening on the window catches both routes: captured events, which are
+    // retargeted to the handle and bubble up from there, and — if capture was
+    // refused — events on the shield, which bubble up the same way.
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  };
+
   return (
     <div className="app">
       <div className="titlebar">
@@ -4295,7 +4399,17 @@ export default function App() {
         />
 
         {leftTab && (
-          <div className={`panel left${leftTab === 'code' ? ' code' : ''}`}>
+          <div
+            className={`panel left${leftTab === 'code' ? ' code' : ''}`}
+            style={leftTab === 'code' ? { width: codeWidth } : undefined}
+          >
+            {leftTab === 'code' && (
+              <div
+                className={`code-resize${codeDrag ? ' on' : ''}`}
+                onPointerDown={startCodeResize}
+                title="Drag to resize"
+              />
+            )}
             {/* Keyed on the tab: switching to another panel is itself the way
                 out of a crashed one, not a view of its wreckage. */}
             <ErrorBoundary
@@ -4735,7 +4849,11 @@ export default function App() {
           </div>
         )}
 
-        {pageState?.editable && !previewRef && (
+        {/* The code panel is the wide one, and it edits the same file the
+            style and settings panels do — so it takes the right-hand side's
+            room while it's open rather than sitting beside a second editor
+            of the same thing. */}
+        {pageState?.editable && !previewRef && leftTab !== 'code' && (
           <div className="panel right">
             <div className="right-tabs">
               {rightTabInd && <span className="right-tabs-indicator" style={rightTabInd} />}
@@ -4899,6 +5017,12 @@ export default function App() {
           onClose={() => setInsertOpen(false)}
         />
       )}
+
+      {/* Over everything the drag could otherwise fall into — the canvas
+          iframe above all — for as long as the drag lasts. It also holds the
+          resize cursor steady, so the pointer doesn't flicker through every
+          cursor it passes over on the way out. */}
+      {codeDrag && <div className="drag-shield ew" />}
 
       {busy && <BusyOverlay message={busy} />}
       {toast && <Toast toast={toast} />}
