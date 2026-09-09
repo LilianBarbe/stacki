@@ -178,19 +178,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('the spacing field shows the utilities value the page applies', marginTop() === 'var(--space-3)', marginTop());
   const styledChips = () => [...panel.querySelectorAll('.embed-editor_selector-chip')].filter((el) => !el.classList.contains('is-pending')).map((el) => el.textContent);
   check('the utility that wins is the last styled chip', styledChips()[styledChips().length - 1] === '.color-faded', chips().join(' '));
-  panel.querySelector('.embed-editor_inherited-check input')?.click();
-  await sleep(80);
-  check('the more specific patterns rule reads above both utilities — it lost', chips().indexOf('.layout > .heading') < chips().indexOf('.margin-top-0'), chips().join(' '));
 
   named('CSS Code')?.querySelector('.embed-editor_section-toggle')?.click();
   await sleep(300);
   const { EditorView } = require('@codemirror/view');
-  const ed = named('CSS Code')?.querySelector('.cm-editor');
-  const text = ed ? EditorView.findFromDOM(ed).state.doc.toString() : '';
-  check('the stacked view leads with the winner', text.startsWith('/* src/styles/utilities.css · @layer utilities */\n.color-faded {'), JSON.stringify(text.slice(0, 80)));
-  check('and names the layer of the rule that lost on it', /@layer patterns \*\/\n\.layout > \.heading \{/.test(text), JSON.stringify(text));
-  const struck = [...(named('CSS Code')?.querySelectorAll('.cm-struck') || [])].map((e) => e.textContent);
-  check('the two margin-tops that lose are struck', struck.length === 2 && struck.every((t) => t === 'margin-top: 0;'), JSON.stringify(struck));
+  const ed = () => named('CSS Code')?.querySelector('.cm-editor');
+  const text = () => (ed() ? EditorView.findFromDOM(ed()).state.doc.toString() : '');
+  const struck = () => [...(named('CSS Code')?.querySelectorAll('.cm-struck') || [])].map((e) => e.textContent);
+  check('the stacked view reads the class rules in cascade order, the winner last', text() === '.margin-top-0 {\n  margin-top: 0;\n}\n\n.color-faded {\n  color: grey;\n  margin-top: var(--space-3);\n}\n', JSON.stringify(text()));
+  check('the ancestor rule, not one of the element\'s classes, is folded away', !text().includes('.layout'));
+  check('the utility that lost on margin-top is struck — to the layer above, though it is not shown', struck().join() === 'margin-top: 0;', JSON.stringify(struck()));
+
+  // Reveal the inherited styles: the chip comes in, and so does its block —
+  // at the top, since a patterns rule loses to every utility.
+  panel.querySelector('.embed-editor_inherited-check input')?.click();
+  await sleep(300);
+  check('the more specific patterns rule reads above both utilities — it lost', chips().indexOf('.layout > .heading') < chips().indexOf('.margin-top-0'), chips().join(' '));
+  check('and the stacked view now opens with it', text().startsWith('.layout > .heading {\n  margin-top: 0;\n}\n'), JSON.stringify(text()));
+  check('struck as well', struck().length === 2 && struck().every((t) => t === 'margin-top: 0;'), JSON.stringify(struck()));
 
   if (failures.length) {
     console.error(`layer-precedence: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

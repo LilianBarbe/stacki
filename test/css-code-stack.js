@@ -1,11 +1,15 @@
-// The CSS Code section with nothing picked: every rule reaching the element.
+// The CSS Code section with nothing picked: the element's classes, as Webflow
+// writes them.
 //
 //   node test/css-code-stack.js
 //
-// Click an element and no class is picked; what the section shows then is the
-// sum — each rule that reaches the element, one under another, winners first,
-// with the declarations that lose the cascade struck through, as DevTools
-// draws it. Built from the resolved style, so it agrees with the fields.
+// Click an element and no class is picked; the section then reads like
+// Webflow's style preview for it: one block per rule of a class the element
+// carries — the base class, its combo, the combo again under each `@media` —
+// downwards in cascade order, the rule that wins last. Nothing that reaches
+// the element without being one of its classes (a tag, a reset, an ancestor
+// chain, a global) — those are the well's folded-away chips. A declaration a
+// later rule beats is struck through.
 
 const fs = require('fs');
 const path = require('path');
@@ -23,56 +27,90 @@ const check = (what, condition, detail) => {
   fs.mkdirSync(buildDir, { recursive: true });
   const bundlePath = path.join(buildDir, 'css-code-stack.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'style-panel', 'lib', 'css-code-stack.ts')],
-    outfile: bundlePath,
-    bundle: true,
-    format: 'cjs',
-    platform: 'node',
-    logLevel: 'silent',
+    stdin: {
+      contents: `
+        export { stackedCssCode } from './lib/css-code-stack'
+        export { parseRegion, collectRules } from './lib/css'
+        export { computeRuleModel } from './lib/cascade'
+      `,
+      resolveDir: path.join(__dirname, '..', 'src', 'style-panel'),
+      loader: 'ts',
+    },
+    outfile: bundlePath, bundle: true, format: 'cjs', platform: 'node', loader: { '.css': 'empty' }, logLevel: 'silent',
   });
-  const { stackedCssCode } = require(bundlePath);
+  const { stackedCssCode, parseRegion, collectRules, computeRuleModel } = require(bundlePath);
 
-  // A heading carrying `.heading` (from a base sheet) and `.color-faded` (a
-  // utility, written later), under a `h2` reset: three rules, and `color` set
-  // by all three. The utility wins colour; the base wins the rest.
-  const c = (ruleId, selectorText, value, specificity, order, winning, label, important = false) =>
-    ({ ruleId, selectorText, value, specificity, order, winning, embedLabel: label, important, origin: 'embed', isSelected: false, complexOnly: false });
-  const props = new Map([
-    ['color', { prop: 'color', source: 'other', contributors: [
-      c('r1', 'h2', 'black', [0, 0, 1], 1, false, 'base.css'),
-      c('r2', '.heading', 'var(--text)', [0, 1, 0], 5, false, 'base.css'),
-      c('r3', '.color-faded', 'var(--faded)', [0, 1, 0], 9, true, 'utilities.css'),
-    ] }],
-    ['font-size', { prop: 'font-size', source: 'other', contributors: [
-      c('r1', 'h2', '1.5rem', [0, 0, 1], 1, false, 'base.css'),
-      c('r2', '.heading', '2rem', [0, 1, 0], 5, true, 'base.css'),
-    ] }],
-    ['margin', { prop: 'margin', source: 'other', contributors: [
-      c('r1', 'h2', '0', [0, 0, 1], 1, true, 'base.css', true),
-    ] }],
-  ]);
-  const { text, struck } = stackedCssCode({ props, selectedRule: null, contexts: [''], states: [] });
-  const lines = text.split('\n');
+  // The hero section of a Webflow build: a base class, a combo, the combo's
+  // phone override — and everything else that reaches a <section>.
+  const css = `
+    * { box-sizing: border-box }
+    section { display: block; padding-left: 1rem }
+    .page-wrapper .hero_wrap { color: red }
+    .hero_wrap { background-color: var(--_theme---background-secondary); padding-left: 2rem }
+    .hero_wrap.is-aplat { padding-right: var(--site--side); padding-left: var(--site--side) }
+    @media screen and (max-width: 767px) {
+      .hero_wrap.is-aplat { padding-right: 0rem; padding-left: 0rem }
+    }
+    .hero_wrap:hover { color: blue }
+    :focus-visible { outline: 2px solid }
+  `;
+  const region = { start: 0, end: css.length, css, root: null, openTag: '<style>' };
+  parseRegion(region);
+  const rules = collectRules(region, { embedKey: 'e', embedLabel: 'main.css', fromComponent: false, componentName: null, regionIndex: 0, idSeed: 's', order: { n: 0 } });
+  const domMatched = new Map();
+  for (const rule of rules) for (const sel of rule.selectors) domMatched.set(sel.text, true);
+  const model = await computeRuleModel(rules, { rootKey: 'el', view: {}, domMatched });
+  const classList = ['hero_wrap', 'is-aplat'];
+  const { text, struck } = stackedCssCode(model, classList);
 
-  check('one block per rule', (text.match(/\{/g) || []).length === 3, text);
-  check('winners first: the utility that wins colour is on top', lines.indexOf('.color-faded {') < lines.indexOf('.heading {') && lines.indexOf('.heading {') < lines.indexOf('h2 {'), text);
-  check('each block names its file', lines[0] === '/* utilities.css */', lines[0]);
-  check('a block holds its own declarations', /\.heading \{\n  color: var\(--text\);\n  font-size: 2rem;\n\}/.test(text), text);
-  check('!important is spelled', /margin: 0 !important;/.test(text), text);
-
+  check('exactly Webflow\'s preview: base, combo, then the combo\'s query',
+    text === [
+      '.hero_wrap {',
+      '  background-color: var(--_theme---background-secondary);',
+      '  padding-left: 2rem;',
+      '}',
+      '',
+      '.hero_wrap.is-aplat {',
+      '  padding-right: var(--site--side);',
+      '  padding-left: var(--site--side);',
+      '}',
+      '',
+      '@media screen and (max-width: 767px) {',
+      '  .hero_wrap.is-aplat {',
+      '    padding-right: 0rem;',
+      '    padding-left: 0rem;',
+      '  }',
+      '}',
+      '',
+      '.hero_wrap:hover {',
+      '  color: blue;',
+      '}',
+      '',
+    ].join('\n'),
+    JSON.stringify(text));
+  check('no tag rule, no reset, no global', !/section \{|\* \{|:focus-visible/.test(text), text);
+  check('no ancestor chain either, though it beats the base class', !text.includes('.page-wrapper'), text);
   const struckText = struck.map((r) => text.slice(r.from, r.to));
-  check('the losing colours are struck', struckText.includes('color: var(--text);') && struckText.includes('color: black;'), JSON.stringify(struckText));
-  check('and the losing font-size', struckText.includes('font-size: 1.5rem;'), JSON.stringify(struckText));
-  check('winners are not', !struckText.some((t) => /^color: var\(--faded\)|^font-size: 2rem|^margin: 0/.test(t)), JSON.stringify(struckText));
+  check('the base padding-left the combo beats is struck', struckText.includes('padding-left: 2rem;'), JSON.stringify(struckText));
+  check('the combo\'s own padding-left, which wins, is not', !struckText.includes('padding-left: var(--site--side);'), JSON.stringify(struckText));
+  check('a query\'s values are not judged against the base', !struckText.some((t) => t.includes('0rem')), JSON.stringify(struckText));
   check('a struck range covers the declaration exactly, no indent', struck.every((r) => text[r.from] !== ' ' && text[r.to - 1] === ';'), JSON.stringify(struck));
 
-  check('nothing reaching the element is nothing to show', stackedCssCode({ props: new Map(), selectedRule: null, contexts: [], states: [] }).text === '');
+  check('an element with no class rules has nothing to show', stackedCssCode(model, ['nothing']).text === '');
+
+  // The well's toggles bring the folded-away rules in, and only then.
+  const withInherited = stackedCssCode(model, classList, { inherited: true }).text;
+  check('showing inherited styles brings the tag rule and the ancestor chain in', /^section \{/m.test(withInherited) && withInherited.includes('.page-wrapper .hero_wrap {'), withInherited);
+  check('in cascade order: the tag before the class it loses to, the chain before the combo written after it', withInherited.indexOf('section {') < withInherited.indexOf('.hero_wrap {') && withInherited.indexOf('.hero_wrap {') < withInherited.indexOf('.page-wrapper .hero_wrap {') && withInherited.indexOf('.page-wrapper .hero_wrap {') < withInherited.indexOf('.hero_wrap.is-aplat {'), withInherited);
+  check('but not the globals — `*` is one, as the well has it', !withInherited.includes(':focus-visible') && !/^\* \{/m.test(withInherited));
+  const withGlobals = stackedCssCode(model, classList, { globals: true }).text;
+  check('showing globals brings the reset and the global in, and nothing inherited', /^\* \{/m.test(withGlobals) && withGlobals.includes(':focus-visible {') && !withGlobals.includes('section {'), withGlobals);
 
   if (failures.length) {
     console.error(`css-code-stack: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
     process.exit(1);
   }
-  console.log(`css-code-stack: ${checked} passed  [every rule reaching the element, losers struck]`);
+  console.log(`css-code-stack: ${checked} passed  [the element's classes, as Webflow writes them]`);
 })().catch((error) => {
   console.error(error);
   process.exit(1);

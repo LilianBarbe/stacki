@@ -741,3 +741,14 @@ export function formatSpecificity(spec: Specificity): string {
 export function compareSpecificity(a: Specificity, b: Specificity): number {
   return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
 }
+
+// A selector that says nothing about *this* element — `:target`, `:focus-visible`,
+// `*`, `::selection`, `body > *`. They match almost everything on the page, so a
+// project with a couple of them tacks them onto every element's chip list and
+// buries the selectors that actually describe what's selected. Kept behind a
+// toggle instead. A class, id or attribute anywhere in the selector (including
+// inside `:is(...)`) makes it specific enough to show.
+export function isGlobalSelector(text: string): boolean {
+  if (/[.#[]/.test(text)) return false
+  return canonicalCompound(text).tokens.length === 0
+}

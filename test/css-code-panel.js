@@ -148,10 +148,9 @@ const check = (what, condition, detail) => {
   await settled();
   check('opening it shows an editor', !!editor());
   check('and remembers that it is open', dom.window.localStorage.getItem('moden.embedEditor.cssCodeOpen') === '1');
-  check('with nothing picked it stacks every rule reaching the element in this query', text() === '/* src/styles/main.css */\n.card {\n  color: red;\n}\n', JSON.stringify(text()));
-  check('a rule in another query waits for that query, like the fields do', !(text() || '').includes('padding'));
+  check('with nothing picked it stacks the class\'s rules — base, its query, its state — as Webflow\'s preview does', text() === '.card {\n  color: red;\n}\n\n@media (width >= 64rem) {\n  .card {\n    padding: 2rem;\n  }\n}\n\n.card:hover {\n  color: blue;\n}\n', JSON.stringify(text()));
   check('read-only', !!editor()?.closest('.code-editor')?.classList.contains('is-readonly'));
-  check('and says what it is', foot().startsWith('Everything reaching this element'), foot());
+  check('and says what it is', foot().startsWith('This element’s classes'), foot());
   check('no file in the header — it is several', !section()?.querySelector('.embed-editor_css-code-file'));
 
   // ── Picking a chip: that selector's own CSS ──

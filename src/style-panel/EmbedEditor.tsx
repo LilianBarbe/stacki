@@ -68,7 +68,7 @@ import {
   setDeclarationValue,
   splitRuleSelectorAt,
 } from './lib/css'
-import { canonicalCompound, compareSpecificity, formatSpecificity, parseSelectorList, type MatchTarget } from './lib/selectors'
+import { canonicalCompound, compareSpecificity, formatSpecificity, parseSelectorList, type MatchTarget, isGlobalSelector } from './lib/selectors'
 import { findNode, getHost, onHostChange, propText, walkNodes } from './lib/host'
 import {
   applyNativePropertyAt,
@@ -1348,16 +1348,6 @@ const SUGGESTION_KIND_LABEL: Record<SelectorSuggestion['kind'], string> = {
   tag: 'tag', class: 'class', 'new-class': 'new class', attribute: 'attribute', 'attribute-value': 'attribute', combo: 'combo',
 }
 
-// A selector that says nothing about *this* element — `:target`, `:focus-visible`,
-// `*`, `::selection`, `body > *`. They match almost everything on the page, so a
-// project with a couple of them tacks them onto every element's chip list and
-// buries the selectors that actually describe what's selected. Kept behind a
-// toggle instead. A class, id or attribute anywhere in the selector (including
-// inside `:is(...)`) makes it specific enough to show.
-function isGlobalSelector(text: string): boolean {
-  if (/[.#[]/.test(text)) return false
-  return canonicalCompound(text).tokens.length === 0
-}
 
 // What each chip colour means, said in words on hover — a colour code nobody has
 // been told is just decoration.
@@ -1398,7 +1388,7 @@ type FamilyMenu = {
   top: number
 }
 
-export function SelectorPicker({ selectors, suggestions, activeSelector, activePicked, busy, loading, onSelect, onDeselect, onAdd, onRemove, onReplace, knownClasses = EMPTY_LIST }: {
+export function SelectorPicker({ selectors, suggestions, activeSelector, activePicked, busy, loading, onSelect, onDeselect, onAdd, onRemove, onReplace, knownClasses = EMPTY_LIST, showGlobals: showGlobalsProp, onShowGlobals, showInherited: showInheritedProp, onShowInherited }: {
   selectors: MatchedSelector[]
   suggestions: SelectorSuggestion[]
   activeSelector: string
@@ -1420,13 +1410,23 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
   /** Classes the panel knows of beyond the app's project list — styled in a
    *  parsed stylesheet, or written on a node of the open page. */
   knownClasses?: string[]
+  /** The two fold-away toggles, when the panel wants to read them (the summed
+   *  CSS Code view follows them); left out, the well keeps them to itself. */
+  showGlobals?: boolean
+  onShowGlobals?: (show: boolean) => void
+  showInherited?: boolean
+  onShowInherited?: (show: boolean) => void
 }) {
   const [draft, setDraft] = useState('')
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(-1)
   const [inputOpen, setInputOpen] = useState(false)
-  const [showGlobals, setShowGlobals] = useState(false)
-  const [showInherited, setShowInherited] = useState(false)
+  const [localGlobals, setLocalGlobals] = useState(false)
+  const [localInherited, setLocalInherited] = useState(false)
+  const showGlobals = showGlobalsProp ?? localGlobals
+  const setShowGlobals = onShowGlobals ?? setLocalGlobals
+  const showInherited = showInheritedProp ?? localInherited
+  const setShowInherited = onShowInherited ?? setLocalInherited
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const wantFocus = useRef(false)
@@ -2112,6 +2112,10 @@ function StyleCard({
   onRemoveClass,
   onReplaceClass,
   knownClasses,
+  showGlobals,
+  onShowGlobals,
+  showInherited,
+  onShowInherited,
   sourceValue,
   sourceOptions,
   onSourceChange,
@@ -2159,6 +2163,11 @@ function StyleCard({
   onReplaceClass: (from: string, to: string) => void
   /** Classes seen in the parsed stylesheets and on the open page, for the well's suggestions. */
   knownClasses: string[]
+  /** The well's fold-away toggles, held by the panel so the summed CSS Code view can follow them. */
+  showGlobals: boolean
+  onShowGlobals: (show: boolean) => void
+  showInherited: boolean
+  onShowInherited: (show: boolean) => void
   sourceValue: string
   sourceOptions: SourceOption[]
   onSourceChange: (value: string) => void
@@ -2296,6 +2305,10 @@ function StyleCard({
         onRemove={onRemoveClass}
         onReplace={onReplaceClass}
         knownClasses={knownClasses}
+        showGlobals={showGlobals}
+        onShowGlobals={onShowGlobals}
+        showInherited={showInherited}
+        onShowInherited={onShowInherited}
       />
       {/* Where edits go, as a compact text link: the Webflow class style or a
           specific embed (page embeds listed in cascade order). Sits under the
@@ -4378,6 +4391,12 @@ export default function EmbedEditor() {
     setSourceSel((prev) => (prev === homeEmbedKey ? prev : homeEmbedKey))
   }, [elementIdentity, activeSelector, homeEmbedKey, inComponentContext])
 
+  // The well's two fold-away toggles. Held here rather than in the well: the
+  // summed CSS Code view shows the same folded-away rules — a global, a tag, a
+  // reset, an ancestor chain — exactly when the well does.
+  const [showGlobals, setShowGlobals] = useState(false)
+  const [showInherited, setShowInherited] = useState(false)
+
   // Every class the panel can vouch for on its own: styled in a stylesheet it
   // has parsed, or written on a node of the open page. Offered by the well's
   // input beside the app's project list, which lags behind the app's own writes.
@@ -5011,10 +5030,11 @@ export default function EmbedEditor() {
   // that is when contentRef's rules were last rebuilt.
   const cssCode = useMemo<CssCodeModel | null>(() => {
     const selector = activeSelector.trim()
-    // Nothing picked: every rule reaching the element, stacked, with the
-    // declarations that lose the cascade struck through — the DevTools view.
+    // Nothing picked: the element's classes' rules, stacked in cascade order
+    // with every query, the declarations that lose struck through — the way
+    // Webflow's style preview writes an element (see lib/css-code-stack).
     if (!selector) {
-      const stacked = stackedCssCode(resolved)
+      const stacked = stackedCssCode(model ?? EMPTY_RULE_MODEL, snapshot?.classList ?? [], { globals: showGlobals, inherited: showInherited })
       if (!stacked.text) return null
       return { target: { selector: '', docKey: null }, text: stacked.text, fileLabel: null, alsoIn: [], stacked: { struck: stacked.struck } }
     }
@@ -5033,7 +5053,7 @@ export default function EmbedEditor() {
       alsoIn: docKeys.filter((key) => key !== docKey).map(label),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scan, activeSelector, sourceDoc, selectedRule, docByKey, embedLabelByKey, resolved])
+  }, [scan, activeSelector, sourceDoc, selectedRule, docByKey, embedLabelByKey, model, snapshot, showGlobals, showInherited])
 
   // Provided to every ProvenanceList so its embed chips can name (full label) and
   // navigate to the source embed on the canvas.
@@ -5107,6 +5127,10 @@ export default function EmbedEditor() {
               onRemoveClass={removeClassFromElement}
               onReplaceClass={replaceClassOnElement}
               knownClasses={knownClasses}
+              showGlobals={showGlobals}
+              onShowGlobals={setShowGlobals}
+              showInherited={showInherited}
+              onShowInherited={setShowInherited}
               sourceValue={effectiveSourceSel}
               sourceOptions={sourceOptions}
               onSourceChange={(value) => { setSourceSel(value); saveEmbedSource(value) }}
