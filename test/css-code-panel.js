@@ -138,13 +138,27 @@ const check = (what, condition, detail) => {
   check('the CSS Code section is on the panel', !!section(), sections().map(titleOf).join(' | '));
   check('and it comes first', sections()[0] && titleOf(sections()[0]) === 'CSS Code', sections().map(titleOf).join(' | '));
   check('it starts collapsed', section()?.classList.contains('is-collapsed'));
-  check('its header names the file, as the source picker does', section()?.querySelector('.embed-editor_css-code-file')?.textContent === 'src/styles/main.css',
-    section()?.querySelector('.embed-editor_css-code-file')?.textContent);
 
+  // ── Nothing picked: the sum ──
+  //
+  // Selecting an element picks no class. The section then stacks every rule
+  // reaching the element, read-only, winners first, with the declarations
+  // that lose the cascade marked to be struck through — the DevTools view.
   click(section().querySelector('.embed-editor_section-toggle'));
   await settled();
   check('opening it shows an editor', !!editor());
   check('and remembers that it is open', dom.window.localStorage.getItem('moden.embedEditor.cssCodeOpen') === '1');
+  check('with nothing picked it stacks every rule reaching the element in this query', text() === '/* src/styles/main.css */\n.card {\n  color: red;\n}\n', JSON.stringify(text()));
+  check('a rule in another query waits for that query, like the fields do', !(text() || '').includes('padding'));
+  check('read-only', !!editor()?.closest('.code-editor')?.classList.contains('is-readonly'));
+  check('and says what it is', foot().startsWith('Everything reaching this element'), foot());
+  check('no file in the header — it is several', !section()?.querySelector('.embed-editor_css-code-file'));
+
+  // ── Picking a chip: that selector's own CSS ──
+  click([...panel.querySelectorAll('.embed-editor_selector-chip')].find((c) => c.textContent.trim() === '.card'));
+  await settled();
+  check('its header names the file, as the source picker does', section()?.querySelector('.embed-editor_css-code-file')?.textContent === 'src/styles/main.css',
+    section()?.querySelector('.embed-editor_css-code-file')?.textContent);
   check('the editor holds every rule for the picked selector, base and @media, formatted',
     text() === '.card {\n  color: red;\n}\n\n@media (width >= 64rem) {\n  .card {\n    padding: 2rem;\n  }\n}\n', JSON.stringify(text()));
   check(':hover is not in it, being a selector of its own', !(text() || '').includes(':hover'));

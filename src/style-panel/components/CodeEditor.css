@@ -41,3 +41,13 @@
 .code-editor.is-readonly .cm-cursor {
   display: none;
 }
+
+/* A declaration that loses the cascade, in the summed CSS Code view: struck
+   through and quietened, the way DevTools shows an overridden value. */
+.code-editor .cm-struck {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary);
+}
+.code-editor .cm-struck * {
+  color: var(--color-text-tertiary);
+}

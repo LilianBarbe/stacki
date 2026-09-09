@@ -245,8 +245,15 @@ const check = (what, condition, detail) => {
   check('with nothing in it yet', panelChips().length === 0, `${panelChips().length} chips`);
 
   await wait(READ_MS + 400); // still far inside the 4s refresh throttle it used to wait out
-  check('the rule in the late stylesheet reaches the well', panelChips().length === 1, panelChips().map((c) => c.textContent).join(','));
-  check('as the selector that stylesheet holds', panelChips()[0]?.textContent === 'section', panelChips()[0]?.textContent);
+  // A tag rule is an inherited (grey) chip, folded away behind its toggle —
+  // and nothing is picked by default any more, so nothing unfolds it.
+  const inheritedToggle = () => panel.querySelector('.embed-editor_inherited-check');
+  check('the rule in the late stylesheet reaches the well', /Show inherited styles \(1\)/.test(inheritedToggle()?.textContent || ''), inheritedToggle()?.textContent);
+  inheritedToggle()?.querySelector('input')?.click();
+  await wait(60);
+  check('as the selector that stylesheet holds', panelChips()[0]?.textContent === 'section', panelChips().map((c) => c.textContent).join(','));
+  inheritedToggle()?.querySelector('input')?.click();
+  await wait(60);
   check('and the spinner goes with it', panelSpinner() == null);
 
   // --- and on the next element, with the stylesheets already read -----------

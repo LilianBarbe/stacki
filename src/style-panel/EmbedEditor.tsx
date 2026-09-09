@@ -13,6 +13,7 @@ import ElementTokenPicker from './ElementTokenPicker'
 import { loadCssCodeOpen, loadEmbedSource, saveCssCodeOpen, saveEmbedSource } from './shared/tool-prefs'
 import CssCodeSection, { cssCodeKey, type CssCodeModel, type CssCodeSave } from './CssCodeSection'
 import { applyCssCode, collectCssCodeLeaves, cssCodeSkeleton, renderCssCode, ruleMatchesSelector } from './lib/css-code-sync'
+import { stackedCssCode } from './lib/css-code-stack'
 import { handleArrowStep } from './lib/number-step'
 import { hslaToRgba } from './lib/color'
 import { clampNonNegative, filterCssProperties } from './lib/css-properties'
@@ -32,7 +33,7 @@ import ProvenanceList, { ProvenanceEmbedNav } from './ProvenanceList'
 import VariableConnect from './VariableConnect'
 import { computeRuleModel, type DeclStatus, type MatchedRule, type RuleModel } from './lib/cascade'
 import { groupDeclarations, groupProps } from './lib/sections'
-import { defaultSelectorTokens, selectorToClassTokens, snapshotTokens, tokensToSelector } from './lib/element-tokens'
+import { selectorToClassTokens, snapshotTokens, tokensToSelector } from './lib/element-tokens'
 import { resolveStyle, indexContexts, contextKeyOf, listMatchedSelectors, NATIVE_ORDER_BASE, selectorKey, selectorsMatch, stateForSelector, STATES, type ChipRole, type ContextInfo, type ContextKey, type MatchedSelector, type ResolvedProp, type ResolvedStyle, type SourceKey, type StateKey, type StyleContext } from './lib/resolved'
 // Whether a class can come OFF the element as written — the same rule the app
 // removes it by, so a chip only offers a × it can honour.
@@ -2544,57 +2545,6 @@ function nativeSignature(model: NativeModel | null): string {
     .join('||')
 }
 
-// The selectors that carry styles for the element in a given context: embed
-// selectors matching it there, plus native class-style selectors with values at
-// the context's breakpoint. Sorted weakest → strongest. Shared by the chip picker
-// and the on-context-switch auto-select.
-// Depth of the applied class chain a selector's classes form a PREFIX of (1 = the
-// base class `.test`, 2 = `.test.is-2`, …), or 0 when they aren't that prefix (a
-// standalone/global class like `.is-2`). `classList` is the element's applied
-// classes, primary first.
-function chainPrefixDepth(classes: string[], classList: string[]): number {
-  const k = classes.length
-  if (!k || k > classList.length) return 0
-  const set = new Set(classes)
-  if (set.size !== k) return 0
-  for (let i = 0; i < k; i += 1) if (!set.has(classList[i])) return 0
-  return k
-}
-
-// How closely a selector describes THIS element: tag → base class (`.test`) → its
-// pseudos (`.test:hover`, `.test:is(:hover,:focus)`) → the applied combo chain
-// (`.test.is-2` → `.test.is-2.ready` + pseudos) → the element's remaining classes IN
-// THE ORDER THEY'RE APPLIED → data attributes → complex/nested selectors
-// (`body > .test`). Returns a comparable [category, depth, pseudo] tuple.
-//
-// Used to choose which selector to pick by default on a new element. NOT the well's
-// chip order — those chips are laid out in cascade order (see `selectorChips`).
-function selectorOrder(text: string, classList: string[]): [number, number, number] {
-  const canon = canonicalCompound(text)
-  const classes = canon.tokens.filter((t) => t.startsWith('class:')).map((t) => t.slice('class:'.length))
-  const hasTag = canon.tokens.some((t) => t.startsWith('tag:'))
-  const hasAttr = canon.tokens.some((t) => t.startsWith('attr:'))
-  const pseudo = text.includes(':') ? 1 : 0 // a pseudo variant sorts after its plain selector
-  if (!canon.oneCompound) return [4, 0, 0] // complex / nested — last
-  if (classes.length) {
-    const depth = chainPrefixDepth(classes, classList)
-    if (depth > 0) return [1, depth, pseudo] // element's own chain: base(1) → combos
-    // Not a prefix chain of the applied classes. These all used to tie at 0 and
-    // fall through to specificity, then alphabetical — so the chips came out in
-    // an order the element knows nothing about. Rank them by where the class
-    // actually sits in `class="…"` instead. A combo sorts by its last applied
-    // class; a class that isn't on the element at all goes after them.
-    let applied = -1
-    for (const cls of classes) {
-      const at = classList.indexOf(cls)
-      if (at > applied) applied = at
-    }
-    return [2, applied === -1 ? classList.length : applied, pseudo]
-  }
-  if (hasAttr) return [3, 0, pseudo] // data attributes
-  if (hasTag) return [0, 0, 0] // a tag that has styles — first
-  return [4, 0, 0]
-}
 
 // What a chip is to the element, and so what colour it wears (see ChipRole).
 //
@@ -3290,10 +3240,10 @@ export default function EmbedEditor() {
       setNativeModel(null)
       nativeModelRef.current = null
       nativeIdentityRef.current = ''
-      // Force the tokens effect to re-default even if the new element shares the old
+      // Force the tokens effect to re-run even if the new element shares the old
       // one's token signature (both classless divs, unreadable classes, …).
       tokenIdentityRef.current = ''
-      pendingDefaultRef.current = true
+      pendingDefaultRef.current = false
     }
 
     if (!element) {
@@ -3875,11 +3825,16 @@ export default function EmbedEditor() {
         || (selectedTokens.length > 0 && selectedTokens.every((name) => names.has(name)))
       if (fits) return
     }
-    const next = defaultSelectorTokens(tokens)
-    setSelectedTokens(next)
+    // Nothing is picked for a fresh element. The panel then shows the SUM of
+    // everything reaching it — every class, every inherited rule, the winner
+    // of each property — which is the answer to "why does it look like this".
+    // A class's own values are one click on its chip away; picking one on the
+    // user's behalf (the first class, the strongest styled one) narrowed the
+    // view to a single rule before they had asked for any.
+    setSelectedTokens([])
     setSelectedSelectorText(null)
-    defaultTokensRef.current = next
-    pendingDefaultRef.current = true
+    defaultTokensRef.current = []
+    pendingDefaultRef.current = false
     // Keep the current query (context) — switching elements stays on the same
     // breakpoint/query so you can style a different element within it. It only
     // changes when you pick a different query yourself.
@@ -4565,69 +4520,11 @@ export default function EmbedEditor() {
     const styled = withoutRemoved(styledSelectorsFor(model, nativeModel, nextContext))
       .filter((s) => s.inContext !== false && !isGlobalSelector(s.text))
     if (!styled.length) return
-    if (activeSelector && styled.some((s) => selectorsMatch(s.text, activeSelector))) return
+    // With nothing picked the panel shows the sum of everything; that view
+    // is as true in the new query as in the old one, and stays.
+    if (!activeSelector || styled.some((s) => selectorsMatch(s.text, activeSelector))) return
     selectActiveSelector(styled[styled.length - 1].text)
   }, [styleContexts, model, nativeModel, activeSelector, selectActiveSelector, withoutRemoved])
-
-  // On selecting a new element, upgrade the raw all-classes default to the strongest
-  // selector actually STYLED in the current context — so if `.media_card_title` is
-  // styled in `@container (…)` but the full combo isn't, we land on `.media_card_title`.
-  // Runs once the model is ready for the new element; skips if you already picked.
-  useEffect(() => {
-    if (!pendingDefaultRef.current || !model) return
-    // Wait until nativeModel is the CURRENT element's — it loads via a separate async
-    // effect and lags the embed model on a switch. Defaulting off a stale nativeModel
-    // would pick the previous element's native selectors (and clobber pendingDefaultRef),
-    // leaving that selector stuck as a pending chip. Re-runs when nativeModel catches up.
-    if (nativeIdentityRef.current !== elementIdentity) return
-    const cur = styleContexts.find((entry) => entry.key === context)
-    if (!cur) return
-    const styled = withoutRemoved(styledSelectorsFor(model, nativeModel, cur)).filter((s) => s.inContext !== false)
-    // Nothing styled yet — likely mid-scan (embeds still streaming). Leave the default
-    // armed so we retry as they arrive, instead of committing to the unstyled combo.
-    if (!styled.length) return
-    pendingDefaultRef.current = false
-    // A global selector must never become the default. It matches nearly every
-    // element, so picking one would both force its (hidden) chip back on screen
-    // and point the style fields at a rule that isn't about this element —
-    // editing `:focus-visible` here would restyle the whole site. With only
-    // globals styling this element, the composed token selector stays the pick.
-    const local = styled.filter((s) => !isGlobalSelector(s.text))
-    if (!local.length) return
-    // Use the FRESH default the effect just set (not `activeSelector`, which is still
-    // the previous element's here). Keep it if it's already styled, else pick the strongest.
-    const defaultSel = tokensToSelector(defaultTokensRef.current, tokens)
-    if (defaultSel && local.some((s) => selectorsMatch(s.text, defaultSel))) return
-    // Fall back to the FIRST applied class that has styles (the primary block class in
-    // Lumos) rather than styled[last] — utility classes (u-*) sort last by name and
-    // shouldn't win the default just because their specificity ties the base class.
-    //
-    // Every class, not just the defaulted one: the default is now the first class
-    // alone, and if THAT one has no styles the next one along is still a better
-    // answer than a selector picked by specificity.
-    const primaryStyled = tokens
-      .filter((token) => token.kind === 'class')
-      .map((token) => token.name)
-      .flatMap((tok) => {
-        const found = local.find((s) => selectorsMatch(s.text, tokensToSelector([tok], tokens)))
-        return found ? [found] : []
-      })[0]
-    // Otherwise the FIRST selector in element-affinity order after the tag — the
-    // element's own class/nesting selector (`.hero_component > .hero_paragraph`), not
-    // the highest-specificity one (a foreign `:not(…) > :is(…)` shouldn't win the
-    // default). This ranking is about which selector best DESCRIBES the element, which
-    // is a different question from the well's cascade order — a reset at the top of the
-    // sheet is the first chip, but it's nobody's idea of the default thing to edit.
-    const classList = snapshot?.classList ?? []
-    const byAffinity = [...local]
-      .map((s) => ({ s, rank: selectorOrder(s.text, classList) }))
-      .sort((a, b) =>
-        a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1] || a.rank[2] - b.rank[2] ||
-        compareSpecificity(a.s.specificity, b.s.specificity) || a.s.text.localeCompare(b.s.text))
-      .map((e) => e.s)
-    const firstAfterTag = byAffinity.find((s) => selectorOrder(s.text, classList)[0] > 0)
-    selectActiveSelector((primaryStyled ?? firstAfterTag ?? byAffinity[0] ?? local[local.length - 1]).text)
-  }, [model, nativeModel, context, styleContexts, tokens, elementIdentity, snapshot, selectActiveSelector, withoutRemoved])
 
   // ── Native (Webflow class style) writes ──
   const refreshNative = useCallback(async () => {
@@ -4961,6 +4858,15 @@ export default function EmbedEditor() {
       selectActiveSelector(`.${base.className}`)
       return { native: model!.styles.indexOf(base) }
     }
+    // The element's first class is what a class system is authored against;
+    // the tag is the fallback for an element that has none. Nothing is picked
+    // by default any more, so this is where an edit made over the summed view
+    // finds its home.
+    const first = snapshot?.classList?.[0]
+    if (first) {
+      selectActiveSelector(`.${first}`)
+      return { embedSelector: `.${first}` }
+    }
     const tag = snapshot?.tag
     if (tag) {
       selectActiveSelector(tag)
@@ -5105,7 +5011,13 @@ export default function EmbedEditor() {
   // that is when contentRef's rules were last rebuilt.
   const cssCode = useMemo<CssCodeModel | null>(() => {
     const selector = activeSelector.trim()
-    if (!selector) return null
+    // Nothing picked: every rule reaching the element, stacked, with the
+    // declarations that lose the cascade struck through — the DevTools view.
+    if (!selector) {
+      const stacked = stackedCssCode(resolved)
+      if (!stacked.text) return null
+      return { target: { selector: '', docKey: null }, text: stacked.text, fileLabel: null, alsoIn: [], stacked: { struck: stacked.struck } }
+    }
     const matched = (contentRef.current?.rules ?? []).filter((rule) => ruleMatchesSelector(rule, selector))
     const docKeys: string[] = []
     for (const rule of matched) if (!docKeys.includes(rule.embedKey)) docKeys.push(rule.embedKey)
@@ -5121,7 +5033,7 @@ export default function EmbedEditor() {
       alsoIn: docKeys.filter((key) => key !== docKey).map(label),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scan, activeSelector, sourceDoc, selectedRule, docByKey, embedLabelByKey])
+  }, [scan, activeSelector, sourceDoc, selectedRule, docByKey, embedLabelByKey, resolved])
 
   // Provided to every ProvenanceList so its embed chips can name (full label) and
   // navigate to the source embed on the canvas.

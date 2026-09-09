@@ -144,8 +144,13 @@ const check = (what, condition, detail) => {
   check('the panel mounts with its sections', !!sectionNamed('Flex/Grid Child'), [...panel.querySelectorAll('.embed-editor_section-title')].map((t) => t.textContent).join(' | '));
   check('and Flex/Grid Child starts collapsed', collapsed('Flex/Grid Child'), 'it is open, so the collapsed case is not being tested');
 
-  // `.card { order: 3 }` — the picked selector is one of the things styling this
-  // section, so the dot is blue.
+  // Nothing is picked on selection: every value is "reaching the element",
+  // none is "yours" yet, so the dot is orange.
+  check('with nothing picked the dot is orange', dotOf('Flex/Grid Child') === 'orange', dotOf('Flex/Grid Child'));
+  // `.card { order: 3 }` — pick the chip, and the selector is now one of the
+  // things styling this section, so the dot is blue.
+  panel.querySelector('.embed-editor_selector-chip')?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  await settled();
   check('a section your own selector styles is blue', dotOf('Flex/Grid Child') === 'blue', dotOf('Flex/Grid Child'));
 
   // Open, the property labels inside say the same thing in the same colours, so

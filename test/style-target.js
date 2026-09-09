@@ -230,14 +230,12 @@ const check = (what, condition, detail) => {
       path.join(__dirname, '..', 'src', 'style-panel', 'EmbedEditor.tsx'),
       'utf8'
     );
-    check('the panel defaults through it', /const next = defaultSelectorTokens\(tokens\)/.test(editor));
-    // The upgrade that follows looks for a class that is already styled — across
-    // every class, not just the defaulted one, or an element whose first class
-    // has no rules would fall through to a selector picked by specificity.
-    check(
-      'and the upgrade still searches every class',
-      /const primaryStyled = tokens[\s\S]{0,120}kind === 'class'/.test(editor)
-    );
+    // …though the panel no longer picks anything on selection: it shows the sum
+    // of everything reaching the element, and a class's own values wait for a
+    // click on its chip. The first class is where an edit made over that summed
+    // view lands, which is the one place the default still matters.
+    check('the panel picks nothing on selection', /setSelectedTokens\(\[\]\)\n\s*setSelectedSelectorText\(null\)\n\s*defaultTokensRef\.current = \[\]/.test(editor));
+    check('an edit over the summed view lands on the first class', /const first = snapshot\?\.classList\?\.\[0\]\n\s*if \(first\) \{\n\s*selectActiveSelector\(`\.\$\{first\}`\)/.test(editor));
   }
 
   if (failures.length) {

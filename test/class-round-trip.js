@@ -140,6 +140,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const chip = (text) => [...panel.querySelectorAll('.embed-editor_selector-chip')].find((el) => el.textContent === text);
     const state = (text) => [...(chip(text)?.classList || [])].filter((c) => c.startsWith('is-')).join(',') || '(no chip)';
     await sleep(1200);
+    // 0. Nothing is picked for a fresh element: the panel shows the sum of
+    // everything reaching it, and a class's own values wait for a click on
+    // its chip. Picking one on the user's behalf narrowed the view to a single
+    // rule before they had asked for any.
+    check(`${label}: nothing is picked on selection`, !panel.querySelector('.embed-editor_selector-chip.is-active'), [...panel.querySelectorAll('.embed-editor_selector-chip')].map((el) => el.className).join(' | '));
 
     // 1. `.x` typed into the well: lands on the element, shows as a dashed blue chip.
     panel.querySelector('.embed-editor_selector-well').dispatchEvent(new dom.window.MouseEvent('mousedown', { bubbles: true }));
