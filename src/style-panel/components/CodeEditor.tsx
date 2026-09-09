@@ -30,12 +30,16 @@ type CodeEditorProps = {
   onSelectionChange?: (position: number) => void
 }
 
+// The colours a CSS editor is expected to have: property names blue (the way
+// DevTools and every editor theme paint them), selectors in the plain text
+// colour so a rule's first line reads as a heading, numbers green, strings
+// amber, `@media` and `!important` blue as keywords.
 const codeEditorHighlightStyle = HighlightStyle.define([
   { tag: tags.keyword, color: 'var(--color-info)' },
-  { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: 'var(--color-text-primary)' },
+  { tag: [tags.propertyName, tags.definition(tags.propertyName)], color: 'var(--color-info)' },
   { tag: [tags.number, tags.unit, tags.color], color: 'var(--color-success)' },
   { tag: [tags.string, tags.url], color: 'var(--color-warning)' },
-  { tag: [tags.className, tags.tagName, tags.attributeName], color: 'var(--color-info)' },
+  { tag: [tags.className, tags.tagName, tags.attributeName], color: 'var(--color-text-primary)' },
   { tag: [tags.operator, tags.punctuation, tags.bracket], color: 'var(--color-text-secondary)' },
   { tag: tags.comment, color: 'var(--color-text-tertiary)', fontStyle: 'italic' },
 ])

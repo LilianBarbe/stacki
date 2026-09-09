@@ -10,7 +10,7 @@ import DisplayControl, { DISPLAY_VALUES } from './DisplayControl'
 import DirectionControl from './DirectionControl'
 import AlignControl from './AlignControl'
 import ElementTokenPicker from './ElementTokenPicker'
-import { loadCssCodeOpen, loadEmbedSource, saveCssCodeOpen, saveEmbedSource } from './shared/tool-prefs'
+import { loadCssCodeOpen, loadEmbedSource, loadSectionsOpen, saveCssCodeOpen, saveEmbedSource, saveSectionsOpen } from './shared/tool-prefs'
 import CssCodeSection, { cssCodeKey, type CssCodeModel, type CssCodeSave } from './CssCodeSection'
 import { applyCssCode, collectCssCodeLeaves, cssCodeSkeleton, renderCssCode, ruleMatchesSelector } from './lib/css-code-sync'
 import { stackedCssCode } from './lib/css-code-stack'
@@ -2213,6 +2213,19 @@ function StyleCard({
   // Read once: the section keeps its own open state from there and writes
   // each change back, so this is only where it starts.
   const [cssCodeOpen] = useState(() => loadCssCodeOpen())
+  // Every section's open/closed state, by id, however it was last put — kept
+  // across elements (a section that comes and goes with the element remounts
+  // to it), across tabs, and across launches. A section not yet touched falls
+  // back to its own default.
+  const [sectionsOpen, setSectionsOpen] = useState(() => loadSectionsOpen())
+  const sectionOpen = (id: string, fallback: boolean) => sectionsOpen[id] ?? fallback
+  const rememberSection = (id: string) => (open: boolean) => {
+    setSectionsOpen((prev) => {
+      const next = { ...prev, [id]: open }
+      saveSectionsOpen(next)
+      return next
+    })
+  }
 
   // Always show Layout + Size so the panel is consistent across elements, not
   // only those that already set a property in that section.
@@ -2363,8 +2376,8 @@ function StyleCard({
           {cssCode ? (
             <SectionBlock
               label="CSS Code"
-              defaultOpen={cssCodeOpen}
-              onOpenChange={saveCssCodeOpen}
+              defaultOpen={sectionOpen('css-code', cssCodeOpen)}
+              onOpenChange={(open) => { saveCssCodeOpen(open); rememberSection('css-code')(open) }}
               headerAction={cssCode.fileLabel ? <span className="embed-editor_css-code-file" title="The file this CSS is written in">{cssCode.fileLabel}</span> : undefined}
             >
               <CssCodeSection key={cssCodeKey(cssCode.target)} model={cssCode} onSave={onSaveCssCode} />
@@ -2374,7 +2387,8 @@ function StyleCard({
             <SectionBlock
               key={group.def.id}
               label={group.def.label}
-              defaultOpen={group.def.id !== 'flex-child'}
+              defaultOpen={sectionOpen(group.def.id, group.def.id !== 'flex-child')}
+              onOpenChange={rememberSection(group.def.id)}
               // A dot whenever anything in the section reaches the element, and
               // blue once the picked selector is one of the things setting it —
               // `source === 'selected'` is the same test every property label in

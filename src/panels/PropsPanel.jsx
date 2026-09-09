@@ -78,7 +78,16 @@ const noLabelActivation = (event) => event.preventDefault();
 
 // Whether the Settings group is open, remembered across selections. See where it
 // is read, below.
-let settingsGroupOpen = false;
+// …and across launches: the module holds it while the app is up, the browser
+// storage holds it between two runs.
+const SETTINGS_GROUP_KEY = 'stacki.propsPanel.settingsOpen';
+let settingsGroupOpen = (() => {
+  try {
+    return localStorage.getItem(SETTINGS_GROUP_KEY) === '1';
+  } catch {
+    return false;
+  }
+})();
 
 export default function PropsPanel({
   node,
@@ -766,6 +775,12 @@ export default function PropsPanel({
   const setSettingsOpen = (next) => {
     settingsGroupOpen = typeof next === 'function' ? next(settingsGroupOpen) : next;
     setSettingsOpenState(settingsGroupOpen);
+    try {
+      if (settingsGroupOpen) localStorage.setItem(SETTINGS_GROUP_KEY, '1');
+      else localStorage.removeItem(SETTINGS_GROUP_KEY);
+    } catch {
+      /* noop */
+    }
   };
 
   // ⌘Enter, forwarded from App as a counter: open Settings and put the caret

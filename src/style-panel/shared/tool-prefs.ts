@@ -113,3 +113,34 @@ export function saveCssCodeOpen(open: boolean) {
     /* noop */
   }
 }
+
+// Whether each section of the style panel (CSS Code, Layout, Spacing, …) was
+// left open or closed, by section id. Moving from element to element used to
+// keep the choice only while the panel stayed mounted; switching tabs, or a
+// section that came and went with the element, put it back to its default.
+// Now it stays however it was last put, across elements and across launches.
+const SECTIONS_OPEN_KEY = 'moden.embedEditor.sectionsOpen'
+
+export function loadSectionsOpen(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(SECTIONS_OPEN_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {}
+    const out: Record<string, boolean> = {}
+    for (const [id, open] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof open === 'boolean') out[id] = open
+    }
+    return out
+  } catch {
+    return {}
+  }
+}
+
+export function saveSectionsOpen(open: Record<string, boolean>) {
+  try {
+    localStorage.setItem(SECTIONS_OPEN_KEY, JSON.stringify(open))
+  } catch {
+    /* noop */
+  }
+}
