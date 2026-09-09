@@ -6,10 +6,11 @@
 //   • Hovering a row outlines every element whose styles read that variable,
 //     directly or through an alias. Expanding a row lists those rules.
 //   • Pick mode (crosshair) turns it round: click anything in the app and the
-//     panel lists each declaration it takes through a variable, with the alias
-//     chain unwound to the literal value.
-//   • Edits apply live as inline overrides on <html>, survive a reload, and can
-//     be written back into the source file from the dev server, or copied.
+//     panel lists every rule that styles it, in cascade order, with each
+//     declaration editable in place and its alias chain unwound to the literal.
+//   • Edits apply live — tokens as inline overrides on <html>, rule edits on the
+//     live CSSOM rule — survive a reload, and can be written back into the
+//     source files from the dev server, or copied.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import tokensRaw from '../style-panel/tokens.css?raw';
 import legacyRaw from '../styles.css?raw';
@@ -18,10 +19,22 @@ import {
   buildIndex,
   consumersOf,
   elementsFor,
-  inspectElement,
+  stylesFor,
   describeElement,
+  selectorState,
 } from './cssIndex.js';
-import { loadEdits, storeEdits, applyEdit, dropEdit } from './edits.js';
+import {
+  loadEdits,
+  storeEdits,
+  applyEdit,
+  dropEdit,
+  loadRuleEdits,
+  storeRuleEdits,
+  ruleEditKey,
+  applyRuleEdit,
+  revertRuleEdit,
+  applyRuleEdits,
+} from './edits.js';
 import './theme-lab.css';
 
 const TOKENS_FILE = 'src/style-panel/tokens.css';
@@ -72,17 +85,25 @@ function formatColor(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${+alpha.toFixed(3)})`;
 }
 
+// Steps the first number in a value (so `6px 12px` and `0 1px 2px` work too).
 function stepNumber(value, delta) {
-  const m = value.trim().match(/^(-?\d*\.?\d+)([a-z%]*)$/i);
+  const m = value.match(/(-?\d*\.?\d+)([a-z%]*)/i);
   if (!m) return null;
   const n = parseFloat(m[1]);
   const unit = m[2];
-  const next = unit === 'em' || unit === 'rem' || (unit === '' && !Number.isInteger(n)) ? n + delta * 0.05 : n + delta;
-  return `${+next.toFixed(3)}${unit}`;
+  const fine = unit === 'em' || unit === 'rem' || (unit === '' && !Number.isInteger(n));
+  const next = +(n + delta * (fine ? 0.05 : 1)).toFixed(3);
+  return value.slice(0, m.index) + `${next}${unit}` + value.slice(m.index + m[0].length);
 }
 
 function shortSheet(sheet) {
   return sheet.replace(/^style-panel\//, '').replace(/\.css$/, '');
+}
+
+// The Vite dev id is an absolute path; the save endpoint wants it relative to the project.
+function projectPath(file) {
+  const i = file.indexOf('/src/');
+  return i >= 0 ? file.slice(i + 1) : file;
 }
 
 function loadWindow() {
@@ -142,7 +163,7 @@ function Overlay({ elements, color, label }) {
   );
 }
 
-// ---------------------------------------------------------------- rows
+// ---------------------------------------------------------------- shared bits
 
 function VarChip({ name, onJump, dim }) {
   return (
@@ -170,6 +191,54 @@ function Swatch({ value, kind, onPick }) {
   );
 }
 
+// A value field: text, ↑↓ steps the first number (⇧ for ×10).
+function ValueInput({ value, onChange, onCommit, className, placeholder, autoFocus, ariaLabel }) {
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      onCommit?.();
+      return;
+    }
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    const next = stepNumber(value, (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1));
+    if (next == null) return;
+    e.preventDefault();
+    onChange(next);
+  };
+  return (
+    <input
+      className={className}
+      value={value}
+      spellCheck={false}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={onKeyDown}
+      aria-label={ariaLabel}
+    />
+  );
+}
+
+function Chain({ chain, computed, onJump }) {
+  const last = chain[chain.length - 1];
+  return (
+    <div className="theme-lab-chain">
+      {chain.map((step, i) => (
+        <React.Fragment key={i}>
+          {i > 0 ? <span className="theme-lab-arrow">→</span> : null}
+          <span className="theme-lab-chain-step" title={`${step.selector}${step.sheet ? ' · ' + step.sheet : ''}`}>
+            <VarChip name={step.name} onJump={onJump} />
+            {step.selector && step.selector !== ':root' ? <span className="theme-lab-chain-scope">{step.selector}</span> : null}
+          </span>
+        </React.Fragment>
+      ))}
+      <span className="theme-lab-arrow">→</span>
+      <code className="theme-lab-literal">{last?.value != null && !/var\(/.test(last.value) ? last.value : computed || 'undefined'}</code>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- token rows
+
 function TokenRow({
   v,
   edited,
@@ -190,14 +259,6 @@ function TokenRow({
 }) {
   const current = edited ?? v.value;
   const kind = kindOf(resolved);
-  const onKeyDown = (e) => {
-    if (kind !== 'number' && !ALIAS_RE.test(current)) return;
-    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-    const next = stepNumber(current, (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1));
-    if (next == null) return;
-    e.preventDefault();
-    onChange(next);
-  };
   return (
     <div
       className={`theme-lab-row${edited != null ? ' is-edited' : ''}${pinned ? ' is-pinned' : ''}${flash ? ' is-flash' : ''}${expanded ? ' is-open' : ''}`}
@@ -213,14 +274,7 @@ function TokenRow({
             {count}
           </span>
         </button>
-        <input
-          className="theme-lab-value"
-          value={current}
-          spellCheck={false}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          aria-label={`Value of ${v.name}`}
-        />
+        <ValueInput className="theme-lab-value" value={current} onChange={onChange} ariaLabel={`Value of ${v.name}`} />
         <button type="button" className="theme-lab-icon" disabled={edited == null} onClick={onReset} title="Reset to the file's value">
           ↺
         </button>
@@ -274,50 +328,114 @@ function TokenRow({
 
 // ---------------------------------------------------------------- inspector
 
-function Chain({ chain, computed, onJump }) {
-  const last = chain[chain.length - 1];
+// One rule that styles the picked element: its selector, and every declaration
+// as an editable line. Edits land on the live CSSOM rule at once.
+function RuleCard({ item, ruleEdits, onEditRule, onJump, onHoverRule }) {
+  const { rule, decls, from } = item;
+  const [adding, setAdding] = useState(false);
+  const [newProp, setNewProp] = useState('');
+  const [newValue, setNewValue] = useState('');
+  const state = selectorState(rule.selector);
+  const editFor = (prop) => ruleEdits[ruleEditKey({ file: rule.file, selector: rule.selector, ordinal: rule.ordinal, prop })];
+
+  // Declarations added through the panel and not yet saved show up here too.
+  const added = Object.values(ruleEdits).filter(
+    (e) => e.file === rule.file && e.selector === rule.selector && e.ordinal === rule.ordinal && e.old == null && !decls.some((d) => d.prop === e.prop)
+  );
+  const lines = [...decls.map((d) => ({ ...d, edit: editFor(d.prop) })), ...added.map((e) => ({ prop: e.prop, value: e.value, refs: [], chains: [], edit: e, isNew: true }))];
+
+  const commitNew = () => {
+    const prop = newProp.trim().toLowerCase();
+    const value = newValue.trim();
+    if (!prop || !value) return;
+    onEditRule(rule, prop, value, null);
+    setNewProp('');
+    setNewValue('');
+    setAdding(false);
+  };
+
   return (
-    <div className="theme-lab-chain">
-      {chain.map((step, i) => (
-        <React.Fragment key={i}>
-          {i > 0 ? <span className="theme-lab-arrow">→</span> : null}
-          <span className="theme-lab-chain-step" title={`${step.selector}${step.sheet ? ' · ' + step.sheet : ''}`}>
-            <VarChip name={step.name} onJump={onJump} />
-            {step.selector && step.selector !== ':root' ? <span className="theme-lab-chain-scope">{step.selector}</span> : null}
-          </span>
-        </React.Fragment>
-      ))}
-      <span className="theme-lab-arrow">→</span>
-      <code className="theme-lab-literal">{last?.value != null && !/var\(/.test(last.value) ? last.value : computed || 'undefined'}</code>
+    <div className={`theme-lab-rule${state ? ' has-state' : ''}`} onMouseEnter={() => onHoverRule({ rule, prop: '' })} onMouseLeave={() => onHoverRule(null)}>
+      <div className="theme-lab-rule-head">
+        <span className="theme-lab-rule-sel" title={rule.selector}>
+          {rule.selector}
+        </span>
+        {state ? <span className="theme-lab-rule-state">{state}</span> : null}
+        <span className="theme-lab-rule-sheet" title={rule.file}>
+          {from ? `${describeElement(from)} · ` : ''}
+          {shortSheet(rule.sheet)}
+        </span>
+      </div>
+      {lines.map((d) => {
+        const current = d.edit ? d.edit.value : d.value;
+        const removed = d.edit && d.edit.value === '';
+        return (
+          <div key={d.prop} className={`theme-lab-decl${d.edit ? ' is-edited' : ''}${removed ? ' is-removed' : ''}${d.isNew ? ' is-new' : ''}`}>
+            <div className="theme-lab-decl-line">
+              <Swatch value={d.chains?.[0]?.computed || (kindOf(current) === 'color' ? current : null)} kind={kindOf(d.chains?.[0]?.computed || current)} onPick={(val) => onEditRule(rule, d.prop, val, d.isNew ? null : d.value)} />
+              <span className="theme-lab-decl-prop" title={d.important ? '!important' : ''}>
+                {d.prop}
+                {d.important ? <span className="theme-lab-decl-important">!</span> : null}
+              </span>
+              <ValueInput
+                className="theme-lab-decl-input"
+                value={current}
+                placeholder={removed ? '(removed)' : ''}
+                onChange={(val) => onEditRule(rule, d.prop, val, d.isNew ? null : d.value)}
+                ariaLabel={`${rule.selector} ${d.prop}`}
+              />
+              <button
+                type="button"
+                className="theme-lab-icon"
+                disabled={!d.edit}
+                onClick={() => onEditRule(rule, d.prop, null, d.isNew ? null : d.value)}
+                title="Reset to the file's value"
+              >
+                ↺
+              </button>
+            </div>
+            {d.chains?.map((c) => (
+              <Chain key={c.ref} chain={c.chain} computed={c.computed} onJump={onJump} />
+            ))}
+          </div>
+        );
+      })}
+      {adding ? (
+        <div className="theme-lab-decl is-new">
+          <div className="theme-lab-decl-line">
+            <span className="theme-lab-swatch is-empty" />
+            <input
+              className="theme-lab-decl-newprop"
+              value={newProp}
+              placeholder="property"
+              spellCheck={false}
+              autoFocus
+              onChange={(e) => setNewProp(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setAdding(false);
+              }}
+              aria-label="New property"
+            />
+            <ValueInput className="theme-lab-decl-input" value={newValue} placeholder="value" onChange={setNewValue} onCommit={commitNew} ariaLabel="New value" />
+            <button type="button" className="theme-lab-icon" onClick={commitNew} title="Add (Enter)">
+              ✓
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="theme-lab-rule-add" onClick={() => setAdding(true)}>
+          + property
+        </button>
+      )}
     </div>
   );
 }
 
-function Inspector({ picked, onJump, onClose, onPickParent }) {
+function Inspector({ picked, ruleEdits, onEditRule, onJump, onClose, onPickParent, onHoverRule }) {
   const { el, report } = picked;
   const ancestors = [];
-  for (let n = el.parentElement, i = 0; n && n !== document.body && i < 4; n = n.parentElement, i++) ancestors.push(n);
-  const section = (title, list) =>
-    list.length ? (
-      <div className="theme-lab-inspect-section">
-        <div className="theme-lab-inspect-title">{title}</div>
-        {list.map((d, i) => (
-          <div key={i} className="theme-lab-decl">
-            <div className="theme-lab-decl-head">
-              <span className="theme-lab-decl-prop">{d.prop}</span>
-              <code className="theme-lab-decl-value">{d.value}</code>
-              <span className="theme-lab-decl-sel" title={`${d.selector} · ${d.sheet}`}>
-                {d.from ? `${describeElement(d.from)} · ` : ''}
-                {d.selector}
-              </span>
-            </div>
-            {d.chains.map((c) => (
-              <Chain key={c.ref} chain={c.chain} computed={c.computed} onJump={onJump} />
-            ))}
-          </div>
-        ))}
-      </div>
-    ) : null;
+  for (let n = el.parentElement, i = 0; n && n !== document.body && i < 5; n = n.parentElement, i++) ancestors.push(n);
+  const cards = (list) => list.map((item, i) => <RuleCard key={i} item={item} ruleEdits={ruleEdits} onEditRule={onEditRule} onJump={onJump} onHoverRule={onHoverRule} />);
   return (
     <div className="theme-lab-inspect">
       <div className="theme-lab-inspect-head">
@@ -336,11 +454,14 @@ function Inspector({ picked, onJump, onClose, onPickParent }) {
           ))}
         </div>
       ) : null}
-      {report.own.length + report.inherited.length === 0 ? (
-        <p className="theme-lab-empty">This element reads no variable of its own — try an ancestor.</p>
+      {report.own.length === 0 ? <p className="theme-lab-empty">No stylesheet rule matches this element — try an ancestor.</p> : null}
+      {cards(report.own)}
+      {report.inherited.length ? (
+        <>
+          <div className="theme-lab-inspect-title">Inherited</div>
+          {cards(report.inherited)}
+        </>
       ) : null}
-      {section('Own declarations', report.own)}
-      {section('Inherited', report.inherited)}
     </div>
   );
 }
@@ -364,6 +485,7 @@ export default function ThemeLab({ onClose }) {
   }, [groups]);
 
   const [edits, setEdits] = useState(loadEdits);
+  const [ruleEdits, setRuleEdits] = useState(loadRuleEdits);
   const [index, setIndex] = useState(() => buildIndex());
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(() => new Set(groups.slice(0, 1).map((g) => g.title)));
@@ -378,7 +500,18 @@ export default function ThemeLab({ onClose }) {
   const [status, setStatus] = useState('');
   const [win, setWin] = useState(() => loadWindow() || { x: window.innerWidth - 500, y: 56, w: 480, h: Math.round(window.innerHeight * 0.75) });
   const rootRef = useRef(null);
-  const listRef = useRef(null);
+
+  // Rule edits still pending go back onto the live rules whenever the sheets
+  // are (re-)indexed — after a reload, or after Vite swapped a stylesheet.
+  useEffect(() => {
+    applyRuleEdits(index, ruleEdits);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+  const reindex = useCallback(() => {
+    const next = buildIndex();
+    setIndex(next);
+    setPicked((p) => (p ? { el: p.el, report: stylesFor(next, p.el) } : p));
+  }, []);
 
   // Resolve a name through edits + source down to its literal.
   const resolve = useCallback(
@@ -407,7 +540,7 @@ export default function ThemeLab({ onClose }) {
     [index, consumersCache]
   );
 
-  // ---- edits
+  // ---- token edits
   const change = (name, value) => {
     setEdits((prev) => {
       const next = { ...prev, [name]: value };
@@ -425,21 +558,58 @@ export default function ThemeLab({ onClose }) {
     });
     dropEdit(name);
   };
+
+  // ---- rule edits: value null resets, '' removes the declaration
+  const editRule = (rule, prop, value, old) => {
+    const base = { file: rule.file, selector: rule.selector, ordinal: rule.ordinal, prop };
+    const key = ruleEditKey(base);
+    setRuleEdits((prev) => {
+      const next = { ...prev };
+      if (value == null) {
+        if (next[key]) revertRuleEdit(index, next[key]);
+        delete next[key];
+      } else {
+        const entry = { ...base, value, old: prev[key]?.old ?? old, important: rule.decls.find((d) => d.prop === prop)?.important || false };
+        next[key] = entry;
+        applyRuleEdit(index, entry);
+      }
+      storeRuleEdits(next);
+      return next;
+    });
+    // The picked report holds the old values; refresh it so chains follow.
+    setPicked((p) => (p ? { el: p.el, report: stylesFor(index, p.el) } : p));
+  };
+
+  const editCount = Object.keys(edits).length + Object.keys(ruleEdits).length;
+
   const resetAll = () => {
     for (const name of Object.keys(edits)) dropEdit(name);
+    for (const e of Object.values(ruleEdits)) revertRuleEdit(index, e);
     setEdits({});
+    setRuleEdits({});
     storeEdits({});
+    storeRuleEdits({});
+    setPicked((p) => (p ? { el: p.el, report: stylesFor(index, p.el) } : p));
     setStatus('All edits reset');
   };
   const cssText = () => {
+    const chunks = [];
     const byFile = {};
     for (const [name, value] of Object.entries(edits)) {
       const file = sourceMap.get(name)?.file || 'unknown';
       (byFile[file] ||= []).push(`  ${name}: ${value};`);
     }
-    return Object.entries(byFile)
-      .map(([file, lines]) => `/* ${file} */\n:root {\n${lines.join('\n')}\n}`)
-      .join('\n\n');
+    for (const [file, lines] of Object.entries(byFile)) chunks.push(`/* ${file} */\n:root {\n${lines.join('\n')}\n}`);
+    const byRule = {};
+    for (const e of Object.values(ruleEdits)) {
+      const key = `${projectPath(e.file)}\n${e.selector}`;
+      (byRule[key] ||= []).push(e.value === '' ? `  /* ${e.prop}: removed */` : `  ${e.prop}: ${e.value}${e.important ? ' !important' : ''};`);
+    }
+    for (const [key, lines] of Object.entries(byRule)) {
+      const [file, selector] = key.split('\n');
+      chunks.push(`/* ${file} */\n${selector} {\n${lines.join('\n')}\n}`);
+    }
+    return chunks.join('\n\n');
   };
   const copy = async () => {
     try {
@@ -450,29 +620,38 @@ export default function ThemeLab({ onClose }) {
     }
   };
   const save = async () => {
-    const files = {};
-    for (const [name, value] of Object.entries(edits)) {
-      const file = sourceMap.get(name)?.file;
-      if (file) (files[file] ||= {})[name] = value;
-    }
     setStatus('Saving…');
-    try {
-      const res = await fetch('/__theme-lab/save', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ files }),
-      });
+    const post = async (url, body) => {
+      const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error || 'save failed');
-      // The file now carries the values; the sheet catches up through HMR a
-      // beat later, so the inline overrides go once that has landed.
+      return json;
+    };
+    try {
+      const missing = [];
+      if (Object.keys(edits).length) {
+        const files = {};
+        for (const [name, value] of Object.entries(edits)) {
+          const file = sourceMap.get(name)?.file;
+          if (file) (files[file] ||= {})[name] = value;
+        }
+        missing.push(...((await post('/__theme-lab/save', { files })).missing || []));
+      }
+      if (Object.keys(ruleEdits).length) {
+        const list = Object.values(ruleEdits).map((e) => ({ file: projectPath(e.file), selector: e.selector, ordinal: e.ordinal, prop: e.prop, value: e.value }));
+        missing.push(...((await post('/__theme-lab/save-rules', { edits: list })).missing || []));
+      }
+      // The files now carry the values; the sheets catch up through HMR a beat
+      // later, so the live overrides go once that has landed.
       setTimeout(() => {
         for (const name of Object.keys(edits)) dropEdit(name);
         setEdits({});
+        setRuleEdits({});
         storeEdits({});
-        setIndex(buildIndex());
-      }, 600);
-      setStatus(json.missing?.length ? `Saved; not found in file: ${json.missing.join(', ')}` : 'Saved to file');
+        storeRuleEdits({});
+        reindex();
+      }, 700);
+      setStatus(missing.length ? `Saved; not found in file: ${missing.join(', ')}` : 'Saved to file');
     } catch (e) {
       setStatus(`Save failed: ${e.message}`);
     }
@@ -505,9 +684,10 @@ export default function ThemeLab({ onClose }) {
     if (!highlightVar) return [];
     return elementsFor(consumers(highlightVar));
   }, [hoverRule, highlightVar, consumers]);
-  const highlightLabel = hoverRule ? `${hoverRule.rule.selector} · ${hoverRule.prop}` : highlightVar ? `${highlightVar} · ${highlighted.length}` : '';
+  const highlightLabel = hoverRule ? `${hoverRule.rule.selector}${hoverRule.prop ? ' · ' + hoverRule.prop : ''}` : highlightVar ? `${highlightVar} · ${highlighted.length}` : '';
 
   // ---- pick mode
+  const pickElement = useCallback((el) => setPicked({ el, report: stylesFor(index, el) }), [index]);
   useEffect(() => {
     if (!picking) return undefined;
     const under = (e) => {
@@ -523,7 +703,7 @@ export default function ThemeLab({ onClose }) {
       e.preventDefault();
       e.stopPropagation();
       if (!el) return;
-      setPicked({ el, report: inspectElement(index, el) });
+      pickElement(el);
       setPicking(false);
       setHoverEl(null);
     };
@@ -555,9 +735,7 @@ export default function ThemeLab({ onClose }) {
       document.removeEventListener('keydown', onKey, true);
       document.documentElement.classList.remove('theme-lab-picking');
     };
-  }, [picking, index]);
-
-  const pickElement = (el) => setPicked({ el, report: inspectElement(index, el) });
+  }, [picking, pickElement]);
 
   // ---- window drag + size persistence
   const dragStart = (e) => {
@@ -601,15 +779,16 @@ export default function ThemeLab({ onClose }) {
   const visibleGroups = groups
     .map((g) => ({ ...g, vars: q ? g.vars.filter((v) => v.name.includes(q) || v.value.toLowerCase().includes(q) || v.doc.toLowerCase().includes(q)) : g.vars }))
     .filter((g) => g.vars.length);
-  const editCount = Object.keys(edits).length;
-  const editedList = Object.keys(edits)
+  const editedTokens = Object.keys(edits)
     .map((name) => sourceMap.get(name))
     .filter(Boolean);
+  const editedRules = Object.values(ruleEdits);
 
   return (
     <>
       <Overlay elements={highlighted} color={hoverRule ? 'var(--color-warning, #fbbf24)' : 'var(--color-selection-bg, #0c8ce9)'} label={highlightLabel} />
       {picking && hoverEl ? <Overlay elements={[hoverEl]} color="var(--color-success, #4ade80)" label={describeElement(hoverEl)} /> : null}
+      {!picking && picked ? <Overlay elements={[picked.el]} color="var(--color-success, #4ade80)" label={describeElement(picked.el)} /> : null}
       <div
         ref={rootRef}
         className="theme-lab"
@@ -631,11 +810,19 @@ export default function ThemeLab({ onClose }) {
               setPicking((p) => !p);
               setHoverEl(null);
             }}
-            title="Pick an element in the app to see the variables it reads (Esc to cancel)"
+            title="Pick an element in the app to see and edit the rules that style it (Esc to cancel)"
           >
             ⌖ Pick
           </button>
-          <button type="button" className="theme-lab-tool" onClick={() => { setIndex(buildIndex()); setStatus('Stylesheets re-indexed'); }} title="Re-read the stylesheets">
+          <button
+            type="button"
+            className="theme-lab-tool"
+            onClick={() => {
+              reindex();
+              setStatus('Stylesheets re-indexed');
+            }}
+            title="Re-read the stylesheets"
+          >
             ↻
           </button>
           <span className="theme-lab-spacer" />
@@ -653,8 +840,18 @@ export default function ThemeLab({ onClose }) {
           ) : null}
         </div>
 
-        <div className="theme-lab-list" ref={listRef}>
-          {picked ? <Inspector picked={picked} onJump={jumpTo} onClose={() => setPicked(null)} onPickParent={pickElement} /> : null}
+        <div className="theme-lab-list">
+          {picked ? (
+            <Inspector
+              picked={picked}
+              ruleEdits={ruleEdits}
+              onEditRule={editRule}
+              onJump={jumpTo}
+              onClose={() => setPicked(null)}
+              onPickParent={pickElement}
+              onHoverRule={setHoverRule}
+            />
+          ) : null}
 
           {editCount ? (
             <div className="theme-lab-group is-open">
@@ -665,7 +862,7 @@ export default function ThemeLab({ onClose }) {
               </button>
               {open.has('__edits') ? (
                 <div className="theme-lab-group-body">
-                  {editedList.map((v) => (
+                  {editedTokens.map((v) => (
                     <div key={v.name} className="theme-lab-change">
                       <VarChip name={v.name} onJump={jumpTo} />
                       <code className="theme-lab-literal is-old">{v.value}</code>
@@ -673,6 +870,21 @@ export default function ThemeLab({ onClose }) {
                       <code className="theme-lab-literal">{edits[v.name]}</code>
                       <span className="theme-lab-spacer" />
                       <button type="button" className="theme-lab-icon" onClick={() => reset(v.name)} title="Reset">
+                        ↺
+                      </button>
+                    </div>
+                  ))}
+                  {editedRules.map((e) => (
+                    <div key={ruleEditKey(e)} className="theme-lab-change">
+                      <span className="theme-lab-change-sel" title={`${projectPath(e.file)} · ${e.selector}`}>
+                        {e.selector}
+                      </span>
+                      <span className="theme-lab-change-prop">{e.prop}</span>
+                      {e.old != null ? <code className="theme-lab-literal is-old">{e.old}</code> : null}
+                      <span className="theme-lab-arrow">→</span>
+                      <code className="theme-lab-literal">{e.value === '' ? '(removed)' : e.value}</code>
+                      <span className="theme-lab-spacer" />
+                      <button type="button" className="theme-lab-icon" onClick={() => editRule({ file: e.file, selector: e.selector, ordinal: e.ordinal, decls: [] }, e.prop, null, e.old)} title="Reset">
                         ↺
                       </button>
                     </div>
@@ -725,16 +937,16 @@ export default function ThemeLab({ onClose }) {
         </div>
 
         <div className="theme-lab-foot">
-          <span className="theme-lab-status">{status || (editCount ? `${editCount} unsaved` : 'Hover a row to see what it paints')}</span>
+          <span className="theme-lab-status">{status || (editCount ? `${editCount} unsaved` : 'Hover a row to see what it paints · Pick to edit an element')}</span>
           <span className="theme-lab-spacer" />
           <button type="button" className="theme-lab-tool" disabled={!editCount} onClick={resetAll} title="Drop every unsaved edit">
             Reset all
           </button>
-          <button type="button" className="theme-lab-tool" disabled={!editCount} onClick={copy} title="Copy the edited variables as CSS">
+          <button type="button" className="theme-lab-tool" disabled={!editCount} onClick={copy} title="Copy the edits as CSS">
             Copy CSS
           </button>
           {CAN_SAVE ? (
-            <button type="button" className="theme-lab-tool is-primary" disabled={!editCount} onClick={save} title="Write the edits into tokens.css / styles.css">
+            <button type="button" className="theme-lab-tool is-primary" disabled={!editCount} onClick={save} title="Write the edits into the source files">
               Save to file
             </button>
           ) : null}
