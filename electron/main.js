@@ -331,6 +331,13 @@ function buildMenu() {
               click: () => mainWindow?.webContents.reload(),
             },
             { type: 'separator' },
+            {
+              // The floating token editor over the app's own UI (src/theme-lab).
+              label: 'Theme Lab',
+              accelerator: 'Shift+CmdOrCtrl+T',
+              click: () => send('menu:themeLab'),
+            },
+            { type: 'separator' },
             { role: 'toggleDevTools' },
             { type: 'separator' },
             { role: 'resetZoom' },

@@ -736,8 +736,8 @@
 .embed-editor_size-grid {
   display: grid;
   grid-template-columns:
-    var(--embed-editor_size-label-w) minmax(0, 1fr)
-    var(--embed-editor_size-label-w) minmax(0, 1fr);
+    44px 1fr
+    44px 1fr;
   align-items: center;
   gap: var(--space-4) var(--space-3);
 }
@@ -4672,7 +4672,7 @@ textarea.embed-editor_value-input.is-expanded {
   padding: var(--space-3) 0;
 }
 .embed-editor_tsettings-section + .embed-editor_tsettings-section {
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-default);
 }
 .embed-editor_tsettings-section:first-child { padding-top: 0; }
 .embed-editor_tsettings-section:last-child { padding-bottom: 0; }

@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+// The floating token editor over the app's own UI — loaded the first time it opens.
+const ThemeLab = React.lazy(() => import('./theme-lab/ThemeLab.jsx'));
 import WelcomeScreen from './panels/WelcomeScreen.jsx';
 import PagesPanel from './panels/PagesPanel.jsx';
 import PalettePanel from './panels/PalettePanel.jsx';
@@ -2150,6 +2152,26 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // ⇧⌘T toggles Theme Lab, the floating token editor over the app's own UI. In
+  // dev the View menu owns that accelerator, so the key arrives as a menu event;
+  // a packaged build has the stock menu and the keydown reaches the window.
+  const [themeLabOpen, setThemeLabOpen] = useState(false);
+  useEffect(() => {
+    const toggle = () => setThemeLabOpen((v) => !v);
+    const onKey = (e) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!(mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === 't')) return;
+      e.preventDefault();
+      toggle();
+    };
+    window.addEventListener('keydown', onKey);
+    const off = window.avb?.onMenu?.('themeLab', toggle);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      off?.();
+    };
+  }, []);
+
   const [insertOpen, setInsertOpen] = useState(false);
 
   // Open requests from the app menu (⌘E accelerator) and from canvas
@@ -4143,6 +4165,11 @@ export default function App() {
     // interactive backdrop runs edge to edge, behind the window controls.
     return (
       <div className="app welcome-mode">
+        {themeLabOpen ? (
+          <Suspense fallback={null}>
+            <ThemeLab onClose={() => setThemeLabOpen(false)} />
+          </Suspense>
+        ) : null}
         <div className="titlebar">
           <span className="spacer" />
         </div>
@@ -4287,6 +4314,11 @@ export default function App() {
 
   return (
     <div className="app">
+      {themeLabOpen ? (
+        <Suspense fallback={null}>
+          <ThemeLab onClose={() => setThemeLabOpen(false)} />
+        </Suspense>
+      ) : null}
       <div className="titlebar">
         <span className="app-title">{project.name}</span>
         <span className="spacer" />

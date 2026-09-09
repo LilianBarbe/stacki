@@ -1,35 +1,32 @@
+/* Legacy variables. Every one is an alias of a design token
+   (style-panel/tokens.css), so the whole app — the shell here and the style
+   panel — draws its colour, type and spacing from one place. The old names stay
+   because upstream Stacki's rules read them; to change a look, change the token. */
 :root {
-  --bg: #191919;            /* canvas */
-  --bg-panel: #111111;      /* side panels */
-  --bg-panel-2: #1a1a1a;    /* raised surfaces */
-  --bg-input: rgba(255, 255, 255, 0.06);
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --bg-active: rgba(255, 255, 255, 0.09);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text: #f5f5f5;
-  --text-dim: #999999;
-  --text-faint: #666666;
-  --accent: #0099ff;
-  --accent-soft: rgba(0, 153, 255, 0.16);
-  /* Selected text, everywhere. A saturated blue rather than the accent, which
-     is too light to carry white text — this one clears 5:1 against white, so a
-     selected value stays as readable as an unselected one. */
-  --selection: #1668e3;
-  --selection-text: #ffffff;
-  --green: #30c158;
-  /* Components read in this green everywhere: Navigator rows, the canvas
-     outline, and the "inside a component" back button. */
-  --component-green: #79e09c;
-  --component-green-soft: rgba(121, 224, 156, 0.16);
-  /* Pages Astro generates from a collection ([id], [...slug]) read in this
-     purple wherever pages are listed. */
-  --collection-purple: #c4afff;
-  --red: #ff453a;
-  --amber: #ffd60a;
-  --radius: 8px;
-  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
-  --mono: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  --bg: var(--color-bg-canvas);                    /* canvas backdrop behind the preview */
+  --bg-panel: var(--color-bg-page);                /* side panels, title bar */
+  --bg-panel-2: var(--color-bg-surface);           /* raised surfaces */
+  --bg-input: var(--color-bg-surface);             /* fields and buttons on a panel */
+  --bg-hover: var(--color-bg-hover);
+  --bg-active: var(--color-bg-active);
+  --border: var(--color-border-default);
+  --border-strong: var(--color-border-strong);
+  --text: var(--color-text-primary);
+  --text-dim: var(--color-text-secondary);
+  --text-faint: var(--color-text-tertiary);
+  --accent: var(--color-selection-bg);             /* the interface blue: focus rings, primary buttons, selected rows */
+  --accent-soft: var(--color-selection-bg-soft);
+  --selection: var(--color-selection-bg);          /* selected text, everywhere */
+  --selection-text: var(--color-text-primary);
+  --green: var(--color-success);
+  --component-green: var(--color-component-tag);   /* Navigator rows, canvas outline, "inside a component" back button */
+  --component-green-soft: var(--color-component-tag-bg);
+  --collection-purple: var(--color-collection);    /* pages Astro generates from a collection ([id], [...slug]) */
+  --red: var(--color-danger);
+  --amber: var(--color-warning);
+  --radius: var(--radius-md);
+  --font: var(--font-family-sans);
+  --mono: var(--font-family-mono);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -384,7 +381,7 @@ textarea { font-family: inherit; font-size: 12px; line-height: 1.5; resize: none
   padding: 1px 6px;
   border-radius: 999px;
   color: var(--text-faint);
-  background: var(--surface-2, rgba(255, 255, 255, 0.06));
+  background: var(--bg-input);
   white-space: nowrap;
 }
 .conflict-file-badge.warn { color: #fff; background: var(--accent); }
@@ -1485,7 +1482,7 @@ textarea { font-family: inherit; font-size: 12px; line-height: 1.5; resize: none
   min-height: 0;
 }
 .panel.left { width: 260px; flex-shrink: 0; }
-.panel.right { width: 322px; flex-shrink: 0; border-right: none; border-left: 1px solid var(--border); }
+.panel.right { width: 300px; flex-shrink: 0; border-right: none; border-left: 1px solid var(--border); }
 
 .panel-section { display: flex; flex-direction: column; min-height: 0; }
 .panel-section + .panel-section { border-top: 1px solid var(--border); }
@@ -2052,7 +2049,7 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
 }
 .palette-folder:first-child { padding-top: 2px; }
-.palette-folder:hover { color: var(--text-secondary); }
+.palette-folder:hover { color: var(--text-dim); }
 
 .palette-folder-caret {
   display: flex;
@@ -4492,7 +4489,7 @@ body > .embed-editor_provenance {
   color: var(--text-faint);
   margin-left: auto;
 }
-.content-warn { font-size: 10.5px; color: var(--yellow, #e0b341); margin-top: 4px; }
+.content-warn { font-size: 10.5px; color: var(--amber); margin-top: 4px; }
 .content-null { font-size: 11.5px; color: var(--text-faint); padding: 6px 0; }
 .content-none {
   padding: 1px 7px;
@@ -4805,7 +4802,7 @@ body > .embed-editor_provenance {
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--panel-raised, #2a2a2a);
+  background: var(--color-bg-surface-overlay);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 .vars-menu-item,
@@ -5132,7 +5129,7 @@ body > .embed-editor_provenance {
   font-size: 10px;
   font-weight: 500;
   color: var(--text-faint);
-  background: var(--surface-2, rgba(255, 255, 255, 0.06));
+  background: var(--bg-input);
   padding: 1px 6px;
   border-radius: 999px;
 }
@@ -5219,7 +5216,7 @@ body > .embed-editor_provenance {
   flex-shrink: 0;
   white-space: nowrap;
   color: var(--text-faint);
-  background: var(--surface-2, rgba(255, 255, 255, 0.06));
+  background: var(--bg-input);
 }
 .file-status.s-A { color: var(--green); background: rgba(48, 193, 88, 0.14); }
 .file-status.s-M { color: var(--accent); background: var(--accent-soft); }
@@ -5292,7 +5289,7 @@ body > .embed-editor_provenance {
   padding: 1px 6px;
   border-radius: 999px;
   color: var(--text-dim, #9aa0a6);
-  background: var(--surface-2, rgba(255, 255, 255, 0.06));
+  background: var(--bg-input);
   white-space: nowrap;
 }
 

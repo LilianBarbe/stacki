@@ -29,14 +29,16 @@
    *   raised      — lifted two steps (hover, secondary surfaces)
    *   overlay     — top of stack (popovers, dropdowns)
    */
-  --color-bg-inset:           #000000;
-  --color-bg-page:            #1c1c1c;
-  --color-bg-surface:         #2b2b2b;
-  --color-bg-surface-raised:  #3b3b3b;
-  --color-bg-surface-high:    #4a4a4a;
+  --color-bg-inset:           #1F1F1F;
+  --color-bg-page:            #111; /* ? */
+  --color-bg-surface:         var(--color-bg-inset);
+  --color-bg-surface-raised:  var(--color-bg-inset);
+  --color-bg-surface-high:    #4a4a4a; /* ? */
   /* Popover/menu surface. Aliased to `raised` so the ramp has one fewer near-duplicate
      grey (it was #363636, a hair off raised's #3b3b3b). */
   --color-bg-surface-overlay: var(--color-bg-surface-raised);
+  /* Backdrop behind the preview frame — the shell's `--bg`. Recessed by default. */
+  --color-bg-canvas:          var(--color-bg-inset);
   --color-bg-hover:           rgba(255, 255, 255, 0.05);
   --color-bg-active:          rgba(255, 255, 255, 0.08);
 
@@ -89,6 +91,10 @@
   --color-info-bg:         rgba(147, 197, 253, 0.10);
   --color-info-border:     rgba(147, 197, 253, 0.30);
   --color-selection-bg:    #0c8ce9;
+  /* The same blue as a wash — selected rows, the shell's `--accent-soft`. */
+  --color-selection-bg-soft: rgba(12, 140, 233, 0.16);
+  /* Pages Astro generates from a collection ([id], [...slug]) — the shell's `--collection-purple`. */
+  --color-collection:      #c4afff;
   --color-class-tag-bg:    #016bcd;
   --color-tag-bg:          #b53a9a;
   --color-component-tag:        #79e09c;
@@ -107,8 +113,8 @@
   --font-size-2xs: 10px;
   --font-size-xs:  11px;
   --font-size-sm:  12px;
-  --font-size-md:  13px;
-  --font-size-lg:  15px;
+  --font-size-md:  12px;
+  --font-size-lg:  13px;
   --font-size-xl:  18px;
   --font-size-2xl: 22px;
   --font-size-3xl: 28px;
@@ -117,7 +123,7 @@
   --font-weight-regular:  400;
   --font-weight-medium:   500;
   --font-weight-semibold: 600;
-  --font-weight-bold:     700;
+  --font-weight-bold:     600;
 
   --line-height-tight:   1.2;
   --line-height-normal:  1.45;
@@ -174,7 +180,7 @@
   --size-control-xs: 24px;
   --size-control-sm: 28px;
   --size-control-md: 26px;
-  --size-control-lg: 34px;
+  --size-control-lg: 30px;
   --size-control-xl: 48px;
 
   /* Canonical single-line input/control height — the one knob for every text
@@ -189,7 +195,7 @@
   --size-icon-xl: 24px;
 
   /* Layout */
-  --size-sidebar: 280px;
+  --size-sidebar: 240px;
   --size-content-max: 720px;
 
   /* ──────────────────────────── Shadows ──────────────────────────── */
