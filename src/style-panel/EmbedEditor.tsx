@@ -4432,29 +4432,28 @@ export default function EmbedEditor() {
         list.push({ text: activeSelector, specificity: [0, 0, 0], state: stateForSelector(activeSelector), simple: canon.simple, key: `active:${activeSelector}`, pending: true, inContext: true })
       }
     }
-    // Order. What the element CARRIES reads in the order it carries it — the
-    // class attribute's order, the one Settings shows and the one a class was
-    // added in — with a class's states and combos right after it. What merely
-    // reaches the element (a tag, a reset, an ancestor chain) sits above that,
-    // in stylesheet order, since that is the only order those have. A typed
-    // selector that fits neither goes last, nearest the input it came from.
+    // Order: Chrome DevTools' Styles pane, which is the rule for everything
+    // here. The rule that wins sits at the top — precedence descending, so
+    // specificity first, and between equals the rule written LATER above the
+    // one written earlier. Read the well downwards and you read who lost to
+    // whom; the first chip is the value on screen, and a class that sets
+    // `margin-top` below a chip that also sets it is the one that lost.
     //
-    // It was stylesheet order throughout for a while, on the argument that the
-    // well then read as the cascade. It read as a shuffle: add `bg-2` after
-    // `overflow-clip` and it landed first, because its rule is written first.
+    // Two orders came before this and both misled. Stylesheet order ascending
+    // put the loser first (add `bg-2` after `overflow-clip` and it landed above
+    // it, because its rule is written earlier). The class attribute's order
+    // said nothing about the cascade at all: `color-faded` sat below
+    // `margin-top-0` while its own `margin-top` was the one winning.
+    //
+    // A class with no rule yet has no place in the cascade; those go last, in
+    // the order they sit on the element, where their rule will land when its
+    // first property is written.
+    const orderOf = (s: MatchedSelector) => (s.order != null ? s.order : -1)
     const posOf = (s: MatchedSelector): number => {
       const canon = canonicalCompound(s.text)
-      if (!canon.simple || !canon.oneCompound) return -1
       const classes = canon.tokens.filter((t) => t.startsWith('class:')).map((t) => t.slice('class:'.length))
-      if (!classes.length) return -1
-      const at = classes.map((c) => classList.indexOf(c))
-      return at.some((i) => i < 0) ? -1 : Math.max(...at)
-    }
-    const groupOf = (s: MatchedSelector, pos: number) => (pos >= 0 ? 1 : s.pending ? 2 : 0)
-    const orderOf = (s: MatchedSelector) => (s.order != null ? s.order : Number.MAX_SAFE_INTEGER)
-    const extraOf = (s: MatchedSelector) => {
-      const canon = canonicalCompound(s.text)
-      return canon.tokens.length * 10 + canon.pseudoClasses.length + (canon.pseudoElement ? 1 : 0)
+      const at = classes.map((c) => classList.indexOf(c)).filter((i) => i >= 0)
+      return at.length ? Math.max(...at) : classList.length
     }
     // Which chips can take their class off the element: one class, written on
     // this element, in an attribute the app knows how to rewrite. Asked of the
@@ -4471,12 +4470,12 @@ export default function EmbedEditor() {
       return node && withoutClass(node.props, cls) ? cls : undefined
     }
     return list
-      .map((s) => { const pos = posOf(s); return { s, group: groupOf(s, pos), pos, rank: orderOf(s), extra: extraOf(s) } })
+      .map((s) => ({ s, styled: s.pending ? 1 : 0, pos: posOf(s), rank: orderOf(s) }))
       .sort((a, b) =>
-        a.group - b.group ||
-        (a.group === 1 ? a.pos - b.pos || a.extra - b.extra : a.rank - b.rank) ||
-        // Same rule (a grouped selector like `.a, .b`) — steady, readable order within it.
-        compareSpecificity(a.s.specificity, b.s.specificity) ||
+        a.styled - b.styled ||
+        (a.styled
+          ? a.pos - b.pos
+          : compareSpecificity(b.s.specificity, a.s.specificity) || b.rank - a.rank) ||
         a.s.text.localeCompare(b.s.text))
       .map((entry) => {
         const s = entry.s
