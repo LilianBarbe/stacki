@@ -7,6 +7,7 @@
 // one value never reflows the rest of the author's code.
 
 import postcss, { type Root, type Rule, type AtRule, type ChildNode, type Declaration } from 'postcss'
+import { declareLayer } from './layers'
 import type { ParsedDeclaration, ParsedRule, StyleRegion } from './types'
 import { parseSelectorList } from './selectors'
 import { selectorKey } from './resolved'
@@ -119,6 +120,49 @@ type WalkContext = {
   idSeed: string
   /** Shared running counter assigning cascade document order across embeds. */
   order: { n: number }
+  /** The layer this whole region is in — its file was imported with
+   *  `@import … layer(name)`. Null (or absent) for no layer. */
+  layer?: string | null
+}
+
+/** A layer or import statement met while walking a stylesheet. */
+export type LayerStatements = {
+  /** `@layer a, b;`, `@layer a { }`, `@import … layer(a)`: a layer, in the
+   *  order the sheets declare them. */
+  declare: (name: string) => void
+  /** `@import "x.css" layer(a)`: the imported file's every rule is in `a`
+   *  (null when imported into no layer). */
+  imported: (spec: string, layer: string | null) => void
+}
+
+// `@import url("./a.css") layer(base) supports(…) screen;` → the spec and the
+// layer name — `layer` alone is an anonymous one, which nothing can refer to.
+const IMPORT_RE = /^\s*(url\(\s*(?:"[^"]*"|'[^']*'|[^)]*)\s*\)|"[^"]*"|'[^']*')\s*(?:layer\(\s*([^)]*?)\s*\)|(layer)\b)?/i
+
+/**
+ * Every `@layer` statement or block and every `@import` at the top of a sheet,
+ * told to `out` in source order. Run over every stylesheet BEFORE their rules
+ * are collected, so a file's layer is known by the time its rules are read —
+ * whichever order the files themselves come in.
+ */
+export function scanLayerStatements(root: Root, out: LayerStatements): void {
+  let anon = 0
+  root.each((child) => {
+    if (child.type !== 'atrule') return
+    const at = child as AtRule
+    const name = at.name.toLowerCase()
+    if (name === 'layer') {
+      const names = at.params.split(',').map((n) => n.trim()).filter(Boolean)
+      if (!at.nodes) names.forEach((n) => out.declare(n))
+      else out.declare(names[0] || `<anonymous ${++anon}>`)
+    } else if (name === 'import') {
+      const m = IMPORT_RE.exec(at.params)
+      if (!m) return
+      const layer = m[2] != null ? (m[2] || `<anonymous ${++anon}>`) : m[3] ? `<anonymous ${++anon}>` : null
+      if (layer) out.declare(layer)
+      out.imported(m[1], layer)
+    }
+  })
 }
 
 /** Split a selector list on top-level commas (ignoring commas inside `()`/`[]`). */
@@ -232,11 +276,13 @@ export function collectRules(region: StyleRegion, ctx: WalkContext): ParsedRule[
   // parentSelectors: null at the top level; the enclosing rule's RESOLVED selectors
   // once inside one. ancestorDisplay: the enclosing rules' RAW selectors plus `@`
   // markers for enclosing queries, in order, for the nested display.
+  let anonymousLayers = 0
   const walk = (
     container: Root | Rule | AtRule,
     atContext: string[],
     parentSelectors: string[] | null,
     ancestorDisplay: string[],
+    layer: string | null,
   ) => {
     container.each((child: ChildNode) => {
       if (child.type === 'rule') {
@@ -251,8 +297,8 @@ export function collectRules(region: StyleRegion, ctx: WalkContext): ParsedRule[
         // the query position (shown when viewing that query).
         const nestedDisplay = selectorsOnly.length > 1 ? renderNestedPath(selectorsOnly) : undefined
         const queryDisplay = displayPath.includes('@') ? renderNestedPath(displayPath) : undefined
-        rules.push(buildRule(node, atContext, ctx, ruleCounter++, resolved, nestedDisplay, queryDisplay))
-        walk(node, atContext, resolved ?? splitTopLevelCommas(node.selector), displayPath)
+        rules.push(buildRule(node, atContext, ctx, ruleCounter++, resolved, nestedDisplay, queryDisplay, layer))
+        walk(node, atContext, resolved ?? splitTopLevelCommas(node.selector), displayPath, layer)
       } else if (child.type === 'atrule') {
         const at = child as AtRule
         const name = at.name.toLowerCase()
@@ -269,18 +315,24 @@ export function collectRules(region: StyleRegion, ctx: WalkContext): ParsedRule[
             const selectorsOnly = nextDisplay.filter((p) => p !== '@')
             const nestedDisplay = selectorsOnly.length > 1 ? renderNestedPath(selectorsOnly) : undefined
             const queryDisplay = renderNestedPath(nextDisplay)
-            rules.push(buildRule(at as unknown as Rule, nextCtx, ctx, ruleCounter++, parentSelectors, nestedDisplay, queryDisplay))
+            rules.push(buildRule(at as unknown as Rule, nextCtx, ctx, ruleCounter++, parentSelectors, nestedDisplay, queryDisplay, layer))
           }
-          walk(at, nextCtx, parentSelectors, nextDisplay)
+          walk(at, nextCtx, parentSelectors, nextDisplay, layer)
         } else if (name === 'layer' && at.nodes) {
-          walk(at, atContext, parentSelectors, ancestorDisplay)
+          // `@layer name { … }`: everything inside is in that layer, nested
+          // under the one we are already in. An anonymous block gets a name
+          // nothing else can share, so it still ranks as a layer of its own.
+          const own = at.params.trim() || `<anonymous ${++anonymousLayers}>`
+          const inner = layer ? `${layer}.${own}` : own
+          declareLayer(inner)
+          walk(at, atContext, parentSelectors, ancestorDisplay, inner)
         }
         // @keyframes / @font-face / @import etc. inject no element styles — skip.
       }
     })
   }
 
-  walk(region.root, [], null, [])
+  walk(region.root, [], null, [], ctx.layer ?? null)
   return rules
 }
 
@@ -650,6 +702,7 @@ function buildRule(
   resolvedSelectors?: string[] | null,
   nestedDisplay?: string,
   queryDisplay?: string,
+  layer: string | null = null,
 ): ParsedRule {
   const ruleId = `${ctx.idSeed}:${ctx.regionIndex}:${index}`
   const declarations: ParsedDeclaration[] = []
@@ -685,6 +738,7 @@ function buildRule(
     nestedDisplay,
     queryDisplay,
     atContext,
+    layer,
     selectors: parseSelectorList(selectorText),
     declarations,
   }

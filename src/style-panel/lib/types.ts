@@ -60,6 +60,10 @@ export type ParsedRule = {
   queryDisplay?: string
   /** At-rule chain wrapping the rule, e.g. `['@media (max-width: 767px)']`. */
   atContext: string[]
+  /** The cascade layer the rule lives in (`utilities`, `a.b` for a nested one),
+   *  from an enclosing `@layer` block or the `@import … layer()` that brought
+   *  its file in; null for a rule in no layer. See lib/layers. */
+  layer?: string | null
   selectors: SelectorInfo[]
   declarations: ParsedDeclaration[]
 }

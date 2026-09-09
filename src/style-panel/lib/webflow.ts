@@ -18,7 +18,7 @@
 // just text with CSS regions in it, and a stylesheet is that with one region
 // covering the whole file.
 
-import { collectRules, renderEmbed, splitEmbed } from './css'
+import { collectRules, renderEmbed, splitEmbed, scanLayerStatements } from './css'
 import postcss from 'postcss'
 import { findNode, getHost, onHostChange, propText, walkNodes, type HostNode } from './host'
 import type { StateKey } from './resolved'
@@ -32,6 +32,7 @@ import type {
 } from './types'
 import type { MatchTarget, TreeView } from './selectors'
 import { hasCanvas, queryCanvas } from '../../canvasQuery.js'
+import { declareLayer, resetLayers, resolveImportPath } from './layers'
 import type { NativeStyleOptions } from './native-styles'
 
 type AnyEl = unknown
@@ -646,7 +647,29 @@ export function rebuildRules(docs: EmbedDoc[]): ParsedRule[] {
   const order = { n: 0 }
   const ordered = [...docs].sort((a, b) => a.source.order - b.source.order)
 
+  // The layers first, over every sheet, before a single rule is read: the
+  // project's `@layer base, patterns, utilities;` and its `@import "x.css"
+  // layer(name)` lines sit in one file (global.css), and the files they name
+  // are read on their own — in whatever order the list has them, which is
+  // alphabetical, so base.css comes before the file that says what layer it
+  // is in. See lib/layers for what the order then decides.
+  resetLayers()
+  const fileLayer = new Map<string, string>()
   for (const doc of ordered) {
+    const importer = doc.source.origin.kind === 'file' || doc.source.origin.kind === 'astro' ? doc.source.origin.path : null
+    for (const region of doc.regions) {
+      if (!region.root) continue
+      scanLayerStatements(region.root, {
+        declare: declareLayer,
+        imported: (spec, layer) => {
+          if (layer && importer) fileLayer.set(resolveImportPath(importer, spec), layer)
+        },
+      })
+    }
+  }
+
+  for (const doc of ordered) {
+    const layer = doc.source.origin.kind === 'file' ? fileLayer.get(doc.source.origin.path) ?? null : null
     doc.regions.forEach((region, regionIndex) => {
       if (!region.root) return
       rules.push(
@@ -658,6 +681,7 @@ export function rebuildRules(docs: EmbedDoc[]): ParsedRule[] {
           regionIndex,
           idSeed: doc.source.key,
           order,
+          layer,
         }),
       )
     })

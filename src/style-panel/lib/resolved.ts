@@ -83,6 +83,8 @@ export type Contributor = {
   specificity: Specificity
   /** Document order of the owning rule (ascending = earlier in the cascade). */
   order: number
+  /** The owning rule's cascade layer, null for none — see lib/layers. */
+  layer?: string | null
   ruleId: string
   /** Where this value comes from: an embed rule or a native Webflow style. */
   origin: SourceKey
@@ -230,9 +232,11 @@ export type MatchedSelector = {
    *  picker); true/undefined when it has styles in the current context. */
   inContext?: boolean
   /** Document order of the rule this selector FIRST appears in (ascending = earlier
-   *  in the cascade). It's the picker's primary sort: the chips read top-to-bottom in
-   *  the order the rules were written, resets first and the newest class last. */
+   *  in the cascade). With the layer and the specificity it places the chip in the
+   *  well, winners first. */
   order?: number
+  /** The cascade layer of that rule, null for none. */
+  layer?: string | null
   /** Nested-source display (`.hero {.title}`) for a nested rule, else undefined —
    *  the chip label; matching still uses `text` (the resolved selector). */
   display?: string
@@ -289,7 +293,7 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
   // cascade position, not a rank over this loop: `base` and `conditional` are two
   // separate lists, so counting as we go would push every @media rule after every
   // plain one no matter where they sit in the file.
-  const addChip = (order: number, text: string, simple: boolean, state: StateKey, specificity: Specificity, inContext: boolean, display?: string, queryDisplay?: string) => {
+  const addChip = (order: number, text: string, simple: boolean, state: StateKey, specificity: Specificity, inContext: boolean, display?: string, queryDisplay?: string, layer: string | null = null) => {
     const key = selectorKey(text)
     const existing = byKey.get(key)
     if (existing) {
@@ -304,10 +308,10 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
       // one this loop reaches: base rules are walked before conditional ones, so a
       // selector first written inside an `@media` and again below it would otherwise
       // be dated by the later rule and drift down the well.
-      if (existing.order == null || order < existing.order) existing.order = order
+      if (existing.order == null || order < existing.order) { existing.order = order; existing.layer = layer }
       return
     }
-    byKey.set(key, { text, specificity, state, simple, key, inContext, order, display, queryDisplay })
+    byKey.set(key, { text, specificity, state, simple, key, inContext, order, display, queryDisplay, layer })
   }
 
   for (const matched of all) {
@@ -328,14 +332,14 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
       // a state, or a pseudo-element makes it non-bare, so it isn't caught here).
       if (canon.universal && canon.oneCompound && canon.tokens.length === 0 && !canon.pseudoElement && canon.pseudoClasses.length === 0) continue
       if (canon.splittable) {
-        addChip(matched.rule.order, sel.text, canon.simple, stateOf(canon.pseudoClasses), sel.specificity, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay)
+        addChip(matched.rule.order, sel.text, canon.simple, stateOf(canon.pseudoClasses), sel.specificity, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay, matched.rule.layer ?? null)
       } else if (!complexSpec || compareSpecificity(sel.specificity, complexSpec) > 0) {
         complexSpec = sel.specificity
       }
     }
     if (complexSpec) {
       const canon = canonicalCompound(matched.rule.selectorText)
-      addChip(matched.rule.order, matched.rule.selectorText, false, stateOf(canon.pseudoClasses), complexSpec, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay)
+      addChip(matched.rule.order, matched.rule.selectorText, false, stateOf(canon.pseudoClasses), complexSpec, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay, matched.rule.layer ?? null)
     }
   }
   return [...byKey.values()].sort(
@@ -431,6 +435,7 @@ export function resolveStyle(
         important: decl.important,
         specificity: best!.specificity,
         order: matched.rule.order,
+        layer: matched.rule.layer ?? null,
         ruleId: matched.rule.ruleId,
         origin: 'embed',
         embedKey: matched.rule.embedKey,

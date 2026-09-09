@@ -9,6 +9,7 @@
 // declarations are flagged `overriddenBy` so you still see what actually applies.
 
 import { canonicalCompound, compareSpecificity, matchSelectorList, type MatchTarget } from './selectors'
+import { compareLayerWin } from './layers'
 import type { ParsedRule, SelectorInfo, Specificity } from './types'
 
 export type RuleKind = 'base' | 'pseudo-class' | 'pseudo-element' | 'at-rule'
@@ -62,12 +63,15 @@ type Hit = {
  * the resolved-style model (lib/resolved.ts) so both agree on who wins.
  */
 export function compareCascade(
-  a: { important: boolean; specificity: Specificity },
-  b: { important: boolean; specificity: Specificity },
+  a: { important: boolean; specificity: Specificity; layer?: string | null },
+  b: { important: boolean; specificity: Specificity; layer?: string | null },
   aOrder: number,
   bOrder: number,
 ): number {
   if (a.important !== b.important) return a.important ? -1 : 1
+  // The layer decides before specificity does — and backwards for !important.
+  const layer = compareLayerWin(a.layer, b.layer, a.important)
+  if (layer !== 0) return layer
   const spec = compareSpecificity(b.specificity, a.specificity)
   if (spec !== 0) return spec
   return bOrder - aOrder // later wins on a tie
@@ -122,7 +126,7 @@ export async function computeRuleModel(rules: ParsedRule[], target: MatchTarget)
   }
 
   // Cascade winners among base hits, keyed by property.
-  type Contribution = { declId: string; prop: string; important: boolean; specificity: Specificity; seq: number; selectorText: string }
+  type Contribution = { declId: string; prop: string; important: boolean; specificity: Specificity; layer: string | null; seq: number; selectorText: string }
   const contributions: Contribution[] = []
   let seq = 0
   for (const hit of hits) {
@@ -133,6 +137,7 @@ export async function computeRuleModel(rules: ParsedRule[], target: MatchTarget)
         prop: decl.prop,
         important: decl.important,
         specificity: hit.strongestBase.specificity,
+        layer: hit.rule.layer ?? null,
         seq: seq++,
         selectorText: hit.strongestBase.selector.text,
       })

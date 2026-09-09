@@ -7,12 +7,12 @@
 // it holds exactly what the panel's own fields are showing: the same winners,
 // the same losers, per property.
 //
-// Winners first. A rule is placed by the strongest thing it wins with, and the
-// ties broken by document order, so the block at the top is the one whose
-// values you are mostly looking at on the page.
+// Winners first — layer, then specificity, then the rule written later — so
+// the block at the top is the one whose values you are mostly looking at on
+// the page. A block in a layer says so beside its file.
 
 import type { Contributor, ResolvedStyle } from './resolved'
-import { compareSpecificity } from './selectors'
+import { comparePrecedence } from './layers'
 
 export type StackedCssCode = {
   text: string
@@ -24,6 +24,7 @@ type Block = {
   ruleId: string
   selectorText: string
   label: string | null
+  layer: string | null
   specificity: Contributor['specificity']
   order: number
   decls: Array<{ prop: string; value: string; important: boolean; winning: boolean }>
@@ -35,18 +36,19 @@ export function stackedCssCode(resolved: ResolvedStyle): StackedCssCode {
     for (const c of entry.contributors) {
       let block = blocks.get(c.ruleId)
       if (!block) {
-        block = { ruleId: c.ruleId, selectorText: c.selectorText, label: c.embedLabel ?? null, specificity: c.specificity, order: c.order, decls: [] }
+        block = { ruleId: c.ruleId, selectorText: c.selectorText, label: c.embedLabel ?? null, layer: c.layer ?? null, specificity: c.specificity, order: c.order, decls: [] }
         blocks.set(c.ruleId, block)
       }
       block.decls.push({ prop, value: c.value, important: c.important, winning: c.winning })
     }
   }
-  const ordered = [...blocks.values()].sort((a, b) => compareSpecificity(b.specificity, a.specificity) || b.order - a.order)
+  const ordered = [...blocks.values()].sort(comparePrecedence)
   let text = ''
   const struck: StackedCssCode['struck'] = []
   for (const block of ordered) {
     if (text) text += '\n'
-    if (block.label) text += `/* ${block.label} */\n`
+    const where = [block.label, block.layer ? `@layer ${block.layer}` : null].filter(Boolean).join(' · ')
+    if (where) text += `/* ${where} */\n`
     text += `${block.selectorText} {\n`
     for (const decl of block.decls) {
       const line = `${decl.prop}: ${decl.value}${decl.important ? ' !important' : ''};`

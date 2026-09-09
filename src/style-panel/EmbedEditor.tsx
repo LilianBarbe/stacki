@@ -14,6 +14,7 @@ import { loadCssCodeOpen, loadEmbedSource, saveCssCodeOpen, saveEmbedSource } fr
 import CssCodeSection, { cssCodeKey, type CssCodeModel, type CssCodeSave } from './CssCodeSection'
 import { applyCssCode, collectCssCodeLeaves, cssCodeSkeleton, renderCssCode, ruleMatchesSelector } from './lib/css-code-sync'
 import { stackedCssCode } from './lib/css-code-stack'
+import { comparePrecedence } from './lib/layers'
 import { handleArrowStep } from './lib/number-step'
 import { hslaToRgba } from './lib/color'
 import { clampNonNegative, filterCssProperties } from './lib/css-properties'
@@ -4433,11 +4434,13 @@ export default function EmbedEditor() {
       }
     }
     // Order: Chrome DevTools' Styles pane, which is the rule for everything
-    // here. The rule that wins sits at the top — precedence descending, so
-    // specificity first, and between equals the rule written LATER above the
-    // one written earlier. Read the well downwards and you read who lost to
-    // whom; the first chip is the value on screen, and a class that sets
-    // `margin-top` below a chip that also sets it is the one that lost.
+    // here. The rule that wins sits at the top — precedence descending: the
+    // cascade layer first (a `utilities` rule above any `patterns` one, and an
+    // unlayered rule above both), then specificity, and between equals the
+    // rule written LATER above the one written earlier. Read the well
+    // downwards and you read who lost to whom; the first chip is the value on
+    // screen, and a class that sets `margin-top` below a chip that also sets
+    // it is the one that lost.
     //
     // Two orders came before this and both misled. Stylesheet order ascending
     // put the loser first (add `bg-2` after `overflow-clip` and it landed above
@@ -4475,7 +4478,7 @@ export default function EmbedEditor() {
         a.styled - b.styled ||
         (a.styled
           ? a.pos - b.pos
-          : compareSpecificity(b.s.specificity, a.s.specificity) || b.rank - a.rank) ||
+          : comparePrecedence({ layer: a.s.layer, specificity: a.s.specificity, order: a.rank }, { layer: b.s.layer, specificity: b.s.specificity, order: b.rank })) ||
         a.s.text.localeCompare(b.s.text))
       .map((entry) => {
         const s = entry.s
