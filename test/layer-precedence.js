@@ -176,10 +176,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const named = (label) => sections().find((b) => b.querySelector('.embed-editor_section-title')?.textContent === label);
   const marginTop = () => named('Spacing')?.querySelector('[data-prop="margin-top"]')?.textContent;
   check('the spacing field shows the utilities value the page applies', marginTop() === 'var(--space-3)', marginTop());
-  check('the utility that wins is the first chip', chips()[0] === '.color-faded', chips().join(' '));
+  const styledChips = () => [...panel.querySelectorAll('.embed-editor_selector-chip')].filter((el) => !el.classList.contains('is-pending')).map((el) => el.textContent);
+  check('the utility that wins is the last styled chip', styledChips()[styledChips().length - 1] === '.color-faded', chips().join(' '));
   panel.querySelector('.embed-editor_inherited-check input')?.click();
   await sleep(80);
-  check('the more specific patterns rule sits below both utilities', chips().indexOf('.layout > .heading') > chips().indexOf('.margin-top-0'), chips().join(' '));
+  check('the more specific patterns rule reads above both utilities — it lost', chips().indexOf('.layout > .heading') < chips().indexOf('.margin-top-0'), chips().join(' '));
 
   named('CSS Code')?.querySelector('.embed-editor_section-toggle')?.click();
   await sleep(300);

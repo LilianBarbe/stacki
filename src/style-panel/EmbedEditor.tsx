@@ -4433,20 +4433,18 @@ export default function EmbedEditor() {
         list.push({ text: activeSelector, specificity: [0, 0, 0], state: stateForSelector(activeSelector), simple: canon.simple, key: `active:${activeSelector}`, pending: true, inContext: true })
       }
     }
-    // Order: Chrome DevTools' Styles pane, which is the rule for everything
-    // here. The rule that wins sits at the top — precedence descending: the
-    // cascade layer first (a `utilities` rule above any `patterns` one, and an
-    // unlayered rule above both), then specificity, and between equals the
-    // rule written LATER above the one written earlier. Read the well
-    // downwards and you read who lost to whom; the first chip is the value on
-    // screen, and a class that sets `margin-top` below a chip that also sets
-    // it is the one that lost.
+    // Order: the cascade, read downwards — Chrome DevTools' ranking, turned
+    // the other way up. Precedence ascending: the cascade layer first (an
+    // unlayered rule below every layer, a `utilities` rule below any
+    // `patterns` one), then specificity, and between equals the rule written
+    // LATER below the one written earlier. So the last chip is the rule that
+    // wins — the value on screen, nearest the input — and every chip above it
+    // lost to one further down. (The stacked CSS Code view keeps DevTools'
+    // winner-first order; the chips read the way a stylesheet is built.)
     //
-    // Two orders came before this and both misled. Stylesheet order ascending
-    // put the loser first (add `bg-2` after `overflow-clip` and it landed above
-    // it, because its rule is written earlier). The class attribute's order
-    // said nothing about the cascade at all: `color-faded` sat below
-    // `margin-top-0` while its own `margin-top` was the one winning.
+    // The class attribute's order was tried and said nothing about the
+    // cascade at all: `color-faded` sat below `margin-top-0` while its own
+    // `margin-top` was the one winning.
     //
     // A class with no rule yet has no place in the cascade; those go last, in
     // the order they sit on the element, where their rule will land when its
@@ -4478,7 +4476,7 @@ export default function EmbedEditor() {
         a.styled - b.styled ||
         (a.styled
           ? a.pos - b.pos
-          : comparePrecedence({ layer: a.s.layer, specificity: a.s.specificity, order: a.rank }, { layer: b.s.layer, specificity: b.s.specificity, order: b.rank })) ||
+          : comparePrecedence({ layer: b.s.layer, specificity: b.s.specificity, order: b.rank }, { layer: a.s.layer, specificity: a.s.specificity, order: a.rank })) ||
         a.s.text.localeCompare(b.s.text))
       .map((entry) => {
         const s = entry.s

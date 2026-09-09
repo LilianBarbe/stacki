@@ -1,14 +1,13 @@
-// The order of the chips in the well: Chrome DevTools' order.
+// The order of the chips in the well: the cascade, read downwards.
 //
 //   node test/chip-devtools-order.js
 //
-// The rule that wins sits at the top — precedence descending: specificity
-// first, and between equals the rule written later above the one written
-// earlier. Two orders came before and both misled: stylesheet order ascending
-// put the loser first, and the class attribute's order said nothing about the
-// cascade at all (`color-faded` sat below `margin-top-0` while its own
-// `margin-top` was winning). A class with no rule yet has no place in the
-// cascade and goes last.
+// Chrome DevTools' ranking, the other way up: precedence ascending, so the
+// rule that wins sits LAST — specificity first, and between equals the rule
+// written later below the one written earlier. The class attribute's order
+// was tried and said nothing about the cascade at all (`color-faded` sat below
+// `margin-top-0` while its own `margin-top` was winning). A class with no rule
+// yet has no place in the cascade and goes last of all.
 
 const fs = require('fs');
 const path = require('path');
@@ -109,24 +108,25 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(1500);
 
   const chips = () => [...panel.querySelectorAll('.embed-editor_selector-chip')].map((el) => el.textContent);
-  check('the class whose rule is written later — the one winning margin-top — sits first', chips()[0] === '.mt-0', chips().join(' '));
-  check('the one it beats comes next, whatever the class attribute says', chips()[1] === '.faded', chips().join(' '));
-  check('a class with no rule yet goes last', chips()[chips().length - 1] === '.fresh', chips().join(' '));
+  check('the one that loses margin-top comes first, whatever the class attribute says', chips()[0] === '.faded', chips().join(' '));
+  check('the class whose rule is written later — the one winning margin-top — sits after it', chips()[1] === '.mt-0', chips().join(' '));
+  check('a class with no rule yet goes last of all', chips()[chips().length - 1] === '.fresh', chips().join(' '));
   check('and is dashed', panel.querySelectorAll('.embed-editor_selector-chip')[chips().length - 1]?.classList.contains('is-pending'));
 
-  // The grey ones, revealed: the ancestor chain outranks every lone class,
-  // the bare tag ranks below them all.
+  // The grey ones, revealed: the bare tag ranks below every class and so
+  // reads first; the ancestor chain outranks every lone class and reads last
+  // of the styled ones.
   panel.querySelector('.embed-editor_inherited-check input')?.click();
   await sleep(80);
-  check('an ancestor chain, more specific, sits above the classes', chips()[0] === '.hero h2', chips().join(' '));
-  check('the tag reset, least specific, sits below them', chips().indexOf('h2') > chips().indexOf('.faded'), chips().join(' '));
-  check('and still above the class with no rule', chips().indexOf('h2') < chips().indexOf('.fresh'), chips().join(' '));
+  check('the tag reset, least specific, reads first', chips()[0] === 'h2', chips().join(' '));
+  check('an ancestor chain, more specific, sits below the classes', chips().indexOf('.hero h2') > chips().indexOf('.mt-0'), chips().join(' '));
+  check('and still above the class with no rule', chips().indexOf('.hero h2') < chips().indexOf('.fresh'), chips().join(' '));
 
   if (failures.length) {
     console.error(`chip-devtools-order: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
     process.exit(1);
   }
-  console.log(`chip-devtools-order: ${checked} passed  [winners first, as DevTools lists them]`);
+  console.log(`chip-devtools-order: ${checked} passed  [the cascade read downwards, winner last]`);
   process.exit(0);
 })().catch((error) => {
   console.error(error);
