@@ -78,7 +78,18 @@ export type HostState = {
   /** Put a class on the selected element. Typing a bare class in the selector
    *  box should land it on the element, the way a class field would — a rule
    *  for a class the element doesn't carry would never apply. */
-  addClass: ((className: string) => void) | null
+  addClass: ((className: string) => boolean | void) | null
+  /** Take a class off the selected element — the × on its chip in the well.
+   *  The mirror of addClass, and of the Settings panel's class field. */
+  removeClass: ((className: string) => void) | null
+  /** Swap one class for another on the selected element, in place — the family
+   *  menu on a chip (`gap-2` → `gap-4`). */
+  replaceClass: ((from: string, to: string) => void) | null
+  /** Whether the selected element takes a class at all — the rule the Settings
+   *  panel's Class field follows. A component that declares no class prop (and
+   *  spreads no rest) ignores one, so the well must not offer to put one there:
+   *  the rule it wrote would style nothing. */
+  acceptsClass: boolean
   /** What the spacing box is pointing at, for the canvas to draw over the
    *  selected element: hovering `padding-top` lights the strip of the page that
    *  padding-top holds open. Null when the pointer leaves it. */
@@ -119,6 +130,9 @@ const state: HostState = {
   selectNode: null,
   recordUndo: null,
   addClass: null,
+  removeClass: null,
+  replaceClass: null,
+  acceptsClass: true,
   onSpacingHover: null,
 }
 

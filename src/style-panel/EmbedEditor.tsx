@@ -34,6 +34,11 @@ import { computeRuleModel, type DeclStatus, type MatchedRule, type RuleModel } f
 import { groupDeclarations, groupProps } from './lib/sections'
 import { defaultSelectorTokens, selectorToClassTokens, snapshotTokens, tokensToSelector } from './lib/element-tokens'
 import { resolveStyle, indexContexts, contextKeyOf, listMatchedSelectors, NATIVE_ORDER_BASE, selectorKey, selectorsMatch, stateForSelector, STATES, type ChipRole, type ContextInfo, type ContextKey, type MatchedSelector, type ResolvedProp, type ResolvedStyle, type SourceKey, type StateKey, type StyleContext } from './lib/resolved'
+// Whether a class can come OFF the element as written — the same rule the app
+// removes it by, so a chip only offers a × it can honour.
+import { withoutClass } from '../classAttr.js'
+import { asTypedSelector, isHtmlTag } from './lib/typed-selector'
+import { tellCanvas } from '../canvasQuery.js'
 import { breakpointTier, buildStyleContexts, mediaParamsForBreakpoint, nativeContribsFor, nativeHasValues, nativeSelectorChips, optionsFor, selectedNativeIndexFor, type NativeStyleOptions } from './lib/native-styles'
 import type { AtRule, Declaration } from 'postcss'
 import {
@@ -62,7 +67,7 @@ import {
   splitRuleSelectorAt,
 } from './lib/css'
 import { canonicalCompound, compareSpecificity, formatSpecificity, parseSelectorList, type MatchTarget } from './lib/selectors'
-import { findNode, getHost, onHostChange, propText } from './lib/host'
+import { findNode, getHost, onHostChange, propText, walkNodes } from './lib/host'
 import {
   applyNativePropertyAt,
   applyNativeToNewBaseClass,
@@ -92,8 +97,7 @@ import {
   writeEmbedDoc,
   type EmbedDoc,
   type EmbedScan,
-  type NativeWriteTarget,
-} from './lib/webflow'
+  type NativeWriteTarget, authoredClassTokens } from './lib/webflow'
 import { previewLiveCss, settleLiveCss } from './lib/live-css'
 import type { BreakpointId, ElementSnapshot, NativeModel, ParsedDeclaration, ParsedRule, Specificity } from './lib/types'
 import './embed-editor.css'
@@ -240,6 +244,14 @@ function ComponentIcon() {
 // error mark (with the reason on hover) if the last write failed, or an unsaved
 // dot (reason on hover) when edits are deferred until you exit the component.
 // Rendered into the tool header's accessory slot (replaces the "Pro" tag).
+// The × on a removable chip: two strokes, drawn at the chip's own weight.
+function RemoveIcon() {
+  return (
+    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+      <path d="M1.5 1.5l5 5M6.5 1.5l-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
 function SpinnerIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -1300,7 +1312,7 @@ type SourceOption = {
 // A selector the element can be targeted by, offered as an autocomplete suggestion:
 // its tag, each class, each data attribute (presence then valued), and its combo
 // class chains.
-type SelectorSuggestion = { selector: string; kind: 'tag' | 'class' | 'attribute' | 'attribute-value' | 'combo' }
+type SelectorSuggestion = { selector: string; kind: 'tag' | 'class' | 'new-class' | 'attribute' | 'attribute-value' | 'combo' }
 
 // Every class in the project, kept in step with the app (the same list the Settings
 // panel's class field autocompletes from).
@@ -1316,12 +1328,22 @@ function useProjectClasses(): string[] {
   }, [])
   return list
 }
+// Whether the selected element takes a class (see HostState.acceptsClass).
+function useAcceptsClass(): boolean {
+  const [ok, setOk] = useState<boolean>(() => getHost().acceptsClass !== false)
+  useEffect(() => {
+    const sync = () => setOk(getHost().acceptsClass !== false)
+    sync()
+    return onHostChange(sync)
+  }, [])
+  return ok
+}
 // How many project-wide classes the suggestion list will show for one query — enough
 // to pick from, few enough that the list stays a list.
 const PROJECT_CLASS_LIMIT = 30
 
 const SUGGESTION_KIND_LABEL: Record<SelectorSuggestion['kind'], string> = {
-  tag: 'tag', class: 'class', attribute: 'attribute', 'attribute-value': 'attribute', combo: 'combo',
+  tag: 'tag', class: 'class', 'new-class': 'new class', attribute: 'attribute', 'attribute-value': 'attribute', combo: 'combo',
 }
 
 // A selector that says nothing about *this* element — `:target`, `:focus-visible`,
@@ -1351,7 +1373,30 @@ const ROLE_HINT: Record<ChipRole, string> = {
 // input offers an autocomplete list of the element's targetable selectors:
 // ↑/↓ move, Enter applies the highlighted one (or the typed text), Tab fills it
 // into the input to keep typing.
-export function SelectorPicker({ selectors, suggestions, activeSelector, activePicked, busy, loading, onSelect, onDeselect, onAdd }: {
+// Classes in a scale are named for it: gap-2 sits beside gap-1 and gap-4,
+// margin-bottom-6 beside margin-bottom-2. Everything up to the last dash or
+// underscore is the family (the same cut the Settings class field makes).
+const familyCollator = new Intl.Collator(undefined, { numeric: true })
+function familyPrefix(cls: string): string | null {
+  const cut = Math.max(cls.lastIndexOf('-'), cls.lastIndexOf('_'))
+  return cut > 0 ? cls.slice(0, cut + 1) : null
+}
+
+const EMPTY_LIST: string[] = []
+
+type FamilyMenu = {
+  /** The class the menu opened on — what a cancel puts back. */
+  original: string
+  /** What the element carries right now (the hovered option, while previewing). */
+  current: string
+  options: string[]
+  /** Where the menu sits, relative to the well: under the chip it opened on.
+   *  Held, not measured live — the chip is replaced while previewing. */
+  left: number
+  top: number
+}
+
+export function SelectorPicker({ selectors, suggestions, activeSelector, activePicked, busy, loading, onSelect, onDeselect, onAdd, onRemove, onReplace, knownClasses = EMPTY_LIST }: {
   selectors: MatchedSelector[]
   suggestions: SelectorSuggestion[]
   activeSelector: string
@@ -1364,6 +1409,15 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
   onSelect: (selector: string) => void
   onDeselect: () => void
   onAdd: (selector: string) => void
+  /** Take a class off the element — the × a removable chip carries (see
+   *  MatchedSelector.removable). Without it no chip offers one. */
+  onRemove?: (className: string) => void
+  /** Swap a removable chip's class for a sibling of its family — the menu on
+   *  right-click, which previews on hover the way the Settings field's does. */
+  onReplace?: (from: string, to: string) => void
+  /** Classes the panel knows of beyond the app's project list — styled in a
+   *  parsed stylesheet, or written on a node of the open page. */
+  knownClasses?: string[]
 }) {
   const [draft, setDraft] = useState('')
   const [open, setOpen] = useState(false)
@@ -1414,7 +1468,100 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
     [selectors, showGlobals, showInherited, activeSelector, activePicked],
   )
 
-  const projectClasses = useProjectClasses()
+  const acceptsClass = useAcceptsClass()
+  const wellRef = useRef<HTMLDivElement>(null)
+  // The project's classes as the app lists them, plus the ones the panel can
+  // see for itself: a class styled in any stylesheet it has parsed, and a
+  // class written on any node of the open page. The app's list is rebuilt on
+  // rescans, which its own writes never cause — so a class created a minute
+  // ago on the heading was offered nowhere when the paragraph below needed it.
+  const appClasses = useProjectClasses()
+  const projectClasses = useMemo(() => {
+    const out = [...appClasses]
+    for (const cls of knownClasses) if (!out.includes(cls)) out.push(cls)
+    return out
+  }, [appClasses, knownClasses])
+
+  // The family menu: right-click a class chip and every class sharing its
+  // prefix is offered (`margin-bottom-2` … `margin-bottom-8`). Hovering one
+  // puts it on the element in place of the current one, so the page shows the
+  // choice before it is made; click keeps it, Escape or a click elsewhere puts
+  // the original back. Drawn from the project's classes plus the ones on this
+  // element, which may not be used anywhere else yet.
+  const [family, setFamily] = useState<FamilyMenu | null>(null)
+  const [familyHighlight, setFamilyHighlight] = useState(-1)
+  const familyRef = useRef<HTMLDivElement>(null)
+  const familyOf = (cls: string): string[] => {
+    const prefix = familyPrefix(cls)
+    if (!prefix) return []
+    const pool = new Set([...projectClasses, ...selectors.map((sel) => sel.removable).filter((c): c is string => !!c)])
+    return [...pool].filter((c) => c.startsWith(prefix)).sort(familyCollator.compare)
+  }
+  const openFamily = (cls: string, chip: HTMLElement) => {
+    const options = familyOf(cls)
+    if (options.length < 2 || !wellRef.current) return
+    const well = wellRef.current.getBoundingClientRect()
+    const rect = chip.getBoundingClientRect()
+    setFamily({ original: cls, current: cls, options, left: rect.left - well.left, top: rect.bottom - well.top + 4 })
+    setFamilyHighlight(options.indexOf(cls))
+  }
+  // The preview is the page's alone: the element on the canvas wears the
+  // hovered class in place of the current one, while the file and the chip
+  // keep the original until a class is actually chosen. Nothing is written
+  // while browsing — an undo step per hover would be a strange thing to leave
+  // behind, and a chip that renames itself under the pointer reads as a
+  // decision already made.
+  const wearOnCanvas = (from: string, to: string) => {
+    const host = getHost()
+    const path = host.selectedId ? host.pathOf?.(host.selectedId) : null
+    if (path) tellCanvas({ type: 'avb:class-preview', path, from, to })
+  }
+  const previewFamily = (index: number) => {
+    if (!family) return
+    setFamilyHighlight(index)
+    const next = family.options[index]
+    if (!next || next === family.current) return
+    wearOnCanvas(family.current, next)
+    setFamily({ ...family, current: next })
+  }
+  const closeFamily = (revert: boolean) => {
+    if (family && revert && family.current !== family.original) wearOnCanvas(family.current, family.original)
+    setFamily(null)
+    setFamilyHighlight(-1)
+  }
+  const applyFamily = (index: number) => {
+    if (!family) return
+    const next = family.options[index]
+    // The page already wears the choice; the file catches up with the write.
+    // Choosing the original again just takes the preview off.
+    if (next && next !== family.original) onReplace?.(family.original, next)
+    else if (family.current !== family.original) wearOnCanvas(family.current, family.original)
+    setFamily(null)
+    setFamilyHighlight(-1)
+  }
+  useEffect(() => {
+    if (!family) return
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest('.embed-editor_chip-menu')) closeFamily(true)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); closeFamily(true) }
+      else if (event.key === 'ArrowDown') { event.preventDefault(); previewFamily(Math.min(familyHighlight + 1, family.options.length - 1)) }
+      else if (event.key === 'ArrowUp') { event.preventDefault(); previewFamily(Math.max(familyHighlight - 1, 0)) }
+      else if (event.key === 'Enter') { event.preventDefault(); applyFamily(familyHighlight) }
+    }
+    document.addEventListener('mousedown', onDown, true)
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('mousedown', onDown, true)
+      document.removeEventListener('keydown', onKey, true)
+    }
+  }) // no deps: the handlers close over the current menu
+  useEffect(() => {
+    if (!family || familyHighlight < 0) return
+    ;(familyRef.current?.children[familyHighlight] as HTMLElement | undefined)?.scrollIntoView?.({ block: 'nearest' })
+  }, [family, familyHighlight])
+
   const q = draft.trim().toLowerCase()
   // The element's own tokens first — they're what you're usually reaching for — then,
   // once you've typed something, every other class in the project (the Settings
@@ -1429,6 +1576,10 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
       (s) => (!q || s.selector.toLowerCase().includes(q)) && !chipKeys.has(selectorKey(s.selector)),
     )
     if (!q) return own
+    // A project class is offered as a class to PUT on the element. An element
+    // that takes none (a component with no class prop) would ignore it, so the
+    // list stops at what already styles this one.
+    if (!acceptsClass) return own
     const taken = new Set(own.map((s) => s.selector))
     const extra: SelectorSuggestion[] = []
     for (const cls of projectClasses) {
@@ -1439,8 +1590,14 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
       extra.push({ selector, kind: 'class' })
       if (extra.length >= PROJECT_CLASS_LIMIT) break
     }
+    // What's typed, as the class it would create — first, so Enter and the list
+    // agree, and so `my-div` is seen to mean `.my-div` before it is applied. Not
+    // offered for a tag name, nor for a class that is already in the list.
+    const word = draft.trim().replace(/^\./, '')
+    const fresh = /^[A-Za-z_][\w-]*$/.test(word) && !(draft.trim() === word && isHtmlTag(word)) ? `.${word}` : null
+    if (fresh && !taken.has(fresh) && !chipKeys.has(selectorKey(fresh))) extra.unshift({ selector: fresh, kind: 'new-class' })
     return [...own, ...extra]
-  }, [suggestions, projectClasses, q, chipKeys])
+  }, [suggestions, projectClasses, acceptsClass, q, draft, chipKeys])
   const showList = open && filtered.length > 0
 
   // Keep the highlighted row visible while arrowing through a long list.
@@ -1461,7 +1618,8 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
     const target = event.target as HTMLElement
     // Clicking a chip selects/deselects it — don't let the input's blur restore the
     // previously-active selector over that choice.
-    if (target.closest('.embed-editor_selector-chip')) { restoreRef.current = null; return }
+    if (target.closest('.embed-editor_selector-chip-wrap')) { restoreRef.current = null; return }
+    if (target.closest('.embed-editor_chip-menu')) return
     if (target.closest('.embed-editor_selector-suggest')) return
     if (inputRef.current && target === inputRef.current) return
     event.preventDefault() // keep focus on the input rather than blurring it
@@ -1505,7 +1663,7 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
     <div className="embed-editor_selectors">
       {/* One grey well wraps the selector tags; clicking empty space reveals the add
           input at its bottom (the input has no chrome of its own). */}
-      <div className="embed-editor_selector-well" onMouseDown={onWellMouseDown}>
+      <div className="embed-editor_selector-well" ref={wellRef} onMouseDown={onWellMouseDown}>
         {/* Nothing to show yet and the scan still running: the well would read as
             "this element has no selectors", which is a different (and wrong) answer
             than "not counted yet". A spinner where the first chip will land says
@@ -1529,20 +1687,73 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
               // Blue stays the default so a chip whose role can't be worked out looks
               // like it always did rather than like a new category.
               const role = sel.role ?? 'added'
+              // A chip that is one class written on this element carries a × that
+              // takes the class off it — the well is where the classes are read,
+              // so it is where one is removed, not only in Settings. A composed
+              // class (a component's own), a combo, a state or a tag has nothing
+              // on this element to take off, and gets none.
+              const removable = onRemove && sel.removable ? sel.removable : null
               return (
-                <button
+                <span
                   key={sel.key}
-                  type="button"
-                  className={`embed-editor_selector-chip is-${role} ${active ? 'is-active' : ''} ${sel.pending ? 'is-pending' : ''} ${dimmed ? 'is-dimmed' : ''}`}
-                  disabled={busy}
-                  // Click the active chip again to deselect (show all winners read-only).
-                  onClick={() => (active ? onDeselect() : onSelect(sel.text))}
-                  title={active ? `${label} — click to deselect` : dimmed ? `${label} — styled in another query` : sel.pending ? `${label} — no styles yet` : `${label} — ${ROLE_HINT[role]}`}
+                  className={`embed-editor_selector-chip-wrap ${removable ? 'is-removable' : ''}`}
                 >
-                  {label}
-                </button>
+                  <button
+                    type="button"
+                    className={`embed-editor_selector-chip is-${role} ${active ? 'is-active' : ''} ${sel.pending ? 'is-pending' : ''} ${dimmed ? 'is-dimmed' : ''}`}
+                    disabled={busy}
+                    // Click the active chip again to deselect (show all winners read-only).
+                    onClick={() => (active ? onDeselect() : onSelect(sel.text))}
+                    // Right-click: the class's family, when it has one.
+                    onContextMenu={(event) => {
+                      if (!removable || !onReplace || busy) return
+                      event.preventDefault()
+                      openFamily(removable, event.currentTarget)
+                    }}
+                    title={active ? `${label} — click to deselect` : dimmed ? `${label} — styled in another query` : sel.pending ? `${label} — no styles yet` : `${label} — ${ROLE_HINT[role]}`}
+                  >
+                    {label}
+                  </button>
+                  {removable ? (
+                    <button
+                      type="button"
+                      className="embed-editor_selector-remove"
+                      disabled={busy}
+                      title={`Remove .${removable} from this element`}
+                      aria-label={`Remove .${removable} from this element`}
+                      onClick={(event) => { event.stopPropagation(); onRemove!(removable) }}
+                    >
+                      <RemoveIcon />
+                    </button>
+                  ) : null}
+                </span>
               )
             })}
+          </div>
+        ) : null}
+        {family ? (
+          <div
+            className="embed-editor_chip-menu"
+            ref={familyRef}
+            role="listbox"
+            aria-label={`Classes like ${family.original}`}
+            style={{ left: family.left, top: family.top }}
+          >
+            {family.options.map((cls, i) => (
+              <button
+                key={cls}
+                type="button"
+                role="option"
+                aria-selected={cls === family.current}
+                className={`embed-editor_chip-menu-item ${i === familyHighlight ? 'is-active' : ''} ${cls === family.original ? 'is-original' : ''}`}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => previewFamily(i)}
+                onClick={() => applyFamily(i)}
+              >
+                <span className="embed-editor_chip-menu-check" aria-hidden="true">{cls === family.original ? <CheckIcon /> : null}</span>
+                <span>{cls}</span>
+              </button>
+            ))}
           </div>
         ) : null}
         {showInput ? (
@@ -1896,6 +2107,9 @@ function StyleCard({
   onSelectActive,
   onDeselect,
   onAddSelector,
+  onRemoveClass,
+  onReplaceClass,
+  knownClasses,
   sourceValue,
   sourceOptions,
   onSourceChange,
@@ -1937,6 +2151,12 @@ function StyleCard({
   onSelectActive: (selector: string) => void
   onDeselect: () => void
   onAddSelector: (selector: string) => void
+  /** Take a class off the element — the × on its chip. */
+  onRemoveClass: (className: string) => void
+  /** Swap a class for a sibling of its family — the menu on a chip's right-click. */
+  onReplaceClass: (from: string, to: string) => void
+  /** Classes seen in the parsed stylesheets and on the open page, for the well's suggestions. */
+  knownClasses: string[]
   sourceValue: string
   sourceOptions: SourceOption[]
   onSourceChange: (value: string) => void
@@ -2071,6 +2291,9 @@ function StyleCard({
         onSelect={onSelectActive}
         onDeselect={onDeselect}
         onAdd={onAddSelector}
+        onRemove={onRemoveClass}
+        onReplace={onReplaceClass}
+        knownClasses={knownClasses}
       />
       {/* Where edits go, as a compact text link: the Webflow class style or a
           specific embed (page embeds listed in cascade order). Sits under the
@@ -2302,7 +2525,13 @@ const selectorKeyOf = (rules: ParsedRule[]): string => rules.map((r) => r.select
 // A fingerprint of the selected element's identity (tag + id + classes + attrs) —
 // changes when a class or data attribute is added/removed in the Designer.
 function snapshotSignature(snap: ElementSnapshot): string {
-  return JSON.stringify([snap.tag, snap.id, snap.classes, snap.attributes])
+  // The authored classes are in the signature too: a class typed into the well
+  // changes them a second before the page re-renders and changes `classes`. With
+  // only the rendered side counted, the poll saw nothing new, threw away the
+  // fresh target it had just resolved, and the panel went on matching against a
+  // snapshot without the class — so the rule being written for it stayed a
+  // pending chip until the page caught up.
+  return JSON.stringify([snap.tag, snap.id, snap.classes, snap.authoredClasses, snap.attributes])
 }
 // A fingerprint of the element's native Webflow class styles — changes when a
 // style value is edited on a class (even without touching the element's classes).
@@ -2465,12 +2694,14 @@ const viewKeyMatches = (view: typeof persistedView) => {
   return !!view && !!host.selectedId && view.hostId === host.selectedId && view.filePath === host.openFilePath
 }
 
-// The selected node's authored classes, straight from the page model. A `class` set by
-// an expression has no literal text to read, and reports none.
+// The selected node's authored classes, straight from the page model: the words
+// of a `class` string plus the literals in a `class:list` — the same reading the
+// snapshot makes, so a class taken out of a list is noticed the same as one taken
+// out of a string. A class set by an expression has no text to read, and reports none.
 function authoredClasses(): string[] {
   const host = getHost()
   const node = host.selectedId ? findNode(host.nodes, host.selectedId) : null
-  return propText(node, 'class').trim().split(/\s+/).filter(Boolean)
+  return authoredClassTokens(node)
 }
 
 /**
@@ -2481,8 +2712,8 @@ function authoredClasses(): string[] {
  * reporting a removed class until the dev server re-renders the page. Left alone, a
  * class you just deleted sits in the selector well for that whole round trip — and
  * a re-scan in between puts it back. Anything that drops out of the authored list is
- * hidden from that moment; it returns if the class does, and is forgotten once the
- * preview stops reporting it too.
+ * hidden from that moment; it returns if the class does, and is forgotten when
+ * another element is selected.
  */
 export function useRemovedClasses(): ReadonlySet<string> {
   const [removed, setRemoved] = useState<ReadonlySet<string>>(EMPTY_CLASSES)
@@ -2504,9 +2735,11 @@ export function useRemovedClasses(): ReadonlySet<string> {
         const next = new Set(old)
         for (const cls of prev) if (!now.includes(cls)) next.add(cls)
         for (const cls of now) next.delete(cls)
-        // Once the preview has caught up there is nothing left to hide.
-        const rendered = host.renderedClasses || []
-        for (const cls of [...next]) if (!rendered.includes(cls)) next.delete(cls)
+        // Kept until the class is written back or the selection moves — NOT
+        // released as soon as the preview stops reporting it. That release
+        // came a canvas round trip before the matcher was re-asked, and in
+        // that gap the rule for the class was still "matched" and nothing hid
+        // its chip: it blinked back for ~200ms after every ×.
         if (next.size === old.size && [...next].every((c) => old.has(c))) return old
         return next
       })
@@ -2598,6 +2831,19 @@ export default function EmbedEditor() {
   const [quickSnapshot, setQuickSnapshot] = useState<ElementSnapshot | null>(restoredRef.current?.quick ?? null)
   // Classes removed since the panel last resolved — hidden from the chips at once.
   const removedClasses = useRemovedClasses()
+  // A selector hanging off a class the element has just lost no longer targets
+  // it, whatever the page still says (see useRemovedClasses). Applied wherever a
+  // styled selector is offered — the chips, and the two places that PICK one on
+  // their own: without it, taking the only class off a div re-defaulted the
+  // pick to the strongest styled selector, which was the class just removed.
+  const withoutRemoved = useCallback((list: MatchedSelector[]) => {
+    if (!removedClasses.size) return list
+    return list.filter((sel) => {
+      const canon = canonicalCompound(sel.text)
+      // Tokens are namespaced (`class:card`); the removed set holds bare names.
+      return !(canon.simple && canon.tokens.some((tok) => tok.startsWith('class:') && removedClasses.has(tok.slice('class:'.length))))
+    })
+  }, [removedClasses])
   const [status, setStatus] = useState('Select an element to inspect its embed styles.')
   const [busy, setBusy] = useState(false)
   // Last save failure (surfaced by the header save indicator, not as body text).
@@ -3037,7 +3283,10 @@ export default function EmbedEditor() {
       // scan takes. Blank them now: an empty well for a moment is honest,
       // another element's selectors are not. A cached native model comes
       // straight back in the identity effect, so that case barely blinks.
-      setScan((prev) => (prev ? { ...prev, model: EMPTY_RULE_MODEL } : prev))
+      // The snapshot goes too: kept, it outranked the new element's quick
+      // snapshot (read a frame later, straight off the source) until the full
+      // resolve landed — so an element's own classes waited on the canvas.
+      setScan((prev) => (prev ? { ...prev, model: EMPTY_RULE_MODEL, rootSnapshot: undefined } : prev))
       setNativeModel(null)
       nativeModelRef.current = null
       nativeIdentityRef.current = ''
@@ -3607,10 +3856,25 @@ export default function EmbedEditor() {
   //
   // The primary class is what a class system is authored against; a combo is a
   // deliberate act, so it takes picking that chip.
+  const pickedForRef = useRef('')
   useEffect(() => {
     const identity = tokens.map((token) => token.name).join('|')
     if (identity === tokenIdentityRef.current) return
     tokenIdentityRef.current = identity
+    // The same element with different classes — one was typed into the well a
+    // moment ago, or taken off in Settings — is not another element, and the
+    // pick stays where the user put it as long as it still names something the
+    // element has. It used to be reset here regardless: type `.huhu`, and the
+    // moment the canvas reported the class the panel jumped back to the
+    // element's first class, taking the fields with it.
+    const elementChanged = pickedForRef.current !== selectedElementKeyRef.current
+    pickedForRef.current = selectedElementKeyRef.current
+    if (!elementChanged) {
+      const names = new Set(tokens.map((token) => token.name))
+      const fits = selectedSelectorText != null
+        || (selectedTokens.length > 0 && selectedTokens.every((name) => names.has(name)))
+      if (fits) return
+    }
     const next = defaultSelectorTokens(tokens)
     setSelectedTokens(next)
     setSelectedSelectorText(null)
@@ -3624,7 +3888,9 @@ export default function EmbedEditor() {
     // the user chose to add new styles. (It falls back to the first embed only if
     // that source isn't available for the new element — see effectiveSourceSel.)
     setNativeFallback(null)
-  }, [tokens])
+    // The pick is read here only to decide whether to keep it; a change to it
+    // alone finds the token identity unchanged above and does nothing.
+  }, [tokens, selectedSelectorText, selectedTokens])
 
   // The element's identity (tag + classes + attrs) as a stable key — drives the
   // native-style read so it re-runs on selection or class changes, not on every
@@ -3746,7 +4012,8 @@ export default function EmbedEditor() {
   // `.hero { @container (width < 50em) }`: resolve to the deepest selector + its query
   // context and select it there. A plain selector (no braces) is used as-is.
   const addTypedSelector = useCallback((input: string) => {
-    const trimmed = input.trim()
+    // A lone word that isn't a tag is the class it names — see typed-selector.
+    const trimmed = asTypedSelector(input)
     if (!trimmed) return
     if (trimmed.includes('{')) {
       const parsed = parseNestedInput(trimmed)
@@ -3777,7 +4044,10 @@ export default function EmbedEditor() {
       canon.tokens.length === 1 &&
       canon.tokens[0].startsWith('class:')
     ) {
-      getHost().addClass?.(canon.tokens[0].slice('class:'.length))
+      // False means the element takes no class at all (a component without a
+      // class prop — the app has said so). A rule for it would style nothing,
+      // so there is nothing here to select either.
+      if (getHost().addClass?.(canon.tokens[0].slice('class:'.length)) === false) return
       // The element itself changed, so the matches the canvas gave us for these
       // same selectors no longer hold — ask again on the next refresh.
       primedRef.current = null
@@ -3817,6 +4087,30 @@ export default function EmbedEditor() {
     setSelectedSelectorText(null)
     setStateKey('')
   }, [])
+
+  // The × on a chip: the class comes off the element (the app rewrites the
+  // attribute, see withoutClass), and the well follows at once — the chip is
+  // hidden until the preview stops reporting the class (useRemovedClasses).
+  // Editing the selector that just left would be editing nothing, so the pick
+  // drops back to the default.
+  // The family menu on a chip: one class for its sibling, in place. The pick
+  // follows it, so the fields keep editing the class that is now there.
+  const replaceClassOnElement = useCallback((from: string, to: string) => {
+    getHost().replaceClass?.(from, to)
+    primedRef.current = null
+    const active = activeSelectorRef.current
+    if (active && canonicalCompound(active).tokens.includes(`class:${from}`)) {
+      const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      selectActiveSelector(active.replace(new RegExp(`\\.${escaped}(?![\\w-])`), `.${to}`))
+    }
+  }, [selectActiveSelector])
+
+  const removeClassFromElement = useCallback((className: string) => {
+    getHost().removeClass?.(className)
+    primedRef.current = null
+    const active = activeSelectorRef.current
+    if (active && canonicalCompound(active).tokens.includes(`class:${className}`)) deselect()
+  }, [deselect])
 
   // A pending "focus this property's input" request — set when you click an override
   // tag, consumed once the newly-picked selector has rendered.
@@ -4128,6 +4422,22 @@ export default function EmbedEditor() {
     setSourceSel((prev) => (prev === homeEmbedKey ? prev : homeEmbedKey))
   }, [elementIdentity, activeSelector, homeEmbedKey, inComponentContext])
 
+  // Every class the panel can vouch for on its own: styled in a stylesheet it
+  // has parsed, or written on a node of the open page. Offered by the well's
+  // input beside the app's project list, which lags behind the app's own writes.
+  const knownClasses = useMemo<string[]>(() => {
+    const out = new Set<string>()
+    for (const rule of contentRef.current?.rules ?? []) {
+      for (const sel of rule.selectors) {
+        for (const m of sel.text.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) out.add(m[1])
+      }
+    }
+    walkNodes(getHost().nodes, (node) => { for (const cls of authoredClassTokens(node)) out.add(cls) })
+    return [...out]
+    // The rules live behind `scan` (a resolve swaps them in), the nodes behind `snapshot`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scan, snapshot])
+
   // Every selector (with styles) that targets this element in the current context —
   // the element's own classes, stateful, and complex/ancestor selectors — for the
   // chip picker. Include the active selector even when it has no rule yet (a fresh
@@ -4142,19 +4452,24 @@ export default function EmbedEditor() {
     // element no longer has doesn't any more — drop it now instead of leaving it in
     // the well until the next resolve. Complex selectors are left to that resolve:
     // the class may be an ancestor's, which this can't tell apart.
-    const list = styledSelectorsFor(model, nativeModel, currentContext).filter((sel) => {
-      if (!removedClasses.size) return true
-      const canon = canonicalCompound(sel.text)
-      return !(canon.simple && canon.tokens.some((tok) => removedClasses.has(tok)))
-    })
-    // Show the active selector as a pending (dashed/outlined) chip while it has no rule
-    // yet, so a freshly typed/picked selector stays visible until its first property
-    // lands (then it becomes a solid styled chip). We show it for a complex/typed
-    // selector always, and for the element's OWN classes only when the user explicitly
-    // typed or picked one (`selectedSelectorText` set) — the AUTO-composed default
-    // (`.card`, `div`) stays hidden since its token chip already indicates the pick.
-    // Switching elements/selectors clears `selectedSelectorText` + the active selector,
-    // so the pending chip disappears on its own when you move on without adding styles.
+    const list = withoutRemoved(styledSelectorsFor(model, nativeModel, currentContext))
+    const classList = snapshot?.classList ?? []
+    const authoredClasses = snapshot?.authoredClasses ?? []
+    // Every class the element carries has a chip, styled or not — the well is
+    // the element's class list, the same one Settings shows, and a class with
+    // no rule yet is exactly the one you came here to write. Dashed until its
+    // first property lands. It used to take a rule to earn a chip, so a class
+    // just typed here (or added in Settings) was nowhere in the well.
+    for (const cls of classList) {
+      const text = `.${cls}`
+      if (list.some((s) => selectorsMatch(s.text, text))) continue
+      list.push({ text, specificity: [0, 1, 0], state: '', simple: true, key: `class:${cls}`, pending: true, inContext: true })
+    }
+    // Anything else picked or typed that has no rule yet (a combo, a state, an
+    // ancestor chain) shows as a pending chip too, so it can be seen selected
+    // while its first property is written. Not the auto-composed default of a
+    // classless element (`div`): nobody picked it, and a dashed tag chip would
+    // read as something to fill in.
     if (activeSelector && !list.some((s) => selectorsMatch(s.text, activeSelector))) {
       const canon = canonicalCompound(activeSelector)
       const own = canon.simple && canon.tokens.every((tok) => ownTokens.has(tok))
@@ -4162,39 +4477,62 @@ export default function EmbedEditor() {
         list.push({ text: activeSelector, specificity: [0, 0, 0], state: stateForSelector(activeSelector), simple: canon.simple, key: `active:${activeSelector}`, pending: true, inContext: true })
       }
     }
-    // Chip order IS cascade order: the rule written first sits at the top, the one
-    // written last at the bottom. That's the order a stylesheet is built in — resets
-    // and base layers up top, each later rule narrowing what came before — so reading
-    // the well downwards is reading the cascade, and the last chip is the class that
-    // was added most recently. It also means the winner of any tie is the chip nearest
-    // the bottom, which is the same rule the panel is about to edit.
+    // Order. What the element CARRIES reads in the order it carries it — the
+    // class attribute's order, the one Settings shows and the one a class was
+    // added in — with a class's states and combos right after it. What merely
+    // reaches the element (a tag, a reset, an ancestor chain) sits above that,
+    // in stylesheet order, since that is the only order those have. A typed
+    // selector that fits neither goes last, nearest the input it came from.
     //
-    // The previous ordering grouped by kind (tag → base class → combo chain → other
-    // classes → attributes → complex) and used source order only as a tiebreaker. It
-    // read tidily but told you nothing about who overrides whom, and it put a reset a
-    // class-attribute position away from where it actually sits in the file.
-    //
-    // A pending chip (freshly picked/typed, no rule yet) has no place in the file yet;
-    // it goes last, where its rule will land when its first property is written.
+    // It was stylesheet order throughout for a while, on the argument that the
+    // well then read as the cascade. It read as a shuffle: add `bg-2` after
+    // `overflow-clip` and it landed first, because its rule is written first.
+    const posOf = (s: MatchedSelector): number => {
+      const canon = canonicalCompound(s.text)
+      if (!canon.simple || !canon.oneCompound) return -1
+      const classes = canon.tokens.filter((t) => t.startsWith('class:')).map((t) => t.slice('class:'.length))
+      if (!classes.length) return -1
+      const at = classes.map((c) => classList.indexOf(c))
+      return at.some((i) => i < 0) ? -1 : Math.max(...at)
+    }
+    const groupOf = (s: MatchedSelector, pos: number) => (pos >= 0 ? 1 : s.pending ? 2 : 0)
     const orderOf = (s: MatchedSelector) => (s.order != null ? s.order : Number.MAX_SAFE_INTEGER)
-    const classList = snapshot?.classList ?? []
-    const authoredClasses = snapshot?.authoredClasses ?? []
+    const extraOf = (s: MatchedSelector) => {
+      const canon = canonicalCompound(s.text)
+      return canon.tokens.length * 10 + canon.pseudoClasses.length + (canon.pseudoElement ? 1 : 0)
+    }
+    // Which chips can take their class off the element: one class, written on
+    // this element, in an attribute the app knows how to rewrite. Asked of the
+    // same rule the app removes by, so the × is only ever offered where it works.
+    const host = getHost()
+    const node = host.selectedId ? findNode(host.nodes, host.selectedId) : null
+    const removableOf = (text: string): string | undefined => {
+      const canon = canonicalCompound(text)
+      if (!canon.oneCompound || canon.pseudoClasses.length || canon.pseudoElement || canon.tokens.length !== 1) return undefined
+      const tok = canon.tokens[0]
+      if (!tok.startsWith('class:')) return undefined
+      const cls = tok.slice('class:'.length)
+      if (!authoredClasses.includes(cls)) return undefined
+      return node && withoutClass(node.props, cls) ? cls : undefined
+    }
     return list
-      .map((s) => ({ s, rank: orderOf(s) }))
+      .map((s) => { const pos = posOf(s); return { s, group: groupOf(s, pos), pos, rank: orderOf(s), extra: extraOf(s) } })
       .sort((a, b) =>
-        a.rank - b.rank ||
+        a.group - b.group ||
+        (a.group === 1 ? a.pos - b.pos || a.extra - b.extra : a.rank - b.rank) ||
         // Same rule (a grouped selector like `.a, .b`) — steady, readable order within it.
         compareSpecificity(a.s.specificity, b.s.specificity) ||
         a.s.text.localeCompare(b.s.text))
       .map((entry) => {
         const s = entry.s
         const role = chipRole(s.text, classList, authoredClasses)
+        const removable = removableOf(s.text)
         // In a query context, show the display with an `@` at the query position;
         // on Base / other contexts show the plain nested display.
         const inQuery = !!currentContext.embedAtContext && s.inContext !== false && !!s.queryDisplay
-        return inQuery ? { ...s, role, display: s.queryDisplay } : { ...s, role }
+        return inQuery ? { ...s, role, removable, display: s.queryDisplay } : { ...s, role, removable }
       })
-  }, [model, nativeModel, currentContext, activeSelector, selectedSelectorText, tokens, snapshot, removedClasses])
+  }, [model, nativeModel, currentContext, activeSelector, selectedSelectorText, tokens, snapshot, withoutRemoved])
 
   // Per-context dropdown info: embed hasStyles/combos (for the dot + auto-highlight)
   // plus whether the breakpoint carries native values.
@@ -4224,12 +4562,12 @@ export default function EmbedEditor() {
     // Only selectors with styles IN this context (drop the dimmed other-context ones).
     // Never jump to a global selector (`:focus-visible`, `*`): editing one edits
     // most of the site, and it isn't about this element.
-    const styled = styledSelectorsFor(model, nativeModel, nextContext)
+    const styled = withoutRemoved(styledSelectorsFor(model, nativeModel, nextContext))
       .filter((s) => s.inContext !== false && !isGlobalSelector(s.text))
     if (!styled.length) return
     if (activeSelector && styled.some((s) => selectorsMatch(s.text, activeSelector))) return
     selectActiveSelector(styled[styled.length - 1].text)
-  }, [styleContexts, model, nativeModel, activeSelector, selectActiveSelector])
+  }, [styleContexts, model, nativeModel, activeSelector, selectActiveSelector, withoutRemoved])
 
   // On selecting a new element, upgrade the raw all-classes default to the strongest
   // selector actually STYLED in the current context — so if `.media_card_title` is
@@ -4244,7 +4582,7 @@ export default function EmbedEditor() {
     if (nativeIdentityRef.current !== elementIdentity) return
     const cur = styleContexts.find((entry) => entry.key === context)
     if (!cur) return
-    const styled = styledSelectorsFor(model, nativeModel, cur).filter((s) => s.inContext !== false)
+    const styled = withoutRemoved(styledSelectorsFor(model, nativeModel, cur)).filter((s) => s.inContext !== false)
     // Nothing styled yet — likely mid-scan (embeds still streaming). Leave the default
     // armed so we retry as they arrive, instead of committing to the unstyled combo.
     if (!styled.length) return
@@ -4289,7 +4627,7 @@ export default function EmbedEditor() {
       .map((e) => e.s)
     const firstAfterTag = byAffinity.find((s) => selectorOrder(s.text, classList)[0] > 0)
     selectActiveSelector((primaryStyled ?? firstAfterTag ?? byAffinity[0] ?? local[local.length - 1]).text)
-  }, [model, nativeModel, context, styleContexts, tokens, elementIdentity, snapshot, selectActiveSelector])
+  }, [model, nativeModel, context, styleContexts, tokens, elementIdentity, snapshot, selectActiveSelector, withoutRemoved])
 
   // ── Native (Webflow class style) writes ──
   const refreshNative = useCallback(async () => {
@@ -4854,6 +5192,9 @@ export default function EmbedEditor() {
               onSelectActive={selectActiveSelector}
               onDeselect={deselect}
               onAddSelector={addTypedSelector}
+              onRemoveClass={removeClassFromElement}
+              onReplaceClass={replaceClassOnElement}
+              knownClasses={knownClasses}
               sourceValue={effectiveSourceSel}
               sourceOptions={sourceOptions}
               onSourceChange={(value) => { setSourceSel(value); saveEmbedSource(value) }}

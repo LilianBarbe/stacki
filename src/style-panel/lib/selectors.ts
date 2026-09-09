@@ -413,12 +413,34 @@ export async function matchSelectorList(selectorText: string, target: MatchTarge
   for (const sel of compiled) {
     const fromDom = target.domMatched?.get(sel.text)
     if (fromDom !== undefined) {
-      results.push({ matched: fromDom, approximate: false })
+      // The page says no, but the source says the element carries every class
+      // the selector asks for — written on it, unconditionally. The page can
+      // only be behind: a class typed into the well a moment ago is in the file
+      // before the dev server has re-rendered the element with it, and until
+      // it does, the rule for that class would drop out of the panel just as
+      // its first property was being written. The source knows what the
+      // element is about to be; that answer wins over the stale one.
+      const matched = fromDom || (await authoredClassCompound(sel, target))
+      results.push({ matched, approximate: false })
       continue
     }
     results.push(await matchComplex(sel, target.rootKey, target.view))
   }
   return results
+}
+
+/** A lone compound made only of classes, every one of which is written on the
+ *  subject element itself (its own `class` / `class:list`, not a class a
+ *  component or a script put there). The one case the source can be surer of
+ *  than the rendered page. */
+async function authoredClassCompound(sel: CompiledSelector, target: MatchTarget): Promise<boolean> {
+  if (sel.compounds.length !== 1) return false
+  const c = sel.compounds[0]
+  if (!c.classes.length || c.id != null || c.tag || c.universal) return false
+  if (c.attrs.length || c.negations.length || c.requireAny.length || c.hasGroups.length || c.positional.length) return false
+  const el = await target.view.snapshot(target.rootKey)
+  if (!el) return false
+  return c.classes.every((cls) => el.authoredClasses.includes(cls))
 }
 
 async function matchComplex(sel: CompiledSelector, subjectKey: string, view: TreeView): Promise<MatchResult> {

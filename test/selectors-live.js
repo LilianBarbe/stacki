@@ -98,10 +98,15 @@ const check = (what, condition, detail) => {
   await settle();
   check('a removed class is hidden at once', hidden() === 'is-active', hidden());
 
-  // The dev server re-renders: there is nothing left to hide.
+  // The dev server re-renders. Still hidden: the class was released here the
+  // moment the preview stopped reporting it, which came a canvas round trip
+  // BEFORE the matcher was re-asked — and in that gap the rule for the class
+  // was still "matched" and nothing hid its chip, so it blinked back for ~200ms
+  // after every ×. Hiding a class that is gone costs nothing; it comes back
+  // the moment the class is written back, or the selection moves.
   setHost({ renderedClasses: ['card'] });
   await settle();
-  check('and forgotten once the preview agrees', hidden() === '', hidden());
+  check('and stays hidden once the preview agrees', hidden() === 'is-active', hidden());
 
   // Putting it back shows it again.
   node.props.class.value = 'card is-active';

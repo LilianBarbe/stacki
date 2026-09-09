@@ -32,7 +32,7 @@ const check = (what, condition, detail) => {
     // own directory so its imports resolve the way they do in the app.
     stdin: {
       contents: `
-        export { resolveTarget } from './lib/webflow'
+        export { resolveTarget, primeDomMatches } from './lib/webflow'
         export { setHost, onHostChange, getHost } from './lib/host'
         export { matchSelectorList } from './lib/selectors'
         export { defaultSelectorTokens, tokensToSelector } from './lib/element-tokens'
@@ -53,7 +53,7 @@ const check = (what, condition, detail) => {
   global.document = dom.window.document;
   dom.window.avb = {};
 
-  const { resolveTarget, setHost, onHostChange, getHost, matchSelectorList, defaultSelectorTokens, tokensToSelector } =
+  const { resolveTarget, primeDomMatches, setHost, onHostChange, getHost, matchSelectorList, defaultSelectorTokens, tokensToSelector } =
     require(bundlePath);
   setHost({ nodes: [], projectPath: '/project', files: [], astroFiles: [] });
 
@@ -123,6 +123,37 @@ const check = (what, condition, detail) => {
     check('with no answer the snapshot is the source one', seen?.tag == null, JSON.stringify(seen?.tag));
     check('an unverifiable tag selector does not match', !(await matches(target, 'html')));
     check('the classes it does know still match', await matches(target, '.theme-dark'));
+  }
+
+  // --- a class the source has and the page does not yet --------------------
+  {
+    // `.my-div` was just typed into the well: it is in the file, and the dev
+    // server has not re-rendered the element with it. Asked, the page says the
+    // selector does not match — and that answer used to win outright, so the
+    // rule being written for the new class dropped out of the panel just as
+    // its first property landed. The source is surer here: a class written on
+    // the element, unconditionally, is one it is about to carry.
+    const div = {
+      id: 'n2',
+      kind: 'element',
+      name: 'div',
+      props: { class: { type: 'string', value: 'my-div' } },
+      children: [],
+    };
+    const divScan = { ...scan, elementByKey: new Map([['n2', div]]) };
+    setHost({ nodes: [div], selectedId: 'n2', renderedClasses: [] });
+    const stale = {
+      answer: { identity: { tag: 'div', id: null, classes: [], attributes: {} }, matched: { '.my-div': false, '.other': false, '.my-div.other': false, 'section.my-div': false } },
+      askedFor: new Map([['.my-div', ['.my-div']], ['.other', ['.other']], ['.my-div.other', ['.my-div.other']], ['section.my-div', ['section.my-div']]]),
+    };
+    const { target } = await resolveTarget(div, divScan, stale);
+    await primeDomMatches(target, [], stale);
+    check('the page was asked and said no', target.domMatched?.get('.my-div') === false);
+    check('the class written on the element matches anyway', await matches(target, '.my-div'));
+    check('a class it does not carry still does not', !(await matches(target, '.other')));
+    check('nor a combo with one it does not carry', !(await matches(target, '.my-div.other')));
+    check('nor a tag the page says it is not', !(await matches(target, 'section.my-div')));
+    setHost({ nodes: [], selectedId: null, renderedClasses: [] });
   }
 
   // --- the panel hears about undo ------------------------------------------

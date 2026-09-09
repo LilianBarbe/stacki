@@ -3252,6 +3252,7 @@ textarea.embed-editor_value-input.is-expanded {
    Clicking any empty space in it focuses the input. Keeps a min height so the black
    box (on .embed-editor_selectors) holds its shape before any tags load. */
 .embed-editor_selector-well {
+  position: relative; /* the family menu is placed against it */
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -3383,6 +3384,99 @@ textarea.embed-editor_value-input.is-expanded {
   border-color: var(--color-text-secondary);
   color: var(--color-text-primary);
 }
+
+/* A chip and, when its selector is one class written on this element, the × that
+   takes the class off it. The wrap is what the chip row lays out; the chip keeps
+   every rule above. A removable chip leaves room at its end for the ×, always —
+   room that appeared on hover would reflow every chip beside it. The × itself
+   sits quiet until pointed at: the chip is the thing, the × is an option on it. */
+.embed-editor_selector-chip-wrap {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+}
+.embed-editor_selector-chip-wrap.is-removable .embed-editor_selector-chip {
+  padding-right: calc(var(--space-2) + 12px);
+}
+.embed-editor_selector-remove {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  transform: translateY(-50%);
+  background: transparent;
+  color: #fff;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+.embed-editor_selector-remove:hover:not(:disabled),
+.embed-editor_selector-remove:focus-visible {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.35);
+}
+.embed-editor_selector-remove:disabled { cursor: not-allowed; opacity: 0.3; }
+/* On a pending chip (dashed, unfilled) the × takes the chip's text colour. */
+.embed-editor_selector-chip.is-pending ~ .embed-editor_selector-remove { color: var(--color-text-secondary); }
+.embed-editor_selector-chip.is-pending.is-active ~ .embed-editor_selector-remove { color: var(--color-info); }
+
+/* The family menu: right-click a class chip and its siblings (`gap-1`, `gap-2`,
+   `gap-4`) are listed under it. Placed against the well, not the chip: the chip
+   is replaced while an option is previewed, and a menu anchored to it would go
+   with it. Sized to its longest name — a short list of near-identical words. */
+.embed-editor_chip-menu {
+  position: absolute;
+  z-index: calc(var(--z-modal) + 2);
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-1);
+  border: var(--border-width-thin) solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay, var(--color-bg-surface-raised));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.embed-editor_chip-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px var(--space-2) 3px var(--space-1);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* The same lift as the suggestion list's highlighted row, so the two lists under
+   the well read as one family of controls. */
+.embed-editor_chip-menu-item.is-active,
+.embed-editor_chip-menu-item:hover:not(:disabled) {
+  background: var(--color-info-border);
+  color: var(--color-text-primary);
+}
+.embed-editor_chip-menu-check {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-info);
+}
+.embed-editor_chip-menu-check svg { width: 10px; height: 10px; }
 
 /* Styled only in another query — dimmed rather than hidden; full opacity on hover. */
 .embed-editor_selector-chip.is-dimmed { opacity: 0.5; }

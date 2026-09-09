@@ -51,7 +51,7 @@ import {
   withStatements,
   withoutDeclarations,
 } from './frontmatterMove.js';
-import { hasClass, namesIn, withClass } from './classAttr.js';
+import { acceptsClass as nodeAcceptsClass, hasClass, namesIn, withClass, withoutClass, withReplacedClass } from './classAttr.js';
 import { toComponentName } from './componentName.js';
 import { resolveInstanceProps } from './instanceProps.js';
 import { propsForExtraction } from './extractProps.js';
@@ -947,8 +947,13 @@ export default function App() {
         setDevStatus('on');
         setDevDiag(null);
         if (external) {
+          // A server Stacki did not start runs without the marker config, so the
+          // canvas has nothing to outline or select and edits reload the page
+          // instead of patching it. Adopting it beats fighting it, but say what
+          // it costs — and that getting it back takes a restart, not just
+          // quitting the other server.
           showToast(
-            `Reusing the dev server already running for this project (${url}) — canvas outlines need the app's own server, so stop that one to enable them.`,
+            `Reusing the dev server already running for this project (${url}) — outlines, canvas selection and live editing need the one Stacki starts itself. Quit that server, then restart the dev server from the log.`,
             'info'
           );
         }
@@ -1024,6 +1029,17 @@ export default function App() {
       await window.avb.writePageRaw({ pagePath: page.path, source: state.source });
     }
     setPageState((s) => (s ? { ...s, dirty: false } : s));
+    // The project's class list is what the class fields suggest from, and it
+    // is rebuilt on rescans — which our own writes never trigger (the watcher
+    // is told to ignore them). So a class written a moment ago was offered
+    // nowhere else until something unrelated changed on disk.
+    const projectPath = projectRef.current?.path;
+    if (projectPath) {
+      window.avb
+        .listProjectClasses(projectPath)
+        .then((c) => setProjectClasses(c || []))
+        .catch(() => {});
+    }
   }, []);
 
   // Leaving a project. Main lets go of everything the project had running and
@@ -2868,6 +2884,72 @@ export default function App() {
     [mutateModel, showToast]
   );
 
+  // The × on a chip in the style panel's well: the class comes off the element
+  // wherever it was written (see withoutClass), and the attribute goes with it
+  // when nothing is left in it — the same edit the Settings panel's class field
+  // makes when its last tag is deleted. A class the element carries only
+  // sometimes (`isWide && "is-wide"`) is code, and is refused out loud.
+  const removeClassFromNode = useCallback(
+    (nodeId, className) => {
+      const clean = String(className || '').trim();
+      if (!nodeId || !clean) return;
+      let refused = false;
+      mutateModel((model) => {
+        const node = findNodeById(model.nodes, nodeId);
+        if (!node || !hasClass(node.props, clean)) return model;
+        const edits = withoutClass(node.props, clean);
+        if (!edits) {
+          refused = true;
+          return model;
+        }
+        for (const { key, value } of edits) {
+          if (value === undefined) delete node.props[key];
+          else node.props[key] = value;
+        }
+        return model;
+      }, true);
+      if (refused) {
+        showToast(`Take ${clean} off this element yourself — it comes from code Stacki can't edit safely.`);
+      }
+    },
+    [mutateModel, showToast]
+  );
+
+  // The family menu on a chip: one class swapped for its sibling in place
+  // (`gap-2` → `gap-4`), the same swap the Settings panel's class field makes.
+  // Saved at once, like every menu that previews on hover; successive hovers
+  // collapse into one undo step, keyed on the element.
+  const replaceClassOnNode = useCallback(
+    (nodeId, from, to) => {
+      const a = String(from || '').trim();
+      const b = String(to || '').trim();
+      if (!nodeId || !a || !b || a === b) return;
+      let refused = false;
+      mutateModel(
+        (model) => {
+          const node = findNodeById(model.nodes, nodeId);
+          if (!node || !hasClass(node.props, a)) return model;
+          const edits = withReplacedClass(node.props, a, b);
+          if (!edits) {
+            refused = true;
+            return model;
+          }
+          for (const { key, value } of edits) {
+            if (value === undefined) delete node.props[key];
+            else node.props[key] = value;
+          }
+          return model;
+        },
+        true,
+        `class-family:${nodeId}`
+      );
+      if (refused) {
+        showToast(`Swap ${a} for ${b} yourself — it comes from code Stacki can't edit safely.`);
+      }
+    },
+    [mutateModel, showToast]
+  );
+
   const setProp = useCallback(
     (nodeId, propName, value, immediate = false) => {
       mutateModel(
@@ -3655,6 +3737,11 @@ export default function App() {
                 : insertables.find((c) => c.name === selectedNode.name)
             )
       : [];
+
+  // Whether the style panel may put a class on the selection: the same answer
+  // the Settings panel gives when it decides to show a Class field, so the two
+  // never disagree about what this element takes.
+  const selectedAcceptsClass = nodeAcceptsClass(selectedNode, selectedSchema);
 
   // Slots offered by the selected node's parent (the component or layout the
   // node is slotted into) — turns the `slot` attribute into a dropdown.
@@ -4937,7 +5024,21 @@ export default function App() {
                 }}
                 onSelectNode={setSelectedId}
                 onRecordUndo={pushCommand}
-                onAddClass={(name) => addClassToNode(selectedId, name)}
+                onAddClass={(name) => {
+                  // A component that takes no class would ignore one, and the
+                  // rule written for it would style nothing — say so instead.
+                  if (!selectedAcceptsClass) {
+                    showToast(
+                      `<${selectedNode?.name || 'This component'}> takes no class — give it a class prop or ...rest first, then add ${name} here.`
+                    );
+                    return false;
+                  }
+                  addClassToNode(selectedId, name);
+                  return true;
+                }}
+                onRemoveClass={(name) => removeClassFromNode(selectedId, name)}
+                onReplaceClass={(from, to) => replaceClassOnNode(selectedId, from, to)}
+                acceptsClass={selectedAcceptsClass}
                 onSpacingHover={setSpacingHover}
                 pathOf={pathFor}
                 renderedClasses={selectedClasses}

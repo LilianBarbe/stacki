@@ -41,7 +41,7 @@ const str = (value) => ({ type: 'string', value });
     platform: 'node',
     logLevel: 'silent',
   });
-  const { withClass, hasClass } = require(bundlePath);
+  const { withClass, hasClass, withoutClass, withReplacedClass, acceptsClass } = require(bundlePath);
 
   // --- a plain class ----------------------------------------------------------
   check('an element with no classes gets one', withClass({}, 'hero').value.value === 'hero');
@@ -156,6 +156,71 @@ const { class: className } = Astro.props;
   check('and it reads back as a class the element has', hasClass(again0.props, 'hero'), JSON.stringify(again0.props));
   check('once', (written.match(/"hero"/g) || []).length === 1, written);
 
+  // --- and taking one off again ------------------------------------------------
+  // The × on a chip in the style panel's well. The class leaves every place it
+  // was written, in the shape it was written in — and the attribute goes with
+  // it when nothing is left, the way the Settings field's last tag does.
+  const one = (props, name) => withoutClass(props, name);
+  const value = (props, name) => one(props, name)?.[0]?.value;
+  check('a word leaves a class string', value({ class: str('card hero wide') }, 'hero')?.value === 'card wide', JSON.stringify(value({ class: str('card hero wide') }, 'hero')));
+  check('the last word takes the attribute with it', one({ class: str('hero') }, 'hero')?.[0]?.value === undefined && one({ class: str('hero') }, 'hero')?.[0]?.key === 'class');
+  check('a class the element does not carry is nothing to remove', one({ class: str('card') }, 'hero') === null);
+  check(
+    'an entry leaves a list on one line',
+    value(oneLine, 'card')?.value === '[isWide && "is-wide"]',
+    value(oneLine, 'card')?.value
+  );
+  check(
+    'from the end of it too',
+    value({ 'class:list': expr('["card", "hero"]') }, 'hero')?.value === '["card"]',
+    value({ 'class:list': expr('["card", "hero"]') }, 'hero')?.value
+  );
+  check('the only entry takes the list with it', one({ 'class:list': expr('["hero"]') }, 'hero')?.[0]?.value === undefined);
+  const grownBack = withoutClass({ 'class:list': expr(grown) }, 'hero')?.[0]?.value?.value;
+  check('a line of its own leaves with its line', grownBack === multi['class:list'].value, JSON.stringify(grownBack));
+  check(
+    'a word leaves a string inside a list',
+    value({ 'class:list': expr('["card hero", x]') }, 'hero')?.value === '["card", x]',
+    value({ 'class:list': expr('["card hero", x]') }, 'hero')?.value
+  );
+  check(
+    'a class the element carries only sometimes is refused',
+    one(oneLine, 'is-wide') === null,
+    JSON.stringify(one(oneLine, 'is-wide'))
+  );
+  check(
+    'a word leaves a template literal, holes and all',
+    value({ class: expr('`card ${size} hero`') }, 'hero')?.value === '`card ${size}`',
+    value({ class: expr('`card ${size} hero`') }, 'hero')?.value
+  );
+  check('an expression nobody can read is refused here too', one({ class: expr('cx("hero", extra)') }, 'hero') === null);
+  const twice = one({ class: str('hero a'), 'class:list': expr('["hero", b]') }, 'hero');
+  check('a class named in two places leaves both', twice?.length === 2 && twice[0].value.value === 'a' && twice[1].value.value === '[b]', JSON.stringify(twice));
+
+  // --- and swapping one for its sibling -----------------------------------------
+  // The family menu on a chip: `gap-2` for `gap-4`, in place, so the class keeps
+  // its position and everything around it stays put.
+  const swap = (props, from, to) => withReplacedClass(props, from, to);
+  check('a word is swapped in place in a class string', swap({ class: str('a gap-2 b') }, 'gap-2', 'gap-4')?.[0]?.value?.value === 'a gap-4 b', JSON.stringify(swap({ class: str('a gap-2 b') }, 'gap-2', 'gap-4')));
+  check('and in a list entry', swap({ 'class:list': expr('["card", "gap-2"]') }, 'gap-2', 'gap-4')?.[0]?.value?.value === '["card", "gap-4"]', JSON.stringify(swap({ 'class:list': expr('["card", "gap-2"]') }, 'gap-2', 'gap-4')));
+  check('and inside a condition, since a rename changes no logic', swap({ 'class:list': expr('["card", wide && "gap-2"]') }, 'gap-2', 'gap-4')?.[0]?.value?.value === '["card", wide && "gap-4"]', JSON.stringify(swap({ 'class:list': expr('["card", wide && "gap-2"]') }, 'gap-2', 'gap-4')));
+  check('and in a template literal, holes left alone', swap({ class: expr('`gap-2 ${size}`') }, 'gap-2', 'gap-4')?.[0]?.value?.value === '`gap-4 ${size}`', JSON.stringify(swap({ class: expr('`gap-2 ${size}`') }, 'gap-2', 'gap-4')));
+  check('a class the element does not carry cannot be swapped', swap({ class: str('a') }, 'gap-2', 'gap-4') === null);
+  check('swapping for a class already there just drops the first', swap({ class: str('gap-2 gap-4') }, 'gap-2', 'gap-4')?.[0]?.value?.value === 'gap-4', JSON.stringify(swap({ class: str('gap-2 gap-4') }, 'gap-2', 'gap-4')));
+  check('a prefix is not a word', swap({ class: str('gap-20') }, 'gap-2', 'gap-4') === null);
+
+  // --- whether the element takes a class at all --------------------------------
+  // The Settings panel shows a Class field for an element always, and for a
+  // component only when it takes one; the style panel's well follows the same
+  // rule, so the two never disagree about what can be put on the selection.
+  check('an element takes a class', acceptsClass({ kind: 'element', name: 'div', props: {} }, []));
+  check('a dynamic tag does too', acceptsClass({ kind: 'component', name: 'Tag', dynamicTag: true, props: {} }, []));
+  check('a component that declares none does not', !acceptsClass({ kind: 'component', name: 'Card', props: {} }, [{ name: 'title', type: 'string' }]));
+  check('one with a class prop does', acceptsClass({ kind: 'component', name: 'Card', props: {} }, [{ name: 'class', type: 'string' }]));
+  check('one already carrying a class does', acceptsClass({ kind: 'component', name: 'Card', props: { class: str('hero') } }, []));
+  check('or a class:list', acceptsClass({ kind: 'component', name: 'Card', props: { 'class:list': expr('["hero"]') } }, []));
+  check('nothing selected takes nothing', !acceptsClass(null, []));
+
   // --- the panel is wired to it ----------------------------------------------
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
   check(
@@ -168,6 +233,18 @@ const { class: className } = Astro.props;
     'and says so when it cannot',
     /refused[\s\S]{0,200}showToast/.test(app),
     'an element whose class is code fails silently again'
+  );
+  check(
+    'the style panel is also given onRemoveClass',
+    /<StylePanel[\s\S]{0,2000}?onRemoveClass=/.test(app),
+    'the × on a chip reaches nothing'
+  );
+  check('the app removes classes through this rule', /withoutClass\(node\.props, clean\)/.test(app));
+  check('and swaps them through this one', /withReplacedClass\(node\.props, a, b\)/.test(app) && /<StylePanel[\s\S]{0,2500}?onReplaceClass=/.test(app));
+  check(
+    'and tells the panel whether the selection takes a class at all',
+    /<StylePanel[\s\S]{0,2000}?acceptsClass=\{selectedAcceptsClass\}/.test(app) && /nodeAcceptsClass\(selectedNode, selectedSchema\)/.test(app),
+    'the well would offer a class to a component that ignores one'
   );
 
   if (failures.length) {

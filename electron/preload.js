@@ -1793,6 +1793,19 @@ if (!process.isMainFrame) {
       applyLiveCss(d);
       return;
     }
+    // A class tried on for size: the style panel's family menu hovers
+    // `margin-bottom-4` over an element carrying `margin-bottom-2`, and the
+    // page shows the swap while the file — and the chip — keep the original
+    // until it is chosen. Done on the element, not with a stylesheet: a
+    // utility class can hold any rule at all, and the only way to show what
+    // it does is to wear it. Sent again with the two swapped to take it off.
+    if (d?.type === 'avb:class-preview' && typeof d.path === 'string') {
+      for (const el of elementsForPath(d.path)) {
+        if (typeof d.from === 'string' && d.from) el.classList.remove(d.from);
+        if (typeof d.to === 'string' && d.to) el.classList.add(d.to);
+      }
+      return;
+    }
     if (d?.type === 'avb:track' && Array.isArray(d.paths)) {
       designMode = true;
       trackedPaths = d.paths;

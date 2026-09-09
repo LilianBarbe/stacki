@@ -242,6 +242,11 @@ export type MatchedSelector = {
   /** What this chip is to the element — its colour. Attached by the picker (it
    *  needs the element's class list, which the model doesn't carry). */
   role?: ChipRole
+  /** The class the chip's × takes off the element. Set only when the chip is one
+   *  class, written on this element, in a form the app can rewrite (a word in a
+   *  `class`, an entry in a `class:list`) — not a combo, not a state, not a class
+   *  a component put there. Attached by the picker, like `role`. */
+  removable?: string
 }
 
 const normalizeSelectorText = (text: string) =>

@@ -30,6 +30,9 @@ export default function StylePanel({
   onSelectNode,
   onRecordUndo,
   onAddClass,
+  onRemoveClass,
+  onReplaceClass,
+  acceptsClass,
   onSpacingHover,
   renderedClasses,
   projectClasses,
@@ -83,6 +86,9 @@ export default function StylePanel({
     selectNode: onSelectNode || null,
     recordUndo: onRecordUndo || null,
     addClass: onAddClass || null,
+    removeClass: onRemoveClass || null,
+    replaceClass: onReplaceClass || null,
+    acceptsClass: acceptsClass !== false,
     onSpacingHover: onSpacingHover || null,
     renderedClasses: renderedClasses || [],
     projectClasses: projectClasses || [],
@@ -93,7 +99,7 @@ export default function StylePanel({
   useEffect(() => {
     setHost(hostPatch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.path, model, node?.id, device, files, astroFiles, openFilePath, onWriteStyleNode, onSelectNode, onRecordUndo, onAddClass, onSpacingHover, renderedClasses, projectClasses, historyTick]);
+  }, [project?.path, model, node?.id, device, files, astroFiles, openFilePath, onWriteStyleNode, onSelectNode, onRecordUndo, onAddClass, onRemoveClass, onReplaceClass, acceptsClass, onSpacingHover, renderedClasses, projectClasses, historyTick]);
 
   // The panel's popups (clip path, transitions, background, grid) are portaled
   // to <body> and were written for moden, where the panel filled the window —

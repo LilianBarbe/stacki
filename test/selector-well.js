@@ -258,11 +258,17 @@ const check = (what, condition, detail) => {
   setCanvasFrame({ postMessage() {} });
   setHost({ selectedId: 'n2' }); // same nodes — only the selection moves, as in the app
   await wait(120);
-  check('picking another element empties the well', panelChips().length === 0, `${panelChips().length} chips`);
-  check('and it spins while the canvas is asked', panelSpinner() != null);
+  // The element's own classes are chips from the first frame — read straight off
+  // the source, they don't wait on anything — dashed until the scan says which
+  // of them a rule styles. So the well is never empty for an element that has a
+  // class, and the dashed chip is what stands in for the wait.
+  check('picking another element shows its class at once', panelChips().length === 1 && panelChips()[0]?.textContent === '.card', panelChips().map((c) => c.textContent).join(','));
+  check('dashed, since nothing has said it is styled yet', panelChips()[0]?.classList.contains('is-pending'), panelChips()[0]?.className);
+  check('and with a chip standing in, no spinner', panelSpinner() == null);
 
   await wait(2000);
-  check('the well fills once the answer (or its absence) lands', panelChips().length === 1, panelChips().map((c) => c.textContent).join(','));
+  check('the well settles once the answer (or its absence) lands', panelChips().length === 1, panelChips().map((c) => c.textContent).join(','));
+  check('and the chip fills in as styled', !panelChips()[0]?.classList.contains('is-pending'), panelChips()[0]?.className);
   check('and stops spinning', panelSpinner() == null);
 
   // --- the well doesn't rearrange itself when the scan lands ------------------

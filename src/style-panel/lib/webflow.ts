@@ -124,7 +124,7 @@ const literalClasses = (node: HostNode | null, name: string): string[] => {
 // The classes written on the node itself. A class can be named in more than one
 // place (`class` plus `class:list`, or twice within one list) — the element still
 // carries it once.
-const authoredClassTokens = (node: HostNode | null): string[] => [
+export const authoredClassTokens = (node: HostNode | null): string[] => [
   ...new Set([
     ...propText(node, 'class').split(/\s+/).filter(Boolean),
     // `class:list={[…]}`, and `class={…}` when it's an expression.
@@ -147,7 +147,15 @@ const classTokens = (node: HostNode | null): string[] => {
 }
 
 export async function buildSnapshot(el: AnyEl): Promise<ElementSnapshot> {
-  const node = typeof el === 'string' ? nodeById(el) : (el as HostNode)
+  // Always the node as the model holds it NOW, looked up by id — not the object
+  // handed over at selection time. The model is cloned on every edit, so that
+  // object is a photograph: a class typed into the well went into the model and
+  // never into it, and everything read off it (the authored classes above all)
+  // stayed as it was at the click. The chips then called the new class a
+  // component's (green), offered no × for it, and the matcher — trusting the
+  // source over a page that hadn't re-rendered — found no source to trust.
+  const given = typeof el === 'string' ? null : (el as HostNode)
+  const node = typeof el === 'string' ? nodeById(el) : (nodeById(String(given?.id ?? '')) ?? given)
   const classes = classTokens(node)
   const attributes: Record<string, string> = {}
   for (const [k, v] of Object.entries(node?.props || {})) {
@@ -828,15 +836,22 @@ export async function resolveTarget(
     if (path && hasCanvas()) identity = (await queryCanvas(path, []))?.identity
   }
   if (identity) {
+    // What the page rendered, plus what the source writes on the node that the
+    // page has not rendered YET — a class typed a moment ago is in the file
+    // before the dev server has re-rendered the element with it. Taking the
+    // page's list alone dropped that class from the well (no chip, no ×) for
+    // the whole round trip, and for good on a component that ignores it.
+    const classes = [...identity.classes]
+    for (const cls of rootSnapshot.authoredClasses) if (!classes.includes(cls)) classes.push(cls)
     const attributes = { ...identity.attributes }
     delete attributes.class
-    if (identity.classes.length) attributes.class = identity.classes.join(' ')
+    if (classes.length) attributes.class = classes.join(' ')
     rootSnapshot = {
       ...rootSnapshot,
       tag: identity.tag,
       id: identity.id ?? rootSnapshot.id,
-      classes: identity.classes,
-      classList: identity.classes,
+      classes,
+      classList: classes,
       attributes,
     }
   }
