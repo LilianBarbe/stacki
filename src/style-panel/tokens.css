@@ -95,7 +95,7 @@
   --color-selection-bg-soft: rgba(12, 140, 233, 0.16);
   /* Pages Astro generates from a collection ([id], [...slug]) — the shell's `--collection-purple`. */
   --color-collection:      #c4afff;
-  --color-class-tag-bg:    #016bcd;
+  --color-class-tag-bg:    #09F;
   --color-tag-bg:          #b53a9a;
   --color-component-tag:        #79e09c;
   --color-component-tag-bg:     rgba(37, 157, 77, 0.25);
@@ -170,7 +170,7 @@
 
   /* ──────────────────────────── Border width ──────────────────────────── */
 
-  --border-width-thin:    1px;
+  --border-width-thin:    1.4px;
   --border-width-default: 1px;
   --border-width-thick:   2px;
 
