@@ -56,7 +56,7 @@ const INTERACTION_STATES = new Set<string>([':hover', ':focus', ':active'])
 
 // Native class styles are ordered before any embed rule so embed CSS (injected
 // into the page after Webflow's compiled stylesheet) wins on a cascade tie.
-const NATIVE_ORDER_BASE = -1_000_000
+export const NATIVE_ORDER_BASE = -1_000_000
 
 /** Extra data resolveStyle needs to fold native class styles into the model. */
 export type NativeResolveInput = {
@@ -197,6 +197,22 @@ export function indexContexts(model: RuleModel, contextKeys: ContextKey[]): Cont
 }
 
 /** A selector (subject = the element) that has styles — one chip in the picker. */
+/**
+ * What a chip IS to the selected element — which is what its colour says.
+ *
+ *   'composed'  a class the element carries that nobody wrote on it — it came out
+ *               of the component that renders it (a variant, its own markup), and
+ *               so it is how the element is composed. Component green.
+ *   'added'     a class written on this element, on top of that composition — a
+ *               utility put there after the fact (`.margin-bottom-7`). Blue.
+ *   'inherited' a selector that styles the element WITHOUT being on it: a tag, a
+ *               reset, an ancestor chain. Grey — it's where the element's look
+ *               comes from, not something it carries.
+ *   'global'    matches nearly every element on the page (`:focus-visible`,
+ *               `body > *`). No fill at all, just a dashed outline.
+ */
+export type ChipRole = 'composed' | 'added' | 'inherited' | 'global'
+
 export type MatchedSelector = {
   /** The authored selector text, e.g. `.test:hover`, `.parent.is-active .test`. */
   text: string
@@ -213,8 +229,9 @@ export type MatchedSelector = {
   /** False when this selector is styled only in OTHER contexts (dimmed in the
    *  picker); true/undefined when it has styles in the current context. */
   inContext?: boolean
-  /** Source-order index (first appearance in the embed CSS) — a tiebreaker so the
-   *  picker keeps authored order, e.g. `:before` before `:after` when written first. */
+  /** Document order of the rule this selector FIRST appears in (ascending = earlier
+   *  in the cascade). It's the picker's primary sort: the chips read top-to-bottom in
+   *  the order the rules were written, resets first and the newest class last. */
   order?: number
   /** Nested-source display (`.hero {.title}`) for a nested rule, else undefined —
    *  the chip label; matching still uses `text` (the resolved selector). */
@@ -222,6 +239,9 @@ export type MatchedSelector = {
   /** Nested display with an `@` at the query's position (`.hero {@ .title}`), shown
    *  when viewing that query, else undefined. */
   queryDisplay?: string
+  /** What this chip is to the element — its colour. Attached by the picker (it
+   *  needs the element's class list, which the model doesn't carry). */
+  role?: ChipRole
 }
 
 const normalizeSelectorText = (text: string) =>
@@ -260,8 +280,11 @@ export function stateForSelector(text: string): StateKey {
 export function listMatchedSelectors(model: RuleModel, context: ContextKey): MatchedSelector[] {
   const all = [...model.base, ...model.conditional]
   const byKey = new Map<string, MatchedSelector>()
-  let order = 0 // source-order rank, assigned on first appearance
-  const addChip = (text: string, simple: boolean, state: StateKey, specificity: Specificity, inContext: boolean, display?: string, queryDisplay?: string) => {
+  // A chip carries the document order of the rule it FIRST appears in — the real
+  // cascade position, not a rank over this loop: `base` and `conditional` are two
+  // separate lists, so counting as we go would push every @media rule after every
+  // plain one no matter where they sit in the file.
+  const addChip = (order: number, text: string, simple: boolean, state: StateKey, specificity: Specificity, inContext: boolean, display?: string, queryDisplay?: string) => {
     const key = selectorKey(text)
     const existing = byKey.get(key)
     if (existing) {
@@ -272,9 +295,14 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
         existing.inContext = true
         if (queryDisplay) existing.queryDisplay = queryDisplay
       }
+      // The chip is dated by the EARLIEST rule that writes it, which is not the first
+      // one this loop reaches: base rules are walked before conditional ones, so a
+      // selector first written inside an `@media` and again below it would otherwise
+      // be dated by the later rule and drift down the well.
+      if (existing.order == null || order < existing.order) existing.order = order
       return
     }
-    byKey.set(key, { text, specificity, state, simple, key, inContext, order: order++, display, queryDisplay })
+    byKey.set(key, { text, specificity, state, simple, key, inContext, order, display, queryDisplay })
   }
 
   for (const matched of all) {
@@ -295,14 +323,14 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
       // a state, or a pseudo-element makes it non-bare, so it isn't caught here).
       if (canon.universal && canon.oneCompound && canon.tokens.length === 0 && !canon.pseudoElement && canon.pseudoClasses.length === 0) continue
       if (canon.splittable) {
-        addChip(sel.text, canon.simple, stateOf(canon.pseudoClasses), sel.specificity, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay)
+        addChip(matched.rule.order, sel.text, canon.simple, stateOf(canon.pseudoClasses), sel.specificity, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay)
       } else if (!complexSpec || compareSpecificity(sel.specificity, complexSpec) > 0) {
         complexSpec = sel.specificity
       }
     }
     if (complexSpec) {
       const canon = canonicalCompound(matched.rule.selectorText)
-      addChip(matched.rule.selectorText, false, stateOf(canon.pseudoClasses), complexSpec, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay)
+      addChip(matched.rule.order, matched.rule.selectorText, false, stateOf(canon.pseudoClasses), complexSpec, inContext, matched.rule.nestedDisplay, matched.rule.queryDisplay)
     }
   }
   return [...byKey.values()].sort(

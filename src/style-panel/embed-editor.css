@@ -3289,20 +3289,25 @@ textarea.embed-editor_value-input.is-expanded {
   height: 12px;
   animation: embed-editor-spin 0.7s linear infinite;
 }
-/* Nothing to reveal (or not counted yet): the row holds its place, quietly. */
-.embed-editor_globals-check.is-empty {
+/* Nothing to reveal (or not counted yet): the toggle holds its place, quietly. */
+.embed-editor_view-check.is-empty {
   opacity: 0.45;
   cursor: default;
 }
 
-/* Solid-blue, near-square tags with white text (Webflow class-tag styling). */
+/* Near-square tags with white text (Webflow class-tag styling), filled by role:
+   the whole chip reads off `--chip-tint`, so the active / hover / dimmed rules
+   below are written once and every colour follows them. See ChipRole:
+   green = a class from inside the component, blue = a class added on the element,
+   grey = a selector that styles it without being on it at all. */
 .embed-editor_selector-chip {
+  --chip-tint: var(--color-class-tag-bg);
   max-width: 100%;
   min-height: var(--embed-editor_chip-h);
   padding: 2px var(--space-2);
   border: var(--border-width-thin) solid transparent;
   border-radius: var(--radius-xs);
-  background: var(--color-class-tag-bg);
+  background: var(--chip-tint);
   color: #fff;
   font-family: var(--font-family-mono);
   font-size: var(--font-size-xs);
@@ -3313,23 +3318,30 @@ textarea.embed-editor_value-input.is-expanded {
   cursor: pointer;
   transition: background var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
 }
+/* The two roles that only change the tint. `.is-added` is the default tint, so it
+   needs no rule of its own — and a chip that arrives without a role keeps looking
+   like the blue one it has always been. */
+.embed-editor_selector-chip.is-composed  { --chip-tint: var(--color-composed-tag-bg); }
+.embed-editor_selector-chip.is-inherited { --chip-tint: var(--color-inherited-tag-bg); }
+
 /* Non-active tags sit clearly darker so the selected one reads as the brightest;
-   the selected tag gets no border/ring — only the fuller blue. Hover lifts partway
-   toward the selected blue, but stays well short of it so the two never look alike. */
+   the selected tag gets no border/ring — only the fuller tint. Hover lifts partway
+   toward the selected one, but stays well short of it so the two never look alike. */
 .embed-editor_selector-chip:not(.is-active):not(.is-pending) {
-  background: color-mix(in srgb, var(--color-class-tag-bg) 45%, #000);
+  background: color-mix(in srgb, var(--chip-tint) 45%, #000);
 }
 .embed-editor_selector-chip:not(.is-active):hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-class-tag-bg) 65%, #000);
+  background: color-mix(in srgb, var(--chip-tint) 65%, #000);
 }
 .embed-editor_selector-chip.is-active {
-  background: var(--color-class-tag-bg);
+  background: var(--chip-tint);
 }
+
 /* The selected chip holds its fill on hover. It needs its own hover rule because
    the app-wide `button:hover:not(:disabled)` (styles.css) scores 0,2,1 — one
    element more than `.is-active`'s 0,2,0 — and would otherwise repaint it. */
 .embed-editor_selector-chip.is-active:hover:not(:disabled) {
-  background: var(--color-class-tag-bg);
+  background: var(--chip-tint);
 }
 .embed-editor_selector-chip.is-active.is-pending:hover:not(:disabled) {
   background: transparent;
@@ -3345,6 +3357,33 @@ textarea.embed-editor_value-input.is-expanded {
   border-color: var(--color-info);
   color: var(--color-info);
 }
+/* A global selector (`:focus-visible`, `body > *`) is not this element's anything —
+   it matches nearly every element on the page. So it gets no fill at all, just a
+   dashed outline: the page talking, not the element. Each rule carries the same
+   `:not()`s as the tinted one it has to beat — otherwise the fill rules above,
+   which are more specific, would paint over it. */
+.embed-editor_selector-chip.is-global:not(.is-active):not(.is-pending),
+.embed-editor_selector-chip.is-global.is-active,
+.embed-editor_selector-chip.is-global:not(.is-active):hover:not(:disabled),
+.embed-editor_selector-chip.is-global.is-active:hover:not(:disabled) {
+  background: transparent;
+}
+.embed-editor_selector-chip.is-global {
+  border-style: dashed;
+  border-color: var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+/* Hover and selection can't say themselves with a fill, so they say it with the
+   stroke and the text instead. */
+.embed-editor_selector-chip.is-global:hover:not(:disabled) {
+  border-color: var(--color-text-tertiary);
+  color: var(--color-text-primary);
+}
+.embed-editor_selector-chip.is-global.is-active {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+}
+
 /* Styled only in another query — dimmed rather than hidden; full opacity on hover. */
 .embed-editor_selector-chip.is-dimmed { opacity: 0.5; }
 .embed-editor_selector-chip.is-dimmed:hover:not(:disabled),
@@ -4644,11 +4683,21 @@ textarea.embed-editor_value-input.is-expanded {
   font-size: var(--font-size-xs);
 }
 
-/* Reveals the selectors that match nearly every element (:target,
-   :focus-visible, *) — off by default so the list reads as what's actually on
-   this element. Sits under the well, not in it: it isn't a selector to pick. */
-.embed-editor_globals-check {
+/* The two view toggles under the well: what to reveal BEYOND the classes this
+   element carries — the selectors that match nearly every element (:target,
+   :focus-visible, *) and the ones that style it without being on it (a tag, a
+   reset, an ancestor). Both off by default, so the well reads as what's actually
+   on the element. They sit under the well, not in it: neither is a selector to
+   pick. The row wraps rather than squeezing them — the panel gets narrow, and
+   half a label is worse than a second line. */
+.embed-editor_selector-views {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-4);
+  row-gap: var(--space-2);
   margin-top: calc(var(--space-1) * -1);
+}
+.embed-editor_view-check {
   user-select: none;
 }
 

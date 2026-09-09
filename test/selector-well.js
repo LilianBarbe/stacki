@@ -106,6 +106,66 @@ const check = (what, condition, detail) => {
   await show({ loading: false, selectors: [{ key: 'g', text: ':focus-visible' }] });
   check('a folded-away global leaves the well quiet', spinner() == null && chips() === 0, `${chips()} chips`);
 
+  // --- inherited chips fold away too ----------------------------------------
+  //
+  // The grey ones — a tag, a reset, an ancestor chain — are the element's whole
+  // cascade history. On a project with any reset at all that is most of the well,
+  // and none of it is what you opened the panel to edit. Same fold as the globals,
+  // behind its own checkbox.
+  const HERO = [
+    { key: 'reset', text: 'h1', role: 'inherited' },
+    { key: 'anc', text: '.hero_component h1', role: 'inherited' },
+    { key: 'own', text: '.heading-style-display', role: 'composed' },
+    { key: 'add', text: '.margin-bottom-7', role: 'added' },
+  ];
+  const chipTexts = () =>
+    [...document.querySelectorAll('.embed-editor_selector-chip')].map((el) => el.textContent);
+  // Each toggle has its own hook class; `_view-check` is only the shared look.
+  const toggle = (which) => document.querySelector(`.embed-editor_${which}-check`);
+
+  await show({ loading: false, selectors: HERO });
+  check(
+    'the well shows what the element carries, not what reaches it',
+    JSON.stringify(chipTexts()) === JSON.stringify(['.heading-style-display', '.margin-bottom-7']),
+    JSON.stringify(chipTexts())
+  );
+  check(
+    'and the checkbox counts what it is holding back',
+    /Show inherited styles \(2\)/.test(toggle('inherited')?.textContent || ''),
+    toggle('inherited')?.textContent
+  );
+
+  await act(async () => {
+    toggle('inherited')?.querySelector('input')?.click();
+  });
+  check(
+    'checking it brings them back, still in cascade order',
+    JSON.stringify(chipTexts()) ===
+      JSON.stringify(['h1', '.hero_component h1', '.heading-style-display', '.margin-bottom-7']),
+    JSON.stringify(chipTexts())
+  );
+
+  // The panel edits ONE selector, and it can be a grey one: an element with no
+  // classes has nothing else to default to. A panel showing the styles of a chip
+  // that isn't on screen explains nothing — so the active one is never folded,
+  // whether it was picked or defaulted to.
+  await show({ loading: false, selectors: HERO, activeSelector: 'h1', activePicked: false });
+  check(
+    'the selector being edited is never folded away',
+    chipTexts().includes('h1'),
+    JSON.stringify(chipTexts())
+  );
+
+  // Nothing grey to reveal: the row still holds its place rather than appearing
+  // later and shifting the panel under the pointer — same as the globals check.
+  await show({ loading: false, selectors: [HERO[2]] });
+  check(
+    'with nothing to reveal the toggle sits inert',
+    toggle('inherited')?.classList.contains('is-empty') &&
+      toggle('inherited')?.querySelector('input')?.disabled,
+    toggle('inherited')?.className
+  );
+
   // --- the whole panel, from a cold open ------------------------------------
   //
   // What the panel does on a real open, in order: it mounts and scans before the

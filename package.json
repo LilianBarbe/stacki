@@ -105,6 +105,8 @@
     "test:openedclick": "node test/opened-click.js",
     "test:instanceroot": "node test/instance-root.js",
     "test:chipedit": "node test/chip-edit.js",
+    "test:chiporder": "node test/chip-order.js",
+    "test:chiprole": "node test/chip-role.js",
     "test:jsguard": "node test/js-guard.js",
     "test:spacingpick": "node test/spacing-pick.js",
     "test:rawattrs": "node test/raw-attrs.js",

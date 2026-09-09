@@ -33,7 +33,7 @@ import VariableConnect from './VariableConnect'
 import { computeRuleModel, type DeclStatus, type MatchedRule, type RuleModel } from './lib/cascade'
 import { groupDeclarations, groupProps } from './lib/sections'
 import { defaultSelectorTokens, selectorToClassTokens, snapshotTokens, tokensToSelector } from './lib/element-tokens'
-import { resolveStyle, indexContexts, contextKeyOf, listMatchedSelectors, selectorKey, selectorsMatch, stateForSelector, STATES, type ContextInfo, type ContextKey, type MatchedSelector, type ResolvedProp, type ResolvedStyle, type SourceKey, type StateKey, type StyleContext } from './lib/resolved'
+import { resolveStyle, indexContexts, contextKeyOf, listMatchedSelectors, NATIVE_ORDER_BASE, selectorKey, selectorsMatch, stateForSelector, STATES, type ChipRole, type ContextInfo, type ContextKey, type MatchedSelector, type ResolvedProp, type ResolvedStyle, type SourceKey, type StateKey, type StyleContext } from './lib/resolved'
 import { breakpointTier, buildStyleContexts, mediaParamsForBreakpoint, nativeContribsFor, nativeHasValues, nativeSelectorChips, optionsFor, selectedNativeIndexFor, type NativeStyleOptions } from './lib/native-styles'
 import type { AtRule, Declaration } from 'postcss'
 import {
@@ -1335,6 +1335,15 @@ function isGlobalSelector(text: string): boolean {
   return canonicalCompound(text).tokens.length === 0
 }
 
+// What each chip colour means, said in words on hover — a colour code nobody has
+// been told is just decoration.
+const ROLE_HINT: Record<ChipRole, string> = {
+  composed: 'a class from inside the component',
+  added: 'a class added on this element',
+  inherited: "styles this element without being on it",
+  global: 'matches nearly every element on the page',
+}
+
 // The selector picker: a chip per selector that styles the element (its own
 // classes, stateful, and complex/ancestor selectors), plus an input to add a new
 // one. Clicking a chip makes it the edit target (like clicking a combo class);
@@ -1361,6 +1370,7 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
   const [highlight, setHighlight] = useState(-1)
   const [inputOpen, setInputOpen] = useState(false)
   const [showGlobals, setShowGlobals] = useState(false)
+  const [showInherited, setShowInherited] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const wantFocus = useRef(false)
@@ -1373,21 +1383,35 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
   // as just the black well (with its min-height) rather than an add-selector field.
   const showInput = inputOpen
 
-  // Global selectors are folded away behind a count chip. The one exception is a
-  // global the user PICKED — it has to stay on screen for the panel below it to
-  // make sense. A global that is merely the current default target stays hidden,
-  // so the checkbox means what it says.
+  // Two kinds of chip are folded away behind a count, so what's left in the well is
+  // what this element actually carries.
+  //
+  // Globals (`:target`, `:focus-visible`, `*`) match nearly everything on the page.
+  // The one exception is a global the user PICKED — it has to stay on screen for the
+  // panel below it to make sense. A global that is merely the current default target
+  // stays hidden, so the checkbox means what it says; nothing else needs the escape
+  // hatch, because a global is never allowed to become the default.
+  //
+  // Inherited selectors (the grey ones — a tag, a reset, an ancestor chain) are the
+  // element's whole cascade history, which is a lot of chips on a project with any
+  // reset at all, and none of them is a thing you came here to edit. Same exception,
+  // but wider: the active one shows whether it was picked or defaulted to, because a
+  // tag selector CAN be the default (an element with no classes has nothing else),
+  // and a panel editing a chip that isn't on screen explains nothing.
   const globals = useMemo(() => selectors.filter((sel) => isGlobalSelector(sel.text)), [selectors])
+  const inherited = useMemo(() => selectors.filter((sel) => sel.role === 'inherited'), [selectors])
   const shownSelectors = useMemo(
     () =>
-      showGlobals
-        ? selectors
-        : selectors.filter(
-            (sel) =>
-              !isGlobalSelector(sel.text) ||
-              (activePicked && selectorsMatch(sel.text, activeSelector)),
-          ),
-    [selectors, showGlobals, activeSelector, activePicked],
+      selectors.filter((sel) => {
+        if (isGlobalSelector(sel.text)) {
+          return showGlobals || (activePicked && selectorsMatch(sel.text, activeSelector))
+        }
+        if (sel.role === 'inherited') {
+          return showInherited || selectorsMatch(sel.text, activeSelector)
+        }
+        return true
+      }),
+    [selectors, showGlobals, showInherited, activeSelector, activePicked],
   )
 
   const projectClasses = useProjectClasses()
@@ -1501,15 +1525,19 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
               // Nested rules show their nesting (`.hero { .title }`); selection/matching
               // still uses the resolved selector (sel.text).
               const label = sel.display ?? sel.text
+              // The chip's colour: what this selector is to the element (see ChipRole).
+              // Blue stays the default so a chip whose role can't be worked out looks
+              // like it always did rather than like a new category.
+              const role = sel.role ?? 'added'
               return (
                 <button
                   key={sel.key}
                   type="button"
-                  className={`embed-editor_selector-chip ${active ? 'is-active' : ''} ${sel.pending ? 'is-pending' : ''} ${dimmed ? 'is-dimmed' : ''}`}
+                  className={`embed-editor_selector-chip is-${role} ${active ? 'is-active' : ''} ${sel.pending ? 'is-pending' : ''} ${dimmed ? 'is-dimmed' : ''}`}
                   disabled={busy}
                   // Click the active chip again to deselect (show all winners read-only).
                   onClick={() => (active ? onDeselect() : onSelect(sel.text))}
-                  title={active ? `${label} — click to deselect` : dimmed ? `${label} — styled in another query` : sel.pending ? `${label} — no styles yet` : label}
+                  title={active ? `${label} — click to deselect` : dimmed ? `${label} — styled in another query` : sel.pending ? `${label} — no styles yet` : `${label} — ${ROLE_HINT[role]}`}
                 >
                   {label}
                 </button>
@@ -1572,22 +1600,36 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
         ) : null}
       </div>
     </div>
-    {/* Outside the well's box — a view option, not one of the selectors. Always
-        here, even with none to show: appearing when the scan lands moved everything
-        under it down a row, so the panel rearranged itself under the pointer just as
-        it became usable. With nothing to reveal it sits inert instead. */}
-    <label
-      className={`embed-editor_check embed-editor_globals-check ${globals.length ? '' : 'is-empty'}`}
-      title="Selectors like :target, :focus-visible and * match nearly every element on the page"
-    >
-      <input
-        type="checkbox"
-        checked={showGlobals && globals.length > 0}
-        disabled={busy || !globals.length}
-        onChange={(event) => setShowGlobals(event.target.checked)}
-      />
-      <span>Show global selectors ({globals.length})</span>
-    </label>
+    {/* Outside the well's box — view options, not selectors. Both are always here,
+        even with none to show: appearing when the scan lands moved everything under
+        them down a row, so the panel rearranged itself under the pointer just as it
+        became usable. With nothing to reveal they sit inert instead. */}
+    <div className="embed-editor_selector-views">
+      <label
+        className={`embed-editor_check embed-editor_view-check embed-editor_globals-check ${globals.length ? '' : 'is-empty'}`}
+        title="Selectors like :target, :focus-visible and * match nearly every element on the page"
+      >
+        <input
+          type="checkbox"
+          checked={showGlobals && globals.length > 0}
+          disabled={busy || !globals.length}
+          onChange={(event) => setShowGlobals(event.target.checked)}
+        />
+        <span>Show global selectors ({globals.length})</span>
+      </label>
+      <label
+        className={`embed-editor_check embed-editor_view-check embed-editor_inherited-check ${inherited.length ? '' : 'is-empty'}`}
+        title="Selectors that style this element without being on it — a tag, a reset, an ancestor"
+      >
+        <input
+          type="checkbox"
+          checked={showInherited && inherited.length > 0}
+          disabled={busy || !inherited.length}
+          onChange={(event) => setShowInherited(event.target.checked)}
+        />
+        <span>Show inherited styles ({inherited.length})</span>
+      </label>
+    </div>
     </>
   )
 }
@@ -2290,11 +2332,14 @@ function chainPrefixDepth(classes: string[], classList: string[]): number {
   return k
 }
 
-// The chip display order: tag → base class (`.test`) → its pseudos (`.test:hover`,
-// `.test:is(:hover,:focus)`) → the applied combo chain (`.test.is-2` → `.test.is-2.ready`
-// + pseudos) → the element's remaining classes IN THE ORDER THEY'RE APPLIED →
-// data attributes → complex/nested selectors (`body > .test`). Returns a
-// comparable [category, depth, pseudo] tuple.
+// How closely a selector describes THIS element: tag → base class (`.test`) → its
+// pseudos (`.test:hover`, `.test:is(:hover,:focus)`) → the applied combo chain
+// (`.test.is-2` → `.test.is-2.ready` + pseudos) → the element's remaining classes IN
+// THE ORDER THEY'RE APPLIED → data attributes → complex/nested selectors
+// (`body > .test`). Returns a comparable [category, depth, pseudo] tuple.
+//
+// Used to choose which selector to pick by default on a new element. NOT the well's
+// chip order — those chips are laid out in cascade order (see `selectorChips`).
 function selectorOrder(text: string, classList: string[]): [number, number, number] {
   const canon = canonicalCompound(text)
   const classes = canon.tokens.filter((t) => t.startsWith('class:')).map((t) => t.slice('class:'.length))
@@ -2322,6 +2367,39 @@ function selectorOrder(text: string, classList: string[]): [number, number, numb
   return [4, 0, 0]
 }
 
+// What a chip is to the element, and so what colour it wears (see ChipRole).
+//
+// Two cuts. The first is between the classes the element CARRIES and the selectors
+// that merely reach it: a tag, a reset or an ancestor chain is the page styling
+// this element on its own terms, and colouring those like its own classes is what
+// made the well hard to read — a browser reset and the class you came to edit were
+// the same blue.
+//
+// The second is inside the classes it carries, and it is the one the source can't
+// see: `class="heading-style-display margin-bottom-7"` says nothing about which of
+// the two is the component and which was put there afterwards. The snapshot can —
+// `authoredClasses` is what the CALL SITE wrote, `classList` is what the canvas
+// says the element ended up with. A class in the second and not the first was never
+// written here: it came out of the component (a variant, its own markup), and that
+// is what "how this element is composed" means. Anything written on the element is
+// something added on top of that composition.
+//
+// A combo mixing the two (`.heading-style-display.margin-bottom-7`) is `added`: it
+// only exists because of the class you put there.
+export function chipRole(text: string, classList: string[], authoredClasses: string[]): ChipRole {
+  if (isGlobalSelector(text)) return 'global'
+  const canon = canonicalCompound(text)
+  if (!canon.oneCompound) return 'inherited' // an ancestor chain / combinator
+  const classes = canon.tokens.filter((t) => t.startsWith('class:')).map((t) => t.slice('class:'.length))
+  if (!classes.length) return 'inherited' // a tag or attribute selector
+  const onElement = new Set(classList)
+  const authored = new Set(authoredClasses)
+  // `onElement` matters for a class the element doesn't carry yet — one typed into
+  // the well a moment ago. It isn't absent from the source because a component put
+  // it there; it's absent because you just added it.
+  return classes.every((cls) => onElement.has(cls) && !authored.has(cls)) ? 'composed' : 'added'
+}
+
 function styledSelectorsFor(
   model: RuleModel | undefined,
   nativeModel: NativeModel | null,
@@ -2336,13 +2414,17 @@ function styledSelectorsFor(
   // EVERY context (dimmed when the current one is a query they can't target — e.g. a
   // container query — or a breakpoint they aren't styled at). inContext holds only
   // when the context IS a breakpoint the selector is actually styled at.
-  for (const ns of nativeSelectorChips(nativeModel, context.breakpoint ?? 'main')) {
+  //
+  // Their `order` follows the same convention resolveStyle uses for native values:
+  // below every embed rule, since the compiled stylesheet is in the document before
+  // the injected embed CSS. That keeps the well in one continuous cascade order.
+  nativeSelectorChips(nativeModel, context.breakpoint ?? 'main').forEach((ns, index) => {
     const key = selectorKey(ns.text)
     const inContext = context.breakpoint ? ns.inContext : false
     const existing = byKey.get(key)
-    if (existing) { if (inContext) existing.inContext = true; continue }
-    byKey.set(key, { text: ns.text, specificity: [0, ns.classDepth, 0] as Specificity, state: ns.state, simple: true, key, inContext })
-  }
+    if (existing) { if (inContext) existing.inContext = true; return }
+    byKey.set(key, { text: ns.text, specificity: [0, ns.classDepth, 0] as Specificity, state: ns.state, simple: true, key, inContext, order: NATIVE_ORDER_BASE + index })
+  })
   return [...byKey.values()].sort(
     (a, b) => compareSpecificity(a.specificity, b.specificity) || a.text.localeCompare(b.text),
   )
@@ -4080,22 +4162,37 @@ export default function EmbedEditor() {
         list.push({ text: activeSelector, specificity: [0, 0, 0], state: stateForSelector(activeSelector), simple: canon.simple, key: `active:${activeSelector}`, pending: true, inContext: true })
       }
     }
-    // Order for readability: tag → base class + pseudos → applied combo chain + pseudos
-    // → standalone/global classes → data attributes → complex selectors.
+    // Chip order IS cascade order: the rule written first sits at the top, the one
+    // written last at the bottom. That's the order a stylesheet is built in — resets
+    // and base layers up top, each later rule narrowing what came before — so reading
+    // the well downwards is reading the cascade, and the last chip is the class that
+    // was added most recently. It also means the winner of any tie is the chip nearest
+    // the bottom, which is the same rule the panel is about to edit.
+    //
+    // The previous ordering grouped by kind (tag → base class → combo chain → other
+    // classes → attributes → complex) and used source order only as a tiebreaker. It
+    // read tidily but told you nothing about who overrides whom, and it put a reset a
+    // class-attribute position away from where it actually sits in the file.
+    //
+    // A pending chip (freshly picked/typed, no rule yet) has no place in the file yet;
+    // it goes last, where its rule will land when its first property is written.
+    const orderOf = (s: MatchedSelector) => (s.order != null ? s.order : Number.MAX_SAFE_INTEGER)
     const classList = snapshot?.classList ?? []
+    const authoredClasses = snapshot?.authoredClasses ?? []
     return list
-      .map((s) => ({ s, rank: selectorOrder(s.text, classList) }))
+      .map((s) => ({ s, rank: orderOf(s) }))
       .sort((a, b) =>
-        a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1] || a.rank[2] - b.rank[2] ||
+        a.rank - b.rank ||
+        // Same rule (a grouped selector like `.a, .b`) — steady, readable order within it.
         compareSpecificity(a.s.specificity, b.s.specificity) ||
-        (a.s.order != null && b.s.order != null ? a.s.order - b.s.order : 0) ||
         a.s.text.localeCompare(b.s.text))
       .map((entry) => {
         const s = entry.s
+        const role = chipRole(s.text, classList, authoredClasses)
         // In a query context, show the display with an `@` at the query position;
         // on Base / other contexts show the plain nested display.
         const inQuery = !!currentContext.embedAtContext && s.inContext !== false && !!s.queryDisplay
-        return inQuery ? { ...s, display: s.queryDisplay } : s
+        return inQuery ? { ...s, role, display: s.queryDisplay } : { ...s, role }
       })
   }, [model, nativeModel, currentContext, activeSelector, selectedSelectorText, tokens, snapshot, removedClasses])
 
@@ -4177,18 +4274,21 @@ export default function EmbedEditor() {
         const found = local.find((s) => selectorsMatch(s.text, tokensToSelector([tok], tokens)))
         return found ? [found] : []
       })[0]
-    // Otherwise the FIRST selector in chip display order after the tag — the element's
-    // own class/nesting selector (`.hero_component > .hero_paragraph`), not the highest-
-    // specificity one (a foreign `:not(…) > :is(…)` shouldn't win the default).
+    // Otherwise the FIRST selector in element-affinity order after the tag — the
+    // element's own class/nesting selector (`.hero_component > .hero_paragraph`), not
+    // the highest-specificity one (a foreign `:not(…) > :is(…)` shouldn't win the
+    // default). This ranking is about which selector best DESCRIBES the element, which
+    // is a different question from the well's cascade order — a reset at the top of the
+    // sheet is the first chip, but it's nobody's idea of the default thing to edit.
     const classList = snapshot?.classList ?? []
-    const inChipOrder = [...local]
+    const byAffinity = [...local]
       .map((s) => ({ s, rank: selectorOrder(s.text, classList) }))
       .sort((a, b) =>
         a.rank[0] - b.rank[0] || a.rank[1] - b.rank[1] || a.rank[2] - b.rank[2] ||
         compareSpecificity(a.s.specificity, b.s.specificity) || a.s.text.localeCompare(b.s.text))
       .map((e) => e.s)
-    const firstAfterTag = inChipOrder.find((s) => selectorOrder(s.text, classList)[0] > 0)
-    selectActiveSelector((primaryStyled ?? firstAfterTag ?? inChipOrder[0] ?? local[local.length - 1]).text)
+    const firstAfterTag = byAffinity.find((s) => selectorOrder(s.text, classList)[0] > 0)
+    selectActiveSelector((primaryStyled ?? firstAfterTag ?? byAffinity[0] ?? local[local.length - 1]).text)
   }, [model, nativeModel, context, styleContexts, tokens, elementIdentity, snapshot, selectActiveSelector])
 
   // ── Native (Webflow class style) writes ──

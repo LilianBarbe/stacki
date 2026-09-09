@@ -131,6 +131,17 @@ export type ElementSnapshot = {
   classes: string[]
   /** Ordered compiled class list (primary first, then combos) for scaffolding. */
   classList: string[]
+  /**
+   * The classes written on THIS node — its own `class` / `class:list` attribute.
+   *
+   * A subset of `classList`, and the difference is the point: a component instance
+   * carries classes nobody wrote at the call site (`<Heading variant="display">`
+   * renders `heading-style-display`), and only the canvas knows about them. So a
+   * class in `classList` but NOT here came from inside the component — it is how
+   * the element is composed — while one that IS here was put on this element on
+   * top of that. The selector chips colour the two differently.
+   */
+  authoredClasses: string[]
   /** Custom attributes plus synthesized `class`/`id` for attribute selectors. */
   attributes: Record<string, string>
 }

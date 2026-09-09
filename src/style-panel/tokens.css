@@ -95,7 +95,14 @@
   --color-selection-bg-soft: rgba(12, 140, 233, 0.16);
   /* Pages Astro generates from a collection ([id], [...slug]) — the shell's `--collection-purple`. */
   --color-collection:      #c4afff;
+  /* Selector-chip fills. Blue is a class written on the element (a utility like
+     `margin-bottom-7`); green is a class it carries that came out of a component —
+     the app's component green, at full strength so it carries white text the way
+     the blue one does; grey is a selector that reaches the element without being
+     on it at all (a tag, a reset, an ancestor chain). */
   --color-class-tag-bg:    #09F;
+  --color-composed-tag-bg: #259d4d;
+  --color-inherited-tag-bg: #7a7a7a;
   --color-tag-bg:          #b53a9a;
   --color-component-tag:        #79e09c;
   --color-component-tag-bg:     rgba(37, 157, 77, 0.25);

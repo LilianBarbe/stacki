@@ -121,17 +121,20 @@ const literalClasses = (node: HostNode | null, name: string): string[] => {
   return out
 }
 
+// The classes written on the node itself. A class can be named in more than one
+// place (`class` plus `class:list`, or twice within one list) — the element still
+// carries it once.
+const authoredClassTokens = (node: HostNode | null): string[] => [
+  ...new Set([
+    ...propText(node, 'class').split(/\s+/).filter(Boolean),
+    // `class:list={[…]}`, and `class={…}` when it's an expression.
+    ...literalClasses(node, 'class:list'),
+    ...literalClasses(node, 'class'),
+  ]),
+]
+
 const classTokens = (node: HostNode | null): string[] => {
-  // A class can be named in more than one place (`class` plus `class:list`, or
-  // twice within one list) — the element still carries it once.
-  const authored = [
-    ...new Set([
-      ...propText(node, 'class').split(/\s+/).filter(Boolean),
-      // `class:list={[…]}`, and `class={…}` when it's an expression.
-      ...literalClasses(node, 'class:list'),
-      ...literalClasses(node, 'class'),
-    ]),
-  ]
+  const authored = authoredClassTokens(node)
   const host = getHost()
   // Rendered classes describe the selected element only — attributing them to
   // any other node (an ancestor being matched, say) would be wrong.
@@ -162,6 +165,9 @@ export async function buildSnapshot(el: AnyEl): Promise<ElementSnapshot> {
     id: id || null,
     classes,
     classList: classes,
+    // What the CALL SITE wrote, kept apart from what the element turned out to
+    // carry: everything in `classes` and not in here came from inside a component.
+    authoredClasses: authoredClassTokens(node),
     attributes,
   }
 }
