@@ -720,11 +720,20 @@ function AddPropertyRow({ busy, onAdd }: { busy: boolean; onAdd: (prop: string, 
 // ─────────────────────────── Section block ───────────────────────────
 
 // A collapsible section header (Webflow's chevron + label) wrapping a group of
-// controls. Open by default; collapse state is local to the block, and told to
-// `onOpenChange` for a block that remembers it.
-function SectionBlock({ label, headerAction, defaultOpen = true, mark = null, onOpenChange, children }: { label: string; headerAction?: ReactNode; defaultOpen?: boolean; mark?: 'own' | 'other' | null; onOpenChange?: (open: boolean) => void; children: ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen)
-  const toggle = () => setOpen((value) => { onOpenChange?.(!value); return !value })
+// controls. Open by default; collapse state is local to the block unless the
+// parent passes `open`, in which case the block only reports (`onOpenChange`)
+// and the parent decides — which is what lets Shift-click reach every block:
+// held with Shift, a click puts ALL the sections the way this one is going
+// (`onToggleAll`), open or closed.
+function SectionBlock({ label, headerAction, defaultOpen = true, open: openProp, mark = null, onOpenChange, onToggleAll, children }: { label: string; headerAction?: ReactNode; defaultOpen?: boolean; open?: boolean; mark?: 'own' | 'other' | null; onOpenChange?: (open: boolean) => void; onToggleAll?: (open: boolean) => void; children: ReactNode }) {
+  const [localOpen, setLocalOpen] = useState(defaultOpen)
+  const open = openProp ?? localOpen
+  const toggle = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    const next = !open
+    if (event.shiftKey && onToggleAll) { onToggleAll(next); return }
+    if (openProp === undefined) setLocalOpen(next)
+    onOpenChange?.(next)
+  }
   return (
     <div className={`embed-editor_section-block ${open ? '' : 'is-collapsed'}`}>
       {/* A row (not one big button) so an optional action can sit next to the chevron
@@ -2226,6 +2235,16 @@ function StyleCard({
       return next
     })
   }
+  // Shift-click on any header: every section, the way that one is going.
+  const setAllSections = (open: boolean) => {
+    setSectionsOpen((prev) => {
+      const next = { ...prev, 'css-code': open }
+      for (const group of groups) next[group.def.id] = open
+      saveSectionsOpen(next)
+      saveCssCodeOpen(open)
+      return next
+    })
+  }
 
   // Always show Layout + Size so the panel is consistent across elements, not
   // only those that already set a property in that section.
@@ -2376,8 +2395,9 @@ function StyleCard({
           {cssCode ? (
             <SectionBlock
               label="CSS Code"
-              defaultOpen={sectionOpen('css-code', cssCodeOpen)}
+              open={sectionOpen('css-code', cssCodeOpen)}
               onOpenChange={(open) => { saveCssCodeOpen(open); rememberSection('css-code')(open) }}
+              onToggleAll={setAllSections}
               headerAction={cssCode.fileLabel ? <span className="embed-editor_css-code-file" title="The file this CSS is written in">{cssCode.fileLabel}</span> : undefined}
             >
               <CssCodeSection key={cssCodeKey(cssCode.target)} model={cssCode} onSave={onSaveCssCode} />
@@ -2387,8 +2407,9 @@ function StyleCard({
             <SectionBlock
               key={group.def.id}
               label={group.def.label}
-              defaultOpen={sectionOpen(group.def.id, group.def.id !== 'flex-child')}
+              open={sectionOpen(group.def.id, group.def.id !== 'flex-child')}
               onOpenChange={rememberSection(group.def.id)}
+              onToggleAll={setAllSections}
               // A dot whenever anything in the section reaches the element, and
               // blue once the picked selector is one of the things setting it —
               // `source === 'selected'` is the same test every property label in

@@ -109,6 +109,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('and CSS Code still open', !collapsed('CSS Code'), section('CSS Code')?.className);
   check('a section never touched keeps its default', section('Layout') && !collapsed('Layout'));
 
+  // Shift-click: every section goes the way the clicked one is going.
+  const shiftClick = (label) => section(label)?.querySelector('.embed-editor_section-toggle')?.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, shiftKey: true }));
+  shiftClick('Layout'); // open → closing it closes them all
+  await sleep(100);
+  const all = () => [...panel.querySelectorAll('.embed-editor_section-block')];
+  check('Shift-click on an open section closes every section', all().every((b) => b.classList.contains('is-collapsed')), all().map((b) => b.querySelector('.embed-editor_section-title')?.textContent + (b.classList.contains('is-collapsed') ? ':closed' : ':open')).join(' '));
+  shiftClick('Spacing'); // closed → opening it opens them all
+  await sleep(100);
+  check('Shift-click on a closed one opens every section', all().every((b) => !b.classList.contains('is-collapsed')), all().map((b) => b.querySelector('.embed-editor_section-title')?.textContent + (b.classList.contains('is-collapsed') ? ':closed' : ':open')).join(' '));
+  check('and that is remembered too', Object.values(loadSectionsOpen()).every(Boolean) && loadSectionsOpen().spacing === true, JSON.stringify(loadSectionsOpen()));
+
   if (failures.length) {
     console.error(`section-memory: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);
     process.exit(1);

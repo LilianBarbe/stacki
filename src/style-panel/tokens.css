@@ -88,6 +88,10 @@
   --color-warning-bg:      rgba(251, 191, 36, 0.10);
   --color-warning-border:  rgba(251, 191, 36, 0.30);
   --color-info:            #93c5fd;
+  /* Property names in the CSS editor. Not the blue: in this panel blue already
+     says "set on the picked selector" and paints variables, and a property
+     name in it read as one of those. A soft violet, seen nowhere else. */
+  --color-code-property:   #c4b5fd;
   --color-info-bg:         rgba(147, 197, 253, 0.10);
   --color-info-border:     rgba(147, 197, 253, 0.30);
   --color-selection-bg:    #0c8ce9;
