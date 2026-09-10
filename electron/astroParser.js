@@ -1663,9 +1663,21 @@ function serializePageMarked(model, prefix = '') {
 // stripped in slot content. Where a plain comment wouldn't survive, the same
 // comment goes in as raw html through a Fragment, which renders nothing of
 // its own — so what lands in the DOM is still just a comment.
-const markerFor = (path, kind, inSlotContent) =>
-  inSlotContent
-    ? `<Fragment set:html={${JSON.stringify(`<!--avb-${kind}:${path}-->`)}} />`
+//
+// A marker for a node in a NAMED slot has to carry the `slot` attribute, or it
+// lands in the default slot while the node it marks renders in the named one —
+// and an attribute needs something to sit on. A <template> was that something
+// for a while, and a <template> is an element: it counts for :nth-child,
+// :first-child, + and ~, and it sits in the page between the slot's real
+// children until the canvas takes it out again. Which is the whole thing
+// comments were chosen to avoid, reintroduced in the one place nobody looks.
+//
+// A <Fragment> takes attributes and renders no element of its own, so it can
+// carry both the slot and the comment: what lands in that slot is a comment
+// and nothing else.
+const markerFor = (path, kind, inSlotContent, slotAttr = '') =>
+  inSlotContent || slotAttr
+    ? `<Fragment${slotAttr} set:html={${JSON.stringify(`<!--avb-${kind}:${path}-->`)}} />`
     : `<!--avb-${kind}:${path}-->`;
 
 // `inSlot` says this node is a direct child of a component, i.e. slot content —
@@ -1709,28 +1721,49 @@ const markerFor = (path, kind, inSlotContent) =>
 // (text, a loop, a branch).
 function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot = false) {
   if (node.kind === 'chunk-group') return; // synthetic, not in page source
-  // A slotted node can't be wrapped: a marker beside it lands in the default
-  // slot while the node itself renders in the named one, so the pair ends up
-  // around nothing. A <template slot="…"> travels with it — but that's an
-  // element, and an element is a sibling that :nth-child counts.
+  // A slotted node can't simply be wrapped: a marker beside it lands in the
+  // default slot while the node itself renders in the named one, so the pair
+  // ends up around nothing. Its markers travel with it by carrying the same
+  // `slot`, and an attribute needs something to sit on.
   //
   // An element doesn't need wrapping at all: tag it with its path directly,
   // which is the same attribute the collector writes onto every element it
   // records. No extra node, nothing for a selector to trip over.
   //
-  // A slotted COMPONENT still gets the <template> pair: an attribute on an
-  // instance is a prop, and only reaches the DOM if that component spreads
-  // its rest props — so it can't be relied on to carry the mapping.
+  // Everything else that can hold an attribute — a component — gets the comment
+  // form: a <Fragment slot="…" set:html> carries the slot and renders no
+  // element, so what lands in that slot is a comment and the node. In a project
+  // whose components read a slot by rendering it to a string and scrubbing the
+  // comments out (a common way to ask "did my slot render anything?"), that
+  // comment is scrubbed with them — and the path still arrives, because the
+  // instance carries it as a prop and its own root writes it onto the DOM.
+  //
+  // Which leaves the node that can hold no attribute at all: <Fragment
+  // slot="…">, which puts nothing of its own on the page and takes no props
+  // this could ride on. Its markers go INSIDE it, as its first and last
+  // children — the Fragment renders nothing but its contents, so they travel
+  // into the named slot with them and need no `slot` of their own. Nothing is
+  // added to the slot but two comments.
+  //
+  // That was a <template> pair, and a <template> is an element: it is a child,
+  // it is counted by :nth-child and :last-child, and it is matched by `> *`.
+  // CSS written for the children a component is given — which is most CSS
+  // written for a component — sees one child that isn't there in the real
+  // build. Nothing this writes may be a child.
   const slotVal = node.props?.slot;
   const slotted = slotVal && slotVal.type === 'string' && !!slotVal.value;
   const tagInPlace = slotted && node.kind === 'element';
   const slotAttr = slotted ? ` slot="${slotVal.value}"` : '';
-  if (!tagInPlace) {
-    lines.push(
-      slotted
-        ? `${indent}<template${slotAttr} data-avb-s="${path}"></template>`
-        : indent + markerFor(path, 's', inSlot)
-    );
+  // A slotted node with no element and no props of its own — its markers can
+  // only ride inside it, which needs children to ride in.
+  const markWithin =
+    slotted &&
+    (node.name === 'Fragment' || node.name === 'slot') &&
+    Array.isArray(node.children) &&
+    node.children.length > 0 &&
+    !isInlineRun(node.children);
+  if (!tagInPlace && !markWithin) {
+    lines.push(indent + markerFor(path, 's', inSlot, slotAttr));
   }
   // Serialized with the path attribute already on it (see above). <Fragment>
   // and <slot> are left out: neither puts an element on the page, so there is
@@ -1786,9 +1819,14 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
   ) {
     const attrs = serializeAttrs(markedProps, markedOrder(node, carryPath, forwards));
     lines.push(`${indent}<${node.name}${attrs}>`);
+    // A slotted Fragment's own markers, riding inside it (see markWithin).
+    // Inside a component, which is what a Fragment is, a plain comment is
+    // dropped by the compiler — so they go in the way slot content does.
+    if (markWithin) lines.push(indent + '  ' + markerFor(path, 's', true));
     node.children.forEach((child, i) =>
       serializeNodeMarked(child, indent + '  ', lines, `${path}.${i}`, node.kind === 'component')
     );
+    if (markWithin) lines.push(indent + '  ' + markerFor(path, 'e', true));
     lines.push(`${indent}</${node.name}>`);
   } else if (node.kind === 'map') {
     // Loop children render once per item, so their marker pairs repeat in
@@ -1887,12 +1925,8 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
       lines
     );
   }
-  if (!tagInPlace) {
-    lines.push(
-      slotted
-        ? `${indent}<template${slotAttr} data-avb-e="${path}"></template>`
-        : indent + markerFor(path, 'e', inSlot)
-    );
+  if (!tagInPlace && !markWithin) {
+    lines.push(indent + markerFor(path, 'e', inSlot, slotAttr));
   }
 }
 

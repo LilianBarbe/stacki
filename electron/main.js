@@ -3092,7 +3092,7 @@ function parseExistingServer(log) {
 
 // Wraps the project's Astro config (dev preview only) with a Vite plugin
 // that swaps each page's source for a marker-annotated equivalent — every
-// model node is wrapped in <template data-avb-s/e="path"> pairs so the
+// model node sits between <!--avb-s:path--> / <!--avb-e:path--> comments so the
 // preview can outline the node selected/hovered in the app. Written into
 // node_modules/.avb so it never shows up in the user's git status; the file
 // on disk is untouched.
@@ -3371,12 +3371,18 @@ try {
   MORPH_CLIENT = '';
 }
 
-// `is:inline` so Astro leaves it exactly as written and the browser asks the
-// dev server for it — which is what puts it in the module graph, and what
-// gives it an import.meta.hot to listen on.
-const MORPH_TAG_HTML = MORPH_CLIENT
-  ? '<script type="module" src="/@id/__x00__virtual:avb-morph" is:inline></script>'
-  : '';
+// The patcher, written as a script Astro is allowed to process — which means
+// Astro bundles it and puts it in <head>, exactly as it does for any script a
+// component writes. It is still a module (import.meta.hot, which is what it
+// listens on), and it is no longer a node in the page's own markup.
+//
+// It used to carry `is:inline`, which tells Astro to leave a tag exactly where
+// it was written. A script is display:none, so a tag in the body looked free —
+// and it is a child: :last-child, :nth-child, `+`, `~` and `> *` all count it.
+// A page rendered into a layout's slot handed that slot one extra child, and
+// CSS written for the children a component is given saw something the real
+// build has not got.
+const MORPH_TAG_HTML = MORPH_CLIENT ? "<script>import 'virtual:avb-morph';</script>" : '';
 
 // Node's own parser, asked the same question it will be asked at startup.
 // Cheap next to spawning a dev server, and it turns a whole class of mistake
@@ -3428,23 +3434,21 @@ const PAGES_DIR = ${JSON.stringify(pagesDir)};
 const SRC_DIR = ${JSON.stringify(srcDir)};
 const PROJECT_DIR = ${JSON.stringify(projectDirPosix)};
 
-// A <template> marker is an element like any other: it sits between two
-// siblings and :nth-child counts it. Outside the canvas nothing needs it, so
-// the page takes those out itself.
+// Nothing this serves is a child of anything. Every marker is a comment —
+// invisible to selectors, to layout and to the box model — and the patcher
+// arrives through the module graph rather than as a tag in the page. The one
+// node that could hold no attribute, a <Fragment slot="…">, carries its markers
+// inside itself, where they travel into the slot with its own contents.
 //
-// The comment markers stay. They are invisible to selectors, to layout and to
-// the box model, and they are the one thing on the page that says which node
-// is which — the patcher that replaces a full reload matches the server's new
+// The comments stay. They are the one thing on the page that says which node is
+// which: the patcher that replaces a full reload matches the server's new
 // rendering against the live document through them, and without them it would
 // be guessing from tag names. A comment in devtools is a small price for not
 // rebuilding an element that was only meant to change its text.
-const AVB_CLEANUP = [
-  '<script is:inline>',
-  "if (!location.hash.includes('avb-design')) {",
-  "  for (const t of document.querySelectorAll('template[data-avb-s],template[data-avb-e]')) t.remove();",
-  '}',
-  '</script>',
-].join('\\n');
+//
+// There used to be a script here that removed the <template> markers this
+// served. Nothing writes one now, so there is nothing to remove — and one fewer
+// tag in a page whose whole point is to be the page.
 
 // Must hook \`load\` (not \`transform\`): Astro's own compiler plugin is also
 // enforce:'pre' and runs first, so a transform would receive compiled JS —
@@ -3571,7 +3575,9 @@ const avbMarkers = {
       const marked = isPage
         ? serializePageMarked(parsed.model)
         : serializePageMarked(parsed.model, rel + '|');
-      return isPage ? marked + AVB_CLEANUP + AVB_MORPH_TAG : marked;
+      // The patcher rides along with a page — Astro hoists it into <head>,
+      // so this adds a module to the page and no node to its markup.
+      return isPage ? marked + AVB_MORPH_TAG : marked;
     } catch {
       return null;
     }
@@ -3607,8 +3613,8 @@ const avbSatteriMarkers = () => {
       if (children[i] && (children[i].type === 'yaml' || children[i].type === 'toml')) offset++;
     }
     const path = String(raw - offset);
-    ctx.insertBefore(node, { type: 'html', value: '<template data-avb-s="' + path + '"></template>' });
-    ctx.insertAfter(node, { type: 'html', value: '<template data-avb-e="' + path + '"></template>' });
+    ctx.insertBefore(node, { type: 'html', value: '<!--avb-s:' + path + '-->' });
+    ctx.insertAfter(node, { type: 'html', value: '<!--avb-e:' + path + '-->' });
   };
   for (const type of AVB_BLOCK_TYPES) plugin[type] = visit;
   return plugin;

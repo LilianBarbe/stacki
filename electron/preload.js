@@ -318,12 +318,18 @@ if (!process.isMainFrame) {
   // + and ~ like anything else, so the markers this replaced shifted the
   // page's own structural selectors for as long as they were in the DOM —
   // through first paint, since they can only be removed once the run has been
-  // recorded. A comment is invisible to all of those. The exception is a
-  // slotted node, whose markers must carry its `slot` attribute to travel
-  // with it: an attribute needs an element, so those stay <template>s and are
-  // read here too. The app tracks paths; their rects are pushed back on
-  // scroll/resize/DOM changes, and hovering the page reports the deepest node
-  // under the cursor.
+  // recorded. A comment is invisible to all of those. A node in a named slot
+  // is marked the same way: its markers have to carry the `slot` attribute to
+  // travel with it, and a <Fragment slot="…" set:html> carries the attribute
+  // while putting nothing but the comment in the slot.
+  //
+  // A <template> is still READ as a marker below. Nothing writes one any more,
+  // but a page served by a dev server that started before this app was updated
+  // still has them, and a canvas that suddenly could not read its own markers
+  // would be a blank navigator with no way to tell why.
+  //
+  // The app tracks paths; their rects are pushed back on scroll/resize/DOM
+  // changes, and hovering the page reports the deepest node under the cursor.
   const regions = new Map(); // path -> [ [node, ...], ... ]
   let trackedPaths = [];
   // The file the app is addressing: empty for the page, or a component's
@@ -424,8 +430,8 @@ if (!process.isMainFrame) {
   // rewrites a paragraph as one clone per line, leaving the original element
   // (the one recorded here) holding just the last line. Attributes ride
   // along on clones, so the path can be re-resolved live. It has to be an
-  // attribute rather than leaving the <template> markers in the DOM: marker
-  // *nodes* would change what :first-child/:nth-child match.
+  // attribute rather than leaving marker *nodes* in the DOM: an element marker
+  // would change what :first-child/:nth-child match.
   const PATH_ATTR = 'data-avb-p';
 
   // An element can carry more than one path, space separated. The page
@@ -1576,11 +1582,11 @@ if (!process.isMainFrame) {
       for (const n of run) {
         if (n.nodeType !== 1) continue;
         // A run holds everything between the marker pair, which includes the
-        // markers of anything nested — a component instance starts with its
-        // own <template data-avb-s="…">. Those are detached once collected,
-        // and they never describe the element: reporting one as the node's
-        // identity tells the style panel the tag is `template` and there are
-        // no classes. Same rule the rect measuring uses.
+        // markers of anything nested. Those are detached once collected, and a
+        // <template> among them — from a page served before this app was
+        // updated — never describes the element anyway: reporting one as the
+        // node's identity tells the style panel the tag is `template` and there
+        // are no classes. Same rule the rect measuring uses.
         if (!n.isConnected || n.tagName === 'TEMPLATE') continue;
         out.push(n);
       }
