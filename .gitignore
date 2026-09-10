@@ -11,3 +11,4 @@ release/
 *.pem
 *.key
 *.mobileprovision
+.conductor/settings.local.toml
