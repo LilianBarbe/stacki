@@ -1,7 +1,7 @@
 {
   "name": "stacki",
   "productName": "Stacki",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "description": "Stacki — a visual builder for Astro projects — pages, layouts, components, props, live preview, and GitHub publishing.",
   "main": "electron/main.js",
   "author": "Timothy Ricks <hello@timothyricks.com>",
@@ -9,7 +9,7 @@
   "scripts": {
     "roundtrip:report": "node scripts/roundtrip-report.js",
     "test:roundtrip": "node --test 'test/*.test.js'",
-    "postinstall": "node scripts/fix-node-pty-permissions.js",
+    "postinstall": "node scripts/fix-node-pty-permissions.js && node scripts/fix-electron-builder-signing.js",
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 node scripts/dev-electron.mjs\"",
     "build": "vite build",
     "test:markers": "node test/markers.js && node test/slot-markers.js && node test/slot-api.js && node test/insert-target.js",
@@ -139,6 +139,7 @@
     "test:docdefaults": "node test/doc-defaults.js",
     "test:querycache": "node test/query-cache.js",
     "test:codeeditorlifecycle": "node test/code-editor-lifecycle.js",
+    "test:buildersigning": "node --test test/builder-signing.test.js",
     "performance:report": "node scripts/performance-report.js",
     "integration:dev": "node test/integration/dev-lifecycle.js"
   },
@@ -184,6 +185,7 @@
       "electron/**/*",
       "dist/**/*",
       "scripts/fix-node-pty-permissions.js",
+      "scripts/fix-electron-builder-signing.js",
       "package.json",
       "node_modules/node-pty/**/*"
     ],

@@ -61,6 +61,12 @@ the `stacki-releases` repo, and only makes the release visible once both
 platforms have landed. Shipped apps auto-update from that feed via
 `electron-updater`.
 
+The install script backports the temporary-keychain password fix from
+[electron-builder #10172](https://github.com/electron-userland/electron-builder/pull/10172)
+to the locked builder version. This keeps signing working on current macOS
+runners without changing the certificate credentials. Remove the backport when
+upgrading to a builder version that includes the fix.
+
 Signing and notarization credentials live in GitHub Actions secrets. They
 are never in this repository, and GitHub does not expose them to workflows
 triggered from forks — so a fork can build and run everything here, but
