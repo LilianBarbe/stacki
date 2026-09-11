@@ -90,17 +90,19 @@ function readDeclarations(text) {
         continue;
       }
       if (node.type !== 'decl' || !node.prop.startsWith('--')) continue;
-      // postcss gives the declaration's span; the value starts after the colon
-      // that follows the property name.
+      // PostCSS offsets end just after the declaration. Including another
+      // character can pull the next declaration into a compact CSS value.
       const start = node.source?.start?.offset ?? 0;
       const end = node.source?.end?.offset ?? start;
-      const declText = text.slice(start, end + 1);
-      const colon = declText.indexOf(':', node.prop.length);
-      const leading = declText.slice(colon + 1).match(/^\s*/)[0].length;
-      const valueStart = start + colon + 1 + leading;
+      const declText = text.slice(start, end);
+      const rawValue = node.raws.value?.raw ?? node.value;
+      const leading = rawValue.match(/^\s*/)[0].length;
+      const valueStart = start + node.prop.length + (node.raws.between ?? ':').length + leading;
       // Trailing `;` and whitespace are not part of the value.
-      let valueEnd = start + declText.replace(/[\s;]+$/, '').length;
-      if (valueEnd <= valueStart) valueEnd = valueStart + node.value.length;
+      // PostCSS keeps whitespace in an empty custom property's node.value.
+      // That whitespace was already skipped above, so using its length again
+      // would consume the semicolon, closing brace, or following declaration.
+      const valueEnd = Math.max(valueStart, start + declText.replace(/[\s;]+$/, '').length);
       entries.push({
         kind: 'var',
         name: node.prop,
@@ -958,7 +960,7 @@ function moveSection(projectPath, { file, selector, names, target }) {
  * at the bottom of its own group rather than at the bottom of the rule, which
  * for a file like this would be two hundred lines away from what it belongs to.
  */
-function addVariable(projectPath, { file, selector, name, value = '', after }) {
+function addVariable(projectPath, { file, selector, name, value = 'unset', after }) {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   const root = postcss.parse(text);

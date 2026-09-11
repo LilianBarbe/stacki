@@ -807,7 +807,12 @@ const STYLESHEET = `/* =========================================================
       `after: ${lines[at - 1]}`
     );
     check('and it shows up in the sheet', rowNames().includes('mid-500'), rowNames().join('|'));
-    check('with an empty value ready to fill in', /--mid-500:\s*;/.test(written), written.slice(0, 300));
+    check('with unset as its initial value', written.includes('--mid-500: unset;'), written.slice(0, 300));
+    check(
+      'the new value field shows unset without the semicolon',
+      all('input.var-input').filter((n) => n.value === 'unset').length === 1,
+      all('input.var-input').map((n) => n.value).join(' | ')
+    );
   }
 
   // --- the theme group: modes as columns ------------------------------------
@@ -1071,8 +1076,13 @@ const STYLESHEET = `/* =========================================================
         });
         await typeInto(find('.vars-add-field input'), 'extra');
         check('adding a variable is recorded', commands.length > addBefore, `${commands.length - addBefore} commands`);
+        const added = fs.readFileSync(file, 'utf8');
+        check('the recorded variable starts unset', /--[\w-]*extra: unset;/.test(added), added.slice(0, 300));
         await act(async () => { await commands[commands.length - 1].undo(); await settle(60) });
         check('and undo takes it out again', fs.readFileSync(file, 'utf8') === wasFile, fs.readFileSync(file, 'utf8').slice(0, 300));
+        await act(async () => { await commands[commands.length - 1].redo(); await settle(60) });
+        check('redo restores the variable with its unset value', fs.readFileSync(file, 'utf8') === added);
+        await act(async () => { await commands[commands.length - 1].undo(); await settle(60) });
       } else {
         check('there is a way to add a variable', false, 'no add row on the sheet');
       }

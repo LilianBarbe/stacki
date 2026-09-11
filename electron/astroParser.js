@@ -2,7 +2,7 @@
 // back to clean .astro source.
 //
 // Node kinds:
-//   component — <Hero .../> or <Section>...</Section> (capitalized)
+//   component — <Hero .../> or <Section>...</Section>; <> uses name Fragment
 //   element   — <div>, <img/>, any lowercase tag
 //   text      — text content between tags (may contain {expressions})
 //   comment   — <!-- ... -->
@@ -10,18 +10,14 @@
 //
 // children: null = self-closing, [] = paired-but-empty, [nodes] otherwise.
 //
-// Pages whose template can't be represented (stray '<', unclosed tags,
-// fragments) are reported as not editable so the UI falls back to code view.
+// Pages whose template can't be represented (stray '<', unclosed tags) are
+// reported as not editable so the UI falls back to code view.
 
 const fs = require('fs');
 const path = require('path');
 const { decodeEntities, encodeText } = require('./htmlText');
 
-const IMPORT_RE = /import\s+(\w+)\s+from\s+(['"])([^'"]+)\2;?/g;
-// `import { Image, Picture } from 'astro:assets'` — Astro's own components come
-// in this way, so without it <Image> looks like an unimported capitalized tag
-// (a dynamic `const Tag = …`) rather than the component it is.
-const NAMED_IMPORT_RE = /import\s*\{([^}]*)\}\s*from\s*(['"])([^'"]+)\2;?/g;
+const { readFrontmatter, writeFrontmatter } = require('./frontmatter');
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
   'link', 'meta', 'param', 'source', 'track', 'wbr',
@@ -44,7 +40,7 @@ const makeId = () => `n${nextId++}`;
 // `<Foo {...rest} />` into `<Foo ...rest />`, which does not compile. Spreads
 // are everywhere in Astro, so this corrupts real components.
 function parseAttrs(attrString) {
-  const props = {};
+  const entries = [];
   // The spread body takes one level of nested braces, the same depth the
   // value form below allows — `{...cond ? { href } : { type: "button" }}` is
   // ordinary Astro, and stopping at the first inner brace would truncate it.
@@ -57,16 +53,20 @@ function parseAttrs(attrString) {
       // Keyed by the spread's own text, so two different spreads on one tag
       // stay separate and the order round-trips.
       const expr = m[1].trim();
-      props[`...${expr}`] = { type: 'spread', value: expr };
+      entries.push([`...${expr}`, { type: 'spread', value: expr }]);
       continue;
     }
     const name = m[2];
-    if (m[3] !== undefined) props[name] = { type: 'string', value: m[3] };
-    else if (m[4] !== undefined) props[name] = { type: 'string', value: m[4] };
-    else if (m[5] !== undefined) props[name] = { type: 'expr', value: m[5].trim() };
-    else props[name] = { type: 'bare' };
+    const value = m[3] !== undefined || m[4] !== undefined
+      ? { type: 'string', value: m[3] ?? m[4] }
+      : m[5] !== undefined
+        ? { type: 'expr', value: m[5].trim() }
+        : { type: 'bare' };
+    entries.push([name, value]);
   }
-  return props;
+  // Object.fromEntries treats __proto__ as an ordinary attribute. Assigning
+  // it on an object invokes the inherited setter and silently drops it.
+  return Object.fromEntries(entries);
 }
 
 // A tag whose attributes were written across several lines keeps them there,
@@ -180,10 +180,8 @@ function skipStringOrComment(str, i) {
   return i;
 }
 
-// Finds the index of the '}' matching the '{' at `start`, skipping strings,
-// template literals, and comments so quotes/braces inside them don't confuse
-// counting.
-function findMatchingBrace(str, start) {
+// Match either kind of delimiter using the same string/comment rules.
+function findMatchingDelimiter(str, start, open, close) {
   let depth = 0;
   for (let i = start; i < str.length; i++) {
     const skipped = skipStringOrComment(str, i);
@@ -192,8 +190,8 @@ function findMatchingBrace(str, start) {
       continue;
     }
     const ch = str[i];
-    if (ch === '{') depth++;
-    else if (ch === '}') {
+    if (ch === open) depth++;
+    else if (ch === close) {
       depth--;
       if (depth === 0) return i;
     }
@@ -201,25 +199,8 @@ function findMatchingBrace(str, start) {
   return -1;
 }
 
-// Finds the index of the ')' matching the '(' at `start`, skipping strings and
-// comments.
-function findMatchingParen(str, start) {
-  let depth = 0;
-  for (let i = start; i < str.length; i++) {
-    const skipped = skipStringOrComment(str, i);
-    if (skipped !== i) {
-      i = skipped - 1;
-      continue;
-    }
-    const ch = str[i];
-    if (ch === '(') depth++;
-    else if (ch === ')') {
-      depth--;
-      if (depth === 0) return i;
-    }
-  }
-  return -1;
-}
+const findMatchingBrace = (str, start) => findMatchingDelimiter(str, start, '{', '}');
+const findMatchingParen = (str, start) => findMatchingDelimiter(str, start, '(', ')');
 
 // Recognizes {items.map((item) => ( <JSX/> ))} and turns it into a 'map'
 // node whose JSX body is a parsed child tree (editable in the navigator).
@@ -807,9 +788,10 @@ function parseTemplate(str, base = null) {
       continue;
     }
 
+    const shorthand = str.startsWith('<>', lt);
     TAG_RE.lastIndex = lt;
-    const m = TAG_RE.exec(str);
-    if (!m) return bail(nodes, str, lt, 'a stray < or a <> fragment');
+    const m = shorthand ? ['<>', 'Fragment', '', ''] : TAG_RE.exec(str);
+    if (!m) return bail(nodes, str, lt, 'a stray <');
 
     const [full, name, attrs, selfClose] = m;
     // One level of nested braces in an attribute ({{ a: 1 }}) is supported;
@@ -854,8 +836,10 @@ function parseTemplate(str, base = null) {
       continue;
     }
 
-    const closeIdx = findMatchingClose(str, afterOpen, name);
-    if (closeIdx === -1) return bail(nodes, str, lt, `an unclosed <${name}> tag`);
+    const closeIdx = shorthand
+      ? findMatchingFragmentClose(str, afterOpen)
+      : findMatchingClose(str, afterOpen, name);
+    if (closeIdx === -1) return bail(nodes, str, lt, `an unclosed <${shorthand ? '' : name}> tag`);
     const inner = str.slice(afterOpen, closeIdx);
     const innerResult = parseTemplate(inner, base === null ? null : base + afterOpen);
     if (!innerResult.clean) return { nodes, clean: false }; // the inner frame recorded the cause
@@ -878,6 +862,7 @@ function parseTemplate(str, base = null) {
       id: makeId(),
       kind,
       name,
+      ...(shorthand ? { shorthand: true } : {}),
       ...(source === undefined ? {} : { source }),
       ...(blankAfter ? { blankAfter } : {}),
       ...tagProps(attrs),
@@ -950,6 +935,46 @@ function findMatchingClose(str, from, name) {
   return -1;
 }
 
+// Fragment delimiters can also occur in quoted attributes, expressions and
+// raw scripts. Skip those regions before counting nested <>…</> pairs.
+function findMatchingFragmentClose(str, from) {
+  let depth = 1;
+  for (let pos = from; pos < str.length;) {
+    if (str[pos] === '{') {
+      const end = findMatchingBrace(str, pos);
+      if (end === -1) return -1;
+      pos = end + 1;
+    } else if (str.startsWith('<!--', pos)) {
+      const end = str.indexOf('-->', pos + 4);
+      if (end === -1) return -1;
+      pos = end + 3;
+    } else if (str.startsWith('</>', pos)) {
+      if (--depth === 0) return pos;
+      pos += 3;
+    } else if (str.startsWith('<>', pos)) {
+      depth++;
+      pos += 2;
+    } else if (str[pos] === '<') {
+      TAG_RE.lastIndex = pos;
+      const tag = TAG_RE.exec(str);
+      if (!tag) {
+        pos++;
+        continue;
+      }
+      pos += tag[0].length;
+      if (RAW_ELEMENTS.has(tag[1]) && tag[3] !== '/') {
+        const close = str.indexOf(`</${tag[1]}`, pos);
+        const end = close === -1 ? -1 : str.indexOf('>', close);
+        if (end === -1) return -1;
+        pos = end + 1;
+      }
+    } else {
+      pos++;
+    }
+  }
+  return -1;
+}
+
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -993,85 +1018,17 @@ function textValue(raw) {
 // offset on the model — for reading a location out of the file on disk, not
 // for the editor's live model (see parseTemplate).
 function parsePage(source, opts = {}) {
-  const fm = source.match(/^---\r?\n(?:([\s\S]*?)\r?\n)?---\r?\n?/);
+  // Try the empty block first.
+  // Otherwise `---\n---\n--- prose` consumes the real close as code and
+  // mistakes the start of the prose for a second closing fence.
+  const fm = source.match(/^---\r?\n(?:---|([\s\S]*?\r?\n)---)\r?\n?/);
   const frontmatter = fm ? fm[1] || '' : '';
   const hadFrontmatter = !!fm;
   const bodyStart = fm ? fm[0].length : 0;
   const body = source.slice(bodyStart);
 
-  const imports = [];
-  // Where each import's text sits, so the block can be cut out by position.
-  // A `.replace(m[0], '')` left behind the line break that ended the
-  // statement, and the blank lines those leave built up on every save.
-  const cuts = [];
-  let m;
-  IMPORT_RE.lastIndex = 0;
-  while ((m = IMPORT_RE.exec(frontmatter)) !== null) {
-    imports.push({ name: m[1], path: m[3], quote: m[2], at: m.index });
-    cuts.push([m.index, m.index + m[0].length]);
-  }
-  // Named imports become one entry per specifier, so "is this name imported"
-  // stays a single lookup. `named` groups them back onto one line on the way
-  // out; `imported` keeps the original behind an `as` alias.
-  NAMED_IMPORT_RE.lastIndex = 0;
-  while ((m = NAMED_IMPORT_RE.exec(frontmatter)) !== null) {
-    // `import type { … }` declares types only — nothing in it can be placed on
-    // a page, and re-emitting it as a value import would break the build. Left
-    // in the frontmatter text untouched.
-    if (/import\s+type\s*\{/.test(m[0])) continue;
-    const specs = m[1]
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    for (const spec of specs) {
-      // An inline `type X` sits alongside real values; it's carried through so
-      // the line comes back whole, but it is never a component.
-      const typeOnly = /^type\s/.test(spec);
-      const [imported, local] = spec
-        .replace(/^type\s+/, '')
-        .split(/\s+as\s+/)
-        .map((s) => s.trim());
-      imports.push({
-        name: local || imported,
-        imported,
-        path: m[3],
-        quote: m[2],
-        named: true,
-        at: m.index,
-        ...(typeOnly ? { typeOnly: true } : {}),
-      });
-    }
-    cuts.push([m.index, m.index + m[0].length]);
-  }
-  // Back into the order they were written in — the two passes above collect
-  // default and named imports separately, and without this every save would
-  // shuffle one group past the other.
-  imports.sort((a, b) => (a.at ?? Infinity) - (b.at ?? Infinity));
-  cuts.sort((a, b) => a[0] - b[0]);
-
-  // Whatever stands above the first import belongs above it. A page that
-  // opens with a `/** … */` describing it had that comment hoisted below the
-  // import block by every save — a loud diff for an edit that never went
-  // near it. Anything between or after the imports still gathers below them,
-  // which is where it already was.
-  const firstImport = cuts.length ? cuts[0][0] : -1;
-  const frontmatterLead = firstImport === -1 ? '' : frontmatter.slice(0, firstImport).trim();
-  let rest = firstImport === -1 ? frontmatter : frontmatter.slice(firstImport);
-  // Back to front, so an earlier cut can't shift a later one's offsets. The
-  // statement goes with the line break that ended it, or removing it would
-  // leave the blank line behind.
-  for (let i = cuts.length - 1; i >= 0; i--) {
-    const from = cuts[i][0] - firstImport;
-    const to = cuts[i][1] - firstImport;
-    const eol = rest.slice(to).match(/^[ \t]*\r?\n/);
-    rest = rest.slice(0, from) + rest.slice(eol ? to + eol[0].length : to);
-  }
-  // Whether a blank line stood between the import block and what follows.
-  // Writing one unconditionally moved `import type { … }` — which stays in the
-  // frontmatter text, being a type and never a component — a line further
-  // down on every save.
-  const extraFrontmatterSpaced = /^[ \t]*\r?\n/.test(rest);
-  const extraFrontmatter = rest.trim();
+  const frontmatterModel = readFrontmatter(frontmatter);
+  const { imports } = frontmatterModel;
 
   lastBail = null;
   const { nodes: topNodes, clean, trailingBlank } = parseTemplate(body, opts.locs ? bodyStart : null);
@@ -1117,6 +1074,7 @@ function parsePage(source, opts = {}) {
   if (
     significant.length === 1 &&
     significant[0].kind === 'component' &&
+    significant[0].name !== 'Fragment' &&
     significant[0].children !== null
   ) {
     wrapper = significant[0];
@@ -1137,7 +1095,7 @@ function parsePage(source, opts = {}) {
   // they have no file to open and no props of their own.
   const markDynamic = (list) => {
     for (const n of list) {
-      if (n.kind === 'component') {
+      if (n.kind === 'component' && n.name !== 'Fragment') {
         const imp = importsByName[n.name];
         if (!imp) n.dynamicTag = true;
         // Astro's own <Image>/<Picture>, identified by where the name came
@@ -1153,10 +1111,7 @@ function parsePage(source, opts = {}) {
   return {
     editable: true,
     model: {
-      imports,
-      frontmatterLead,
-      extraFrontmatter,
-      extraFrontmatterSpaced,
+      ...frontmatterModel,
       hadFrontmatter,
       trailingBlank,
       nodes: topNodes,
@@ -1167,45 +1122,11 @@ function parsePage(source, opts = {}) {
   };
 }
 
-// Writes the import block. Named specifiers that share a module are emitted
-// together, at the position of the first one, so `{ Image, Picture }` comes
-// back as the single line it was written as. `specFor` lets the marked writer
-// rewrite a path without duplicating any of this.
-function serializeImports(model, lines, specFor) {
-  const done = new Set();
-  for (const imp of model.imports) {
-    if (done.has(imp)) continue;
-    // Whichever quote the file used. Rewriting every import line to change
-    // one character is a diff on a page that was only opened.
-    const q = imp.quote === '"' ? '"' : "'";
-    if (!imp.named) {
-      lines.push(`import ${imp.name} from ${q}${specFor ? specFor(imp) : imp.path}${q};`);
-      continue;
-    }
-    const group = model.imports.filter((i) => i.named && i.path === imp.path);
-    for (const g of group) done.add(g);
-    const specs = group.map((g) => {
-      const base = g.imported && g.imported !== g.name ? `${g.imported} as ${g.name}` : g.name;
-      return g.typeOnly ? `type ${base}` : base;
-    });
-    lines.push(`import { ${specs.join(', ')} } from ${q}${imp.path}${q};`);
-  }
-}
-
-// The frontmatter, in the order it was written: whatever stood above the
-// imports, the import block, then the rest. The blank line only appears
-// between two things that are both there — on a page with no imports it used
-// to open the frontmatter with an empty line.
+// A shared source-aware writer keeps the preview, file and code editor in
+// agreement. The surrounding page writer supplies the last line break.
 function serializeFrontmatter(model, lines, specFor) {
-  const start = lines.length;
-  if (model.frontmatterLead) lines.push(model.frontmatterLead);
-  serializeImports(model, lines, specFor);
-  if (model.extraFrontmatter) {
-    // `!== false` so a model built anywhere but the parser keeps the spacing
-    // the app has always written.
-    if (lines.length > start && model.extraFrontmatterSpaced !== false) lines.push('');
-    lines.push(model.extraFrontmatter);
-  }
+  const text = writeFrontmatter(model, specFor);
+  if (text) lines.push(text.replace(/\r?\n$/, ''));
 }
 
 function serializePage(model) {
@@ -1281,14 +1202,21 @@ function inlineString(nodes) {
 // element is addressed), so the attribute does the whole job and adds nothing
 // to the DOM. The stored `source` goes: it would put the run back verbatim,
 // tags and all, without them.
-function tagInlineRun(nodes, path) {
+function tagInlineRun(nodes, path, atRoot = false) {
   return nodes.map((n, i) => {
     if (n.kind !== 'element') return n;
     const childPath = `${path}.${i}`;
+    const forwards = Object.keys(n.props || {}).some((key) => key.startsWith('...'));
+    const pathProp = atRoot || forwards
+      ? { type: 'expr', value: `[${JSON.stringify(childPath)}, Astro.props["data-avb-p"]].filter(Boolean).join(" ")` }
+      : { type: 'string', value: childPath };
     const tagged = {
       ...n,
       source: undefined,
-      props: { ...n.props, 'data-avb-p': { type: 'string', value: childPath } },
+      // As on a block element, the explicit marker precedes a spread: HTML
+      // keeps the first duplicate attribute, which must name this child too.
+      props: forwards ? { 'data-avb-p': pathProp, ...n.props } : { ...n.props, 'data-avb-p': pathProp },
+      attrOrder: forwards && n.attrOrder ? ['data-avb-p', ...n.attrOrder] : n.attrOrder,
     };
     if (Array.isArray(n.children) && n.children.length > 0) {
       tagged.children = tagInlineRun(n.children, childPath);
@@ -1571,19 +1499,22 @@ function serializeNode(node, indent, lines) {
     default: {
       const kept = attrsAsWritten(node);
       const attrs = kept === null ? serializeAttrs(node.props, node.attrOrder) : kept;
+      // A shorthand fragment has no attributes. If the editor adds one (for
+      // example slot), use the equivalent named form that can carry it.
+      const tagName = node.shorthand && node.name === 'Fragment' && !attrs ? '' : node.name;
       // The closing tag as written, when it was written across lines. Only
       // trusted while it still names this element: renaming the tag rebuilds
       // it the ordinary way.
       const closeTag =
-        node.closeSource && node.closeSource.startsWith(`</${node.name}`)
+        node.closeSource && node.closeSource.startsWith(`</${tagName}`)
           ? node.closeSource
-          : `</${node.name}>`;
+          : `</${tagName}>`;
       const openTag = (close) => {
         // Preserved attributes carry their own trailing whitespace — the line
         // break before the closing bracket — so the usual leading space would
         // be one too many.
         const tail = kept !== null && /\s$/.test(attrs) ? close.replace(/^ /, '') : close;
-        const text = `${indent}<${node.name}${attrs}${tail}`;
+        const text = `${indent}<${tagName}${attrs}${tail}`;
         for (const line of text.split('\n')) lines.push(line);
       };
       if (node.children === null) {
@@ -1824,7 +1755,8 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
     // dropped by the compiler — so they go in the way slot content does.
     if (markWithin) lines.push(indent + '  ' + markerFor(path, 's', true));
     node.children.forEach((child, i) =>
-      serializeNodeMarked(child, indent + '  ', lines, `${path}.${i}`, node.kind === 'component')
+      serializeNodeMarked(child, indent + '  ', lines, `${path}.${i}`, node.kind === 'component',
+        node.name === 'Fragment' && atRoot)
     );
     if (markWithin) lines.push(indent + '  ' + markerFor(path, 'e', true));
     lines.push(`${indent}</${node.name}>`);
@@ -1847,7 +1779,7 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
     const loopBody = (bodyIndent) => {
       lines.push(bodyIndent + '<Fragment>');
       (node.children || []).forEach((child, i) =>
-        serializeNodeMarked(child, bodyIndent + '  ', lines, `${path}.${i}`, true)
+        serializeNodeMarked(child, bodyIndent + '  ', lines, `${path}.${i}`, true, atRoot)
       );
       lines.push(bodyIndent + '</Fragment>');
     };
@@ -1919,7 +1851,7 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
       isInlineRun(node.children);
     serializeNode(
       inlineKids
-        ? { ...base, source: undefined, children: tagInlineRun(node.children, path) }
+        ? { ...base, source: undefined, children: tagInlineRun(node.children, path, node.name === 'Fragment' && atRoot) }
         : base,
       indent,
       lines

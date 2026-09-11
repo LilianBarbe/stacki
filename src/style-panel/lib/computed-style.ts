@@ -15,26 +15,27 @@
 import { useEffect, useRef, useState } from 'react'
 import { hasCanvas, queryCanvas } from '../../canvasQuery.js'
 import { findNode, getHost, onHostChange } from './host'
+import { createQueryCache } from './query-cache'
 
-type Answers = Record<string, string>
+const cache = createQueryCache(async (path, props) => {
+  const expected = selectedTag()
+  const answer = await queryCanvas(path, [], [], props)
+  const tag = answer?.identity?.tag
+  if (tag && expected && tag !== expected) return null
+  return answer?.computedProps
+    ? Object.fromEntries(Object.entries(answer.computedProps).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : null]))
+    : null
+})
 
-// path → the computed values already fetched for it. Cleared whenever the page
-// re-renders, since anything inherited may have moved with it.
-const answers = new Map<string, Answers>()
-// Properties asked for since the last flush, batched so a panel full of controls
-// costs one round trip instead of thirty.
-let queued = new Set<string>()
-let flushing: number | null = null
-const listeners = new Set<() => void>()
+function currentCache() {
+  const host = getHost()
+  cache.setScope([host.projectPath, host.openFilePath, host.nodes, host.selectedId, host.device, host.historyTick])
+  return cache
+}
 
 /** Forget everything: the page changed under us, so the answers may have too. */
 export function forgetComputedStyles(): void {
-  answers.clear()
-  notify()
-}
-
-function notify() {
-  for (const fn of listeners) fn()
+  cache.clear()
 }
 
 function pathOfSelection(): string | null {
@@ -51,44 +52,6 @@ function selectedTag(): string | null {
   if (node?.kind !== 'element') return null
   const name = node.name ?? ''
   return /^[a-z][a-z0-9-]*$/.test(name) ? name : null
-}
-
-/** The element the page measured, per path. Kept to check an answer against the
- *  node it was asked about, below — not shown anywhere. */
-const measured = new Map<string, string>()
-
-function flush(path: string) {
-  const props = [...queued]
-  queued = new Set()
-  flushing = null
-  if (!props.length) return
-  const expected = selectedTag()
-  void queryCanvas(path, [], [], props).then((answer: { computedProps?: Record<string, string | null>; identity?: { tag?: string } } | null) => {
-    if (!answer?.computedProps) return
-    // Only trust values read off the element we asked about. If the page resolved
-    // that path to a different tag, the answer describes something else — showing it
-    // as this control's default would be worse than showing nothing.
-    const tag = answer.identity?.tag ?? ''
-    if (tag) measured.set(path, tag)
-    if (tag && expected && tag !== expected) return
-    const next: Answers = { ...(answers.get(path) ?? {}) }
-    let changed = false
-    for (const [prop, value] of Object.entries(answer.computedProps)) {
-      const v = (value ?? '').trim()
-      if (v && next[prop] !== v) { next[prop] = v; changed = true }
-    }
-    if (!changed) return
-    answers.set(path, next)
-    notify()
-  })
-}
-
-function request(path: string, prop: string) {
-  if (answers.get(path)?.[prop] != null) return
-  queued.add(prop)
-  // A microtask would batch only one component's render; a timeout of 0 catches the
-  // whole panel's pass, which is what makes this one query instead of thirty.
-  if (flushing == null) flushing = window.setTimeout(() => flush(path), 0)
 }
 
 /** An answer from the page: what it said, and whether it is still being asked. */
@@ -112,8 +75,8 @@ function answeredNow(prop: string): Answer {
   // Nothing to ask — so nothing is pending either. No answer is ever coming, and
   // a control waiting forever would never show anything.
   if (!path) return { value: '', pending: false, path: null }
-  const known = answers.get(path)?.[prop]
-  return { value: known ?? '', pending: known == null, path }
+  const known = currentCache().read(path, prop)
+  return { value: known ?? '', pending: known === undefined, path }
 }
 
 // `pending` is the part worth having. '' means two different things — "the page
@@ -125,12 +88,12 @@ function useComputedAnswer(prop: string): Answer {
   useEffect(() => {
     if (!prop) return undefined
     const sync = () => bump((n) => n + 1)
-    listeners.add(sync)
+    const offCache = cache.subscribe(sync)
     // The selection moves, or the page re-renders under it: ask for the element
     // that's selected now.
     const off = onHostChange(sync)
     return () => {
-      listeners.delete(sync)
+      offCache()
       off()
     }
   }, [prop])
@@ -140,7 +103,7 @@ function useComputedAnswer(prop: string): Answer {
   // answer was missing. `request` is idempotent — already answered, or already
   // queued for this flush, and it does nothing.
   useEffect(() => {
-    if (answer.pending && answer.path) request(answer.path, prop)
+    if (answer.pending && answer.path) void currentCache().request(answer.path, prop)
   })
 
   return answer

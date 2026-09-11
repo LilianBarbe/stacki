@@ -49,6 +49,7 @@ const TerminalPane = forwardRef(function TerminalPane(
   const fitRef = useRef(null);
   const initialized = useRef(false);
   const ready = useRef(false);
+  const lastSize = useRef(null);
   // Removes this pane's IPC listeners on unmount. Held in a ref because init
   // can run later, from the ResizeObserver.
   const disposeListeners = useRef(null);
@@ -73,7 +74,9 @@ const TerminalPane = forwardRef(function TerminalPane(
     try {
       fitRef.current.fit();
       const dims = fitRef.current.proposeDimensions();
-      if (dims?.cols && dims?.rows) {
+      if (dims?.cols && dims?.rows &&
+          (dims.cols !== lastSize.current?.cols || dims.rows !== lastSize.current?.rows)) {
+        lastSize.current = dims;
         window.avb.resizeTerminal({ id: terminalId, cols: dims.cols, rows: dims.rows });
       }
     } catch {
@@ -105,11 +108,13 @@ const TerminalPane = forwardRef(function TerminalPane(
     // xterm's built-in paste is text-only; decideTerminalPaste classifies the
     // clipboard's actual shape. See src/terminalPaste.js.
     const pasteImage = async (file) => {
-      const forwardCtrlV = () => window.avb.terminalInput(terminalId, '\x16');
+      const forwardCtrlV = () => { if (!runDisposed) window.avb.terminalInput(terminalId, '\x16'); };
       if (!file) return forwardCtrlV();
       try {
         const bytes = new Uint8Array(await file.arrayBuffer());
+        if (runDisposed) return;
         const result = await window.avb.terminalClipboardImage(bytes, file.type || 'image/png');
+        if (runDisposed) return;
         if (!result?.ok || !result.path) return forwardCtrlV();
         const escaped = isWindows()
           ? quoteWindowsPath(result.path)
@@ -275,11 +280,13 @@ const TerminalPane = forwardRef(function TerminalPane(
       window.avb
         .startTerminal({ id: terminalId, cwd: projectPath, autoLaunch: autoLaunchRef.current })
         .then((result) => {
+          if (runDisposed) return;
           if (!result?.ok && result?.error) {
             term.writeln(`\r\n\x1b[31m${result.error}\x1b[0m\r\n`);
           }
         })
         .catch((err) => {
+          if (runDisposed) return;
           // The IPC handler rejected outright. Without this the failure is
           // swallowed and the pane just stays blank — no prompt, no error.
           term.writeln(`\r\n\x1b[31mFailed to start terminal: ${err?.message || err}\x1b[0m\r\n`);
@@ -298,6 +305,7 @@ const TerminalPane = forwardRef(function TerminalPane(
     return () => {
       runDisposed = true;
       ready.current = false;
+      lastSize.current = null;
       ro.disconnect();
       // Drop the IPC listeners; otherwise every open/close leaks a pair that
       // pins this disposed terminal in their closures.

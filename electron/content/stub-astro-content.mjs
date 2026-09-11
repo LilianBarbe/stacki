@@ -11,6 +11,7 @@
 // `z` is the project's own zod, not a copy — the same instance the config
 // would have used, so every check and brand behaves identically.
 import { z } from 'astro/zod';
+import { withMetadata } from './schemaTools.mjs';
 
 export { z };
 
@@ -19,7 +20,7 @@ export function defineCollection(config) {
 }
 
 export function reference(collection) {
-  return z.string().meta({ astroReference: String(collection) });
+  return withMetadata(z.string(), { astroReference: String(collection) });
 }
 
 // Only the runtime helpers exist to be called at module scope; a config that

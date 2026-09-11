@@ -7,6 +7,7 @@ import { hidesChildRows, noteText } from '../treeSelection.js';
 import { thenBranch, rowChildren, rowHost } from '../branches.js';
 import {
   LayoutIcon,
+  LayersIcon,
   ElementComponentIcon,
   astroAssetIcon,
   TextIcon,
@@ -27,6 +28,8 @@ import {
   CustomElementIcon,
 } from '../ui/Icons.jsx';
 
+const isFragmentNode = (node) =>
+  (node.kind === 'component' || node.kind === 'element') && node.name === 'Fragment';
 
 // The page structure tree: layout wrapper + nested nodes (components,
 // elements, text, comments). Supports:
@@ -528,6 +531,8 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
 
   const isLayoutNode = node.id === 'layout';
   const isSelected = selectedId === node.id;
+  const isFragment = isFragmentNode(node);
+  const isComponent = node.kind === 'component' && !node.dynamicTag && !isFragment;
 
   // Keep the selected row visible while navigating with the arrow keys.
   const rowRef = useRef(null);
@@ -582,7 +587,8 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
       <div
         ref={rowRef}
         data-node-id={node.id}
-        className={`structure-node ${node.kind === 'component' && !node.dynamicTag ? 'is-component' : ''} ${node.kind === 'map' || node.kind === 'cond' || node.kind === 'branch' || (isDataBound(node) && !(node.kind === 'component' && !node.dynamicTag)) ? 'is-map' : ''} ${isLayoutNode ? 'layout-node' : ''} ${isSelected ? 'selected' : ''}`}
+        title={isFragment ? 'Inline group in this file. Expand it to edit its children; there is no separate file to open.' : undefined}
+        className={`structure-node ${isComponent ? 'is-component' : ''} ${node.kind === 'map' || node.kind === 'cond' || node.kind === 'branch' || (isDataBound(node) && !isComponent) ? 'is-map' : ''} ${isLayoutNode ? 'layout-node' : ''} ${isSelected ? 'selected' : ''}`}
         style={{
           paddingLeft: 6 + depth * 16,
           ...(isDropInto ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' } : {}),
@@ -615,10 +621,10 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
         }}
         onDoubleClick={(e) => {
           // Drill into a component's own file, the way Webflow opens one.
-          // astro:assets components live in Astro, not the project — there is
-          // no file to open, so a double-click does nothing rather than
+          // astro:assets and the built-in Fragment have no project file to
+          // open, so a double-click does nothing rather than
           // hunting for one that can't be found.
-          if (node.kind !== 'component' || node.dynamicTag || node.astroAsset) return;
+          if (!isComponent || node.astroAsset) return;
           if (!onOpenComponent) return;
           e.stopPropagation();
           onOpenComponent(node.name, node.id);
@@ -715,6 +721,7 @@ function defaultCollapsed(node) {
 // The row's icon already says what kind a node is, so no trailing kind badge
 // ("comment", "loop", …) — it only repeated the icon in words.
 function describeNode(node, live) {
+  if (isFragmentNode(node)) return { icon: <LayersIcon size={13} />, label: 'Fragment' };
   switch (node.kind) {
     case 'text':
       return { icon: <TextIcon size={12} />, label: truncate(node.value, 34) };

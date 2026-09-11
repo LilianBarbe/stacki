@@ -50,8 +50,9 @@ function decodeEntities(text) {
         return whole;
       }
     }
-    const named = NAMED[body] ?? NAMED[body.toLowerCase()];
-    return named ?? whole;
+    if (Object.hasOwn(NAMED, body)) return NAMED[body];
+    const lower = body.toLowerCase();
+    return Object.hasOwn(NAMED, lower) ? NAMED[lower] : whole;
   });
 }
 
@@ -63,12 +64,9 @@ function decodeEntities(text) {
  * its own habits.
  */
 function encodeText(text) {
-  return String(text ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/ /g, '&#160;')
-    .replace(/[   ‌‍­]/g, (c) => `&#${c.codePointAt(0)};`);
+  return String(text ?? '').replace(/[&<>    ‌‍­]/g, (c) =>
+    c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : `&#${c.codePointAt(0)};`
+  );
 }
 
 module.exports = { decodeEntities, encodeText };

@@ -65,6 +65,8 @@ const gitSnapshot = require('./gitSnapshot');
 const previewWorktree = require('./previewWorktree');
 const { registerTerminalHandlers, cleanupTerminals } = require('./terminal');
 const { createSelfWrites } = require('./selfWrites');
+const { watchProject } = require('./projectWatcher');
+const { createSerialQueue, createKeyedQueue } = require('./serialQueue');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
@@ -222,6 +224,11 @@ function createWindow() {
   // reopen above is asking about.)
   mainWindow.on('closed', () => {
     openProjectRoot = null;
+    stopWatchingProject();
+    stopDevServer();
+    stopAllServices();
+    stopAllPreviews();
+    cleanupTerminals();
   });
 }
 
@@ -413,10 +420,7 @@ ipcMain.handle('project:close', async (_e, next) => {
   stopAllServices();
   stopAllPreviews();
   cleanupTerminals();
-  if (watcher) {
-    watcher.close();
-    watcher = null;
-  }
+  stopWatchingProject();
   // Nothing is open, so nothing is in reach: the asset protocol and the
   // terminals both scope themselves to this.
   openProjectRoot = null;
@@ -441,7 +445,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => stopDevServer());
+app.on('before-quit', () => {
+  stopWatchingProject();
+  stopDevServer();
+});
 // Reading a project's content config leaves a process behind holding its
 // schemas; they go when the app does.
 app.on('before-quit', () => stopAllServices());
@@ -1136,22 +1143,17 @@ ipcMain.handle('recents:remove', async (_e, projectPath) => {
 // running, so one is started for it, used, and stopped again — which is what
 // makes "the site as it is now" true for a project that was last edited
 // somewhere else entirely.
-let capturing = null; // one at a time: each capture is a browser and a server
+const queueCapture = createSerialQueue(); // each capture owns a browser and a server
 // Bumped when a project is opened. A capture waiting its turn behind another
 // one belongs to a start screen that is no longer on screen — and the machine
 // is now busy starting the project the user actually asked for.
 let captureEra = 0;
 
-async function captureThumb(projectPath) {
+function captureThumb(projectPath) {
   const era = captureEra;
-  if (capturing) await capturing.catch(() => {});
-  if (era !== captureEra) return { ok: false, error: 'skipped' };
-  capturing = doCaptureThumb(projectPath);
-  try {
-    return await capturing;
-  } finally {
-    capturing = null;
-  }
+  return queueCapture(() => era === captureEra
+    ? doCaptureThumb(projectPath)
+    : { ok: false, error: 'skipped' });
 }
 
 async function doCaptureThumb(projectPath) {
@@ -1172,23 +1174,42 @@ async function doCaptureThumb(projectPath) {
 // `devServer` belongs to the canvas, and a thumbnail must not disturb what the
 // editor is showing. The project's own config is used rather than the app's
 // generated one — the picture is of the site, not of the canvas.
+function spawnAstroServer(projectPath, localBin, args) {
+  const [cmd, argv] = nodeCliCommand(localBin, args);
+  return spawn(cmd, argv, {
+    cwd: projectPath,
+    shell: isWin && cmd === localBin,
+    // Give descendants their own process group so closing a project can stop
+    // Vite and Astro together, including CLIs that launch another process.
+    detached: !isWin,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+  });
+}
+
+function stopProcessTree(proc) {
+  if (!proc?.pid) return;
+  try {
+    if (isWin) {
+      spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true })
+        .on('error', () => { try { proc.kill('SIGTERM'); } catch { /* already gone */ } });
+    } else {
+      process.kill(-proc.pid, 'SIGTERM');
+    }
+  } catch {
+    try { proc.kill('SIGTERM'); } catch { /* already gone */ }
+  }
+}
+
 async function withTemporaryServer(projectPath, fn) {
   const binName = isWin ? 'astro.cmd' : 'astro';
   const localBin = path.join(projectPath, 'node_modules', '.bin', binName);
   const port = await findFreePort(4400 + Math.floor(Math.random() * 200));
-  const [cmd, argv] = nodeCliCommand(localBin, [
-    'dev',
-    '--port',
-    String(port),
-    '--host',
-    '127.0.0.1',
+  const proc = spawnAstroServer(projectPath, localBin, [
+    'dev', '--port', String(port), '--host', '127.0.0.1',
   ]);
-  const proc = spawn(cmd, argv, {
-    cwd: projectPath,
-    shell: isWin && cmd === localBin,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
-  });
+  let spawnError = null;
+  proc.on('error', (error) => { spawnError = error; });
   let log = '';
   proc.stdout.on('data', (d) => (log = (log + d).slice(-4000)));
   proc.stderr.on('data', (d) => (log = (log + d).slice(-4000)));
@@ -1199,27 +1220,25 @@ async function withTemporaryServer(projectPath, fn) {
     // spawned is not enough — the CLI is asked to stop it, and the process
     // group is killed for the versions that do not fork.
     try {
-      const [stopCmd, stopArgv] = nodeCliCommand(localBin, ['dev', 'stop']);
-      execFile(stopCmd, stopArgv, { cwd: projectPath, timeout: 10000 }, () => {});
+      // Opening this project can replace the thumbnail's daemon while its
+      // capture is running. Stop only the daemon that still owns our port.
+      const lock = readAstroLock(projectPath);
+      if (lock?.url && new URL(lock.url).port === String(port) && devServer?.projectPath !== projectPath) {
+        const [stopCmd, stopArgv] = nodeCliCommand(localBin, ['dev', 'stop']);
+        execFile(stopCmd, stopArgv, { cwd: projectPath, timeout: 10000 }, () => {});
+      }
     } catch {
       /* best effort */
     }
-    try {
-      if (isWin) spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { shell: true });
-      else process.kill(-proc.pid, 'SIGTERM');
-    } catch {
-      try {
-        proc.kill('SIGTERM');
-      } catch {
-        /* already gone */
-      }
-    }
+    stopProcessTree(proc);
   };
 
   try {
     const deadline = Date.now() + 45000;
     let up = false;
     while (Date.now() < deadline) {
+      if (spawnError) return { ok: false, error: spawnError.message };
+      if (proc.exitCode !== null && proc.exitCode !== 0) break;
       if (await serverAlive(url)) {
         up = true;
         break;
@@ -1805,99 +1824,33 @@ function markSelfWrite(p, text = null) {
 const isSelfWrite = (full) => selfWrites.isEcho(path.resolve(full));
 
 ipcMain.handle('watch:start', async (_e, projectPath) => {
-  openProjectRoot = path.resolve(projectPath); // scopes the asset protocol
-  if (watcher) {
-    watcher.close();
-    watcher = null;
-  }
-  const srcDir = path.join(projectPath, 'src');
-  if (!fs.existsSync(srcDir)) return { ok: false };
-
-  let pending = new Set();
-  let timer = null;
-  let cmsTimer = null;
-  let srcAssetTimer = null;
-  let cssTimer = null;
-
-  watcher = fs.watch(srcDir, { recursive: true }, (_event, filename) => {
-    if (!filename) return;
-    const name = filename.toString();
-    // ANYTHING under src/ can be the difference between a page and the dev
-    // server's error screen: a .ts a component imports, a JSON file it reads,
-    // an image an import points at. This used to be said only for the file
-    // kinds the app itself edits, so breaking a .ts in an editor and fixing it
-    // there left the preview on the error screen with nothing to nudge it —
-    // the poll that gets it back only starts once a probe has failed, and no
-    // probe was ever asked for.
-    //
-    // The app's own writes say it through markSelfWrite instead, which is why
-    // they are skipped here.
-    const changed = path.join(srcDir, name);
-    if (!isSelfWrite(changed)) notePageMayHaveChanged(true);
-    // JSON data files feed the CMS panel, not the page model.
-    if (/\.json$/i.test(name)) {
-      const full = path.join(srcDir, name);
-      if (isSelfWrite(full)) return;
-      clearTimeout(cmsTimer);
-      cmsTimer = setTimeout(() => send('cms:changed', {}), 200);
-      return;
-    }
-    // Media under src/ is listed by the Assets panel now, so it has to hear
-    // about changes there the same way it hears about public/.
-    if (MEDIA_EXT.test(name)) {
-      const full = path.join(srcDir, name);
-      if (isSelfWrite(full)) return;
-      clearTimeout(srcAssetTimer);
-      srcAssetTimer = setTimeout(() => send('assets:changed', {}), 200);
-      return;
-    }
-    if (/\.css$/i.test(name)) {
-      const full = path.join(srcDir, name);
-      if (isSelfWrite(full)) return;
-      clearTimeout(cssTimer);
-      cssTimer = setTimeout(() => send('css:changed', {}), 200);
-      return;
-    }
-    if (!/\.(astro|md|mdx|html)$/i.test(name)) return;
-    const full = path.join(srcDir, name);
-    // Ignore an event that is only this app's own write coming back.
-    if (isSelfWrite(full)) return;
-    pending.add(full);
-    // The site changed, so its picture is out of date — but not urgently, and
-    // not while the user is still typing.
-    scheduleThumb(projectPath, 60000);
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      const files = [...pending];
-      pending = new Set();
-      send('fs:changed', { files });
-    }, 150);
+  stopWatchingProject();
+  openProjectRoot = path.resolve(projectPath);
+  if (!fs.existsSync(path.join(projectPath, 'src'))) return { ok: false };
+  watcher = watchProject({
+    projectPath, send, isSelfWrite, notePageMayHaveChanged, scheduleThumb, mediaPattern: MEDIA_EXT,
   });
-
-  // Watch public/ too — external asset changes refresh the Assets panel.
-  if (assetsWatcher) {
-    assetsWatcher.close();
-    assetsWatcher = null;
-  }
-  const publicDir = path.join(projectPath, 'public');
-  if (fs.existsSync(publicDir)) {
-    let assetsTimer = null;
-    assetsWatcher = fs.watch(publicDir, { recursive: true }, (_event, filename) => {
-      if (filename && String(filename).startsWith('.')) return;
-      const full = filename ? path.join(publicDir, filename.toString()) : null;
-      if (full && isSelfWrite(full)) return;
-      clearTimeout(assetsTimer);
-      assetsTimer = setTimeout(() => send('assets:changed', {}), 200);
-    });
-  }
   return { ok: true };
 });
+
+function stopWatchingProject() {
+  watcher?.close();
+  watcher = null;
+  clearTimeout(pageChangeTimer);
+  pageChangeTimer = null;
+  pageChangeExternal = false;
+  clearTimeout(thumbTimer);
+  thumbTimer = null;
+  for (const timer of styleNudges.values()) clearTimeout(timer);
+  styleNudges.clear();
+  captureEra++;
+  selfWrites.clear();
+}
 
 // ---------------------------------------------------------------------------
 // Assets (public/) — list, upload, move, rename, folders
 // ---------------------------------------------------------------------------
 
-let assetsWatcher = null;
 
 const publicDirOf = (projectPath) => path.join(projectPath, 'public');
 
@@ -3019,7 +2972,8 @@ ipcMain.handle('selection:copy', async (_e, state) => {
 // Dev server IPC
 // ---------------------------------------------------------------------------
 
-function stopDevServer() {
+function stopDevServer(cancelPending = true) {
+  if (cancelPending) devStarts.cancel();
   if (!devServer) return;
   const { proc, daemon, bin, projectPath } = devServer;
   devServer = null;
@@ -3033,21 +2987,8 @@ function stopDevServer() {
     }
     return;
   }
-  // External servers (started by the user, e.g. in a terminal) are never killed.
-  if (!proc) return;
-  try {
-    if (isWin) {
-      spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { shell: true });
-    } else {
-      process.kill(-proc.pid, 'SIGTERM');
-    }
-  } catch {
-    try {
-      proc.kill('SIGTERM');
-    } catch {
-      /* already gone */
-    }
-  }
+  // External servers have no owned process and stay running.
+  stopProcessTree(proc);
 }
 
 let devLogBuffer = [];
@@ -3418,9 +3359,12 @@ function writeMarkerConfig(projectPath) {
     const parserPath = path
       .join(__dirname, 'astroParser.js')
       .replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
-    const pagesDir = toPosix(path.join(projectPath, 'src', 'pages'));
-    const srcDir = toPosix(path.join(projectPath, 'src'));
-    const projectDirPosix = toPosix(projectPath);
+    // Vite normally resolves symlinks before loading source (including
+    // macOS /var -> /private/var). Match both spellings because a project's
+    // preserveSymlinks option can keep the original one instead.
+    const projectDirs = [...new Set([
+      toPosix(path.resolve(projectPath)), toPosix(fs.realpathSync(projectPath)),
+    ])];
     const cfg = `// Generated by Stacki (dev preview only) — do not edit.
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -3430,9 +3374,7 @@ const require = createRequire(import.meta.url);
 const { parsePage, serializePageMarked, resolveChunks, markChunkHtml } = require(${JSON.stringify(
       parserPath
     )});
-const PAGES_DIR = ${JSON.stringify(pagesDir)};
-const SRC_DIR = ${JSON.stringify(srcDir)};
-const PROJECT_DIR = ${JSON.stringify(projectDirPosix)};
+const PROJECT_DIRS = ${JSON.stringify(projectDirs)};
 
 // Nothing this serves is a child of anything. Every marker is a comment —
 // invisible to selectors, to layout and to the box model — and the patcher
@@ -3560,8 +3502,9 @@ const avbMarkers = {
     // and layouts — marks with its own namespace, so opening one and
     // selecting inside it outlines on the canvas like a page does. Without
     // this a component’s internals have no markers at all.
-    const isPage = file.startsWith(PAGES_DIR + '/');
-    if (!isPage && !file.startsWith(SRC_DIR + '/')) return null;
+    const projectDir = PROJECT_DIRS.find((root) => file.startsWith(root + '/src/'));
+    if (!projectDir) return null;
+    const isPage = file.startsWith(projectDir + '/src/pages/');
     try {
       const source = readFileSync(file, 'utf8');
       // Seeded here so the very first edit already has something to compare
@@ -3571,7 +3514,7 @@ const avbMarkers = {
       if (!parsed.editable) return null;
       resolveChunks(parsed.model, file);
       // Project-relative, matching what the app derives from the open file.
-      const rel = file.slice(PROJECT_DIR.length + 1);
+      const rel = file.slice(projectDir.length + 1);
       const marked = isPage
         ? serializePageMarked(parsed.model)
         : serializePageMarked(parsed.model, rel + '|');
@@ -3745,8 +3688,9 @@ export default {
   }
 }
 
-async function spawnDevServer(projectPath, localBin, force, bare) {
+async function spawnDevServer(projectPath, localBin, force, bare, assertActive) {
   const port = await findFreePort(4321);
+  assertActive();
   const args = ['dev', '--port', String(port), '--host', '127.0.0.1'];
   // Astro resolves --config against the project root and rejects absolute
   // paths ([ConfigNotFound]), so pass it relative to the spawn cwd.
@@ -3756,25 +3700,17 @@ async function spawnDevServer(projectPath, localBin, force, bare) {
   if (markerCfg) args.push('--config', toPosix(path.relative(projectPath, markerCfg)));
   if (force) args.push('--force');
 
-  const [cmd, argv] = nodeCliCommand(localBin, args);
-  const proc = spawn(cmd, argv, {
-    cwd: projectPath,
-    // Only the Windows .cmd shim needs a shell to run at all. Going through
-    // one when we have a real node.exe path would re-split it on spaces —
-    // "C:\Program Files\nodejs\node.exe" is the common case.
-    shell: isWin && cmd === localBin,
-    // No stdin pipe — the daemon child can inherit CLI stdio, and a pipe
-    // that closes when the CLI exits has been observed to kill it.
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
-  });
+  const proc = spawnAstroServer(projectPath, localBin, args);
 
   const url = `http://127.0.0.1:${port}`;
   devServer = { proc, url, projectPath, bin: localBin };
 
   proc.stdout.on('data', (d) => pushDevLog(d.toString()));
   proc.stderr.on('data', (d) => pushDevLog(d.toString()));
-  proc.on('error', (err) => pushDevLog(`\n[spawn error] ${err.message}\n`));
+  proc.on('error', (err) => {
+    pushDevLog(`\n[spawn error] ${err.message}\n`);
+    if (devServer?.proc === proc) devServer = null;
+  });
   proc.on('exit', (code) => {
     if (devServer && devServer.proc === proc) {
       // Astro >= 7 daemonizes: the CLI exits 0 after forking the real server
@@ -3812,10 +3748,14 @@ async function spawnDevServer(projectPath, localBin, force, bare) {
   // Wait until the port answers so the iframe doesn't load into a dead server.
   const deadline = Date.now() + 60000;
   while (Date.now() < deadline) {
+    assertActive();
     if (!devServer) {
       throw new Error('Dev server exited before it was ready.\n\n' + (await failureDetail()));
     }
-    if (await portAnswers(port)) return url;
+    if (await portAnswers(port)) {
+      assertActive();
+      return url;
+    }
     await new Promise((r) => setTimeout(r, 300));
   }
   throw new Error('Astro dev server did not start within 60 seconds.\n\n' + (await failureDetail()));
@@ -3848,42 +3788,35 @@ function readAstroLock(projectPath) {
 
 // Serialize dev:start calls — concurrent spawns race Astro's daemon lock and
 // the loser dies with "exited before becoming ready".
-let devStartInFlight = null;
+const devStarts = createKeyedQueue();
 
 ipcMain.handle('dev:start', (_e, projectPath) => {
-  // Whatever thumbnails were queued for the start screen, this takes priority.
   captureEra++;
-  if (devStartInFlight) return devStartInFlight;
-  devStartInFlight = doDevStart(projectPath)
-    // Now that a server has resolved the config, this is the authoritative
-    // answer — the scan before it could only read the config's text.
-    .then((r) => ({ ...r, trailingSlash: readTrailingSlash(projectPath) }))
-    .then((r) => {
-      // The server that just came up can also take the project's picture. A
-      // few seconds in, so it does not compete with the canvas's own first
-      // load for the same server.
-      scheduleThumb(projectPath, 6000);
-      return r;
-    })
-    .finally(() => {
-      devStartInFlight = null;
-    });
-  return devStartInFlight;
+  return devStarts.run(projectPath, async (assertActive) => {
+    const result = await doDevStart(projectPath, assertActive);
+    assertActive();
+    scheduleThumb(projectPath, 6000);
+    return { ...result, trailingSlash: readTrailingSlash(projectPath) };
+  });
 });
 
-async function doDevStart(projectPath) {
+async function doDevStart(projectPath, assertActive) {
+  assertActive();
   if (devServer && devServer.projectPath === projectPath) {
     // For adopted external servers, make sure it's still alive.
     if (devServer.external) {
-      if (await serverAlive(devServer.url)) {
-        return { url: devServer.url, external: true };
+      const current = devServer;
+      if (await serverAlive(current.url)) {
+        assertActive();
+        return { url: current.url, external: true };
       }
       devServer = null;
     } else {
       return { url: devServer.url };
     }
   }
-  stopDevServer();
+  assertActive();
+  stopDevServer(false);
   devLogBuffer = [];
 
   // Without this the failure is the shim's "env: node: No such file or
@@ -3901,6 +3834,7 @@ async function doDevStart(projectPath) {
   if (!fs.existsSync(localBin)) {
     // Dependencies missing or incomplete — install with the right PM first.
     await installDependencies(projectPath);
+    assertActive();
     send('progress', { message: null });
     if (!fs.existsSync(localBin)) {
       throw new Error('astro is not installed in this project (no node_modules/.bin/astro after install). Is astro listed in package.json dependencies?');
@@ -3915,13 +3849,16 @@ async function doDevStart(projectPath) {
     try {
       // Retry with --force: first-attempt daemon startup can flake (stale
       // daemon state, vite re-optimizing after a config change).
-      return { url: await spawnDevServer(projectPath, localBin, force) };
+      return { url: await spawnDevServer(projectPath, localBin, force, false, assertActive) };
     } catch (err) {
+      assertActive();
       lastErr = err;
+      stopDevServer(false);
       // Another dev server already running for this project?
       const existing = parseExistingServer(recentDevLog());
       if (existing) {
         const alive = await serverAlive(existing);
+        assertActive();
         if (alive) {
           // Adopt the user's own server instead of fighting it.
           devServer = { proc: null, url: existing, projectPath, external: true };
@@ -3930,6 +3867,7 @@ async function doDevStart(projectPath) {
       }
       devLogBuffer = [];
       await new Promise((r) => setTimeout(r, 800));
+      assertActive();
     }
   }
   // Everything above ran with this app's generated config. A project whose
@@ -3938,7 +3876,7 @@ async function doDevStart(projectPath) {
   // markers and no live patching — an edit reloads the page, the way it did
   // before any of this — but the canvas is a canvas again.
   try {
-    const url = await spawnDevServer(projectPath, localBin, true, true);
+    const url = await spawnDevServer(projectPath, localBin, true, true, assertActive);
     pushDevLog(
       '\n[stacki] the preview would not start with this app\'s config, so it is ' +
         'running on the project\'s own. Outlines and live updates are off; the ' +
@@ -3947,6 +3885,8 @@ async function doDevStart(projectPath) {
     if (devServer) devServer.bare = true;
     return { url, bare: true };
   } catch {
+    assertActive();
+    stopDevServer(false);
     throw lastErr; // report the first failure: it is the one that explains it
   }
 }
@@ -4606,11 +4546,7 @@ async function stopPreview(projectPath) {
   const cur = previewServers.get(projectPath);
   if (!cur) return;
   previewServers.delete(projectPath);
-  try {
-    cur.proc?.kill();
-  } catch {
-    /* already gone */
-  }
+  stopProcessTree(cur.proc);
   try {
     await previewWorktree.removeWorktree(git, { projectPath });
   } catch {
@@ -4642,23 +4578,16 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
     );
   }
   const port = await findFreePort(4500);
-  const [cmd, argv] = nodeCliCommand(localBin, [
-    'dev',
-    '--port',
-    String(port),
-    '--host',
-    '127.0.0.1',
+  const proc = spawnAstroServer(dir, localBin, [
+    'dev', '--port', String(port), '--host', '127.0.0.1',
   ]);
-  const proc = spawn(cmd, argv, {
-    cwd: dir,
-    shell: isWin && cmd === localBin,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
-  });
+
   const url = `http://127.0.0.1:${port}`;
   let log = '';
-  proc.stdout.on('data', (d) => (log += d.toString()));
-  proc.stderr.on('data', (d) => (log += d.toString()));
+  proc.stdout.on('data', (d) => (log = (log + d).slice(-12000)));
+  proc.stderr.on('data', (d) => (log = (log + d).slice(-12000)));
+  let spawnError = null;
+  proc.on('error', (error) => { spawnError = error; });
   previewServers.set(projectPath, { proc, url, ref, port });
   proc.on('exit', () => {
     if (previewServers.get(projectPath)?.proc === proc) previewServers.delete(projectPath);
@@ -4670,7 +4599,7 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
   // not left as a blank canvas.
   const deadline = Date.now() + 45000;
   while (Date.now() < deadline) {
-    if (proc.exitCode !== null || proc.killed) break;
+    if (spawnError || proc.exitCode !== null || proc.killed) break;
     if (await serverAlive(url)) return { url, ref, reused: false };
     await new Promise((r) => setTimeout(r, 400));
   }

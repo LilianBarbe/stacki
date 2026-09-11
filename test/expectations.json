@@ -11,18 +11,6 @@
     "it changes meaning or is invalid Astro. Those are bugs, not formatting drift.",
     "severity:'formatting' means the output is semantically the same file, reformatted."
   ],
-  "interleaved-frontmatter.astro": {
-    "editable": true,
-    "identity": "fail",
-    "severity": "corruption",
-    "note": "Imports are hoisted above frontmatter statements that originally preceded them. If a hoisted import's module has side effects, or a const is used in a later import path, hoisting changes evaluation order."
-  },
-  "frontmatter-blank-lines.astro": {
-    "editable": true,
-    "identity": "fail",
-    "severity": "formatting",
-    "note": "Leading and trailing blank lines inside the frontmatter are lost to extraFrontmatter.trim() (astroParser.js:298)."
-  },
   "four-space-indent.astro": {
     "editable": true,
     "identity": "fail",
@@ -46,12 +34,6 @@
     "identity": "fail",
     "severity": "formatting",
     "note": "The hanging-bracket style — `<a href={href}` / `\\t\\t>Join our Discord <svg …` — is reflowed: tabs become the serializer's two-space indent and each tag gets its own line. The text's own boundary space survives the reflow now (that was the double-save bug); what is left is the indentation style, which the serializer does not preserve."
-  },
-  "empty-frontmatter-dashes-in-body.astro": {
-    "editable": true,
-    "identity": "fail",
-    "severity": "formatting",
-    "note": "`---\\n---\\n--- these dashes are body text` — an empty fence followed by a body line that starts with dashes. The body's `---` is read as frontmatter code (model.extraFrontmatter === '---') and written back on a line of its own, splitting the sentence in two. Renders the same; the file is rewritten."
   },
   "frontmatter-after-blank-line.astro": {
     "editable": true,

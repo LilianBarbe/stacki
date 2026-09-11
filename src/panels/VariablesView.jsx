@@ -551,7 +551,7 @@ export default function VariablesView({ project, selected, hidden, onClose, show
           block.kind === 'matrix'
             ? `--${column.label}-${typed}`
             : `${stemOf(block)}${typed}`;
-        adds.push({ file: anchor.file, selector: anchor.selector, name, value: '', after: anchor.name });
+        adds.push({ file: anchor.file, selector: anchor.selector, name, value: 'unset', after: anchor.name });
       });
       if (!adds.length) return;
       await writeWithUndo(adds.map((a) => a.file), 'the variable', async () => {

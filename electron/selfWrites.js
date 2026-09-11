@@ -49,6 +49,9 @@ function createSelfWrites({ read, now = () => Date.now(), windowMs = DEFAULT_WIN
       }
       return now() - mine.at < windowMs;
     },
+    clear() {
+      seen.clear();
+    },
     /** For tests and for anyone who wants to know what we last put there. */
     lastWrite(abs) {
       return seen.get(abs) || null;

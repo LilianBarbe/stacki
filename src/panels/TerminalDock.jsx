@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import TerminalPane from './TerminalPane.jsx';
+import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
 import { PlusIcon, CloseIcon, ChevronDownIcon } from '../ui/Icons.jsx';
+import { usePointerDrag } from '../ui/usePointerDrag.js';
+
+const TerminalPane = lazy(() => import('./TerminalPane.jsx'));
 
 // The bottom terminal dock: tab bar, drag-to-resize top edge, one pty per tab.
 //
@@ -185,6 +187,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
 
   // --- Resize ------------------------------------------------------------
 
+  const startDrag = usePointerDrag();
   const onHandleDown = (e) => {
     e.preventDefault();
     const startY = e.clientY;
@@ -193,20 +196,18 @@ export default function TerminalDock({ projectPath, open, onClose }) {
     setDragging(true);
 
     // Dragging up (a smaller clientY) makes the dock taller.
-    const onMove = (ev) =>
-      setHeight(Math.min(maxHeight, Math.max(MIN_HEIGHT, startHeight + (startY - ev.clientY))));
-    const onUp = (ev) => {
-      onMove(ev);
-      setDragging(false);
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      store(
-        HEIGHT_KEY,
-        String(Math.min(maxHeight, Math.max(MIN_HEIGHT, startHeight + (startY - ev.clientY))))
-      );
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    let nextHeight = startHeight;
+    startDrag(e, {
+      cursor: 'ns-resize',
+      onMove: (ev) => {
+        nextHeight = Math.min(maxHeight, Math.max(MIN_HEIGHT, startHeight + startY - ev.clientY));
+        setHeight(nextHeight);
+      },
+      onEnd: () => {
+        setDragging(false);
+        store(HEIGHT_KEY, String(nextHeight));
+      },
+    });
   };
 
   // Re-fit the visible terminal whenever the space it has changes. Each pane
@@ -305,6 +306,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
             className="term-pane-wrap"
             style={{ display: tab.id === activeId ? 'block' : 'none' }}
           >
+            <Suspense fallback={<div className="term-pane" role="status">Loading terminal…</div>}>
             <TerminalPane
               ref={(ref) => setPaneRef(tab.id, ref)}
               terminalId={tab.id}
@@ -312,6 +314,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
               autoLaunch={autoLaunch}
               onTitleChange={(title) => setTabTitle(tab.id, title)}
             />
+            </Suspense>
           </div>
         ))}
       </div>

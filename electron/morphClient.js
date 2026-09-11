@@ -53,15 +53,7 @@ function stripAnchors(root) {
 // pass after the content is settled, from a copy of the new rendering that
 // still has them, so the editor's paths point at what is on the page now.
 function syncAnchors(liveRoot, serverRoot) {
-  const gone = [];
-  const collect = (p) => {
-    for (let n = p.firstChild; n; n = n.nextSibling) {
-      if (isAnchor(n)) gone.push(n);
-      else if (n.nodeType === 1) collect(n);
-    }
-  };
-  collect(liveRoot);
-  for (const n of gone) n.remove();
+  stripAnchors(liveRoot);
 
   // Whitespace is not content, and is never matched.
   //
@@ -151,24 +143,33 @@ function keyFor(n) {
 // ahead always finds one, decides a node was inserted, and from there every
 // remaining sibling is rebuilt. An element that was only meant to keep still
 // loses its animation, its scroll position and anything the client hung on it.
-// The subsequence is worked out rather than guessed, so what stayed is known
-// exactly, and lists here are short enough that the cost does not matter.
+// Consume a shared prefix before building the matrix. Most edits change text
+// or attributes, leaving every child key in place; those lists, along with
+// appends and removals at the end, take linear time and memory. The remaining
+// matrix keeps the existing tie-breaking for repeated text and element keys.
 function diffChildren(a, b) {
   const n = a.length;
   const m = b.length;
-  const dp = [];
-  for (let i = 0; i <= n; i++) dp.push(new Int32Array(m + 1));
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) {
-      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    }
-  }
   const ops = [];
   let i = 0;
   let j = 0;
+  while (i < n && j < m && a[i] === b[j]) ops.push([0, i++, j++]);
+
+  const start = i;
+  const dp = [];
+  if (i < n && j < m) {
+    for (let row = 0; row <= n - start; row++) dp.push(new Int32Array(m - start + 1));
+    for (let row = n - start - 1; row >= 0; row--) {
+      for (let col = m - start - 1; col >= 0; col--) {
+        dp[row][col] = a[row + start] === b[col + start]
+          ? dp[row + 1][col + 1] + 1
+          : Math.max(dp[row + 1][col], dp[row][col + 1]);
+      }
+    }
+  }
   while (i < n && j < m) {
     if (a[i] === b[j]) { ops.push([0, i++, j++]); continue; }      // keep
-    if (dp[i + 1][j] >= dp[i][j + 1]) ops.push([-1, i++, -1]);      // removed
+    if (dp[i - start + 1][j - start] >= dp[i - start][j - start + 1]) ops.push([-1, i++, -1]); // removed
     else ops.push([1, -1, j++]);                                    // inserted
   }
   while (i < n) ops.push([-1, i++, -1]);
@@ -210,26 +211,29 @@ const classesOf = (n) => (n.getAttribute('class') || '').split(/\s+/).filter(Boo
 // vacuous and would match anything, including a node the client inserted.
 function keepsClassesOf(live, serverNode) {
   const want = classesOf(serverNode);
-  const have = classesOf(live);
-  if (!want.length) return !have.length;
-  for (const c of want) if (have.indexOf(c) === -1) return false;
+  if (!want.length) return live.classList.length === 0;
+  for (const c of want) if (!live.classList.contains(c)) return false;
   return true;
 }
 
 function findLive(from, serverNode) {
   let loose = null;
+  const key = keyOf(serverNode);
   for (let n = from; n; n = n.nextSibling) {
     if (isAnchor(n)) continue;
     if (serverNode.nodeType !== 1) {
       if (n.nodeType === serverNode.nodeType) return n;
-      if (n.nodeType !== 1 && !loose) loose = n;
       continue;
     }
     if (n.nodeType !== 1) continue;
     if (n.tagName !== serverNode.tagName) continue;
-    const ks = keyOf(serverNode);
-    if (ks !== null && keyOf(n) === ks) return n;
-    if (ks === null && keepsClassesOf(n, serverNode)) return n;
+    // An explicit id cannot fall back to a different same-tag element. If
+    // client code removed it, reloading is safer than editing its neighbour.
+    if (key !== null) {
+      if (keyOf(n) === key) return n;
+      continue;
+    }
+    if (keepsClassesOf(n, serverNode)) return n;
     // Same tag, weaker evidence. Kept in case nothing better turns up: the
     // diff has already decided this node persists, so the only question left
     // is which one it is, and a same-tag sibling beats giving up and reloading.
@@ -340,65 +344,75 @@ function isStyleModule(src) {
 // So a new module is loaded rather than reloaded around — the same thing
 // loadStyles does for a stylesheet, for the same reason: an element made here
 // runs, a cloned one does not.
-function scriptSignature(doc) {
+function scriptsOf(doc) {
   const out = [];
   const list = doc.getElementsByTagName('script');
   for (let i = 0; i < list.length; i++) {
     const s = list[i];
     const src = s.getAttribute('src') || '';
     if (isStyleModule(src)) continue;
-    out.push(src + ' | ' + (s.getAttribute('type') || '') + ' | ' + s.textContent);
+    const attrs = Array.from(s.attributes, (a) => [a.name, a.value]);
+    attrs.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+    out.push({
+      src,
+      type: s.getAttribute('type') || '',
+      attrs,
+      signature: JSON.stringify([attrs, s.textContent]),
+    });
   }
-  return out.join('\n@@\n');
+  return out;
 }
 
-// One line per script, the same way scriptSignature writes them.
-function scriptLines(doc) {
-  const sig = scriptSignature(doc);
-  return sig ? sig.split('\n@@\n') : [];
+// Structured signatures cannot collide with separators in URLs or source.
+function scriptSignature(doc) {
+  return JSON.stringify(scriptsOf(doc).map((s) => s.signature));
 }
 
 /**
  * What the new rendering adds, or null when it does anything else to the
  * scripts — which is the reload.
  *
- * Only a module with a `src` can be added this way. An inline script has to run
+ * Only an external script can be added this way. An inline script has to run
  * where it sits, and this cannot put it there: the copy the patch inserted is
  * inert and replacing it is a different job. So an inline arrival still reloads.
  */
 function addedScripts(prevDoc, nextDoc) {
-  const before = scriptLines(prevDoc);
-  const after = scriptLines(nextDoc);
-  const had = new Set(before);
-  const has = new Set(after);
-  for (const line of before) {
-    if (!has.has(line)) return null; // something changed or went away
+  const before = scriptsOf(prevDoc);
+  const after = scriptsOf(nextDoc);
+  const had = new Set(before.map((s) => s.signature));
+  const added = [];
+  let i = 0;
+  for (const script of after) {
+    if (script.signature === before[i]?.signature) {
+      i++;
+    } else {
+      // Already-run scripts must keep their order and count. Neither a
+      // reorder nor another execution of an existing script can be patched.
+      if (had.has(script.signature) || !script.src) return null;
+      added.push(script);
+    }
   }
-  const added = after.filter((line) => !had.has(line));
-  // `src | type | text` — a module is the part before the first separator.
-  if (added.some((line) => !line.split(' | ')[0])) return null; // an inline one
-  return added.map((line) => {
-    const [src, type] = line.split(' | ');
-    return { src, type };
-  });
+  return i === before.length ? added : null;
 }
 
 // The modules a rendering asks for that this page has never run. Made here, not
 // cloned, so they run.
 const loadedScripts = new Set();
 function noteScripts(doc) {
-  for (const line of scriptLines(doc)) {
-    const src = line.split(' | ')[0];
+  for (const { src } of scriptsOf(doc)) {
     if (src) loadedScripts.add(src);
   }
 }
 function runScripts(added) {
-  for (const { src, type } of added) {
+  for (const { src, attrs } of added) {
     if (!src || loadedScripts.has(src)) continue;
     loadedScripts.add(src);
     const el = document.createElement('script');
-    if (type) el.type = type;
-    el.src = src;
+    // Preserve loading semantics such as integrity, crossorigin and nonce.
+    // Dynamic classic scripts default to async; source scripts without that
+    // attribute must instead execute in insertion order.
+    el.async = false;
+    for (const [name, value] of attrs) el.setAttribute(name, value);
     document.head.appendChild(el);
   }
 }

@@ -98,8 +98,9 @@ check('a file that has since gone is not our write either', writes.isEcho(PAGE) 
 const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
 check(
   'the watcher asks about every kind of file it hears about',
-  (main.match(/isSelfWrite\(/g) || []).length >= 6,
-  `${(main.match(/isSelfWrite\(/g) || []).length} places ask`
+  /watchProject\(\{[\s\S]*?isSelfWrite/.test(main) &&
+    /if \(isSelfWrite\(changed\)\) return;/.test(fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8')),
+  'the watcher must receive the self-write guard before routing events'
 );
 check(
   'no stopwatch is left behind anywhere',

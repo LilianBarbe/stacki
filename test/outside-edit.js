@@ -127,9 +127,10 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 
   // --- who says it, and when -----------------------------------------------------
   const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+  const watcher = fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8');
   check(
     'a change the app did not make is marked as coming from outside',
-    /if \(!isSelfWrite\(changed\)\) notePageMayHaveChanged\(true\);/.test(main),
+    /if \(isSelfWrite\(changed\)\) return;\s*notePageMayHaveChanged\(true\);/.test(watcher),
     'the app cannot tell an outside edit from its own'
   );
   check(

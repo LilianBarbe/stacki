@@ -188,7 +188,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   const close = main.slice(main.indexOf("ipcMain.handle('project:close'"), main.indexOf("app.on('window-all-closed'"));
   check('letting go stops the dev server', /stopDevServer\(\)/.test(close), close.slice(0, 200));
   check('and the shells, which outlive a window', /cleanupTerminals\(\)/.test(close), close.slice(0, 200));
-  check('and the watcher', /watcher\.close\(\)/.test(close), close.slice(0, 200));
+  check('and the watcher', /stopWatchingProject\(\)/.test(close), close.slice(0, 200));
   check('and puts the project out of reach', /openProjectRoot = null/.test(close), close.slice(0, 200));
   check(
     'and starts the window over, which is what lets the renderer go',

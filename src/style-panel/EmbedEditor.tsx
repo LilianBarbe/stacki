@@ -17,6 +17,7 @@ import { hslaToRgba } from './lib/color'
 import { clampNonNegative, filterCssProperties } from './lib/css-properties'
 import { panelSpan } from './lib/panel-box'
 import { forgetComputedStyles, useHighlight } from './lib/computed-style'
+import { forgetComputedColors } from './lib/computed-color'
 import SizeSection from './SizeSection'
 import GapControl from './GapControl'
 import GridControls from './GridControls'
@@ -3163,6 +3164,7 @@ export default function EmbedEditor() {
     // `text-align` and the segment for the old alignment stayed lit, while the
     // canvas behind it had already gone back to the inherited one.
     forgetComputedStyles()
+    forgetComputedColors()
     const rules = rebuildRules(docsRef.current)
     if (contentRef.current) contentRef.current.rules = rules
     const target = targetRef.current

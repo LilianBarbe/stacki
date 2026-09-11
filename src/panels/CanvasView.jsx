@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePointerDrag } from '../ui/usePointerDrag.js';
 
 // Freeform canvas: the page rendered at every breakpoint side by side on a
 // pannable, zoomable surface. Drag anywhere to pan; pinch (or ⌘/Ctrl+wheel)
@@ -23,6 +24,7 @@ const MAX_ZOOM = 4;
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
 export default function CanvasView({ url, refreshKey }) {
+  const startDrag = usePointerDrag();
   const wrapRef = React.useRef(null);
   const iframeRefs = React.useRef({}); // key -> iframe element
   const [view, setView] = React.useState(null); // {x, y, s}
@@ -49,13 +51,13 @@ export default function CanvasView({ url, refreshKey }) {
   // Page heights reported by the preload inside each preview iframe.
   React.useEffect(() => {
     const onMessage = (e) => {
-      if (e.data?.type !== 'avb:page-height' || typeof e.data.height !== 'number') return;
+      if (e.data?.type !== 'avb:page-height' || !Number.isFinite(e.data.height)) return;
       const entry = Object.entries(iframeRefs.current).find(
         ([, el]) => el && el.contentWindow === e.source
       );
       if (!entry) return;
       const [key] = entry;
-      const height = Math.round(e.data.height);
+      const height = clamp(Math.round(e.data.height), 200, MAX_PAGE_HEIGHT);
       setHeights((h) => (h[key] === height ? h : { ...h, [key]: height }));
     };
     window.addEventListener('message', onMessage);
@@ -81,6 +83,11 @@ export default function CanvasView({ url, refreshKey }) {
 
   React.useLayoutEffect(() => {
     fit();
+    const observer = new ResizeObserver(() => {
+      if (!userMovedRef.current) fit();
+    });
+    observer.observe(wrapRef.current);
+    return () => observer.disconnect();
   }, [fit]);
 
   // Real page heights arrive after the iframes load; keep the layout fitted
@@ -89,6 +96,10 @@ export default function CanvasView({ url, refreshKey }) {
   React.useEffect(() => {
     if (!userMovedRef.current) fit();
   }, [worldW, worldH, fit]);
+
+  // A newly loaded page may be shorter than the previous one. Discard its
+  // old measurements; fresh reports will fit unless the user moved the view.
+  React.useEffect(() => setHeights({}), [url, refreshKey]);
 
   // Native wheel listener — React attaches wheel handlers passively, so
   // preventDefault (needed to stop history-swipe/page zoom) requires our own.
@@ -125,15 +136,10 @@ export default function CanvasView({ url, refreshKey }) {
     setPanning(true);
     const sx = e.clientX;
     const sy = e.clientY;
-    const onMove = (ev) =>
-      setView({ ...v0, x: v0.x + ev.clientX - sx, y: v0.y + ev.clientY - sy });
-    const onUp = () => {
-      setPanning(false);
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    startDrag(e, {
+      onMove: (ev) => setView({ ...v0, x: v0.x + ev.clientX - sx, y: v0.y + ev.clientY - sy }),
+      onEnd: () => setPanning(false),
+    });
   };
 
   // Zoom buttons zoom around the viewport center.
@@ -197,7 +203,7 @@ export default function CanvasView({ url, refreshKey }) {
             {Math.round(view.s * 100)}%
           </button>
           <button title="Zoom in" onClick={() => zoomTo(view.s * 1.25)}>+</button>
-          <button title="Fit all breakpoints" onClick={fit}>Fit</button>
+          <button title="Fit all breakpoints" onClick={() => { userMovedRef.current = false; fit(); }}>Fit</button>
         </div>
       )}
     </div>

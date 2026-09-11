@@ -164,6 +164,11 @@ for (const file of sources) {
   for (const m of text.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s+from\s+'(\.[^']+)';/gm)) {
     imported.set(m[1], path.resolve(path.dirname(file), m[2]));
   }
+  // Lazy-loading changes when a panel loads, not its prop contract. Follow
+  // those module references too so startup optimization cannot erase coverage.
+  for (const m of text.matchAll(/const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:React\.)?lazy(?:Panel)?\(\s*\(\s*\)\s*=>\s*import\(\s*['"](\.[^'"]+)['"]\s*\)/g)) {
+    imported.set(m[1], path.resolve(path.dirname(file), m[2]));
+  }
   for (const m of text.matchAll(/<([A-Z][\w$]*)[\s>]/g)) {
     const target = imported.get(m[1]);
     if (!target) continue;

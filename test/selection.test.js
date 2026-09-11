@@ -69,9 +69,10 @@ describe('locateSelection', () => {
         ranges.set(key, at);
 
         if (node.kind === 'element' || node.kind === 'component' || node.kind === 'raw') {
+          const opening = node.shorthand ? '<>' : `<${node.name}`;
           assert.ok(
-            lines[at.startLine - 1].includes(`<${node.name}`),
-            `${key}: <${node.name}> is not on line ${at.startLine}: ${lines[at.startLine - 1]}`
+            lines[at.startLine - 1].includes(opening),
+            `${key}: ${opening} is not on line ${at.startLine}: ${lines[at.startLine - 1]}`
           );
         }
       }

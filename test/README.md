@@ -5,7 +5,22 @@ npm test                                   # the gate — run this before every 
 npm run roundtrip:report                   # where the parser stands, and what is left to fix
 node scripts/roundtrip-report.js ~/a-site  # same report against any Astro project
 STACKI_CORPUS=~/a-site npm test            # crash-sweep a real project as part of the gate
+node scripts/run-tests.js querycache       # run one or more named test commands
+npm run performance:report -- d9f9c05      # compare preview diff with the pre-refactor checkpoint
+npm run integration:dev                    # real Electron/Astro lifecycle smoke test
 ```
+
+The gate discovers every `test:*` command in `package.json` and runs the commands
+directly, reporting all failures. Add a new standalone test command there once;
+there is no second list to update. Files named `*.test.js` are already included by
+the Node test runner. Individual `npm run test:...` commands remain available.
+
+The optional `integration:dev` test installs a pinned Astro version into a temporary
+project and starts real Electron and Astro processes. It needs network access on
+the first install and uses isolated app data; it does not modify an existing site.
+The ordinary gate stays offline. Several older content tests use an optional
+external project and report a skip if it is absent; the standalone lifecycle and
+content worker regressions still run.
 
 ## The round-trip gate
 

@@ -66,7 +66,7 @@ const workDirOf = (projectPath) => path.join(projectPath, 'node_modules', '.stac
 function stageRunner(projectPath, configAbs) {
   const dir = workDirOf(projectPath);
   fs.mkdirSync(dir, { recursive: true });
-  for (const name of ['stub-astro-content.mjs', 'stub-astro-loaders.mjs', 'introspect.mjs']) {
+  for (const name of ['stub-astro-content.mjs', 'stub-astro-loaders.mjs', 'schemaTools.mjs', 'introspect.mjs']) {
     fs.writeFileSync(
       path.join(dir, name),
       fs.readFileSync(path.join(__dirname, 'content', name), 'utf8'),
@@ -182,125 +182,121 @@ const stampOf = (projectPath, inputs) =>
 // and validating an entry against a schema is the cheap half, which is asked
 // for on every edit. So the process that read the config stays around to answer
 // those, and is replaced when the config it read changes.
-const services = new Map(); // projectPath -> service
+const services = new Map(); // projectPath -> service, including one still starting
 const IDLE_TIMEOUT = 5 * 60 * 1000;
 
-function stopService(projectPath) {
-  const service = services.get(projectPath);
-  if (!service) return;
-  services.delete(projectPath);
+function stopService(projectPath, service = services.get(projectPath), error = new Error('The content config was reloaded.')) {
+  if (!service || service.stopped) return;
+  // An old child's exit can arrive after its replacement starts. It must only
+  // clean up its own requests and process, never the replacement's registry.
+  if (services.get(projectPath) === service) services.delete(projectPath);
+  service.stopped = true;
   clearTimeout(service.idle);
-  for (const pending of service.pending.values()) pending.reject(new Error('The content config was reloaded.'));
+  clearTimeout(service.timer);
+  service.rejectManifest?.(error);
+  for (const pending of service.pending.values()) pending.reject(error);
   service.pending.clear();
   try {
-    service.child.kill();
+    service.child?.kill();
   } catch {
     /* already gone */
   }
 }
 
 function touch(service) {
+  if (service.stopped) return;
   clearTimeout(service.idle);
-  // Nothing to answer for a while: let the process go, and pay for the next one
-  // when it is actually needed.
-  service.idle = setTimeout(() => stopService(service.projectPath), IDLE_TIMEOUT);
-  if (service.idle.unref) service.idle.unref();
+  service.idle = setTimeout(() => stopService(service.projectPath, service), IDLE_TIMEOUT);
+  service.idle.unref?.();
 }
 
-async function startService(projectPath, configAbs) {
-  const esbuild = esbuildOf(projectPath);
-  if (!esbuild) throw new Error('Reading the content config needs the project dependencies installed.');
+async function startService(service) {
+  const { projectPath, configAbs } = service;
+  try {
+    if (service.stopped) throw new Error('The content config was reloaded.');
+    const esbuild = esbuildOf(projectPath);
+    if (!esbuild) throw new Error('Reading the content config needs the project dependencies installed.');
+    const { dir, entry } = stageRunner(projectPath, configAbs);
+    const { outfile, inputs } = await bundle(esbuild, projectPath, dir, entry);
+    // Closing a project while esbuild is running must not leave a new child
+    // behind once the asynchronous build eventually finishes.
+    if (service.stopped) throw new Error('The content config was reloaded.');
+    service.inputs = inputs;
+    service.stamp = stampOf(projectPath, inputs);
+    const child = service.child = spawn(process.execPath, [outfile], {
+      cwd: projectPath,
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const manifest = new Promise((resolve, reject) => {
+      service.resolveManifest = resolve;
+      service.rejectManifest = reject;
+    });
+    const fail = (error) => stopService(projectPath, service, error);
+    let buffer = '';
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk;
+      let at;
+      while ((at = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, at);
+        buffer = buffer.slice(at + 1);
+        const start = line.indexOf(SENTINEL);
+        if (start === -1) continue;
+        let message;
+        try {
+          message = JSON.parse(line.slice(start + SENTINEL.length));
+        } catch {
+          continue;
+        }
+        if (message.type === 'manifest') service.resolveManifest(message.value);
+        else if (message.type === 'reply') service.pending.get(message.id)?.resolve(message.value);
+      }
+    });
+    child.stderr.on('data', (chunk) => (service.stderr = (service.stderr + chunk).slice(-4000)));
+    child.on('error', fail);
+    child.stdin.on('error', fail);
+    child.on('exit', () => fail(new Error(cleanError(service.stderr) || 'The content config could not be read.')));
+    service.timer = setTimeout(() => fail(new Error('Reading the content config timed out.')), RUN_TIMEOUT);
+    service.timer.unref?.();
+    service.manifest = await manifest;
+    if (service.stopped) throw new Error('The content config was reloaded.');
+    touch(service);
+    return service;
+  } catch (error) {
+    stopService(projectPath, service, error);
+    throw error;
+  } finally {
+    clearTimeout(service.timer);
+  }
+}
 
-  const { dir, entry } = stageRunner(projectPath, configAbs);
-  const { outfile, inputs } = await bundle(esbuild, projectPath, dir, entry);
-
-  const child = spawn(process.execPath, [outfile], {
-    cwd: projectPath,
-    // Electron's own binary, told to behave as node, so this works the same in
-    // a packaged app as it does in development.
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-
-  // Deliberately not unref'd: the pipes are what carry the answers, and a
-  // process with nothing else to do would exit mid-question. Callers outside
-  // the app end with stopAllServices(); inside it, the idle timer does.
+// Publish the pending service before doing any asynchronous work. Readers and
+// validation requests then share its bundle, process, and completed manifest.
+function serviceFor(projectPath, { force = false } = {}) {
+  const found = configPathOf(projectPath);
+  const existing = services.get(projectPath);
+  if (!found) {
+    stopService(projectPath);
+    return Promise.resolve(null);
+  }
+  if (existing && !force && existing.configAbs === found.abs &&
+      (!existing.manifest || existing.stamp === stampOf(projectPath, existing.inputs))) {
+    return existing.ready.then((service) => {
+      if (service.stopped) throw new Error('The content config was reloaded.');
+      touch(service);
+      return service;
+    });
+  }
+  stopService(projectPath);
   const service = {
-    projectPath,
-    child,
-    inputs,
-    stamp: stampOf(projectPath, inputs),
-    pending: new Map(),
-    nextId: 1,
-    stderr: '',
-    idle: null,
+    projectPath, configAbs: found.abs, child: null, pending: new Map(),
+    nextId: 1, stderr: '', stopped: false,
   };
   services.set(projectPath, service);
-
-  const manifest = new Promise((resolve, reject) => {
-    service.resolveManifest = resolve;
-    service.rejectManifest = reject;
-  });
-
-  let buffer = '';
-  child.stdout.on('data', (chunk) => {
-    buffer += chunk;
-    let at;
-    while ((at = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, at);
-      buffer = buffer.slice(at + 1);
-      const start = line.indexOf(SENTINEL);
-      if (start === -1) continue; // something the project printed
-      let message;
-      try {
-        message = JSON.parse(line.slice(start + SENTINEL.length));
-      } catch {
-        continue;
-      }
-      if (message.type === 'manifest') service.resolveManifest(message.value);
-      else if (message.type === 'reply') {
-        const pending = service.pending.get(message.id);
-        if (pending) {
-          service.pending.delete(message.id);
-          pending.resolve(message.value);
-        }
-      }
-    }
-  });
-  child.stderr.on('data', (chunk) => (service.stderr = (service.stderr + chunk).slice(-4000)));
-  child.on('error', (err) => service.rejectManifest(err));
-  child.on('exit', () => {
-    service.rejectManifest(new Error(cleanError(service.stderr) || 'The content config could not be read.'));
-    stopService(projectPath);
-  });
-
-  const timer = setTimeout(() => {
-    service.rejectManifest(new Error('Reading the content config timed out.'));
-    stopService(projectPath);
-  }, RUN_TIMEOUT);
-  if (timer.unref) timer.unref();
-
-  try {
-    service.manifest = await manifest;
-  } finally {
-    clearTimeout(timer);
-  }
-  touch(service);
-  return service;
-}
-
-// The service for a project, started or restarted as needed. Restarted when
-// anything the config imports has changed on disk since it was read.
-async function serviceFor(projectPath, { force = false } = {}) {
-  const existing = services.get(projectPath);
-  if (existing && !force && existing.stamp === stampOf(projectPath, existing.inputs)) {
-    touch(existing);
-    return existing;
-  }
-  if (existing) stopService(projectPath);
-  const found = configPathOf(projectPath);
-  if (!found) return null;
-  return startService(projectPath, found.abs);
+  service.ready = existing
+    ? existing.ready.catch(() => {}).then(() => startService(service))
+    : startService(service);
+  return service.ready;
 }
 
 /**
@@ -309,7 +305,10 @@ async function serviceFor(projectPath, { force = false } = {}) {
  */
 async function readContentConfig(projectPath, { force = false } = {}) {
   const found = configPathOf(projectPath);
-  if (!found) return { missing: true, collections: [] };
+  if (!found) {
+    stopService(projectPath);
+    return { missing: true, collections: [] };
+  }
   try {
     const service = await serviceFor(projectPath, { force });
     return { ...service.manifest, configPath: found.rel };
@@ -331,19 +330,33 @@ async function validateEntry(projectPath, { collection, data }) {
     return { issues: [], error: cleanError(err.message) };
   }
   if (!service) return { issues: [], unchecked: true };
+  if (service.stopped) return { issues: [], error: 'The content config was reloaded.' };
   touch(service);
   const id = service.nextId++;
-  const reply = new Promise((resolve, reject) => {
-    service.pending.set(id, { resolve, reject });
-    const timer = setTimeout(() => {
-      service.pending.delete(id);
-      reject(new Error('Checking the entry timed out.'));
-    }, RUN_TIMEOUT);
-    if (timer.unref) timer.unref();
-  });
   try {
-    service.child.stdin.write(JSON.stringify({ id, op: 'validate', collection, data }) + '\n');
-    return await reply;
+    // Serialize first: unsupported data must not leave a request waiting for a
+    // reply to a message that was never written.
+    const message = JSON.stringify({ id, op: 'validate', collection, data }) + '\n';
+    return await new Promise((resolve, reject) => {
+      const finish = (callback, value) => {
+        clearTimeout(timer);
+        service.pending.delete(id);
+        callback(value);
+      };
+      const timer = setTimeout(() => finish(reject, new Error('Checking the entry timed out.')), RUN_TIMEOUT);
+      timer.unref?.();
+      service.pending.set(id, {
+        resolve: (value) => finish(resolve, value),
+        reject: (error) => finish(reject, error),
+      });
+      try {
+        service.child.stdin.write(message, (error) => {
+          if (error) service.pending.get(id)?.reject(error);
+        });
+      } catch (error) {
+        service.pending.get(id)?.reject(error);
+      }
+    });
   } catch (err) {
     return { issues: [], error: cleanError(err.message) };
   }

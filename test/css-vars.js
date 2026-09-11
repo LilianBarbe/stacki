@@ -20,6 +20,7 @@ const path = require('path');
 const {
   readVariables,
   setVariable,
+  addVariable,
   readDeclarations,
   groupRules,
   labelForRule,
@@ -177,6 +178,43 @@ const cssFiles = (root) => {
     nested?.groups[0]?.columns[0]?.context?.includes('.card'),
     JSON.stringify(nested?.groups[0]?.columns[0]?.context)
   );
+
+  // Empty custom properties are valid CSS. PostCSS retains their whitespace;
+  // the editor must not mistake the following punctuation for their value.
+  for (const emptyCss of [
+    ':root { --blank: ; --next: red; }',
+    ':root { --blank:; --next: red; }',
+    ':root { --blank:;--next:red}',
+    ':root {\n  --blank: \n\t;\n  --next: red;\n}',
+    ':root { --blank:             ;--next: red; }',
+    ':root { --blank: }',
+  ]) {
+    fs.writeFileSync(file, emptyCss);
+    const entries = readDeclarations(emptyCss)[0].entries;
+    const declaration = entries.find((entry) => entry.name === '--blank');
+    check('an existing empty CSS value stays empty', declaration.value === '', JSON.stringify(declaration));
+    check('an empty value has a zero-width editable span', declaration.valueStart === declaration.valueEnd);
+    if (emptyCss.includes('--next')) {
+      check('a neighboring value excludes its terminator', entries.find((entry) => entry.name === '--next')?.value === 'red');
+    }
+    const result = setVariable(dir, {
+      file: 'src/styles/tokens.css', valueStart: declaration.valueStart, valueEnd: declaration.valueEnd,
+      expect: '', value: 'unset',
+    });
+    check('an empty value can be updated', result.ok === true, JSON.stringify(result));
+    check('editing an empty value preserves delimiters and adjacent declarations',
+      fs.readFileSync(file, 'utf8') === emptyCss.replace(/(--blank:\s*)/, '$1unset'),
+      fs.readFileSync(file, 'utf8'));
+  }
+
+  fs.writeFileSync(file, ':root {\n  --existing: 1px;\n}\n');
+  const added = addVariable(dir, { file: 'src/styles/tokens.css', selector: ':root', name: '--new' });
+  check('a newly added variable defaults to unset', added.ok && fs.readFileSync(file, 'utf8').includes('--new: unset;'));
+  const explicitEmpty = addVariable(dir, {
+    file: 'src/styles/tokens.css', selector: ':root', name: '--explicit-empty', value: '',
+  });
+  check('an explicit empty value is preserved when adding a declaration', explicitEmpty.ok &&
+    readDeclarations(fs.readFileSync(file, 'utf8'))[0].entries.find((entry) => entry.name === '--explicit-empty')?.value === '');
 
   fs.rmSync(dir, { recursive: true, force: true });
 }

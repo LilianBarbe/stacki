@@ -8,7 +8,13 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  optimizeDeps: {
+    include: ['stacki/frontmatter'],
+  },
   build: {
     outDir: 'dist',
+    commonjsOptions: {
+      include: [/node_modules/, /electron[\\/]frontmatter\.js$/],
+    },
   },
 });

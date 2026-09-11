@@ -36,8 +36,8 @@ export const SECTIONS: readonly SectionDef[] = [
     label: 'Flex/Grid Child',
     order: [
       'flex', 'flex-grow', 'flex-shrink', 'flex-basis',
-      // Grid-item placement (the Position control): Area = grid-area (named area);
-      // Manual = the line longhands. Kept here so they group into Flex/Grid Child.
+      // The Position control reads column/row shorthands and line longhands.
+      // grid-area has no dedicated field; NO_CONTROL sends it to Custom properties.
       'grid-area',
       'grid-column', 'grid-column-start', 'grid-column-end',
       'grid-row', 'grid-row-start', 'grid-row-end',
@@ -180,6 +180,7 @@ export const PROPERTY_ORDER: ReadonlyMap<string, number> = (() => {
 // control for one is what takes it off this list.
 const NO_CONTROL: ReadonlySet<string> = new Set([
   'inset',
+  'grid-area',
   'outline',
   'border-top', 'border-right', 'border-bottom', 'border-left',
   'columns', 'column-rule',

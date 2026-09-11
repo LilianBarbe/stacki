@@ -41,44 +41,35 @@ const SOURCE_DIRS = ['src', 'public'];
 const SKIP = new Set(['node_modules', 'dist', '.git', '.astro', '.stacki', '.vercel', '.netlify']);
 
 function fingerprint(projectPath) {
-  let newest = 0;
-  let count = 0;
+  const hash = crypto.createHash('sha1');
+  const include = (full) => {
+    try {
+      const stat = fs.statSync(full);
+      // Count + newest timestamp misses changes to every older file whenever
+      // another file has a future timestamp. Include each path and its own
+      // metadata so renames and edits both invalidate the thumbnail.
+      hash.update(JSON.stringify([path.relative(projectPath, full), stat.size, stat.mtimeMs, stat.ctimeMs]));
+    } catch {
+      /* raced with a write */
+    }
+  };
   const walk = (dir, depth) => {
     if (depth > 8) return;
     let entries;
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       if (entry.name.startsWith('.') || SKIP.has(entry.name)) continue;
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full, depth + 1);
-        continue;
-      }
-      try {
-        const stat = fs.statSync(full);
-        count++;
-        if (stat.mtimeMs > newest) newest = stat.mtimeMs;
-      } catch {
-        /* raced with a write */
-      }
+      if (entry.isDirectory()) walk(full, depth + 1);
+      else include(full);
     }
   };
   for (const dir of SOURCE_DIRS) walk(path.join(projectPath, dir), 0);
-  // Config decides what the pages are, so it counts too.
-  for (const name of ['astro.config.mjs', 'astro.config.ts', 'astro.config.js', 'package.json']) {
-    try {
-      const stat = fs.statSync(path.join(projectPath, name));
-      count++;
-      if (stat.mtimeMs > newest) newest = stat.mtimeMs;
-    } catch {
-      /* not there */
-    }
+  for (const name of ['astro.config.mjs', 'astro.config.ts', 'astro.config.js', 'astro.config.mts', 'astro.config.cjs', 'package.json']) {
+    include(path.join(projectPath, name));
   }
-  return `${count}:${Math.round(newest)}`;
+  return hash.digest('hex');
 }
 
 function readMeta(userDataPath, projectPath) {
@@ -95,7 +86,7 @@ function readMeta(userDataPath, projectPath) {
  */
 function isStale(userDataPath, projectPath) {
   const meta = readMeta(userDataPath, projectPath);
-  if (!meta) return true;
+  if (!meta || !fs.existsSync(thumbPathFor(userDataPath, projectPath))) return true;
   return meta.fingerprint !== fingerprint(projectPath);
 }
 
@@ -143,6 +134,18 @@ function makeWindow() {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function within(promise, ms, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Renders `url` and stores the top of the page as this project's thumbnail.
  * Returns { ok } or { ok: false, error } — a thumbnail is never worth throwing
@@ -152,36 +155,25 @@ async function capture(userDataPath, projectPath, url) {
   let win = null;
   try {
     win = makeWindow();
-    const loaded = new Promise((resolve, reject) => {
-      const done = () => resolve();
-      win.webContents.once('did-finish-load', done);
-      win.webContents.once('did-fail-load', (_e, code, description) =>
-        reject(new Error(`${description || 'load failed'} (${code})`))
-      );
-      setTimeout(() => reject(new Error('the page did not finish loading')), LOAD_TIMEOUT);
-    });
-    // A load that fails does so during loadURL below, before anything awaits
-    // this — which node reports as an unhandled rejection even though the
-    // await two lines down handles it. Claim it now; the await still sees it.
-    loaded.catch(() => {});
-    await win.loadURL(url).catch(() => {});
-    await loaded;
+    const capturedFingerprint = fingerprint(projectPath);
+    // loadURL tracks the main frame, so a failed subframe cannot reject a
+    // successful page. Race the load itself: awaiting it before the timeout
+    // promise would leave a stalled navigation holding the capture queue.
+    await within(win.loadURL(url), LOAD_TIMEOUT, 'the page did not finish loading');
 
     // Wait for the things that arrive after the load event and change what the
     // hero looks like, then put the page back at the top: a fragment in the
     // URL, a restored scroll position or a script's own scrollTo would
     // otherwise photograph the middle of the page — which is the bug this
     // replaces.
-    await win.webContents
-      .executeJavaScript(
+    await within(win.webContents.executeJavaScript(
         `(async () => {
            try { await document.fonts.ready; } catch {}
            window.scrollTo(0, 0);
            return document.title || '';
          })()`,
         true
-      )
-      .catch(() => '');
+      ), 3000, 'fonts did not settle').catch(() => '');
     await wait(SETTLE_MS);
 
     // Back to the top, and stay there until it has been painted. Two things
@@ -190,16 +182,14 @@ async function capture(userDataPath, projectPath, url) {
     // scroll that has been applied has not necessarily been drawn — the
     // compositor paints on the next frame, and capturePage photographs
     // whatever is on screen now.
-    await win.webContents
-      .executeJavaScript(
+    await within(win.webContents.executeJavaScript(
         `new Promise((done) => {
            document.documentElement.style.scrollBehavior = 'auto';
            window.scrollTo(0, 0);
            requestAnimationFrame(() => requestAnimationFrame(() => done(true)));
          })`,
         true
-      )
-      .catch(() => {});
+      ), 3000, 'the page did not repaint').catch(() => {});
     await wait(150);
 
     const image = await win.webContents.capturePage({
@@ -214,7 +204,7 @@ async function capture(userDataPath, projectPath, url) {
     fs.writeFileSync(thumbPathFor(userDataPath, projectPath), image.resize({ width: THUMB_WIDTH }).toPNG());
     fs.writeFileSync(
       metaPathFor(userDataPath, projectPath),
-      JSON.stringify({ fingerprint: fingerprint(projectPath), capturedAt: Date.now(), url }, null, 2)
+      JSON.stringify({ fingerprint: capturedFingerprint, capturedAt: Date.now(), url }, null, 2)
     );
     return { ok: true };
   } catch (err) {

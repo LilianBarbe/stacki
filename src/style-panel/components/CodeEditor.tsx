@@ -74,7 +74,6 @@ const codeEditorTheme = EditorView.theme({
   '.cm-content ::selection': {
     color: 'var(--selection-text)',
     backgroundColor: 'var(--selection)',
-    color: 'var(--color-text-primary)',
   },
 }, { dark: true })
 

@@ -193,11 +193,12 @@ export function walkNodes(
 }
 
 export function findNode(nodes: HostNode[] | null | undefined, id: string): HostNode | null {
-  let found: HostNode | null = null
-  walkNodes(nodes, (n) => {
-    if (!found && n.id === id) found = n
-  })
-  return found
+  for (const node of nodes || []) {
+    if (node.id === id) return node
+    const found = node.children && findNode(node.children, id)
+    if (found) return found
+  }
+  return null
 }
 
 // A prop's literal string value, or '' for expressions and bare attributes —

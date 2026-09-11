@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePointerDrag } from '../ui/usePointerDrag.js';
 import CanvasView from './CanvasView.jsx';
 import { setCanvasFrame, receiveCanvasReply, noteCanvasReady } from '../canvasQuery.js';
 import { forgetComputedColors } from '../style-panel/lib/computed-color';
@@ -74,8 +75,7 @@ const DEVICES = [
 // ResizeObserver, which only fires while the window is actually rendering.
 export function deviceForWidth(px) {
   if (!Number.isFinite(px) || px <= 0) return null;
-  const bands = DEVICES.filter((d) => d.from !== undefined).sort((a, b) => b.from - a.from);
-  return (bands.find((d) => px >= d.from) || bands[bands.length - 1]).key;
+  return DEVICES.find((d) => d.from !== undefined && px >= d.from).key;
 }
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
@@ -111,6 +111,7 @@ export default function PreviewPane({
   // The breakpoint lives in App so a re-mount of this pane can't silently
   // kick the user out of a view (which would reload every preview iframe).
   const setDevice = onDevice;
+  const startDrag = usePointerDrag();
   const [customW, setCustomW] = React.useState(null); // drag override
   const [customH, setCustomH] = React.useState(null); // null = fill height
   const [resizing, setResizing] = React.useState(false);
@@ -167,6 +168,12 @@ export default function PreviewPane({
   selPathRef.current = selPath;
   const selOccRef = React.useRef(selOcc);
   selOccRef.current = selOcc;
+  const onSelectPathRef = React.useRef(onSelectPath);
+  onSelectPathRef.current = onSelectPath;
+  const onOpenPathRef = React.useRef(onOpenPath);
+  onOpenPathRef.current = onOpenPath;
+  const onDeviceRef = React.useRef(onDevice);
+  onDeviceRef.current = onDevice;
   const onSelectedClassesRef = React.useRef(onSelectedClasses);
   onSelectedClassesRef.current = onSelectedClasses;
   const onRenderedPathsRef = React.useRef(onRenderedPaths);
@@ -252,7 +259,7 @@ export default function PreviewPane({
       } else if (d?.type === 'avb:hover-node') {
         setCanvasHover(d.path || null);
         setHoverOcc(d.occurrence || 0);
-      } else if (d?.type === 'avb:click-node' && onSelectPath) {
+      } else if (d?.type === 'avb:click-node' && onSelectPathRef.current) {
         clickedPathRef.current = d.path || null;
         // Which instance was clicked: a node inside a loop renders once per
         // item and only that one should light up. Set now, not from the
@@ -262,7 +269,7 @@ export default function PreviewPane({
         setSelOcc(d.occurrence || 0);
         // `outside` distinguishes a click the canvas could place somewhere this
         // file doesn't own from one it couldn't place at all — see canvasClick.
-        onSelectPath(d.path || null, { outside: !!d.outside });
+        onSelectPathRef.current(d.path || null, { outside: !!d.outside });
       } else if (d?.type === 'avb:canvas-ready') {
         // The page has walked its markers — anything asked too early can be
         // asked again now (see canvasQuery.js). It has also just re-rendered,
@@ -275,18 +282,18 @@ export default function PreviewPane({
         // canvasQuery.js. Routed here because this is the component that
         // knows which frame the message came from.
         receiveCanvasReply(d);
-      } else if (d?.type === 'avb:open-node' && onOpenPath) {
+      } else if (d?.type === 'avb:open-node' && onOpenPathRef.current) {
         // A null path means the double-click landed on markup the open file
         // doesn't address — the layout's own chrome. App decides what that opens.
         // The occurrence says which instance was opened: a component rendered
         // inside a loop is many boxes on the page, and only the one that was
         // double-clicked should be the one being edited.
-        onOpenPath(d.path || null, d.occurrence || 0);
+        onOpenPathRef.current(d.path || null, d.occurrence || 0);
       }
     };
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [onSelectPath, onOpenPath]);
+  }, []);
 
   const hoverPath = navHoverPath || canvasHover;
   // A navigator hover means "the node", so every instance lights up; a canvas
@@ -303,7 +310,7 @@ export default function PreviewPane({
   React.useEffect(() => {
     registerFrame();
     return () => setCanvasFrame(null);
-  }, [registerFrame, url, refreshKey]);
+  }, [registerFrame, url, refreshKey, device === 'canvas']);
 
   const sendTrack = React.useCallback(() => {
     const w = iframeRef.current?.contentWindow;
@@ -328,11 +335,12 @@ export default function PreviewPane({
   // to the node. A selection that came from clicking the page is skipped —
   // it's already on screen, and moving it would yank it out from under the
   // pointer. Not sent on reload: the frame has no regions mapped yet.
-  const prevFocusRef = React.useRef(focusPath);
+  const prevContextRef = React.useRef({ focusPath, pathScope });
   React.useEffect(() => {
     const w = iframeRef.current?.contentWindow;
-    const focusChanged = prevFocusRef.current !== focusPath;
-    prevFocusRef.current = focusPath;
+    const previous = prevContextRef.current;
+    const contextChanged = previous.focusPath !== focusPath || previous.pathScope !== pathScope;
+    prevContextRef.current = { focusPath, pathScope };
     if (!w || !selPath) return;
     // Any selection that came from a click on the page: whatever it resolved to
     // is already on screen under the pointer. Notably the layout, whose box is
@@ -344,17 +352,24 @@ export default function PreviewPane({
     // Drilling into a component (or backing out) opens a different file and
     // selects within it, which looks like a fresh selection — but the canvas
     // still shows the same page and the instance is already under the pointer.
-    // Scrolling here would jump to whichever instance the new path resolves to.
-    if (focusChanged) return;
+    // Nested components keep the same outer focus, so the edited file's scope
+    // must count too. Opening or closing one should not scroll to its root.
+    if (contextChanged) return;
     // Repeated nodes: aim at the instance in play, not the first on the page.
     w.postMessage({ type: 'avb:scroll-to', path: selPath, occ: selOccRef.current }, '*');
-  }, [selPath, focusPath]);
+  }, [selPath, focusPath, pathScope]);
 
   // A reload wipes iframe state — clear stale boxes until fresh rects arrive.
   React.useEffect(() => {
     setRects({});
     setCanvasHover(null);
-  }, [url, refreshKey]);
+    setSpacing({});
+    setSelOcc(null);
+    setHoverOcc(0);
+    selClassesRef.current = null;
+    clickedPathRef.current = undefined;
+    lastClickRef.current = null;
+  }, [url, refreshKey, device === 'canvas']);
 
   // Track the canvas width so "Fill" can be expressed in px too — CSS can
   // only animate the frame width between two lengths, not px ↔ 100%.
@@ -424,7 +439,7 @@ export default function PreviewPane({
         return;
       }
       const key = { 1: 'desktop', 2: 'tablet', 3: 'phone', 4: 'canvas' }[e.key];
-      if (key) selectDevice(key);
+      if (key) onDeviceRef.current(key);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -433,6 +448,7 @@ export default function PreviewPane({
   // Drag-resize from the edge handles. The frame is horizontally centered,
   // so a side handle changes the width by twice the pointer movement.
   const startResize = (edge) => (e) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     const frame = frameRef.current;
     const wrap = wrapRef.current;
@@ -442,26 +458,21 @@ export default function PreviewPane({
     const startW = frame.offsetWidth;
     const startH = frame.offsetHeight;
     setResizing(true);
-    document.body.style.cursor = edge === 's' ? 'row-resize' : 'col-resize';
-    const onMove = (ev) => {
-      if (edge === 's') {
-        const h = Math.round(startH + (ev.clientY - startY));
-        setCustomH(clamp(h, 160, Math.max(160, wrap.clientHeight - 32)));
-      } else {
-        const dx = ev.clientX - startX;
-        const w = Math.round(startW + (edge === 'e' ? 2 : -2) * dx);
-        setCustomW(clamp(w, 280, Math.max(280, wrap.clientWidth - 24)));
-        setDevice('custom');
-      }
-    };
-    const onUp = () => {
-      setResizing(false);
-      document.body.style.cursor = '';
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    startDrag(e, {
+      cursor: edge === 's' ? 'row-resize' : 'col-resize',
+      onMove: (ev) => {
+        if (edge === 's') {
+          const h = Math.round(startH + (ev.clientY - startY));
+          setCustomH(clamp(h, 160, Math.max(160, wrap.clientHeight - 32)));
+        } else {
+          const dx = ev.clientX - startX;
+          const w = Math.round(startW + (edge === 'e' ? 2 : -2) * dx);
+          setCustomW(clamp(w, 280, Math.max(280, wrap.clientWidth - 24)));
+          setDevice('custom');
+        }
+      },
+      onEnd: () => setResizing(false),
+    });
   };
 
   return (

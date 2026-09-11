@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react'
 import { hasCanvas, queryCanvas } from '../../canvasQuery.js'
 import { getHost, onHostChange } from './host'
+import { createQueryCache } from './query-cache'
 
 /**
  * Does this value need the page to resolve it?
@@ -36,16 +37,14 @@ export function needsPage(value: string): boolean {
   )
 }
 
-// Answers already given, so a panel full of swatches asks once per value and a
-// re-render costs nothing. Keyed by the element asked about as well as the
-// value: the same `var(--background)` is a different colour on two elements.
-const answers = new Map<string, string | null>()
-const inFlight = new Map<string, Promise<string | null>>()
+const cache = createQueryCache(async (path, values) => {
+  const answer = await queryCanvas(path, [], values)
+  return answer?.computed ?? null
+})
 
 /** Forget everything: the page changed under us, so the answers may have too. */
 export function forgetComputedColors(): void {
-  answers.clear()
-  inFlight.clear()
+  cache.clear()
 }
 
 // The element to resolve against: whatever is selected, and the page itself
@@ -57,21 +56,6 @@ function pathOfSelection(): string {
   return (host.selectedId ? host.pathOf?.(host.selectedId) : null) ?? ''
 }
 
-async function resolve(path: string, value: string): Promise<string | null> {
-  const key = `${path}|${value}`
-  if (answers.has(key)) return answers.get(key) ?? null
-  const pending = inFlight.get(key)
-  if (pending) return pending
-  const ask = queryCanvas(path, [], [value]).then((answer: { computed?: Record<string, string | null> } | null) => {
-    const computed = answer?.computed?.[value] ?? null
-    answers.set(key, computed)
-    inFlight.delete(key)
-    return computed
-  })
-  inFlight.set(key, ask)
-  return ask
-}
-
 /**
  * The colour to paint for `value`: the value itself when it stands alone, and
  * what the page computes it to when it doesn't. Returns the raw value until
@@ -79,29 +63,25 @@ async function resolve(path: string, value: string): Promise<string | null> {
  */
 export function useResolvedColor(value: string): string {
   const raw = String(value ?? '').trim()
-  const [resolved, setResolved] = useState<string | null>(null)
+  const [, bump] = useState(0)
+  const host = getHost()
+  cache.setScope([host.projectPath, host.openFilePath, host.nodes, host.selectedId, host.device, host.historyTick])
+  const path = pathOfSelection()
+  const pageDependent = needsPage(raw)
+  const enabled = pageDependent && hasCanvas()
+  const resolved = enabled ? cache.read(path, raw) : null
 
   useEffect(() => {
-    if (!needsPage(raw) || !hasCanvas()) {
-      setResolved(null)
-      return undefined
-    }
-    let live = true
-    const ask = () => {
-      const path = pathOfSelection()
-      void resolve(path, raw).then((color) => {
-        if (live) setResolved(color)
-      })
-    }
-    ask()
-    // The selection moves, or the page re-renders under it: ask again for the
-    // element that is selected now.
-    const off = onHostChange(ask)
-    return () => {
-      live = false
-      off()
-    }
-  }, [raw])
+    if (!pageDependent) return undefined
+    const sync = () => bump((n) => n + 1)
+    const offCache = cache.subscribe(sync)
+    const offHost = onHostChange(sync)
+    return () => { offCache(); offHost() }
+  }, [pageDependent])
+
+  useEffect(() => {
+    if (enabled && resolved === undefined) void cache.request(path, raw)
+  })
 
   return resolved || raw
 }

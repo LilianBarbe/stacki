@@ -12,6 +12,7 @@
 // and what an entry holds.
 import { z } from 'astro/zod';
 import { LOADER } from './stub-astro-loaders.mjs';
+import { withMetadata, hasCrossFieldChecks, toJsonSchema } from './schemaTools.mjs';
 
 // Only these carry a body; the same loader over .json or .yaml does not.
 const BODY_EXT = new Set(["md", "mdx", "mdoc", "markdown"]);
@@ -29,48 +30,7 @@ const extensionsOf = (pattern) =>
       .filter(Boolean);
   });
 
-const imageStub = () => z.string().meta({ astroImage: true });
-
-const defOf = (schema) => schema?._zod?.def || null;
-
-// zod keeps .refine()/.superRefine() as checks on the schema they wrap. They
-// see the whole object, so they are the rules no single field can enforce and
-// the reason a form needs an error region of its own.
-const hasCrossFieldChecks = (schema) => {
-  const def = defOf(schema);
-  return Array.isArray(def?.checks) && def.checks.length > 0;
-};
-
-// Called for every node zod converts. `jsonSchema` is the object being emitted
-// and can be written to.
-const override = (ctx) => {
-  const def = defOf(ctx.zodSchema);
-  if (!def) return;
-  if (def.type === 'date') {
-    // Dates disappear from an input-side JSON Schema entirely (the input to
-    // z.coerce.date() is "anything"), so without this a date field would look
-    // like a field with no type at all.
-    ctx.jsonSchema.astroDate = true;
-    if (def.coerce) ctx.jsonSchema.astroCoerced = true;
-  }
-  if (def.type === 'pipe' || def.type === 'transform') {
-    // The value in the file is not the value in the entry — testimonials'
-    // "true" becomes a boolean. A writer that forgets this corrupts the file.
-    ctx.jsonSchema.astroTransform = true;
-  }
-};
-
-const toJsonSchema = (schema) =>
-  z.toJSONSchema(schema, {
-    // What a file is allowed to hold, which is what an editor writes — not
-    // what a page receives after parsing.
-    io: 'input',
-    unrepresentable: 'any',
-    // A recursive schema (navigation) has to be able to point at itself.
-    cycles: 'ref',
-    reused: 'inline',
-    override,
-  });
+const imageStub = () => withMetadata(z.string(), { astroImage: true });
 
 function describeLoader(loader) {
   if (!loader) return { kind: 'none' };

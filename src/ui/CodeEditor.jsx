@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
-import { EditorState } from '@codemirror/state';
+import { Annotation, EditorState, Transaction } from '@codemirror/state';
 import { css } from '@codemirror/lang-css';
 import { javascript } from '@codemirror/lang-javascript';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
@@ -13,6 +13,8 @@ import { tags as t } from '@lezer/highlight';
 // they differ from the editor's current text (so typing doesn't loop).
 // Key the component by node id at the call site so switching nodes resets
 // history and selection.
+
+const externalValue = Annotation.define();
 
 export const appTheme = EditorView.theme(
   {
@@ -146,7 +148,9 @@ export default function CodeEditor({ value, language, onChange, revealLine }) {
           appTheme,
           appHighlight,
           EditorView.updateListener.of((u) => {
-            if (u.docChanged) onChangeRef.current?.(u.state.doc.toString());
+            if (u.docChanged && !u.transactions.some((tr) => tr.annotation(externalValue))) {
+              onChangeRef.current?.(u.state.doc.toString());
+            }
           }),
         ],
       }),
@@ -165,7 +169,10 @@ export default function CodeEditor({ value, language, onChange, revealLine }) {
     if (!view) return;
     const cur = view.state.doc.toString();
     if ((value ?? '') !== cur) {
-      view.dispatch({ changes: { from: 0, to: cur.length, insert: value ?? '' } });
+      view.dispatch({
+        changes: { from: 0, to: cur.length, insert: value ?? '' },
+        annotations: [externalValue.of(true), Transaction.addToHistory.of(false)],
+      });
     }
   }, [value]);
 
@@ -180,7 +187,7 @@ export default function CodeEditor({ value, language, onChange, revealLine }) {
       effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
     });
     view.focus();
-  }, [revealLine, value]);
+  }, [revealLine, language]);
 
   return <div ref={hostRef} className="cm-host" />;
 }
