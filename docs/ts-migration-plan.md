@@ -166,6 +166,15 @@ Order by boundary distance, hottest last:
 Per file: rename, fix type errors, run its test gate, commit. No drive-by
 refactors (AGENTS.md change rule).
 
+Mutating modules (`loopBindings`, `dataSuggest`, the panels' in-place tree
+edits) convert with **minimal fidelity** — local mutable mirrors, no deep
+identity design. The mutable-tree write path is scheduled for replacement by
+the diff-mapping editor core (`docs/diff-mapping-editor-core.md`), which lands
+after this plan behind its own corpus gate; do not build a `LiveModel` type
+family or version counters the intent processor will delete. One rename is
+owed first: the diff-mapping plan's projection concept is `shared/page-node.ts`
+— unify the names before its `shared/projection.ts` appears.
+
 ### Phase 4 — AI-assistant contract surface (ongoing)
 
 - `AGENTS.md` gets a contracts section naming `shared/` as the API surface
