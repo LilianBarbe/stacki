@@ -111,9 +111,9 @@ export default function CmsPanel({
     // Every .astro file has some data in its frontmatter, and listing all of
     // them would bury the project's actual content files. Only the one being
     // edited is shown — its data is the data you're looking at on the canvas.
-    if (g.key.toLowerCase().endsWith('.astro') && g.key !== currentFile) continue;
+    if (g.key.toLowerCase().endsWith('.astro') && g.key !== currentFile) {continue;}
     let group = groups.find((x) => x.key === g.key);
-    if (!group) groups.push((group = { ...g, items: [] }));
+    if (!group) {groups.push((group = { ...g, items: [] }));}
     group.items.push(c);
   }
   // The file being edited comes first and says so — its own frontmatter data
@@ -127,9 +127,9 @@ export default function CmsPanel({
   // Reopening the panel with a collection already open lands inside its
   // group rather than back at the top.
   useEffect(() => {
-    if (!selectedRel || openKey !== null) return;
+    if (!selectedRel || openKey !== null) {return;}
     const c = collections.find((x) => x.rel === selectedRel);
-    if (c) setOpenKey(groupOf(c).key);
+    if (c) {setOpenKey(groupOf(c).key);}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRel, files]);
 
@@ -137,7 +137,7 @@ export default function CmsPanel({
 
   const create = async (name) => {
     setCreating(false);
-    if (!name.trim()) return;
+    if (!name.trim()) {return;}
     const res = await act(() => window.avb.createCms({ projectPath: project.path, name }));
     await refresh(); // don't wait on the watcher to show what we just made
     if (res?.rel) {
@@ -185,7 +185,7 @@ export default function CmsPanel({
               placeholder="Collection name"
               onBlur={(e) => create(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Enter') {e.currentTarget.blur();}
                 if (e.key === 'Escape') {
                   e.currentTarget.value = '';
                   e.currentTarget.blur();
@@ -279,7 +279,7 @@ export default function CmsPanel({
                 title="Collection settings"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!c.error) onOpenSettings(c.rel);
+                  if (!c.error) {onOpenSettings(c.rel);}
                 }}
                 disabled={!!c.error}
               >

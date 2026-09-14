@@ -13,7 +13,7 @@ const FRONTMATTER = /^(---)([ \t]*\r?\n)([\s\S]*?)(\r?\n)(---)([ \t]*)(\r?\n?)/;
 /** { data, body, frontmatter } — data is null when the file has no frontmatter. */
 function parse(text) {
   const m = text.match(FRONTMATTER);
-  if (!m) return { data: null, frontmatter: null, body: text, offset: 0 };
+  if (!m) {return { data: null, frontmatter: null, body: text, offset: 0 };}
   const frontmatter = m[3];
   return {
     data: yaml.parseData(frontmatter + '\n') ?? {},
@@ -33,7 +33,7 @@ const parseData = (text) => parse(text).data;
 function applyEdits(text, edits, { body } = {}) {
   const m = text.match(FRONTMATTER);
   if (!m) {
-    if (!edits.length) return body === undefined ? text : body;
+    if (!edits.length) {return body === undefined ? text : body;}
     const block = yaml.applyEdits('', edits).replace(/\n?$/, '\n');
     return `---\n${block}---\n${body === undefined ? text : body}`;
   }

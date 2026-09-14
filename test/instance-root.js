@@ -30,7 +30,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const PRELOAD = path.join(__dirname, '..', 'electron', 'preload.js');
@@ -102,7 +102,7 @@ const BUTTON = 'src/components/Button.astro|';
   window.Element.prototype.getBoundingClientRect = function () {
     const key = (this.getAttribute('class') || '').split(' ')[0];
     const b = BOXES[key];
-    if (!b) return NO_BOX;
+    if (!b) {return NO_BOX;}
     const [x, y, w, h] = b;
     return { x, y, width: w, height: h, left: x, top: y, right: x + w, bottom: y + h };
   };

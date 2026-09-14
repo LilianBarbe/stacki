@@ -40,12 +40,12 @@ export default function HelpPopover({ title, children, label = 'Help', className
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {return}
     const onDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+      if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)}
     }
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') {setOpen(false)}
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)

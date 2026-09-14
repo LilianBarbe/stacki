@@ -22,17 +22,17 @@ function splitRow(line) {
         } else if (line[i] === '"') {
           i++;
           break;
-        } else value += line[i++];
+        } else {value += line[i++];}
       }
       cells.push({ value, text: line.slice(start, i) });
     } else {
       const start = i;
-      while (i < line.length && line[i] !== ',') i++;
+      while (i < line.length && line[i] !== ',') {i++;}
       cells.push({ value: line.slice(start, i), text: line.slice(start, i) });
     }
-    if (i >= line.length) break;
-    if (line[i] === ',') i++;
-    if (i === line.length) cells.push({ value: '', text: '' }); // trailing comma
+    if (i >= line.length) {break;}
+    if (line[i] === ',') {i++;}
+    if (i === line.length) {cells.push({ value: '', text: '' });} // trailing comma
   }
   return cells;
 }
@@ -50,7 +50,7 @@ function parseLines(text) {
   let header = null;
   const rows = [];
   lines.forEach((line, index) => {
-    if (isSkippable(line)) return;
+    if (isSkippable(line)) {return;}
     if (!header) {
       header = splitRow(line).map((c) => c.value.trim());
       return;
@@ -75,28 +75,28 @@ const DELETE = Symbol('delete');
  * row's header, which is a schema change, not a content edit.
  */
 function applyEdits(text, edits) {
-  if (!edits.length) return text;
+  if (!edits.length) {return text;}
   const { lines, header, rows } = parseLines(text);
   const touched = new Set();
   const removed = new Set();
 
   for (const { path, value } of edits) {
     const row = rows[path[0]];
-    if (!row) continue;
+    if (!row) {continue;}
     if (path.length === 1 && value === DELETE) {
       removed.add(row.index);
       continue;
     }
     const column = header.indexOf(String(path[1]));
-    if (column === -1) continue;
-    while (row.cells.length < header.length) row.cells.push({ value: '', text: '' });
+    if (column === -1) {continue;}
+    while (row.cells.length < header.length) {row.cells.push({ value: '', text: '' });}
     const next = value === DELETE ? '' : String(value ?? '');
     row.cells[column] = { value: next, text: quote(next) };
     touched.add(row.index);
   }
 
   for (const row of rows) {
-    if (!touched.has(row.index)) continue;
+    if (!touched.has(row.index)) {continue;}
     lines[row.index] = row.cells.map((c) => c.text).join(',');
   }
   return lines.filter((_, index) => !removed.has(index)).join('\n');

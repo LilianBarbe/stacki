@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import DragSlider from './components/DragSlider'
 import ColorSwatch from './components/ColorSwatch'
@@ -28,7 +26,7 @@ export const SHADOW_RANGE: Record<string, { min: number; max: number }> = {
 // value isn't a plain length (var()/calc()/…), so the slider is disabled.
 export function parseLen(value: string): { num: number; unit: string } | null {
   const match = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i)
-  if (!match) return null
+  if (!match) {return null}
   return { num: parseFloat(match[1]), unit: match[2] || 'px' }
 }
 
@@ -51,10 +49,10 @@ function ShadowTextInput({ value, busy, ariaLabel, placeholder, className, prop,
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
   const timer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancel = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null } }
   useEffect(() => cancel, [])
-  const liveNow = (text: string) => { const t = text.trim(); if (t) onLive(t) }
+  const liveNow = (text: string) => { const t = text.trim(); if (t) {onLive(t)} }
   const live = (text: string) => { cancel(); timer.current = window.setTimeout(() => liveNow(text), 100) }
   const commit = (text = draft) => { const t = text.trim(); if (!t) { onClear(); return } onCommit(t) }
   const scrub = useScrub({
@@ -76,7 +74,7 @@ function ShadowTextInput({ value, busy, ariaLabel, placeholder, className, prop,
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.currentTarget.blur(); return }
           const stepped = handleArrowStep(e)
-          if (!stepped) return
+          if (!stepped) {return}
           e.preventDefault()
           e.currentTarget.value = stepped.text
           e.currentTarget.setSelectionRange(stepped.caret, stepped.caret)

@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Selector parsing, specificity, and matching against the selected element.
 //
 // The Designer gives us no canvas DOM, so we can't call `element.matches()`.
@@ -74,14 +72,14 @@ const emptyCompound = (): Compound => ({
 
 function normalizeCombinator(value: string): Combinator {
   const v = value.trim()
-  if (v === '>') return '>'
-  if (v === '+') return '+'
-  if (v === '~') return '~'
+  if (v === '>') {return '>'}
+  if (v === '+') {return '+'}
+  if (v === '~') {return '~'}
   return ' '
 }
 
 function isPseudoElement(value: string): boolean {
-  if (value.startsWith('::')) return true
+  if (value.startsWith('::')) {return true}
   // Legacy single-colon pseudo-elements.
   return /^:(before|after|first-line|first-letter|placeholder|selection|marker|backdrop)$/i.test(value)
 }
@@ -136,7 +134,7 @@ const STATE_PSEUDO_CLASSES = new Set([':hover', ':focus', ':active'])
 export function canonicalCompound(selectorText: string): CanonicalCompound {
   const sel = compileSelectorList(selectorText)[0]
   const subject = sel?.compounds[sel.compounds.length - 1]
-  if (!sel || !subject) return { simple: false, oneCompound: false, tokens: [], pseudoClasses: [], pseudoElement: '', splittable: false, universal: false }
+  if (!sel || !subject) {return { simple: false, oneCompound: false, tokens: [], pseudoClasses: [], pseudoElement: '', splittable: false, universal: false }}
 
   const pseudoClasses = subject.pseudoClasses
   const pseudoElement = normalizePseudoElement(sel.pseudoElement)
@@ -152,7 +150,7 @@ export function canonicalCompound(selectorText: string): CanonicalCompound {
   const splittable = oneCompound && !subject.universal && noFunctionalPseudo
 
   const tokens: string[] = []
-  if (subject.tag) tokens.push(`tag:${subject.tag}`)
+  if (subject.tag) {tokens.push(`tag:${subject.tag}`)}
   subject.classes.forEach((cls) => tokens.push(`class:${cls}`))
   subject.attrs.forEach((attr) => {
     // Presence `[data-x]` → `attr:data-x` (matches a chip); a valued/operator
@@ -164,7 +162,7 @@ export function canonicalCompound(selectorText: string): CanonicalCompound {
 
 /** Normalize a pseudo-element to its `::name` form (handles legacy `:before`), or ''. */
 export function normalizePseudoElement(pe: string | null | undefined): string {
-  if (!pe) return ''
+  if (!pe) {return ''}
   return `::${pe.replace(/^::?/, '').toLowerCase()}`
 }
 
@@ -172,13 +170,13 @@ const compileCache = new Map<string, CompiledSelector[]>()
 
 function compileSelectorList(selectorText: string): CompiledSelector[] {
   const cached = compileCache.get(selectorText)
-  if (cached) return cached
+  if (cached) {return cached}
 
   let result: CompiledSelector[] = []
   try {
     selectorParser((root) => {
       root.each((selector) => {
-        if (selector.type !== 'selector') return
+        if (selector.type !== 'selector') {return}
         result.push(compileSelector(selector))
       })
     }).processSync(selectorText)
@@ -279,7 +277,7 @@ function compileSelector(selector: SelectorNode): CompiledSelector {
           // classes — the element must match one of their arguments. :where
           // adds zero specificity; :is/:matches add their most specific arg.
           const inner = compileFunctionalArg(node)
-          if (inner.length) current.requireAny.push(inner)
+          if (inner.length) {current.requireAny.push(inner)}
           if (value !== ':where') {
             const top = mostSpecific(inner)
             if (top) { a += top[0]; b += top[1]; c += top[2] }
@@ -311,7 +309,7 @@ function compileSelector(selector: SelectorNode): CompiledSelector {
         break
     }
   })
-  if (started) pushCurrent()
+  if (started) {pushCurrent()}
 
   return {
     text: selector.toString().trim(),
@@ -326,16 +324,16 @@ function compileSelector(selector: SelectorNode): CompiledSelector {
 function compileFunctionalArg(node: selectorParser.Pseudo): CompiledSelector[] {
   const out: CompiledSelector[] = []
   node.each?.((child) => {
-    if (child.type === 'selector') out.push(compileSelector(child))
+    if (child.type === 'selector') {out.push(compileSelector(child))}
   })
   return out
 }
 
 function axisFromCombinator(value: string): HasAxis {
   const v = value.trim()
-  if (v === '>') return 'child'
-  if (v === '+') return 'adjacent'
-  if (v === '~') return 'sibling'
+  if (v === '>') {return 'child'}
+  if (v === '+') {return 'adjacent'}
+  if (v === '~') {return 'sibling'}
   return 'descendant'
 }
 
@@ -343,7 +341,7 @@ function axisFromCombinator(value: string): HasAxis {
 function compileHasArg(node: selectorParser.Pseudo): HasCond[] {
   const out: HasCond[] = []
   node.each?.((child) => {
-    if (child.type !== 'selector') return
+    if (child.type !== 'selector') {return}
     const first = child.nodes[0]
     const axis: HasAxis = first && first.type === 'combinator' ? axisFromCombinator(first.value) : 'descendant'
     // compileSelector ignores a leading combinator, so `sel` is the arg minus it.
@@ -356,7 +354,7 @@ function compileHasArg(node: selectorParser.Pseudo): HasCond[] {
 function mostSpecific(selectors: CompiledSelector[]): Specificity | null {
   let best: Specificity | null = null
   for (const sel of selectors) {
-    if (!best || compareSpecificity(sel.specificity, best) > 0) best = sel.specificity
+    if (!best || compareSpecificity(sel.specificity, best) > 0) {best = sel.specificity}
   }
   return best
 }
@@ -426,16 +424,16 @@ export async function matchSelectorList(selectorText: string, target: MatchTarge
 }
 
 async function matchComplex(sel: CompiledSelector, subjectKey: string, view: TreeView): Promise<MatchResult> {
-  if (!sel.compounds.length) return NO_MATCH
+  if (!sel.compounds.length) {return NO_MATCH}
   const keyIndex = sel.compounds.length - 1
   // Key (rightmost) compound must match the subject element itself.
-  if (!(await matchCompound(sel.compounds[keyIndex], subjectKey, view))) return NO_MATCH
+  if (!(await matchCompound(sel.compounds[keyIndex], subjectKey, view))) {return NO_MATCH}
   return { matched: await matchUpchain(sel, keyIndex, subjectKey, view), approximate: false }
 }
 
 /** Anchor compounds to the left of `compoundIndex` by walking the real tree. */
 async function matchUpchain(sel: CompiledSelector, compoundIndex: number, currentKey: string, view: TreeView): Promise<boolean> {
-  if (compoundIndex === 0) return true
+  if (compoundIndex === 0) {return true}
   // combinators[i] links compounds[i] and compounds[i+1], so the combinator to
   // the LEFT of compoundIndex lives at compoundIndex - 1.
   const combinator = sel.combinators[compoundIndex - 1]
@@ -443,8 +441,8 @@ async function matchUpchain(sel: CompiledSelector, compoundIndex: number, curren
 
   if (combinator === '>') {
     const parent = view.parentKey(currentKey)
-    if (parent == null) return false // parent unknown → can't confirm
-    if (!(await matchCompound(left, parent, view))) return false
+    if (parent == null) {return false} // parent unknown → can't confirm
+    if (!(await matchCompound(left, parent, view))) {return false}
     return matchUpchain(sel, compoundIndex - 1, parent, view)
   }
 
@@ -471,19 +469,19 @@ async function matchUpchain(sel: CompiledSelector, compoundIndex: number, curren
 
 async function matchCompound(compound: Compound, key: string, view: TreeView): Promise<boolean> {
   const el = await view.snapshot(key)
-  if (!el) return false
+  if (!el) {return false}
 
   // id
-  if (compound.id != null && el.id !== compound.id) return false
+  if (compound.id != null && el.id !== compound.id) {return false}
 
   // classes — every class in the selector must be on the element
   for (const cls of compound.classes) {
-    if (!el.classes.includes(cls)) return false
+    if (!el.classes.includes(cls)) {return false}
   }
 
   // attributes / data attributes
   for (const attr of compound.attrs) {
-    if (!matchAttr(attr, el)) return false
+    if (!matchAttr(attr, el)) {return false}
   }
 
   // tag — strict: must equal the known tag. If the tag is unknown, only accept
@@ -493,7 +491,7 @@ async function matchCompound(compound: Compound, key: string, view: TreeView): P
     const hasOther = compound.id != null || compound.classes.length > 0 || compound.attrs.length > 0
       || compound.requireAny.length > 0 || compound.hasGroups.length > 0
     if (el.tag != null) {
-      if (el.tag !== compound.tag) return false
+      if (el.tag !== compound.tag) {return false}
     } else if (!hasOther) {
       return false
     }
@@ -505,17 +503,17 @@ async function matchCompound(compound: Compound, key: string, view: TreeView): P
     for (const sel of group) {
       if ((await matchComplex(sel, key, view)).matched) { ok = true; break }
     }
-    if (!ok) return false
+    if (!ok) {return false}
   }
 
   // :has(...) — element must satisfy each relational condition
   for (const cond of compound.hasGroups) {
-    if (!(await matchHas(cond, key, view))) return false
+    if (!(await matchHas(cond, key, view))) {return false}
   }
 
   // :not(...) — element must NOT match the negated selector
   for (const negation of compound.negations) {
-    if ((await matchComplex(negation, key, view)).matched) return false
+    if ((await matchComplex(negation, key, view)).matched) {return false}
   }
 
   // Structural pseudo-classes we can decide statically. `:root` matches only the
@@ -524,14 +522,14 @@ async function matchCompound(compound: Compound, key: string, view: TreeView): P
   // applied to this element. Dynamic states (:hover/:focus/…) stay optimistic
   // (matched + flagged conditional) since we can't know the runtime state.
   for (const pseudo of compound.pseudoClasses) {
-    if (pseudo === ':root' && el.tag !== 'html') return false
+    if (pseudo === ':root' && el.tag !== 'html') {return false}
   }
 
   // Position in the parent is knowable from the tree, so don't wave these
   // through with the dynamic states — a first child was matching
   // `> :last-child` and picking up styles it never gets on the page.
   for (const entry of compound.positional) {
-    if ((await matchesPosition(entry, key, view)) === false) return false
+    if ((await matchesPosition(entry, key, view)) === false) {return false}
   }
 
   return true
@@ -559,11 +557,11 @@ function pseudoArgText(node: { toString: () => string }): string | null {
  * selector list we don't evaluate) so the caller stays optimistic.
  */
 function parseAnB(raw: string | null): { a: number; b: number } | null {
-  if (!raw) return null
+  if (!raw) {return null}
   const s = raw.replace(/\s+/g, '').toLowerCase()
-  if (s === 'odd') return { a: 2, b: 1 }
-  if (s === 'even') return { a: 2, b: 0 }
-  if (s.includes('of')) return null
+  if (s === 'odd') {return { a: 2, b: 1 }}
+  if (s === 'even') {return { a: 2, b: 0 }}
+  if (s.includes('of')) {return null}
   const anb = /^([+-]?\d*)n([+-]\d+)?$/.exec(s)
   if (anb) {
     const lead = anb[1]
@@ -571,13 +569,13 @@ function parseAnB(raw: string | null): { a: number; b: number } | null {
     const b = anb[2] ? Number(anb[2]) : 0
     return Number.isFinite(a) && Number.isFinite(b) ? { a, b } : null
   }
-  if (/^[+-]?\d+$/.test(s)) return { a: 0, b: Number(s) }
+  if (/^[+-]?\d+$/.test(s)) {return { a: 0, b: Number(s) }}
   return null
 }
 
 /** Does 1-based `pos` satisfy An+B for some integer n ≥ 0? */
 function nthMatches(pos: number, a: number, b: number): boolean {
-  if (a === 0) return pos === b
+  if (a === 0) {return pos === b}
   const n = (pos - b) / a
   return Number.isInteger(n) && n >= 0
 }
@@ -596,22 +594,22 @@ async function matchesPosition(
   view: TreeView,
 ): Promise<boolean | null> {
   const parent = view.parentKey(key)
-  if (parent == null) return null
+  if (parent == null) {return null}
   const siblings = view.elementChildKeys?.(parent)
-  if (!siblings || siblings.indexOf(key) < 0) return null
+  if (!siblings || siblings.indexOf(key) < 0) {return null}
 
   // `-of-type` counts only siblings sharing this element's tag.
   let list = siblings
   if (entry.name.endsWith('-of-type')) {
     const snaps = await Promise.all(siblings.map((k) => view.snapshot(k)))
-    if (snaps.some((s) => !s?.tag)) return null
+    if (snaps.some((s) => !s?.tag)) {return null}
     const ownTag = snaps[siblings.indexOf(key)]?.tag
-    if (!ownTag) return null
+    if (!ownTag) {return null}
     list = siblings.filter((_, i) => snaps[i]?.tag === ownTag)
   }
 
   const pos = list.indexOf(key) + 1
-  if (pos === 0) return null
+  if (pos === 0) {return null}
   const total = list.length
 
   switch (entry.name) {
@@ -641,33 +639,33 @@ async function matchesPosition(
 
 async function matchHas(cond: HasCond, subjectKey: string, view: TreeView): Promise<boolean> {
   for (const candidate of hasCandidates(cond.axis, subjectKey, view)) {
-    if ((await matchComplex(cond.sel, candidate, view)).matched) return true
+    if ((await matchComplex(cond.sel, candidate, view)).matched) {return true}
   }
   return false
 }
 
 function hasCandidates(axis: HasAxis, key: string, view: TreeView): string[] {
-  if (axis === 'child') return view.childKeys(key)
-  if (axis === 'adjacent') return followingSiblings(key, view, true)
-  if (axis === 'sibling') return followingSiblings(key, view, false)
+  if (axis === 'child') {return view.childKeys(key)}
+  if (axis === 'adjacent') {return followingSiblings(key, view, true)}
+  if (axis === 'sibling') {return followingSiblings(key, view, false)}
   return descendants(key, view)
 }
 
 function precedingSiblings(key: string, view: TreeView, adjacentOnly: boolean): string[] {
   const parent = view.parentKey(key)
-  if (parent == null) return []
+  if (parent == null) {return []}
   const sibs = view.childKeys(parent)
   const idx = sibs.indexOf(key)
-  if (idx <= 0) return []
+  if (idx <= 0) {return []}
   return adjacentOnly ? [sibs[idx - 1]] : sibs.slice(0, idx).reverse() // nearest-first
 }
 
 function followingSiblings(key: string, view: TreeView, adjacentOnly: boolean): string[] {
   const parent = view.parentKey(key)
-  if (parent == null) return []
+  if (parent == null) {return []}
   const sibs = view.childKeys(parent)
   const idx = sibs.indexOf(key)
-  if (idx < 0) return []
+  if (idx < 0) {return []}
   const after = sibs.slice(idx + 1)
   return adjacentOnly ? after.slice(0, 1) : after
 }
@@ -678,21 +676,21 @@ function descendants(key: string, view: TreeView): string[] {
   while (stack.length && out.length < MAX_HAS_DESCENDANTS) {
     const current = stack.shift() as string
     out.push(current)
-    for (const child of view.childKeys(current)) stack.push(child)
+    for (const child of view.childKeys(current)) {stack.push(child)}
   }
   return out
 }
 
 function attrValue(el: ElementSnapshot, name: string): string | undefined {
-  if (name === 'class') return el.classes.join(' ')
-  if (name === 'id') return el.id ?? undefined
+  if (name === 'class') {return el.classes.join(' ')}
+  if (name === 'id') {return el.id ?? undefined}
   return el.attributes[name]
 }
 
 function matchAttr(attr: AttrCond, el: ElementSnapshot): boolean {
   const actual = attrValue(el, attr.name)
-  if (actual == null) return false
-  if (attr.operator == null || attr.value == null) return true // [attr] presence
+  if (actual == null) {return false}
+  if (attr.operator == null || attr.value == null) {return true} // [attr] presence
 
   const expected = attr.insensitive ? attr.value.toLowerCase() : attr.value
   const got = attr.insensitive ? actual.toLowerCase() : actual

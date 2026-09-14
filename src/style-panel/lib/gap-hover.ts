@@ -37,7 +37,7 @@ export function useGapHover(axes: GapAxis[], value: string) {
   }
 
   const hide = () => {
-    if (hovering.current || holding.current) return
+    if (hovering.current || holding.current) {return}
     getHost().onSpacingHover?.(null)
   }
 
@@ -74,7 +74,7 @@ export function useGapHover(axes: GapAxis[], value: string) {
     },
     /** Relabel while typing, but only if the bands are actually up. */
     onValue: (text: string) => {
-      if (hovering.current || holding.current) show(text)
+      if (hovering.current || holding.current) {show(text)}
     },
   }
 }

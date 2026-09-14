@@ -478,7 +478,7 @@ export default function PropsPanel({
   const srcProp = node?.props?.src;
   const srcKey = srcProp ? `${srcProp.type}:${srcProp.value}` : '';
   useEffect(() => {
-    if (!srcProp || !projectPath) return undefined;
+    if (!srcProp || !projectPath) {return undefined;}
     let live = true;
     const fromRel = (rel) =>
       rel &&
@@ -490,12 +490,12 @@ export default function PropsPanel({
     if (srcProp.type === 'string') {
       const value = String(srcProp.value || '');
       // A remote source is the one case Astro really does infer — leave it.
-      if (!value || /^(https?:)?\/\//.test(value) || value.startsWith('data:')) return undefined;
+      if (!value || /^(https?:)?\/\//.test(value) || value.startsWith('data:')) {return undefined;}
       fromRel(`public/${value.replace(/^\//, '')}`);
       return () => { live = false; };
     }
     const binding = assetImportOf(srcProp.value, dataCtx?.imports);
-    if (!binding || !filePath) return undefined;
+    if (!binding || !filePath) {return undefined;}
     window.avb
       .resolveSourcePath({ projectPath, fromFile: filePath, spec: binding.spec })
       .then((r) => live && r?.ok && fromRel(r.rel))
@@ -513,16 +513,16 @@ export default function PropsPanel({
   // it moot) and the component can only warn about it at runtime, so the panel
   // is the only place it can be said before the fact.
   const srcKind = React.useMemo(() => {
-    if (!srcProp) return null;
+    if (!srcProp) {return null;}
     const isSvg = (s) => /\.svg(\?|#|$)/i.test(String(s || ''));
     if (srcProp.type === 'string') {
       const v = String(srcProp.value || '');
-      if (!v) return null;
-      if (isSvg(v)) return 'svg';
+      if (!v) {return null;}
+      if (isSvg(v)) {return 'svg';}
       return /^(https?:)?\/\//.test(v) || v.startsWith('data:') ? 'remote' : 'public';
     }
     const binding = assetImportOf(srcProp.value, dataCtx?.imports);
-    if (!binding) return null;
+    if (!binding) {return null;}
     return isSvg(binding.spec) ? 'svg' : 'asset';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [srcKey, dataCtx?.imports]);
@@ -543,15 +543,15 @@ export default function PropsPanel({
     // the component ignores, and they would reappear on switching back. Same
     // edit, so it is one undo and the values come back together.
     const next = { ...(node.props || {}), [fieldName]: value };
-    if (value === undefined) delete next[fieldName];
+    if (value === undefined) {delete next[fieldName];}
     // Which props this branch rules out, and every prop the same union covers
     // — the second set bounds what a switch back is allowed to bring in, so a
     // value held for one union can't be restored by an edit to another.
     const forbidden = new Set();
     const involved = new Set();
     for (const union of unions) {
-      if (!union.names.includes(fieldName)) continue;
-      for (const name of union.names) involved.add(name);
+      if (!union.names.includes(fieldName)) {continue;}
+      for (const name of union.names) {involved.add(name);}
       // How this union decides which branch applies. When the edited prop is
       // one the branches pin to a literal (variant: "constrained"), the value
       // just picked settles it on its own — the props the losing branches
@@ -568,18 +568,18 @@ export default function PropsPanel({
             : (schema.find((x) => x.name === name)?.default ?? undefined);
           // `want` is the set of values this branch allows for that prop —
           // one for `variant: "autofit"`, several for `"autofit" | "autofill"`.
-          if (have !== undefined && !want.includes(String(have))) return false;
+          if (have !== undefined && !want.includes(String(have))) {return false;}
         }
         return true;
       };
       const fits = union.branches.filter((b) => {
-        if (!pinsField) for (const name of b.forbids) if (next[name] !== undefined) return false;
+        if (!pinsField) {for (const name of b.forbids) {if (next[name] !== undefined) {return false;}}}
         return pinsMatch(b);
       });
       const live = fits.length ? fits : union.branches;
       for (const name of union.names) {
-        if (name === fieldName) continue;
-        if (live.every((b) => b.forbids.includes(name))) forbidden.add(name);
+        if (name === fieldName) {continue;}
+        if (live.every((b) => b.forbids.includes(name))) {forbidden.add(name);}
       }
     }
 
@@ -589,15 +589,15 @@ export default function PropsPanel({
 
     const patch = { [fieldName]: value };
     for (const name of forbidden) {
-      if (node.props?.[name] === undefined) continue;
+      if (node.props?.[name] === undefined) {continue;}
       stash[name] = node.props[name]; // held, so switching back can put it back
       patch[name] = undefined;
     }
     // Switching back: anything set aside that this branch allows again, and
     // that nothing has written in the meantime, returns exactly as it was.
     for (const [name, held] of Object.entries(stash)) {
-      if (!involved.has(name) || forbidden.has(name)) continue;
-      if (node.props?.[name] !== undefined) continue;
+      if (!involved.has(name) || forbidden.has(name)) {continue;}
+      if (node.props?.[name] !== undefined) {continue;}
       patch[name] = held;
       delete stash[name];
     }
@@ -621,7 +621,7 @@ export default function PropsPanel({
   const unions = schema.find((f) => f.unions)?.unions || [];
   const effective = (name) => {
     const set = node.props?.[name];
-    if (set) return set.type === 'bare' ? 'true' : String(set.value ?? '');
+    if (set) {return set.type === 'bare' ? 'true' : String(set.value ?? '');}
     const f = schema.find((x) => x.name === name);
     return f?.default === undefined ? undefined : String(f.default);
   };
@@ -634,13 +634,13 @@ export default function PropsPanel({
       const fits = union.branches.filter((b) => {
         // A branch is out if something set on the node is forbidden there…
         for (const name of b.forbids) {
-          if (name !== ignore && node.props?.[name] !== undefined) return false;
+          if (name !== ignore && node.props?.[name] !== undefined) {return false;}
         }
         // …or if it fixes a prop to a value the node doesn't have.
         for (const [name, want] of Object.entries(b.pins)) {
-          if (name === ignore) continue;
+          if (name === ignore) {continue;}
           const have = effective(name);
-          if (have !== undefined && !want.includes(String(have))) return false;
+          if (have !== undefined && !want.includes(String(have))) {return false;}
         }
         return true;
       });
@@ -659,7 +659,7 @@ export default function PropsPanel({
   const branchDefault = (name) => {
     let found;
     for (const [i, union] of unions.entries()) {
-      if (!union.names.includes(name)) continue;
+      if (!union.names.includes(name)) {continue;}
       for (const b of liveBranches[i]) {
         // A branch may answer with a rule rather than a value: "Next, or
         // Previous when direction is back" turns on a prop this panel is
@@ -670,8 +670,8 @@ export default function PropsPanel({
             ? rule.then
             : rule.otherwise
           : b.defaults?.[name];
-        if (v === undefined) continue;
-        if (found !== undefined && found !== v) return undefined;
+        if (v === undefined) {continue;}
+        if (found !== undefined && found !== v) {return undefined;}
         found = v;
       }
     }
@@ -706,10 +706,10 @@ export default function PropsPanel({
     let pinning = 0;
     for (const b of union.branches) {
       const pinned = b.pins?.[name];
-      if (!pinned) continue;
+      if (!pinned) {continue;}
       pinning++;
       for (const v of pinned) {
-        if (seen.has(v)) return false;
+        if (seen.has(v)) {return false;}
         seen.add(v);
       }
     }
@@ -717,19 +717,19 @@ export default function PropsPanel({
   };
 
   const narrowOptions = (field) => {
-    if (!field.options?.length) return field;
+    if (!field.options?.length) {return field;}
     let allowed;
     const fitting = branchesFitting(field.name);
     for (const [i, union] of unions.entries()) {
-      if (!union.names.includes(field.name)) continue;
-      if (choosesBranch(union, field.name)) continue;
+      if (!union.names.includes(field.name)) {continue;}
+      if (choosesBranch(union, field.name)) {continue;}
       for (const b of fitting[i]) {
         const pinned = b.pins?.[field.name];
-        if (!pinned) return field;
+        if (!pinned) {return field;}
         allowed = allowed ? [...new Set([...allowed, ...pinned])] : [...pinned];
       }
     }
-    if (!allowed) return field;
+    if (!allowed) {return field;}
     const set = node.props?.[field.name];
     const keep = set && set.type !== 'expr' ? String(set.value ?? '') : undefined;
     const options = field.options.filter(
@@ -742,8 +742,8 @@ export default function PropsPanel({
 
   const appliesNow = (field) => {
     for (const [i, union] of unions.entries()) {
-      if (!union.names.includes(field.name)) continue;
-      if (liveBranches[i].every((b) => b.forbids.includes(field.name))) return false;
+      if (!union.names.includes(field.name)) {continue;}
+      if (liveBranches[i].every((b) => b.forbids.includes(field.name))) {return false;}
     }
     return true;
   };
@@ -776,15 +776,15 @@ export default function PropsPanel({
   const [wantClassFocus, setWantClassFocus] = useState(false);
   const rootRef = useRef(null);
   useEffect(() => {
-    if (!focusClass) return;
+    if (!focusClass) {return;}
     setSettingsOpen(true);
     setWantClassFocus(true);
   }, [focusClass]);
   useEffect(() => {
-    if (!wantClassFocus || !settingsOpen) return;
+    if (!wantClassFocus || !settingsOpen) {return;}
     setWantClassFocus(false);
     const input = rootRef.current?.querySelector('.class-input-field');
-    if (!input) return;
+    if (!input) {return;}
     input.focus();
     input.closest('.props-field')?.scrollIntoView({ block: 'nearest' });
   }, [wantClassFocus, settingsOpen]);
@@ -795,9 +795,9 @@ export default function PropsPanel({
   // the field belongs to the node that was double-clicked and not the one
   // that was selected a render ago.
   useEffect(() => {
-    if (!focusContent) return;
+    if (!focusContent) {return;}
     const field = rootRef.current?.querySelector('.rich-content');
-    if (!field) return;
+    if (!field) {return;}
     field.focus();
     // Land after the last character rather than at the top: the gesture means
     // "let me write here", and a caret parked before the first word makes
@@ -832,7 +832,7 @@ export default function PropsPanel({
   const changeToLayout = (name) => {
     // The wrapper is an import, not markup: a name no layout file provides
     // can't be written, so the field puts the old one back.
-    if (!layouts.some((l) => l.name === name)) return false;
+    if (!layouts.some((l) => l.name === name)) {return false;}
     onChangeLayout(name);
     return true;
   };
@@ -860,13 +860,13 @@ export default function PropsPanel({
     (node.props?.slot !== undefined ? 1 : 0);
 
   const onPickDimensions = (fieldName, dims) => {
-    if (!onSetProps || !node || !dims?.w || !dims?.h) return;
-    if (!/^(src|poster)$/i.test(fieldName)) return;
+    if (!onSetProps || !node || !dims?.w || !dims?.h) {return;}
+    if (!/^(src|poster)$/i.test(fieldName)) {return;}
     const takes = (n) => (schema || []).some((f) => f.name === n);
     const patch = {};
-    if (takes('width')) patch.width = { type: 'expr', value: String(dims.w) };
-    if (takes('height')) patch.height = { type: 'expr', value: String(dims.h) };
-    if (Object.keys(patch).length) onSetProps(node.id, patch);
+    if (takes('width')) {patch.width = { type: 'expr', value: String(dims.w) };}
+    if (takes('height')) {patch.height = { type: 'expr', value: String(dims.h) };}
+    if (Object.keys(patch).length) {onSetProps(node.id, patch);}
   };
 
   return (
@@ -884,7 +884,7 @@ export default function PropsPanel({
       style={{ flex: '1 1 50%', overflow: 'hidden' }}
       onClick={(event) => {
         const button = event.target instanceof Element ? event.target.closest('button') : null;
-        if (button && !button.disabled) clickNote();
+        if (button && !button.disabled) {clickNote();}
       }}
     >
       <div className="props-title">
@@ -923,7 +923,7 @@ export default function PropsPanel({
                     return;
                   }
                   const r = host?.getBoundingClientRect();
-                  if (!r) return;
+                  if (!r) {return;}
                   setContentPicker({
                     left: r.left,
                     top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
@@ -1139,11 +1139,11 @@ function CommentField({ value, onCommit }) {
   // while typing, or the caret would jump.
   const focused = useRef(false);
   useEffect(() => {
-    if (!focused.current) setDraft(value ?? '');
+    if (!focused.current) {setDraft(value ?? '');}
   }, [value]);
   const commit = (text = draft) => {
     const next = text.trim();
-    if (next !== (value ?? '').trim()) onCommit(next);
+    if (next !== (value ?? '').trim()) {onCommit(next);}
   };
   return (
     <div className="props-field props-comment">
@@ -1173,9 +1173,9 @@ const decodeAttr = (v) =>
   v == null || v.type === 'bare' ? '' : v.type === 'expr' ? `{${v.value}}` : String(v.value);
 // Inverse: '' → bare, "{...}" → expression, anything else → string.
 const encodeAttr = (text) => {
-  if (text === '') return { type: 'bare' };
+  if (text === '') {return { type: 'bare' };}
   const m = text.match(/^\{([\s\S]*)\}$/);
-  if (m) return { type: 'expr', value: m[1].trim() };
+  if (m) {return { type: 'expr', value: m[1].trim() };}
   return { type: 'string', value: text };
 };
 
@@ -1225,7 +1225,7 @@ function AttributesSection({ node, names, projectPath, bindCtx, onSetProp, onSet
                 title="Delete attribute"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (editor?.attr === name) setEditor(null);
+                  if (editor?.attr === name) {setEditor(null);}
                   onSetProp(name, undefined, true);
                 }}
               >
@@ -1261,15 +1261,15 @@ function AttributesSection({ node, names, projectPath, bindCtx, onSetProp, onSet
             }
           }}
           onChangeValue={(text) => {
-            if (editor.attr) onSetProp(editor.attr, encodeAttr(text));
+            if (editor.attr) {onSetProp(editor.attr, encodeAttr(text));}
           }}
           // Pasting `id="hero"` fills both boxes at once — the attribute is
           // created and given its value in one go rather than needing the
           // name committed first.
           onCommitPair={(attrName, text) => {
             const clean = attrName.trim();
-            if (!clean) return;
-            if (editor.attr && editor.attr !== clean) onRenameProp(editor.attr, clean);
+            if (!clean) {return;}
+            if (editor.attr && editor.attr !== clean) {onRenameProp(editor.attr, clean);}
             onSetProp(clean, encodeAttr(text), true);
             setEditor((e) => ({ ...e, attr: clean }));
           }}
@@ -1280,11 +1280,11 @@ function AttributesSection({ node, names, projectPath, bindCtx, onSetProp, onSet
             const patch = {};
             for (const { name: attrName, value: text } of pairs) {
               const clean = attrName.trim();
-              if (clean) patch[clean] = encodeAttr(text);
+              if (clean) {patch[clean] = encodeAttr(text);}
             }
-            if (!Object.keys(patch).length) return;
-            if (onSetProps) onSetProps(node.id, patch);
-            else for (const [k, v] of Object.entries(patch)) onSetProp(k, v, true);
+            if (!Object.keys(patch).length) {return;}
+            if (onSetProps) {onSetProps(node.id, patch);}
+            else {for (const [k, v] of Object.entries(patch)) {onSetProp(k, v, true);}}
             setEditor(null);
           }}
           onClose={() => setEditor(null)}
@@ -1310,7 +1310,7 @@ function parseAttrPaste(text) {
   ATTR_PASTE_RE.lastIndex = 0;
   let m;
   while ((m = ATTR_PASTE_RE.exec(text)) !== null) {
-    if (!m[0].trim()) continue;
+    if (!m[0].trim()) {continue;}
     const value = m[2] ?? m[3] ?? m[4] ?? m[5];
     out.push({ name: m[1], value: value === undefined ? '' : value });
   }
@@ -1359,10 +1359,10 @@ function AttrEditor({ pos, name, value, isNew, projectPath, bindCtx, dataCtx, on
 
   useEffect(() => {
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
+      if (ref.current && !ref.current.contains(e.target)) {onClose();}
     };
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {onClose();}
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
@@ -1391,9 +1391,9 @@ function AttrEditor({ pos, name, value, isNew, projectPath, bindCtx, dataCtx, on
             const text = e.clipboardData.getData('text');
             // Only when it actually looks like markup — a plain name paste
             // must keep behaving like a paste into a text box.
-            if (!text || !/=/.test(text)) return;
+            if (!text || !/=/.test(text)) {return;}
             const pairs = parseAttrPaste(text);
-            if (!pairs.length) return;
+            if (!pairs.length) {return;}
             e.preventDefault();
             if (pairs.length === 1) {
               setDraftName(pairs[0].name);
@@ -1454,7 +1454,7 @@ function AttrEditor({ pos, name, value, isNew, projectPath, bindCtx, dataCtx, on
             // typing `a === b` inline is the trade — but the box this opens is where
             // an expression that needs one is worth writing anyway.
             onKeyDownCapture={(e) => {
-              if (e.key !== '=' || e.metaKey || e.ctrlKey || e.altKey || bigAt) return;
+              if (e.key !== '=' || e.metaKey || e.ctrlKey || e.altKey || bigAt) {return;}
               e.preventDefault();
               e.stopPropagation();
               // Kept on screen: the field sits deep in a right-hand panel, so a box
@@ -1493,7 +1493,7 @@ function AttrEditor({ pos, name, value, isNew, projectPath, bindCtx, dataCtx, on
             onOpen={(host) => {
               if (insertAt) { setInsertAt(null); return; }
               const r = (host || ref.current)?.getBoundingClientRect();
-              if (!r) return;
+              if (!r) {return;}
               setInsertAt({
                 left: r.left,
                 top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
@@ -1562,10 +1562,10 @@ function isHrefName(name) {
 function parseObjectLiteral(src) {
   const t = String(src ?? '').trim();
   const m = t.match(/^\{([\s\S]*)\}$/);
-  if (!m) return t === '' ? [] : null;
+  if (!m) {return t === '' ? [] : null;}
   const inner = m[1].trim();
-  if (!inner) return [];
-  if (/[{}]|\.\.\./.test(inner)) return null;
+  if (!inner) {return [];}
+  if (/[{}]|\.\.\./.test(inner)) {return null;}
   const entries = [];
   const re =
     /\s*(?:"([^"]*)"|'([^']*)'|([\w$@:.-]+))\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|[^,]+?)\s*(?:,|$)/y;
@@ -1573,7 +1573,7 @@ function parseObjectLiteral(src) {
   while (pos < inner.length) {
     re.lastIndex = pos;
     const em = re.exec(inner);
-    if (!em) return null;
+    if (!em) {return null;}
     entries.push({ key: em[1] ?? em[2] ?? em[3], raw: em[4].trim() });
     pos = re.lastIndex;
   }
@@ -1591,13 +1591,13 @@ function serializeObjectLiteral(entries) {
 // else as {expression}; an empty value means `true`.
 const decodeRaw = (raw) => {
   const m = String(raw).match(/^"((?:[^"\\]|\\.)*)"$|^'((?:[^'\\]|\\.)*)'$/);
-  if (m) return (m[1] ?? m[2]).replace(/\\(.)/g, '$1');
+  if (m) {return (m[1] ?? m[2]).replace(/\\(.)/g, '$1');}
   return raw === 'true' ? '' : `{${raw}}`;
 };
 const encodeRaw = (text) => {
-  if (text === '') return 'true';
+  if (text === '') {return 'true';}
   const m = text.match(/^\{([\s\S]*)\}$/);
-  if (m) return m[1].trim() || 'true';
+  if (m) {return m[1].trim() || 'true';}
   return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 };
 
@@ -1644,7 +1644,7 @@ function ObjectAttrsField({ pill, menu, entries, bindCtx, projectPath, onCommit 
                 title="Delete attribute"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (editor?.index === i) setEditor(null);
+                  if (editor?.index === i) {setEditor(null);}
                   onCommit(entries.filter((_, j) => j !== i));
                 }}
               >
@@ -1667,9 +1667,9 @@ function ObjectAttrsField({ pill, menu, entries, bindCtx, projectPath, onCommit 
           isNew={editor.index == null}
           onCommitName={(newName) => {
             const clean = newName.trim();
-            if (!clean) return;
+            if (!clean) {return;}
             if (editor.index == null) {
-              if (entries.some((en) => en.key === clean)) return;
+              if (entries.some((en) => en.key === clean)) {return;}
               onCommit([...entries, { key: clean, raw: 'true' }]);
               setEditor((ed) => ({ ...ed, index: entries.length }));
             } else if (clean !== entries[editor.index].key) {
@@ -1712,16 +1712,16 @@ const SOURCE_RE = /^\s*([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)/;
 
 function sourceChip(value) {
   const text = String(value || '').trim();
-  if (!text || text === NO_SOURCE) return '';
+  if (!text || text === NO_SOURCE) {return '';}
   const match = SOURCE_RE.exec(text);
-  if (!match) return '';
+  if (!match) {return '';}
   let name = match[1];
   // A segment that is called is not part of the path: `posts.filter(…)` is
   // `posts`, done to — and a call on the whole thing (`getPosts()`) names a
   // function, which is not a source anything can be swapped for.
   while (text[name.length] === '(') {
     const at = name.lastIndexOf('.');
-    if (at < 0) return '';
+    if (at < 0) {return '';}
     name = name.slice(0, at);
   }
   return name;
@@ -1731,7 +1731,7 @@ function sourceChip(value) {
 // kept, so choosing another list does not throw away the code around it.
 function withSource(value, path) {
   const current = sourceChip(value);
-  if (!current) return path;
+  if (!current) {return path;}
   const text = String(value);
   const at = text.indexOf(current);
   return text.slice(0, at) + path + text.slice(at + current.length);
@@ -1757,11 +1757,11 @@ function MapEditor({ node, loopContext, bindCtx, dataCtx, onSetText }) {
   // picker's name and showing the code field.
   const isCustomData = (data) => {
     const d = (data || '').trim();
-    if (!d || d === NO_SOURCE) return false;
+    if (!d || d === NO_SOURCE) {return false;}
     const known = new Set();
     const walk = (nodes) => {
       for (const n of nodes || []) {
-        if (n.pickable !== false) known.add(n.path);
+        if (n.pickable !== false) {known.add(n.path);}
         walk(n.children);
       }
     };
@@ -1793,9 +1793,9 @@ function MapEditor({ node, loopContext, bindCtx, dataCtx, onSetText }) {
     setFields(next);
     const itemOk = IDENT_RE.test(next.item);
     const indexOk = !next.index || IDENT_RE.test(next.index);
-    if (!next.data.trim() || !itemOk || !indexOk) return; // incomplete — don't write broken code
+    if (!next.data.trim() || !itemOk || !indexOk) {return;} // incomplete — don't write broken code
     const head = `${next.data.trim()}.map((${next.item}${next.index ? `, ${next.index}` : ''}) => (`;
-    if (head === node.head) return;
+    if (head === node.head) {return;}
     // Renaming the item or index has to carry into the children that
     // reference it. Only a rename counts — adding or removing an index
     // leaves nothing to point the old name at.
@@ -1813,7 +1813,7 @@ function MapEditor({ node, loopContext, bindCtx, dataCtx, onSetText }) {
     onSetText(head, renames);
   };
   const commitOnEnter = (e) => {
-    if (e.key === 'Enter') commit(fields);
+    if (e.key === 'Enter') {commit(fields);}
   };
 
   // Changing the source changes what the item *is*, so a name describing the
@@ -1844,7 +1844,7 @@ function MapEditor({ node, loopContext, bindCtx, dataCtx, onSetText }) {
       return;
     }
     const r = ref.current?.getBoundingClientRect();
-    if (!r) return;
+    if (!r) {return;}
     setInsertAt({
       field,
       pos: {
@@ -1856,7 +1856,7 @@ function MapEditor({ node, loopContext, bindCtx, dataCtx, onSetText }) {
   };
   const openSourceMenu = () => {
     const r = dataRef.current?.getBoundingClientRect();
-    if (!r) return;
+    if (!r) {return;}
     setSourceMenu({
       left: r.left,
       top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
@@ -1923,7 +1923,7 @@ function MapEditor({ node, loopContext, bindCtx, dataCtx, onSetText }) {
                 onWrite={() => {
                   setSourceMenu(null);
                   setCustom(true);
-                  if (isNoSource) update({ data: '' });
+                  if (isNoSource) {update({ data: '' });}
                 }}
                 onClose={() => setSourceMenu(null)}
               />
@@ -1995,9 +1995,9 @@ function MapEditor({ node, loopContext, bindCtx, dataCtx, onSetText }) {
             setInsertAt(null);
             const next =
               field === 'data' ? dataApiRef.current?.insert(path) : codeApiRef.current?.insert(path);
-            if (next == null) return;
-            if (field === 'data') commitSource(next.trim() || NO_SOURCE);
-            else if (next !== node.head) onSetText(next);
+            if (next == null) {return;}
+            if (field === 'data') {commitSource(next.trim() || NO_SOURCE);}
+            else if (next !== node.head) {onSetText(next);}
           }}
           onClose={() => setInsertAt(null)}
         />
@@ -2012,10 +2012,10 @@ function MapEditor({ node, loopContext, bindCtx, dataCtx, onSetText }) {
 // The glyph an option wears in the tag list — the same ones the insert
 // palette uses, so a component reads as a component in both places.
 function tagOptionIcon(opt) {
-  if (opt.kind === 'astroAsset') return astroAssetIcon(opt.name, 13);
-  if (opt.kind === 'layout') return <LayoutIcon size={13} style={{ color: '#79e09c' }} />;
+  if (opt.kind === 'astroAsset') {return astroAssetIcon(opt.name, 13);}
+  if (opt.kind === 'layout') {return <LayoutIcon size={13} style={{ color: '#79e09c' }} />;}
   if (opt.kind === 'component')
-    return <ElementComponentIcon size={13} style={{ color: '#79e09c' }} />;
+    {return <ElementComponentIcon size={13} style={{ color: '#79e09c' }} />;}
   return elementIcon(opt.name, 13);
 }
 
@@ -2091,16 +2091,16 @@ function TagField({ tag, options, onChangeTag }) {
 
   const commit = (t) => {
     const raw = String(t).trim();
-    if (raw === committedRef.current) return updateDraft(committedRef.current);
+    if (raw === committedRef.current) {return updateDraft(committedRef.current);}
     // A capital means a component — passed through with its case intact, and
     // it's the caller that decides whether anything provides that name.
-    if (/^[A-Z][\w$]*$/.test(raw)) return apply(raw);
+    if (/^[A-Z][\w$]*$/.test(raw)) {return apply(raw);}
     const clean = raw.toLowerCase();
     // Not `slot` either: switching into one here would be a one-way door —
     // insert a slot from the palette instead.
     if (/^[a-z][a-z0-9-]*$/.test(clean) && clean !== committedRef.current && clean !== 'slot') {
       apply(clean);
-    } else updateDraft(committedRef.current);
+    } else {updateDraft(committedRef.current);}
   };
 
   const onKeyDown = (e) => {
@@ -2189,9 +2189,9 @@ function referencedName(expr) {
 // this file's frontmatter declares it (edited in place), 'file' when it's
 // imported (opens the file that defines it), null when neither.
 function symbolTarget(name, dataCtx) {
-  if (!name || !dataCtx) return null;
-  if (dataCtx.onSetFrontmatter && findDeclaration(dataCtx.frontmatter || '', name)) return 'local';
-  if (dataCtx.onOpenSymbol && findImportOf(dataCtx.imports || '', name)) return 'file';
+  if (!name || !dataCtx) {return null;}
+  if (dataCtx.onSetFrontmatter && findDeclaration(dataCtx.frontmatter || '', name)) {return 'local';}
+  if (dataCtx.onOpenSymbol && findImportOf(dataCtx.imports || '', name)) {return 'file';}
   return null;
 }
 
@@ -2202,7 +2202,7 @@ function symbolTarget(name, dataCtx) {
 function SourceEditButton({ name, dataCtx, anchorRef, className = 'attr-asset-toggle' }) {
   const [pos, setPos] = useState(null);
   const target = symbolTarget(name, dataCtx);
-  if (!target) return null;
+  if (!target) {return null;}
 
   const open = () => {
     if (target === 'file') {
@@ -2251,9 +2251,9 @@ function assetImportOf(expr, frontmatter) {
   const m = String(expr ?? '')
     .trim()
     .match(/^([A-Za-z_$][\w$]*)(?:\.src)?$/);
-  if (!m || !frontmatter) return null;
+  if (!m || !frontmatter) {return null;}
   const imp = findImportOf(frontmatter, m[1]);
-  if (!imp || !MEDIA_IMPORT_RE.test(imp.spec)) return null;
+  if (!imp || !MEDIA_IMPORT_RE.test(imp.spec)) {return null;}
   return { ident: m[1], spec: imp.spec };
 }
 
@@ -2339,7 +2339,7 @@ function ConditionField({ test, scope, chipsOf, bindCtx, onSetText }) {
 
   const open = (chip) => {
     const r = wrapRef.current?.getBoundingClientRect();
-    if (!r) return;
+    if (!r) {return;}
     setPick({
       chip: chip || null,
       pos: {
@@ -2381,7 +2381,7 @@ function ConditionField({ test, scope, chipsOf, bindCtx, onSetText }) {
             const next = chip
               ? apiRef.current?.replaceRange(chip.from, chip.to, path)
               : apiRef.current?.insert(path);
-            if (next != null) onSetText(next);
+            if (next != null) {onSetText(next);}
           }}
           onClose={() => setPick(null)}
         />
@@ -2428,12 +2428,12 @@ function FieldDataPicker({ pos, bindCtx, current, tree, onPick, onWrite, onClose
       // closed it again before the button came back up, which looked like a
       // chip that did nothing at all. Clicking it again still closes, through
       // the same toggle that opened it.
-      if (e.target.closest?.('.bind-menu, .bind-handle, .dd-source, .cm-chip')) return;
+      if (e.target.closest?.('.bind-menu, .bind-handle, .dd-source, .cm-chip')) {return;}
       onClose();
     };
     const onKey = (e) => e.key === 'Escape' && onClose();
     const onScroll = (e) => {
-      if (e.target?.closest?.('.bind-menu')) return;
+      if (e.target?.closest?.('.bind-menu')) {return;}
       onClose();
     };
     document.addEventListener('mousedown', close);
@@ -2474,9 +2474,9 @@ function FieldDataPicker({ pos, bindCtx, current, tree, onPick, onWrite, onClose
 // in the code editor are `{from, to, path}` objects. Both name a value, and
 // that name is what the picker's Edit row goes and opens.
 function chipExpr(chip) {
-  if (!chip) return '';
-  if (typeof chip.path === 'string') return chip.path;
-  if (typeof chip.getAttribute === 'function') return chip.getAttribute('data-expr') || '';
+  if (!chip) {return '';}
+  if (typeof chip.path === 'string') {return chip.path;}
+  if (typeof chip.getAttribute === 'function') {return chip.getAttribute('data-expr') || '';}
   return '';
 }
 
@@ -2544,7 +2544,7 @@ export function BindField({ value, field, placeholder, bindCtx, dataCtx, apiRef,
 
   const open = (chip) => {
     const r = wrapRef.current?.getBoundingClientRect();
-    if (!r) return;
+    if (!r) {return;}
     setMenu({
       left: r.left,
       // Below the field, or above it when the field sits near the bottom of
@@ -2587,7 +2587,7 @@ export function BindField({ value, field, placeholder, bindCtx, dataCtx, apiRef,
       // ternary the hole was written inside.
       if (chip && typeof chip.from === 'number') {
         const next = exprApiRef.current?.replaceRange(chip.from, chip.to, `\${${path}}`);
-        if (next != null) onChange({ type: 'expr', value: next }, true);
+        if (next != null) {onChange({ type: 'expr', value: next }, true);}
         return;
       }
       // The code editor holds one expression, so a pick replaces it.
@@ -2595,14 +2595,14 @@ export function BindField({ value, field, placeholder, bindCtx, dataCtx, apiRef,
       onChange({ type: 'expr', value: path }, true);
       return;
     }
-    if (chip) inputRef.current?.replace(chip, path);
-    else inputRef.current?.insert(path);
+    if (chip) {inputRef.current?.replace(chip, path);}
+    else {inputRef.current?.insert(path);}
   };
 
   useEffect(() => {
-    if (!menu) return undefined;
+    if (!menu) {return undefined;}
     const close = (e) => {
-      if (e.target.closest?.('.bind-menu, .bind-pick')) return;
+      if (e.target.closest?.('.bind-menu, .bind-pick')) {return;}
       // `.cm-chip` for the same reason as the rest: a chip opens this picker on
       // mousedown, and this listener is live before that mousedown has finished
       // reaching document — so a chip missing from the list opens the picker and
@@ -2610,14 +2610,14 @@ export function BindField({ value, field, placeholder, bindCtx, dataCtx, apiRef,
       // one somewhere else is how you move on, and leaving both open left two
       // pickers over the panel, one of them about a value nobody was looking at.
       const chip = e.target.closest?.('.expr-chip, .cm-chip');
-      if (chip && wrapRef.current?.contains(chip)) return;
+      if (chip && wrapRef.current?.contains(chip)) {return;}
       setMenu(null);
     };
     const onKey = (e) => e.key === 'Escape' && setMenu(null);
     const onScroll = (e) => {
       // The list scrolls inside itself; the panel behind it moves the field
       // out from under it, so that one closes it.
-      if (e.target?.closest?.('.bind-menu')) return;
+      if (e.target?.closest?.('.bind-menu')) {return;}
       setMenu(null);
     };
     const onResize = () => setMenu(null);
@@ -2672,7 +2672,7 @@ export function BindField({ value, field, placeholder, bindCtx, dataCtx, apiRef,
   // chip already in the field and the next one. Null while the code editor is
   // up: that holds one expression, so a pick replaces it instead.
   useEffect(() => {
-    if (!apiRef) return undefined;
+    if (!apiRef) {return undefined;}
     apiRef.current = showInput ? { insert: (path) => inputRef.current?.insert(path) } : null;
     return () => {
       apiRef.current = null;
@@ -2746,9 +2746,9 @@ function ValueCodeEditor({ pos, name, value, scope, chipsOf, bindCtx, onChange, 
   const [pick, setPick] = useState(null); // {chip, pos}
   useEffect(() => {
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
+      if (ref.current && !ref.current.contains(e.target)) {onClose();}
     };
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => { if (e.key === 'Escape') {onClose();} };
     document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('keydown', onKey, true);
     return () => {
@@ -2788,7 +2788,7 @@ function ValueCodeEditor({ pos, name, value, scope, chipsOf, bindCtx, onChange, 
         chipsOf={chipsOf}
         onChipClick={(chip) => {
           const r = ref.current?.getBoundingClientRect();
-          if (!r) return;
+          if (!r) {return;}
           setPick({
             chip: chip || null,
             pos: {
@@ -2811,7 +2811,7 @@ function ValueCodeEditor({ pos, name, value, scope, chipsOf, bindCtx, onChange, 
             const next = chip
               ? apiRef.current?.replaceRange(chip.from, chip.to, path)
               : apiRef.current?.insert(path);
-            if (next != null) onChange(next);
+            if (next != null) {onChange(next);}
           }}
           onClose={() => setPick(null)}
         />
@@ -2839,7 +2839,7 @@ function VarSourceEditor({ pos, name, code, onChangeCode, onClose }) {
     // the one case the lookup can't follow — fall back to where we last wrote.
     const found = findDeclaration(src, name);
     const range = found ? { start: found.start, end: found.end } : rangeRef.current;
-    if (!range) return;
+    if (!range) {return;}
     rangeRef.current = { start: range.start, end: range.start + text.length };
     onChangeCode(src.slice(0, range.start) + text + src.slice(range.end));
   };
@@ -2850,14 +2850,14 @@ function VarSourceEditor({ pos, name, code, onChangeCode, onClose }) {
   // preview with a stack trace you then had to wait out. It goes in when you
   // leave the field, and only if it parses.
   const commit = (text) => {
-    if (text === draft && error) return false;
+    if (text === draft && error) {return false;}
     const verdict = checkStatement(text);
     if (!verdict.ok) {
       setError(verdict.message);
       return false;
     }
     setError('');
-    if (text !== (findDeclaration(codeRef.current, name)?.statement ?? '')) apply(text);
+    if (text !== (findDeclaration(codeRef.current, name)?.statement ?? '')) {apply(text);}
     return true;
   };
 
@@ -2866,15 +2866,15 @@ function VarSourceEditor({ pos, name, code, onChangeCode, onClose }) {
   // a bubbling listener on the document would see it.
   useEffect(() => {
     const onDown = (e) => {
-      if (!ref.current || ref.current.contains(e.target)) return;
+      if (!ref.current || ref.current.contains(e.target)) {return;}
       // A press outside commits, the way leaving any field does — and if that
       // fails, the popup stays up holding the message. Closing on the press
       // that produced the error would be showing it to nobody. Escape and the
       // × still close, so this is a reason to stay, not a trap.
-      if (commit(draftRef.current)) onClose();
+      if (commit(draftRef.current)) {onClose();}
     };
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {onClose();}
     };
     document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('keydown', onKey, true);
@@ -2926,7 +2926,7 @@ function VarSourceEditor({ pos, name, code, onChangeCode, onClose }) {
           setDraft(text);
           // Only once it has already gone red: then it is a correction being
           // watched for, not a running commentary on an unfinished line.
-          if (error) setError(checkStatement(text).ok ? '' : error);
+          if (error) {setError(checkStatement(text).ok ? '' : error);}
         }}
         onCommit={commit}
       />
@@ -2971,8 +2971,8 @@ function boundsHint(field) {
   } else if (max !== undefined) {
     parts.push(maxExclusive ? `less than ${max}` : `${max} or less`);
   }
-  if (step === 1) parts.push('whole numbers');
-  else if (step !== undefined) parts.push(`steps of ${step}`);
+  if (step === 1) {parts.push('whole numbers');}
+  else if (step !== undefined) {parts.push(`steps of ${step}`);}
   return parts.length ? `Accepts ${parts.join(', ')}` : undefined;
 }
 
@@ -2988,15 +2988,15 @@ function boundsHint(field) {
 // unions are ALL written as expressions (`cols={3}`), and each of those is
 // exactly what its own control puts there.
 function isBoundValue(field, value) {
-  if (!value || value.type !== 'expr') return false;
+  if (!value || value.type !== 'expr') {return false;}
   const src = String(value.value).trim();
-  if (field.type === 'boolean') return !/^(true|false)$/.test(src);
-  if (field.type === 'number') return !/^[-+]?(\d+\.?\d*|\.\d+)$/.test(src);
-  if (field.type === 'enum') return !(field.options || []).includes(src);
+  if (field.type === 'boolean') {return !/^(true|false)$/.test(src);}
+  if (field.type === 'number') {return !/^[-+]?(\d+\.?\d*|\.\d+)$/.test(src);}
+  if (field.type === 'enum') {return !(field.options || []).includes(src);}
   // A list of plain items is a list, and the list control writes exactly that.
   // Anything else an array prop can hold — a name, a spread, an object per item
   // — is a program, and the code editor is the only field that can show one.
-  if (field.type === 'code') return arrayItems(src) === null;
+  if (field.type === 'code') {return arrayItems(src) === null;}
   return true;
 }
 
@@ -3008,34 +3008,34 @@ function valueFromExpr(field, raw) {
   const src = String(raw ?? '').trim();
   const quoted = src.match(/^(['"])((?:[^\\]|\\.)*)\1$/);
   if (quoted) {
-    if (field.type === 'boolean' || field.type === 'number') return undefined;
+    if (field.type === 'boolean' || field.type === 'number') {return undefined;}
     const text = quoted[2].replace(/\\n/g, '\n').replace(/\\(['"\\])/g, '$1');
     return field.type === 'enum' && !(field.options || []).includes(text)
       ? undefined
       : { type: 'string', value: text };
   }
-  if (field.type === 'boolean') return /^(true|false)$/.test(src) ? { type: 'expr', value: src } : undefined;
+  if (field.type === 'boolean') {return /^(true|false)$/.test(src) ? { type: 'expr', value: src } : undefined;}
   if (field.type === 'number')
-    return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(src) ? { type: 'expr', value: src } : undefined;
+    {return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(src) ? { type: 'expr', value: src } : undefined;}
   if (field.type === 'enum')
-    return (field.options || []).includes(src)
+    {return (field.options || []).includes(src)
       ? { type: field.numeric ? 'expr' : 'string', value: src }
-      : undefined;
+      : undefined;}
   // An array of plain items survives the trip: the list can show it, so going
   // back to the control keeps the value rather than dropping the prop.
-  if (field.type === 'code' && arrayItems(src)) return { type: 'expr', value: src };
+  if (field.type === 'code' && arrayItems(src)) {return { type: 'expr', value: src };}
   return undefined;
 }
 
 // What the toggle offers to go back to, named as what's on screen rather than
 // as a type — "Use the toggle" beats "switch to boolean".
 function controlWord(field) {
-  if (field.type === 'boolean') return 'toggle';
-  if (field.type === 'code') return 'list';
-  if (field.type === 'enum' && field.options?.length) return 'options list';
-  if (field.type === 'style') return 'CSS editor';
-  if (isMediaName(field.name)) return 'asset picker';
-  if (isHrefName(field.name)) return 'link settings';
+  if (field.type === 'boolean') {return 'toggle';}
+  if (field.type === 'code') {return 'list';}
+  if (field.type === 'enum' && field.options?.length) {return 'options list';}
+  if (field.type === 'style') {return 'CSS editor';}
+  if (isMediaName(field.name)) {return 'asset picker';}
+  if (isHrefName(field.name)) {return 'link settings';}
   return 'normal field';
 }
 
@@ -3064,7 +3064,7 @@ function PropField({
   // expression we can't evaluate ({heroWidth}).
   const siblingNumber = (propName) => {
     const v = assetCtx?.siblingProps?.[propName];
-    if (!v) return null;
+    if (!v) {return null;}
     const n = parseFloat(v.type === 'expr' ? v.value : v.value);
     return Number.isFinite(n) && n > 0 ? n : null;
   };
@@ -3076,8 +3076,8 @@ function PropField({
   // Blank when the component says nothing — better than implying a value that
   // isn't there.
   const placeholderFor = (field) => {
-    if (field.default !== undefined) return String(field.default);
-    if (branchDefault !== undefined) return String(branchDefault);
+    if (field.default !== undefined) {return String(field.default);}
+    if (branchDefault !== undefined) {return String(branchDefault);}
     const dims = assetCtx?.srcDims;
     if (dims) {
       const isW = /^width$/i.test(field.name);
@@ -3092,8 +3092,8 @@ function PropField({
           return String(Math.round(other * ratio));
         }
       }
-      if (isW && dims.w) return String(dims.w);
-      if (isH && dims.h) return String(dims.h);
+      if (isW && dims.w) {return String(dims.w);}
+      if (isH && dims.h) {return String(dims.h);}
     }
     return field.hint || '';
   };
@@ -3155,7 +3155,7 @@ function PropField({
   // already carries a value stays, flagged — it's in the markup either way,
   // and hiding it would leave a prop the component ignores with no way to
   // reach it from here.
-  if (reason && !isSet) return null;
+  if (reason && !isSet) {return null;}
 
   const reset = () => {
     setMenuPos(null);
@@ -3164,13 +3164,13 @@ function PropField({
 
   const fromCustom = () => {
     setCustom(false);
-    if (value?.type === 'expr') onChange(valueFromExpr(field, value.value), true);
+    if (value?.type === 'expr') {onChange(valueFromExpr(field, value.value), true);}
   };
 
   const onLabelClick = (e) => {
     // A field switched to a value has something to offer even before anything
     // is set: the way back to its control.
-    if (!isSet && !showExpr) return;
+    if (!isSet && !showExpr) {return;}
     if (e.altKey) {
       reset();
       return;
@@ -3247,7 +3247,7 @@ function PropField({
               return;
             }
             const r = host?.getBoundingClientRect();
-            if (!r) return;
+            if (!r) {return;}
             setInsertAt({
               left: r.left,
               top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
@@ -3337,8 +3337,8 @@ function PropField({
             const flat = collapseDeclarations(text);
             // Nothing left in it means no attribute at all — an element never
             // asked for an empty style="" and shouldn't carry one.
-            if (!flat) onChange(undefined, true);
-            else onChange({ type: 'string', value: flat }, false);
+            if (!flat) {onChange(undefined, true);}
+            else {onChange({ type: 'string', value: flat }, false);}
           }}
         />
       </div>
@@ -3526,25 +3526,25 @@ function PropField({
     const { min, max, step: grain, minExclusive, maxExclusive } = field;
     const bounded = min !== undefined || max !== undefined || grain !== undefined;
     const allows = (n) => {
-      if (!Number.isFinite(n)) return false;
-      if (min !== undefined && (minExclusive ? n <= min : n < min)) return false;
-      if (max !== undefined && (maxExclusive ? n >= max : n > max)) return false;
+      if (!Number.isFinite(n)) {return false;}
+      if (min !== undefined && (minExclusive ? n <= min : n < min)) {return false;}
+      if (max !== undefined && (maxExclusive ? n >= max : n > max)) {return false;}
       // Rounded before comparing, or 0.1 + 0.2 fails a step of 0.1.
-      if (grain !== undefined && Math.abs(Math.round(n / grain) * grain - n) > 1e-9) return false;
+      if (grain !== undefined && Math.abs(Math.round(n / grain) * grain - n) > 1e-9) {return false;}
       return true;
     };
     const clamp = (n) => {
       let v = n;
-      if (grain !== undefined) v = Math.round(v / grain) * grain;
-      if (min !== undefined) v = Math.max(v, minExclusive ? min + (grain ?? 1e-6) : min);
-      if (max !== undefined) v = Math.min(v, maxExclusive ? max - (grain ?? 1e-6) : max);
+      if (grain !== undefined) {v = Math.round(v / grain) * grain;}
+      if (min !== undefined) {v = Math.max(v, minExclusive ? min + (grain ?? 1e-6) : min);}
+      if (max !== undefined) {v = Math.min(v, maxExclusive ? max - (grain ?? 1e-6) : max);}
       return Math.round(v * 1e6) / 1e6;
     };
     // The last value that was allowed, to fall back to. An empty field is
     // allowed — it means "unset", and the component's own default applies.
-    if (num === '' || allows(parseFloat(num))) lastGoodRef.current = num;
+    if (num === '' || allows(parseFloat(num))) {lastGoodRef.current = num;}
     const revertIfRejected = () => {
-      if (!bounded || num === '' || allows(parseFloat(num))) return;
+      if (!bounded || num === '' || allows(parseFloat(num))) {return;}
       const back = lastGoodRef.current;
       onChange(back === '' ? undefined : { type: 'expr', value: back }, true);
     };
@@ -3574,7 +3574,7 @@ function PropField({
         revertIfRejected();
         return;
       }
-      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {return;}
       e.preventDefault();
       step(e.key === 'ArrowUp' ? 1 : -1, e, e.target.value);
     };
@@ -3778,13 +3778,13 @@ function ResetMenu({ pos, onReset, onUnbind, unbindLabel, onClose }) {
 
   useEffect(() => {
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
+      if (ref.current && !ref.current.contains(e.target)) {onClose();}
     };
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {onClose();}
     };
     const onScroll = (e) => {
-      if (ref.current && ref.current.contains(e.target)) return;
+      if (ref.current && ref.current.contains(e.target)) {return;}
       onClose();
     };
     document.addEventListener('mousedown', onDown);

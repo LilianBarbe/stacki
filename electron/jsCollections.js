@@ -47,13 +47,13 @@ function skipQuoted(src, i) {
           i = skipQuoted(src, i);
           continue;
         }
-        if (c === '{') depth += 1;
-        else if (c === '}') depth -= 1;
+        if (c === '{') {depth += 1;}
+        else if (c === '}') {depth -= 1;}
         i += 1;
       }
       continue;
     }
-    if (ch === q) return i + 1;
+    if (ch === q) {return i + 1;}
     i += 1;
   }
   return i;
@@ -72,7 +72,7 @@ function scanStatement(src, i) {
   let depth = 0;
   while (i < src.length) {
     const ch = src[i];
-    if (ch === undefined) break;
+    if (ch === undefined) {break;}
     if (ch === '"' || ch === "'" || ch === '`') {
       i = skipQuoted(src, i);
       continue;
@@ -87,15 +87,15 @@ function scanStatement(src, i) {
       i = end === -1 ? src.length : end + 2;
       continue;
     }
-    if ('([{'.includes(ch)) depth += 1;
+    if ('([{'.includes(ch)) {depth += 1;}
     else if (')]}'.includes(ch)) {
       depth -= 1;
-      if (depth < 0) return i;
+      if (depth < 0) {return i;}
     } else if (ch === ';' && depth === 0) {
       return i;
     } else if (ch === '\n' && depth === 0) {
       const next = skipTrivia(src, i);
-      if (next >= src.length || NEXT_STATEMENT.test(src.slice(next, next + 10))) return i;
+      if (next >= src.length || NEXT_STATEMENT.test(src.slice(next, next + 10))) {return i;}
     }
     i += 1;
   }
@@ -104,7 +104,7 @@ function scanStatement(src, i) {
 
 function skipTrivia(src, i) {
   for (;;) {
-    while (i < src.length && /\s/.test(src[i])) i += 1;
+    while (i < src.length && /\s/.test(src[i])) {i += 1;}
     if (src.startsWith('//', i)) {
       const nl = src.indexOf('\n', i);
       i = nl === -1 ? src.length : nl + 1;
@@ -146,10 +146,10 @@ function parseString(src, i) {
       i += 2;
       continue;
     }
-    if (ch === quote) return { value: out, next: i + 1 };
+    if (ch === quote) {return { value: out, next: i + 1 };}
     // A template literal with a substitution isn't a constant — bail rather
     // than freezing whatever it happens to evaluate to right now.
-    if (quote === '`' && ch === '$' && src[i + 1] === '{') throw new Unsupported('template expression');
+    if (quote === '`' && ch === '$' && src[i + 1] === '{') {throw new Unsupported('template expression');}
     out += ch;
     i += 1;
   }
@@ -159,16 +159,16 @@ function parseString(src, i) {
 function parseValue(src, i) {
   i = skipTrivia(src, i);
   const ch = src[i];
-  if (ch === '"' || ch === "'" || ch === '`') return parseString(src, i);
+  if (ch === '"' || ch === "'" || ch === '`') {return parseString(src, i);}
   if (ch === '[') {
     const arr = [];
     i = skipTrivia(src, i + 1);
     while (src[i] !== ']') {
-      if (i >= src.length) throw new Unsupported('unterminated array');
+      if (i >= src.length) {throw new Unsupported('unterminated array');}
       const v = parseValue(src, i);
       arr.push(v.value);
       i = skipTrivia(src, v.next);
-      if (src[i] === ',') i = skipTrivia(src, i + 1);
+      if (src[i] === ',') {i = skipTrivia(src, i + 1);}
     }
     return { value: arr, next: i + 1 };
   }
@@ -176,8 +176,8 @@ function parseValue(src, i) {
     const obj = {};
     i = skipTrivia(src, i + 1);
     while (src[i] !== '}') {
-      if (i >= src.length) throw new Unsupported('unterminated object');
-      if (src.startsWith('...', i)) throw new Unsupported('spread');
+      if (i >= src.length) {throw new Unsupported('unterminated object');}
+      if (src.startsWith('...', i)) {throw new Unsupported('spread');}
       let key;
       if (src[i] === '"' || src[i] === "'") {
         const k = parseString(src, i);
@@ -185,15 +185,15 @@ function parseValue(src, i) {
         i = skipTrivia(src, k.next);
       } else {
         const m = /^[A-Za-z_$][\w$]*/.exec(src.slice(i));
-        if (!m) throw new Unsupported('computed or unusual key');
+        if (!m) {throw new Unsupported('computed or unusual key');}
         key = m[0];
         i = skipTrivia(src, i + m[0].length);
       }
-      if (src[i] !== ':') throw new Unsupported('shorthand or method');
+      if (src[i] !== ':') {throw new Unsupported('shorthand or method');}
       const v = parseValue(src, i + 1);
       obj[key] = v.value;
       i = skipTrivia(src, v.next);
-      if (src[i] === ',') i = skipTrivia(src, i + 1);
+      if (src[i] === ',') {i = skipTrivia(src, i + 1);}
     }
     return { value: obj, next: i + 1 };
   }
@@ -203,7 +203,7 @@ function parseValue(src, i) {
     return { value: v, next: i + word[0].length };
   }
   const num = /^-?(?:0[xX][\da-fA-F]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?|\.\d+)/.exec(src.slice(i));
-  if (num) return { value: Number(num[0].replace(/_/g, '')), next: i + num[0].length };
+  if (num) {return { value: Number(num[0].replace(/_/g, '')), next: i + num[0].length };}
   // A name standing for something else — `image: dailyDevotionals`, the way an
   // imported asset is written. It is not a literal and never will be, so it
   // travels as the source it is (the same `{ __expr }` a computed constant
@@ -261,14 +261,14 @@ function findCollections(source, opts = {}) {
       continue;
     }
     const value = parsed.value;
-    if (!Array.isArray(value)) continue;
+    if (!Array.isArray(value)) {continue;}
     // A collection is a list of records; an array of bare strings is a
     // constant in a data file, but it is content in a page.
     const isRecords =
       value.length > 0 && value.every((v) => v && typeof v === 'object' && !Array.isArray(v));
     const isPlainList =
       allowPlainLists && value.every((v) => v === null || typeof v !== 'object');
-    if (!isRecords && !isPlainList) continue;
+    if (!isRecords && !isPlainList) {continue;}
     out.push({ name: m[1], data: value, start, end: parsed.next });
   }
   return out;
@@ -290,25 +290,25 @@ const quote = (s) =>
 function literal(value, indent, pad) {
   // A value the CMS is carrying as source rather than data — a computed const
   // (`new Date().getFullYear() - FOUNDED`) round-trips as the text it is.
-  if (isExpr(value)) return value[EXPR];
-  if (value === null || value === undefined) return 'null';
-  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'null';
-  if (typeof value === 'boolean') return String(value);
-  if (typeof value === 'string') return quote(value);
+  if (isExpr(value)) {return value[EXPR];}
+  if (value === null || value === undefined) {return 'null';}
+  if (typeof value === 'number') {return Number.isFinite(value) ? String(value) : 'null';}
+  if (typeof value === 'boolean') {return String(value);}
+  if (typeof value === 'string') {return quote(value);}
   if (Array.isArray(value)) {
-    if (!value.length) return '[]';
+    if (!value.length) {return '[]';}
     const inner = pad + indent;
     return `[\n${value.map((v) => inner + literal(v, indent, inner)).join(',\n')},\n${pad}]`;
   }
   const entries = Object.entries(value).filter(([, v]) => v !== undefined);
-  if (!entries.length) return '{}';
+  if (!entries.length) {return '{}';}
   const pair = ([k, v]) => `${ID_KEY.test(k) ? k : quote(k)}: ${literal(v, indent, pad + indent)}`;
   // Keep short records on one line — that's how these files are written by
   // hand, and expanding every one would churn the whole file on first save.
   // WIDTH matches Prettier's default so re-saving a formatted file is a no-op;
   // +1 leaves room for the trailing comma the caller adds.
   const oneLine = `{ ${entries.map(pair).join(', ')} }`;
-  if (pad.length + oneLine.length + 1 <= WIDTH && !oneLine.includes('\n')) return oneLine;
+  if (pad.length + oneLine.length + 1 <= WIDTH && !oneLine.includes('\n')) {return oneLine;}
   const inner = pad + indent;
   return `{\n${entries
     .map(([k, v]) => {
@@ -326,7 +326,7 @@ function literal(value, indent, pad) {
 
 /** The array literal text for `data`, indented to sit at column 0 of a statement. */
 function serializeCollection(data, indent = '  ') {
-  if (!data.length) return '[]';
+  if (!data.length) {return '[]';}
   return `[\n${data.map((row) => indent + literal(row, indent, indent)).join(',\n')},\n]`;
 }
 
@@ -339,7 +339,7 @@ function indentOf(text, fallback) {
   const re = /\n([ \t]+)(\S)/g;
   let m;
   while ((m = re.exec(text)) !== null) {
-    if (m[2] === '*') continue; // the middle of a /* … */ block
+    if (m[2] === '*') {continue;} // the middle of a /* … */ block
     return m[1][0] === '\t' ? '\t' : ' '.repeat(m[1].length);
   }
   return fallback;
@@ -348,7 +348,7 @@ function indentOf(text, fallback) {
 /** Replace one collection's array in `source`, leaving everything else alone. */
 function replaceCollection(source, name, data, opts) {
   const found = findCollections(source, opts).find((c) => c.name === name);
-  if (!found || found.data === null) return null;
+  if (!found || found.data === null) {return null;}
   const indent = indentOf(source.slice(found.start, found.end), indentOf(source, '  '));
   return source.slice(0, found.start) + serializeCollection(data, indent) + source.slice(found.end);
 }
@@ -380,13 +380,13 @@ function findScalarExports(source, opts = {}) {
       // edited, rather than being invisible.
       const end = scanStatement(source, start);
       const text = source.slice(start, end).trim();
-      if (text) out.push({ name: m[1], value: { [EXPR]: text }, start, end: start + text.length, code: true });
+      if (text) {out.push({ name: m[1], value: { [EXPR]: text }, start, end: start + text.length, code: true });}
       continue;
     }
     const v = parsed.value;
     // An array is a collection of its own; an object rides along here as a
     // group of fields.
-    if (Array.isArray(v)) continue;
+    if (Array.isArray(v)) {continue;}
     out.push({ name: m[1], value: v, start, end: parsed.next });
   }
   return out;
@@ -395,9 +395,9 @@ function findScalarExports(source, opts = {}) {
 /** A file's single values as one record, or null when it has none. */
 function readGeneral(source, opts) {
   const found = findScalarExports(source, opts);
-  if (!found.length) return null;
+  if (!found.length) {return null;}
   const out = {};
-  for (const f of found) out[f.name] = f.value;
+  for (const f of found) {out[f.name] = f.value;}
   return out;
 }
 
@@ -417,7 +417,7 @@ function writeGeneral(source, data, opts) {
     // Unchanged values keep their exact source text — compare by shape, since
     // an object or an expression is never identical by reference.
     if (isExpr(f.value) || isExpr(next)) {
-      if (isExpr(next) && isExpr(f.value) && next[EXPR] === f.value[EXPR]) continue;
+      if (isExpr(next) && isExpr(f.value) && next[EXPR] === f.value[EXPR]) {continue;}
     } else if (next === f.value || JSON.stringify(next) === JSON.stringify(f.value)) {
       continue;
     }

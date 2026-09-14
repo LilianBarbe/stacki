@@ -17,9 +17,9 @@ const EMBED_SOURCE_KEY = 'moden.embedEditor.source'
 export function loadToolOrder(): string[] {
   try {
     const raw = localStorage.getItem(ORDER_KEY)
-    if (!raw) return []
+    if (!raw) {return []}
     const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return []
+    if (!Array.isArray(parsed)) {return []}
     return parsed.filter((id): id is string => typeof id === 'string')
   } catch {
     return []
@@ -45,8 +45,8 @@ export function loadLastTool(): string | null {
 
 export function saveLastTool(id: string | null) {
   try {
-    if (id) localStorage.setItem(LAST_TOOL_KEY, id)
-    else localStorage.removeItem(LAST_TOOL_KEY)
+    if (id) {localStorage.setItem(LAST_TOOL_KEY, id)}
+    else {localStorage.removeItem(LAST_TOOL_KEY)}
   } catch {
     /* noop */
   }
@@ -63,8 +63,8 @@ export function loadEmbedSource(): string | null {
 
 export function saveEmbedSource(key: string | null) {
   try {
-    if (key) localStorage.setItem(EMBED_SOURCE_KEY, key)
-    else localStorage.removeItem(EMBED_SOURCE_KEY)
+    if (key) {localStorage.setItem(EMBED_SOURCE_KEY, key)}
+    else {localStorage.removeItem(EMBED_SOURCE_KEY)}
   } catch {
     /* noop */
   }
@@ -87,7 +87,7 @@ export function orderTools<T extends { id: string }>(tools: T[], savedOrder: str
     }
   }
   for (const tool of tools) {
-    if (remaining.has(tool.id)) result.push(tool)
+    if (remaining.has(tool.id)) {result.push(tool)}
   }
   return result
 }

@@ -137,7 +137,7 @@ function registerAssetProtocol() {
       return new Response(null, { status: 400 });
     }
     // stacki-asset://local/Users/… on posix, //local/C:/… on Windows.
-    if (isWin) abs = abs.replace(/^\//, '');
+    if (isWin) {abs = abs.replace(/^\//, '');}
     abs = path.resolve(abs);
     // Preview iframes run the user's own site; keep the scheme from being a
     // general-purpose file reader by serving only the open project's files.
@@ -171,9 +171,9 @@ const resource = (name) => path.join(__dirname, '..', 'resources', name);
 // padded icon-dock.png; elsewhere the Dock isn't a thing and the window icon
 // below covers it.
 function setApplicationIcon() {
-  if (process.platform !== 'darwin') return;
+  if (process.platform !== 'darwin') {return;}
   const img = nativeImage.createFromPath(resource('icon-dock.png'));
-  if (!img.isEmpty()) app.dock?.setIcon(img);
+  if (!img.isEmpty()) {app.dock?.setIcon(img);}
 }
 
 function createWindow() {
@@ -354,9 +354,9 @@ let pendingProject = null;
 ipcMain.handle('project:pending', () => {
   const asked = pendingProject;
   pendingProject = null;
-  if (asked && fs.existsSync(asked)) return asked;
-  if (!isDev) return null;
-  if (openProjectRoot && fs.existsSync(openProjectRoot)) return openProjectRoot;
+  if (asked && fs.existsSync(asked)) {return asked;}
+  if (!isDev) {return null;}
+  if (openProjectRoot && fs.existsSync(openProjectRoot)) {return openProjectRoot;}
   let p = null;
   try {
     p = JSON.parse(fs.readFileSync(reopenFile(), 'utf8'))?.path || null;
@@ -405,7 +405,7 @@ app.whenReady().then(() => {
   // protocol, which is what `openProjectRoot` already scopes.
   registerTerminalHandlers({ send, projectRoot: () => openProjectRoot });
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) {createWindow();}
   });
 });
 
@@ -437,12 +437,12 @@ app.on('window-all-closed', () => {
   // destroying it fires this. That is not the app being closed — and treating
   // it as one killed the dev server (and, off macOS, quit) in the middle of
   // taking a picture.
-  if (mainWindow && !mainWindow.isDestroyed()) return;
+  if (mainWindow && !mainWindow.isDestroyed()) {return;}
   stopDevServer();
   // The pty ids are keyed to the window that opened them, so a surviving shell
   // could never be reached again — and on macOS the app stays running.
   cleanupTerminals();
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform !== 'darwin') {app.quit();}
 });
 
 app.on('before-quit', () => {
@@ -534,7 +534,7 @@ function logAutoUpdate(message, details) {
 
   console.log(line);
 
-  if (!app.isReady()) return;
+  if (!app.isReady()) {return;}
 
   try {
     const logsDirectory = app.getPath('logs');
@@ -586,8 +586,8 @@ function registerAutoUpdaterEvents() {
     // A check from the File menu reports its own failure, and reports it even
     // when this dialog has already been shown once — two dialogs for the one
     // click would be worse than none.
-    if (manualUpdateCheck) return;
-    if (autoUpdateErrorDialogShown || isExpectedAutoUpdateNetworkError(error)) return;
+    if (manualUpdateCheck) {return;}
+    if (autoUpdateErrorDialogShown || isExpectedAutoUpdateNetworkError(error)) {return;}
     autoUpdateErrorDialogShown = true;
 
     const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
@@ -603,7 +603,7 @@ function registerAutoUpdaterEvents() {
 }
 
 async function runAutoUpdateCheck() {
-  if (!app.isPackaged || autoUpdateCheckInFlight) return;
+  if (!app.isPackaged || autoUpdateCheckInFlight) {return;}
 
   autoUpdateCheckInFlight = true;
   try {
@@ -694,7 +694,7 @@ function startAutoUpdateChecks() {
   registerAutoUpdaterEvents();
   void runAutoUpdateCheck();
 
-  if (autoUpdateInterval) clearInterval(autoUpdateInterval);
+  if (autoUpdateInterval) {clearInterval(autoUpdateInterval);}
   autoUpdateInterval = setInterval(() => void runAutoUpdateCheck(), AUTO_UPDATE_CHECK_INTERVAL_MS);
 }
 
@@ -733,7 +733,7 @@ function shellPathDirs() {
       shell = null;
     }
   }
-  if (!shell) return [];
+  if (!shell) {return [];}
   try {
     const out = execFileSync(shell, ['-ilc', 'printf "__AVB__%s__AVB__" "$PATH"'], {
       encoding: 'utf8',
@@ -752,7 +752,7 @@ function shellPathDirs() {
 const cmpVersion = (a, b) => {
   const parts = (v) => v.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
   const [x, y] = [parts(a), parts(b)];
-  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] - y[i];
+  for (let i = 0; i < 3; i++) {if (x[i] !== y[i]) {return x[i] - y[i];}}
   return 0;
 };
 
@@ -804,7 +804,7 @@ function nodeDirGuesses() {
         .filter((v) => /^v?\d/.test(v))
         .sort(cmpVersion)
         .pop();
-      if (newest) dirs.push(suffix ? path.join(base, newest, suffix) : path.join(base, newest));
+      if (newest) {dirs.push(suffix ? path.join(base, newest, suffix) : path.join(base, newest));}
     } catch {
       /* not installed */
     }
@@ -816,7 +816,7 @@ function nodeDirGuesses() {
 // child process is about to start.
 let toolPathReady = false;
 function ensureToolPath() {
-  if (toolPathReady || isWin) return;
+  if (toolPathReady || isWin) {return;}
   toolPathReady = true;
   const parts = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
   const seen = new Set(parts);
@@ -828,8 +828,8 @@ function ensureToolPath() {
   };
   // Appended, not prepended: the system's own resolution order stays intact,
   // and these directories only ever win for tools the base PATH lacks.
-  for (const dir of shellPathDirs()) append(dir);
-  for (const dir of nodeDirGuesses()) if (fs.existsSync(dir)) append(dir);
+  for (const dir of shellPathDirs()) {append(dir);}
+  for (const dir of nodeDirGuesses()) {if (fs.existsSync(dir)) {append(dir);}}
   process.env.PATH = parts.join(path.delimiter);
 }
 
@@ -837,10 +837,10 @@ function resolveNodeBin() {
   ensureToolPath();
   const exe = isWin ? 'node.exe' : 'node';
   for (const dir of (process.env.PATH || '').split(path.delimiter)) {
-    if (!dir) continue;
+    if (!dir) {continue;}
     const p = path.join(dir, exe);
     try {
-      if (fs.statSync(p).isFile()) return p;
+      if (fs.statSync(p).isFile()) {return p;}
     } catch {
       /* not here */
     }
@@ -860,14 +860,14 @@ function resolveCliEntry(binPath) {
     const rel = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin && pkg.bin[name];
     if (rel) {
       const entry = path.join(pkgDir, rel);
-      if (fs.existsSync(entry)) return entry;
+      if (fs.existsSync(entry)) {return entry;}
     }
   } catch {
     /* not a plain node_modules layout */
   }
   try {
     const real = fs.realpathSync(binPath);
-    if (/\.(js|mjs|cjs)$/i.test(real)) return real;
+    if (/\.(js|mjs|cjs)$/i.test(real)) {return real;}
   } catch {
     /* not a symlink */
   }
@@ -879,7 +879,7 @@ function resolveCliEntry(binPath) {
 // fails on a GUI launch — never happens. Returns [command, argv].
 function nodeCliCommand(binPath, args) {
   const node = resolveNodeBin();
-  if (!node) return [binPath, args];
+  if (!node) {return [binPath, args];}
   const entry = resolveCliEntry(binPath);
   return entry ? [node, [entry, ...args]] : [binPath, args];
 }
@@ -925,12 +925,12 @@ const isMarkdownPage = (p) => PAGE_MD_RE.test(p);
 const isMdx = (p) => /\.mdx$/i.test(p);
 
 function listAstroFiles(dir) {
-  if (!fs.existsSync(dir)) return [];
+  if (!fs.existsSync(dir)) {return [];}
   const out = [];
   const walk = (d) => {
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, entry.name);
-      if (entry.isDirectory()) walk(full);
+      if (entry.isDirectory()) {walk(full);}
       // Markdown only counts as a page. A .md under src/components isn't a
       // component, it's a README.
       else if (entry.name.endsWith('.astro') || (d.includes(`${path.sep}pages`) && PAGE_MD_RE.test(entry.name))) {
@@ -949,8 +949,8 @@ function toPosix(p) {
 function routeForPage(projectPath, pagePath) {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   let rel = toPosix(path.relative(pagesDir, pagePath)).replace(/\.(astro|mdx?)$/i, '');
-  if (rel === 'index') return '/';
-  if (rel.endsWith('/index')) rel = rel.slice(0, -'/index'.length);
+  if (rel === 'index') {return '/';}
+  if (rel.endsWith('/index')) {rel = rel.slice(0, -'/index'.length);}
   return '/' + rel;
 }
 
@@ -989,11 +989,11 @@ function readTrailingSlash(projectPath) {
   const ours =
     devServer && devServer.projectPath === projectPath && !devServer.external;
   try {
-    if (!ours) throw new Error('no server of ours');
+    if (!ours) {throw new Error('no server of ours');}
     const resolved = JSON.parse(
       fs.readFileSync(path.join(projectPath, 'node_modules', '.avb', 'resolved.json'), 'utf8')
     );
-    if (TRAILING_SLASH_MODES.includes(resolved.trailingSlash)) return resolved.trailingSlash;
+    if (TRAILING_SLASH_MODES.includes(resolved.trailingSlash)) {return resolved.trailingSlash;}
   } catch {
     /* no server has run yet — read the config instead */
   }
@@ -1005,7 +1005,7 @@ function readTrailingSlash(projectPath) {
       continue;
     }
     const mode = trailingSlashFromSource(text);
-    if (mode) return mode;
+    if (mode) {return mode;}
     break; // the first config that exists is the one Astro loads
   }
   return 'ignore'; // Astro's default, and the one that serves either spelling
@@ -1017,7 +1017,7 @@ function isAstroProject(dir) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-      if (deps.astro) return true;
+      if (deps.astro) {return true;}
     } catch {
       /* fall through */
     }
@@ -1188,7 +1188,7 @@ function spawnAstroServer(projectPath, localBin, args) {
 }
 
 function stopProcessTree(proc) {
-  if (!proc?.pid) return;
+  if (!proc?.pid) {return;}
   try {
     if (isWin) {
       spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true })
@@ -1237,8 +1237,8 @@ async function withTemporaryServer(projectPath, fn) {
     const deadline = Date.now() + 45000;
     let up = false;
     while (Date.now() < deadline) {
-      if (spawnError) return { ok: false, error: spawnError.message };
-      if (proc.exitCode !== null && proc.exitCode !== 0) break;
+      if (spawnError) {return { ok: false, error: spawnError.message };}
+      if (proc.exitCode !== null && proc.exitCode !== 0) {break;}
       if (await serverAlive(url)) {
         up = true;
         break;
@@ -1277,13 +1277,13 @@ let thumbTimer = null;
 function scheduleThumb(projectPath, delay) {
   clearTimeout(thumbTimer);
   thumbTimer = setTimeout(() => {
-    if (!devServer || devServer.projectPath !== projectPath) return;
-    if (!thumbs.isStale(app.getPath('userData'), projectPath)) return;
+    if (!devServer || devServer.projectPath !== projectPath) {return;}
+    if (!thumbs.isStale(app.getPath('userData'), projectPath)) {return;}
     captureThumb(projectPath).then((r) => {
-      if (r?.ok) send('recents:thumb', { projectPath });
+      if (r?.ok) {send('recents:thumb', { projectPath });}
     });
   }, delay);
-  if (thumbTimer.unref) thumbTimer.unref();
+  if (thumbTimer.unref) {thumbTimer.unref();}
 }
 
 // ---------------------------------------------------------------------------
@@ -1295,7 +1295,7 @@ ipcMain.handle('project:openDialog', async () => {
     title: 'Open an Astro project',
     properties: ['openDirectory'],
   });
-  if (result.canceled || !result.filePaths.length) return { canceled: true };
+  if (result.canceled || !result.filePaths.length) {return { canceled: true };}
   const dir = result.filePaths[0];
   if (!isAstroProject(dir)) {
     return { canceled: false, error: 'That folder does not look like an Astro project (no astro dependency or astro.config found).' };
@@ -1308,7 +1308,7 @@ ipcMain.handle('project:newDialog', async () => {
     title: 'Choose an empty folder for the new project',
     properties: ['openDirectory', 'createDirectory'],
   });
-  if (result.canceled || !result.filePaths.length) return { canceled: true };
+  if (result.canceled || !result.filePaths.length) {return { canceled: true };}
   const dir = result.filePaths[0];
   const entries = fs.readdirSync(dir).filter((f) => !f.startsWith('.'));
   if (entries.length > 0) {
@@ -1319,10 +1319,10 @@ ipcMain.handle('project:newDialog', async () => {
 
 // Detects the project's package manager from its lockfile.
 function detectPackageManager(dir) {
-  if (fs.existsSync(path.join(dir, 'pnpm-lock.yaml'))) return 'pnpm';
-  if (fs.existsSync(path.join(dir, 'yarn.lock'))) return 'yarn';
+  if (fs.existsSync(path.join(dir, 'pnpm-lock.yaml'))) {return 'pnpm';}
+  if (fs.existsSync(path.join(dir, 'yarn.lock'))) {return 'yarn';}
   if (fs.existsSync(path.join(dir, 'bun.lockb')) || fs.existsSync(path.join(dir, 'bun.lock')))
-    return 'bun';
+    {return 'bun';}
   return 'npm';
 }
 
@@ -1353,7 +1353,7 @@ async function installDependencies(dir) {
 // create-astro never has to guess a name from a parent directory.
 ipcMain.handle('project:createAstro', async (_e, opts) => {
   const { dir, template = 'basics', install = true, git = true, ai = false } = opts || {};
-  if (!dir || !fs.existsSync(dir)) throw new Error('Choose a folder for the new project first.');
+  if (!dir || !fs.existsSync(dir)) {throw new Error('Choose a folder for the new project first.');}
   ensureToolPath(); // npm is a Node shim — same PATH problem as astro
 
   const args = [
@@ -1429,7 +1429,7 @@ ipcMain.handle('project:parentDialog', async () => {
     title: 'Choose where the site should go',
     properties: ['openDirectory', 'createDirectory'],
   });
-  if (result.canceled || !result.filePaths.length) return { canceled: true };
+  if (result.canceled || !result.filePaths.length) {return { canceled: true };}
   return { canceled: false, parentPath: result.filePaths[0] };
 });
 
@@ -1485,7 +1485,7 @@ ipcMain.handle('project:scan', async (_e, projectPath) => {
   if (fs.existsSync(pagesDir)) {
     const walkDirs = (d) => {
       for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue;
+        if (!entry.isDirectory()) {continue;}
         const full = path.join(d, entry.name);
         pageFolders.push(toPosix(path.relative(pagesDir, full)));
         walkDirs(full);
@@ -1560,8 +1560,8 @@ ipcMain.handle('project:classes', async (_e, projectPath) => {
     }
     for (const e of entries) {
       const full = path.join(d, e.name);
-      if (e.isDirectory()) walk(full);
-      else if (exts.test(e.name)) files.push(full);
+      if (e.isDirectory()) {walk(full);}
+      else if (exts.test(e.name)) {files.push(full);}
     }
   };
   walk(path.join(projectPath, 'src'));
@@ -1569,7 +1569,7 @@ ipcMain.handle('project:classes', async (_e, projectPath) => {
   const addCssClasses = (css) => {
     const re = /(?:^|[\s,{>~+()])\.(-?[A-Za-z_][A-Za-z0-9_-]*)/g;
     let m;
-    while ((m = re.exec(css)) !== null) out.add(m[1]);
+    while ((m = re.exec(css)) !== null) {out.add(m[1]);}
   };
   for (const f of files) {
     let content;
@@ -1585,11 +1585,11 @@ ipcMain.handle('project:classes', async (_e, projectPath) => {
     const attrRe = /class(?:Name)?\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
     let m;
     while ((m = attrRe.exec(content)) !== null) {
-      for (const t of (m[1] ?? m[2] ?? '').split(/\s+/)) if (t) out.add(t);
+      for (const t of (m[1] ?? m[2] ?? '').split(/\s+/)) {if (t) {out.add(t);}}
     }
     const styleRe = /<style[^>]*>([\s\S]*?)<\/style>/gi;
     let sm;
-    while ((sm = styleRe.exec(content)) !== null) addCssClasses(sm[1]);
+    while ((sm = styleRe.exec(content)) !== null) {addCssClasses(sm[1]);}
   }
   return [...out].sort();
 });
@@ -1600,7 +1600,7 @@ ipcMain.handle('project:classes', async (_e, projectPath) => {
 // without turning this into a type checker.
 function importedTypes(source, filePath, projectPath) {
   const fm = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!fm) return '';
+  if (!fm) {return '';}
   const out = [];
   const seen = new Set();
   // `import type { A, B } from '…'`, `import { type A } from '…'`, and the
@@ -1614,9 +1614,9 @@ function importedTypes(source, filePath, projectPath) {
       .split(',')
       .map((n) => n.replace(/\btype\b/, '').split(/\s+as\s+/)[0].trim())
       .filter(Boolean);
-    if (!names.length) continue;
+    if (!names.length) {continue;}
     const target = resolveImportPath(projectPath, filePath, m[2]);
-    if (!target || seen.has(target) || target.endsWith('.astro')) continue;
+    if (!target || seen.has(target) || target.endsWith('.astro')) {continue;}
     seen.add(target);
     let text;
     try {
@@ -1630,7 +1630,7 @@ function importedTypes(source, filePath, projectPath) {
       const decl = new RegExp(
         `(?:^|\n)\\s*(?:export\\s+)?(?:type|interface)\\s+${name.replace(/[^\w$]/g, '')}\\b`
       ).exec(text);
-      if (!decl) continue;
+      if (!decl) {continue;}
       const from = decl.index;
       // To the end of the declaration: an interface ends at its closing brace,
       // a type alias at the semicolon that closes it.
@@ -1638,7 +1638,7 @@ function importedTypes(source, filePath, projectPath) {
       let end = text.length;
       for (let i = from; i < text.length; i++) {
         const c = text[i];
-        if ('{(['.includes(c)) depth++;
+        if ('{(['.includes(c)) {depth++;}
         else if ('})]'.includes(c)) {
           depth--;
           if (depth === 0 && /\{/.test(text.slice(from, i))) { end = i + 1; break; }
@@ -1685,10 +1685,10 @@ function safeSchema(filePath, projectPath) {
 // ---------------------------------------------------------------------------
 
 function literalValue(raw) {
-  if (raw === undefined) return undefined;
+  if (raw === undefined) {return undefined;}
   const s = raw.trim();
-  if (/^(true|false)$/.test(s)) return s === 'true';
-  if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+  if (/^(true|false)$/.test(s)) {return s === 'true';}
+  if (/^-?\d+(\.\d+)?$/.test(s)) {return Number(s);}
   // Strings, including template literals without interpolation.
   if (/^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`$]*`)$/s.test(s)) {
     return s.slice(1, -1).replace(/\\(['"`\\])/g, '$1');
@@ -1713,11 +1713,11 @@ function findNamedImport(code, name) {
   while ((m = re.exec(code)) !== null) {
     for (const part of m[1].split(',')) {
       const seg = part.trim().replace(/^type\s+/, '');
-      if (!seg) continue;
+      if (!seg) {continue;}
       const asMatch = seg.match(/^([\w$]+)\s+as\s+([\w$]+)$/);
       const orig = asMatch ? asMatch[1] : seg;
       const local = asMatch ? asMatch[2] : seg;
-      if (local === name) return { orig, spec: m[2] };
+      if (local === name) {return { orig, spec: m[2] };}
     }
   }
   return null;
@@ -1725,11 +1725,11 @@ function findNamedImport(code, name) {
 
 function resolveModuleFile(spec, fromFile, projectPath) {
   let base;
-  if (spec.startsWith('.')) base = path.resolve(path.dirname(fromFile), spec);
+  if (spec.startsWith('.')) {base = path.resolve(path.dirname(fromFile), spec);}
   else if (spec.startsWith('@/') || spec.startsWith('~/')) {
     base = path.join(projectPath, 'src', spec.slice(2));
-  } else if (spec.startsWith('src/')) base = path.join(projectPath, spec);
-  else return null;
+  } else if (spec.startsWith('src/')) {base = path.join(projectPath, spec);}
+  else {return null;}
   const candidates = [
     base,
     `${base}.ts`,
@@ -1741,7 +1741,7 @@ function resolveModuleFile(spec, fromFile, projectPath) {
   ];
   for (const c of candidates) {
     try {
-      if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
+      if (fs.existsSync(c) && fs.statSync(c).isFile()) {return c;}
     } catch {
       /* keep looking */
     }
@@ -1751,9 +1751,9 @@ function resolveModuleFile(spec, fromFile, projectPath) {
 
 function resolveIdentifierDefaults(schema, source, filePath, projectPath) {
   for (const field of schema) {
-    if (!field.defaultExpr) continue;
+    if (!field.defaultExpr) {continue;}
     const ident = String(field.default).trim();
-    if (!/^[A-Za-z_$][\w$]*$/.test(ident)) continue;
+    if (!/^[A-Za-z_$][\w$]*$/.test(ident)) {continue;}
     // Local const in the component's own frontmatter first.
     let value = constLiteralIn(source, ident);
     if (value === undefined) {
@@ -1826,7 +1826,7 @@ const isSelfWrite = (full) => selfWrites.isEcho(path.resolve(full));
 ipcMain.handle('watch:start', async (_e, projectPath) => {
   stopWatchingProject();
   openProjectRoot = path.resolve(projectPath);
-  if (!fs.existsSync(path.join(projectPath, 'src'))) return { ok: false };
+  if (!fs.existsSync(path.join(projectPath, 'src'))) {return { ok: false };}
   watcher = watchProject({
     projectPath, send, isSelfWrite, notePageMayHaveChanged, scheduleThumb, mediaPattern: MEDIA_EXT,
   });
@@ -1841,7 +1841,7 @@ function stopWatchingProject() {
   pageChangeExternal = false;
   clearTimeout(thumbTimer);
   thumbTimer = null;
-  for (const timer of styleNudges.values()) clearTimeout(timer);
+  for (const timer of styleNudges.values()) {clearTimeout(timer);}
   styleNudges.clear();
   captureEra++;
   selfWrites.clear();
@@ -1877,7 +1877,7 @@ const rootOfRel = (rel) => String(rel || '').split('/')[0];
 function assetAbs(projectPath, rel) {
   const clean = String(rel || '').replace(/^\/+/, '');
   const root = rootOfRel(clean);
-  if (!ASSET_ROOTS.includes(root)) throw new Error('Invalid asset path');
+  if (!ASSET_ROOTS.includes(root)) {throw new Error('Invalid asset path');}
   const rootAbs = path.resolve(projectPath, root);
   const abs = path.resolve(projectPath, clean);
   if (abs !== rootAbs && !abs.startsWith(rootAbs + path.sep)) {
@@ -1912,7 +1912,7 @@ ipcMain.handle('assets:list', async (_e, projectPath) => {
       return false;
     }
     for (const entry of names) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') {continue;}
       const full = path.join(dir, entry.name);
       const entryRel = `${rel}/${entry.name}`;
       if (entry.isDirectory()) {
@@ -1920,10 +1920,10 @@ ipcMain.handle('assets:list', async (_e, projectPath) => {
         const placeholder = { rel: entryRel, name: entry.name, parent: rel, isDir: true, root: rootOfRel(rel) };
         entries.push(placeholder);
         const any = walk(full, entryRel, mediaOnly);
-        if (any) held = true;
-        else if (mediaOnly) entries.splice(at, 1); // nothing below it — not an asset folder
+        if (any) {held = true;}
+        else if (mediaOnly) {entries.splice(at, 1);} // nothing below it — not an asset folder
       } else {
-        if (mediaOnly && !MEDIA_EXT.test(entry.name)) continue;
+        if (mediaOnly && !MEDIA_EXT.test(entry.name)) {continue;}
         let size = 0;
         try {
           size = fs.statSync(full).size;
@@ -1967,7 +1967,7 @@ ipcMain.handle('assets:pickUpload', async (_e, { projectPath, destRel }) => {
     title: 'Upload assets',
     properties: ['openFile', 'multiSelections'],
   });
-  if (result.canceled || !result.filePaths.length) return { added: 0 };
+  if (result.canceled || !result.filePaths.length) {return { added: 0 };}
   return copyAssetsIn(projectPath, destRel, result.filePaths);
 });
 
@@ -2008,7 +2008,7 @@ ipcMain.handle('assets:move', async (_e, { projectPath, fromRel, toDirRel }) => 
         'move it outside the app and fix the references by hand.'
     );
   }
-  if (!fs.existsSync(from)) return { ok: false };
+  if (!fs.existsSync(from)) {return { ok: false };}
   // Refuse moving a folder into itself/its own subtree.
   if (fs.statSync(from).isDirectory() && (toDir === from || toDir.startsWith(from + path.sep))) {
     throw new Error('Cannot move a folder into itself.');
@@ -2024,11 +2024,11 @@ ipcMain.handle('assets:move', async (_e, { projectPath, fromRel, toDirRel }) => 
 
 ipcMain.handle('assets:rename', async (_e, { projectPath, rel, newName }) => {
   const clean = String(newName).trim().replace(/[/\\]/g, '');
-  if (!clean) throw new Error('Invalid name');
+  if (!clean) {throw new Error('Invalid name');}
   const from = assetAbs(projectPath, rel);
   const dest = path.join(path.dirname(from), clean);
-  if (dest === from) return { ok: true };
-  if (fs.existsSync(dest)) throw new Error('Something with that name already exists.');
+  if (dest === from) {return { ok: true };}
+  if (fs.existsSync(dest)) {throw new Error('Something with that name already exists.');}
   markSelfWrite(from);
   markSelfWrite(dest);
   fs.renameSync(from, dest);
@@ -2042,7 +2042,7 @@ ipcMain.handle('assets:rename', async (_e, { projectPath, rel, newName }) => {
 // can get it back from without us.
 ipcMain.handle('assets:delete', async (_e, { projectPath, rel }) => {
   const abs = assetAbs(projectPath, rel);
-  if (!fs.existsSync(abs)) return { ok: false };
+  if (!fs.existsSync(abs)) {return { ok: false };}
   markSelfWrite(abs);
   await shell.trashItem(abs);
   send('assets:changed', {});
@@ -2070,7 +2070,7 @@ ipcMain.handle('assets:writeText', async (_e, { projectPath, rel, text }) => {
 
 ipcMain.handle('assets:mkdir', async (_e, { projectPath, parentRel, name }) => {
   const clean = String(name).trim().replace(/[/\\]/g, '');
-  if (!clean) throw new Error('Invalid folder name');
+  if (!clean) {throw new Error('Invalid folder name');}
   const dir = path.join(assetAbs(projectPath, parentRel), clean);
   markSelfWrite(dir);
   fs.mkdirSync(dir, { recursive: true });
@@ -2096,10 +2096,10 @@ const isAstroRel = (rel) => /\.astro$/i.test(String(rel || ''));
 // the scanners ever seeing its markup.
 function frontmatterSpan(source) {
   const open = /^---[ \t]*\r?\n/.exec(source);
-  if (!open) return null;
+  if (!open) {return null;}
   const start = open[0].length;
   const close = source.slice(start).search(/\r?\n---[ \t]*(\r?\n|$)/);
-  if (close === -1) return null;
+  if (close === -1) {return null;}
   return { start, end: start + close };
 }
 
@@ -2122,7 +2122,7 @@ function splitCmsRel(rel) {
 function cmsAbs(projectPath, rel) {
   const root = path.resolve(projectPath, 'src');
   const abs = path.resolve(root, rel || '');
-  if (abs !== root && !abs.startsWith(root + path.sep)) throw new Error('Invalid data path');
+  if (abs !== root && !abs.startsWith(root + path.sep)) {throw new Error('Invalid data path');}
   return abs;
 }
 
@@ -2132,7 +2132,7 @@ function cmsAbs(projectPath, rel) {
 ipcMain.handle('cms:list', async (_e, projectPath) => {
   const root = path.join(projectPath, 'src');
   const files = [];
-  if (!fs.existsSync(root)) return { files };
+  if (!fs.existsSync(root)) {return { files };}
   const walk = (dir, rel) => {
     let entries = [];
     try {
@@ -2141,7 +2141,7 @@ ipcMain.handle('cms:list', async (_e, projectPath) => {
       return;
     }
     for (const entry of entries) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') {continue;}
       const full = path.join(dir, entry.name);
       const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
@@ -2152,12 +2152,12 @@ ipcMain.handle('cms:list', async (_e, projectPath) => {
         // holds several and the folder alone wouldn't tell them apart.
         let source = '';
         try {
-          if (fs.statSync(full).size > MAX_CMS_BYTES) continue;
+          if (fs.statSync(full).size > MAX_CMS_BYTES) {continue;}
           source = fs.readFileSync(full, 'utf8');
         } catch {
           continue;
         }
-        if (!/export\s+const\s+[A-Za-z_$][\w$]*\s*(?::[^=]+)?=\s*\[/.test(source)) continue;
+        if (!/export\s+const\s+[A-Za-z_$][\w$]*\s*(?::[^=]+)?=\s*\[/.test(source)) {continue;}
         // Single values (site name, url, a count) have no rows to repeat, so
         // they ride together as one "General" record at the top of the file's
         // group rather than being invisible.
@@ -2173,7 +2173,7 @@ ipcMain.handle('cms:list', async (_e, projectPath) => {
           });
         }
         for (const col of findCollections(source)) {
-          if (!col.data) continue; // computed contents — nothing safe to write back
+          if (!col.data) {continue;} // computed contents — nothing safe to write back
           files.push({
             rel: `${entryRel}#${col.name}`,
             name: col.name,
@@ -2190,13 +2190,13 @@ ipcMain.handle('cms:list', async (_e, projectPath) => {
         // content rather than a constant, so the scan is told both.
         let source = '';
         try {
-          if (fs.statSync(full).size > MAX_CMS_BYTES) continue;
+          if (fs.statSync(full).size > MAX_CMS_BYTES) {continue;}
           source = fs.readFileSync(full, 'utf8');
         } catch {
           continue;
         }
         const body = frontmatterOf(source);
-        if (!body) continue;
+        if (!body) {continue;}
         // Single values ride together as one "General" record, the same way a
         // data file's do.
         const general = readGeneral(body, PAGE_SCAN);
@@ -2212,7 +2212,7 @@ ipcMain.handle('cms:list', async (_e, projectPath) => {
           });
         }
         for (const col of findCollections(body, PAGE_SCAN)) {
-          if (!col.data) continue;
+          if (!col.data) {continue;}
           files.push({
             rel: `${entryRel}#${col.name}`,
             name: col.name,
@@ -2248,17 +2248,17 @@ ipcMain.handle('cms:list', async (_e, projectPath) => {
 ipcMain.handle('cms:read', async (_e, { projectPath, rel }) => {
   const { fileRel, exportName } = splitCmsRel(rel);
   const abs = cmsAbs(projectPath, fileRel);
-  if (!exportName) return { data: JSON.parse(fs.readFileSync(abs, 'utf8')) };
+  if (!exportName) {return { data: JSON.parse(fs.readFileSync(abs, 'utf8')) };}
   const file = fs.readFileSync(abs, 'utf8');
   // A page's data lives in its frontmatter; everything below it is markup the
   // scanners must never see.
   const page = isAstroRel(fileRel);
   const source = page ? frontmatterOf(file) : file;
-  if (source == null) throw new Error(`src/${fileRel} has no frontmatter.`);
+  if (source == null) {throw new Error(`src/${fileRel} has no frontmatter.`);}
   const scan = page ? PAGE_SCAN : undefined;
   if (exportName === GENERAL) {
     const general = readGeneral(source, scan);
-    if (!general) throw new Error(`src/${fileRel} has no single values left to edit.`);
+    if (!general) {throw new Error(`src/${fileRel} has no single values left to edit.`);}
     return { data: general };
   }
   const col = findCollections(source, scan).find((c) => c.name === exportName);
@@ -2269,7 +2269,7 @@ ipcMain.handle('cms:read', async (_e, { projectPath, rel }) => {
         : `${exportName} is no longer exported from src/${fileRel}.`
     );
   }
-  if (!col.data) throw new Error(`${exportName} isn't plain data — ${col.reason}.`);
+  if (!col.data) {throw new Error(`${exportName} isn't plain data — ${col.reason}.`);}
   return { data: withAssets(col.data, assetOfImport(projectPath, abs, source)) };
 });
 
@@ -2281,9 +2281,9 @@ function assetOfImport(projectPath, abs, source) {
   const imports = defaultImports(source);
   return (name) => {
     const imp = imports.find((i) => i.name === name);
-    if (!imp) return null;
+    if (!imp) {return null;}
     const target = resolveImportPath(projectPath, abs, imp.spec);
-    if (!target || !MEDIA_EXT.test(target)) return null;
+    if (!target || !MEDIA_EXT.test(target)) {return null;}
     const rel = toPosix(path.relative(projectPath, target));
     return rel && !rel.startsWith('..') ? rel : null;
   };
@@ -2299,18 +2299,18 @@ ipcMain.handle('cms:assetRef', async (_e, { projectPath, rel, assetRel }) => {
   const abs = cmsAbs(projectPath, fileRel);
   const clean = String(assetRel || '').replace(/^\/+/, '');
   const root = clean.split('/')[0];
-  if (root === 'public') return { value: '/' + clean.split('/').slice(1).join('/') };
-  if (root !== 'src') throw new Error('Invalid asset path');
+  if (root === 'public') {return { value: '/' + clean.split('/').slice(1).join('/') };}
+  if (root !== 'src') {throw new Error('Invalid asset path');}
   const target = path.resolve(projectPath, clean);
-  if (!fs.existsSync(target)) throw new Error(`${clean} no longer exists.`);
+  if (!fs.existsSync(target)) {throw new Error(`${clean} no longer exists.`);}
   const file = fs.readFileSync(abs, 'utf8');
   const page = isAstroRel(fileRel);
   const span = page ? frontmatterSpan(file) : null;
-  if (page && !span) throw new Error(`src/${fileRel} has no frontmatter.`);
+  if (page && !span) {throw new Error(`src/${fileRel} has no frontmatter.`);}
   const source = page ? file.slice(span.start, span.end) : file;
   const imports = defaultImports(source);
   const already = imports.find((i) => resolveImportPath(projectPath, abs, i.spec) === target);
-  if (already) return { name: already.name, asset: clean };
+  if (already) {return { name: already.name, asset: clean };}
   const fromHere = toPosix(path.relative(path.dirname(abs), target));
   const spec = importSpecFor({
     imports,
@@ -2331,7 +2331,7 @@ ipcMain.handle('cms:write', async (_e, { projectPath, rel, data }) => {
   const { fileRel, exportName } = splitCmsRel(rel);
   if (exportName) {
     const abs = cmsAbs(projectPath, fileRel);
-    if (!fs.existsSync(abs)) throw new Error(`src/${fileRel} no longer exists.`);
+    if (!fs.existsSync(abs)) {throw new Error(`src/${fileRel} no longer exists.`);}
     // Only the edited span is rewritten — imports, comments and the file's
     // other exports are left exactly as they were.
     const file = fs.readFileSync(abs, 'utf8');
@@ -2339,32 +2339,32 @@ ipcMain.handle('cms:write', async (_e, { projectPath, rel, data }) => {
     // span is spliced back — the markup below is never re-serialized.
     const page = isAstroRel(fileRel);
     const span = page ? frontmatterSpan(file) : null;
-    if (page && !span) throw new Error(`src/${fileRel} has no frontmatter.`);
+    if (page && !span) {throw new Error(`src/${fileRel} has no frontmatter.`);}
     const source = page ? file.slice(span.start, span.end) : file;
     const scan = page ? PAGE_SCAN : undefined;
     const written =
       exportName === GENERAL
         ? writeGeneral(source, data && typeof data === 'object' && !Array.isArray(data) ? data : {}, scan)
         : replaceCollection(source, exportName, data, scan);
-    if (written == null) throw new Error(`Couldn't write ${exportName} back into src/${fileRel}.`);
+    if (written == null) {throw new Error(`Couldn't write ${exportName} back into src/${fileRel}.`);}
     const next = page ? file.slice(0, span.start) + written + file.slice(span.end) : written;
     markSelfWrite(abs, next);
     fs.writeFileSync(abs, next, 'utf8');
     // Editing a page's own frontmatter changes a file the editor may have
     // open. Our writes are invisible to the watcher, so say so directly —
     // otherwise the model would keep the old data and write it back over this.
-    if (page) send('fs:changed', { files: [abs] });
+    if (page) {send('fs:changed', { files: [abs] });}
     return { ok: true };
   }
   const abs = cmsAbs(projectPath, rel);
   // A save still in flight when the collection is deleted must not recreate
   // the file — the editor closes a moment after the delete lands.
-  if (!fs.existsSync(abs)) throw new Error(`src/${rel} no longer exists.`);
+  if (!fs.existsSync(abs)) {throw new Error(`src/${rel} no longer exists.`);}
   let indent = 2;
   let trailingNewline = true;
   const before = fs.readFileSync(abs, 'utf8');
   const match = before.match(/\n([ \t]+)\S/);
-  if (match) indent = match[1] === '\t' ? '\t' : match[1].length;
+  if (match) {indent = match[1] === '\t' ? '\t' : match[1].length;}
   trailingNewline = /\n$/.test(before);
   const json = JSON.stringify(data, null, indent) + (trailingNewline ? '\n' : '');
   markSelfWrite(abs, json);
@@ -2376,10 +2376,10 @@ ipcMain.handle('cms:write', async (_e, { projectPath, rel, data }) => {
 // that isn't a content collection.
 ipcMain.handle('cms:create', async (_e, { projectPath, name }) => {
   const slug = String(name).trim().toLowerCase().replace(/\.json$/i, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  if (!slug) throw new Error('Give the collection a name.');
+  if (!slug) {throw new Error('Give the collection a name.');}
   const rel = `data/${slug}.json`;
   const abs = cmsAbs(projectPath, rel);
-  if (fs.existsSync(abs)) throw new Error(`src/${rel} already exists.`);
+  if (fs.existsSync(abs)) {throw new Error(`src/${rel} already exists.`);}
   markSelfWrite(abs);
   fs.mkdirSync(path.dirname(abs), { recursive: true });
   fs.writeFileSync(abs, '[]\n', 'utf8');
@@ -2416,7 +2416,7 @@ ipcMain.handle('content:config', async (_e, { projectPath, force } = {}) =>
 const collectionOf = async (projectPath, name) => {
   const config = await readContentConfig(projectPath);
   const collection = (config.collections || []).find((c) => c.name === name);
-  if (!collection) throw new Error(`${name} is not a collection in this project.`);
+  if (!collection) {throw new Error(`${name} is not a collection in this project.`);}
   return { config, collection };
 };
 
@@ -2439,9 +2439,9 @@ ipcMain.handle('css:addVariables', async (_e, { projectPath, adds }) => {
   for (const add of adds || []) {
     markSelfWrite(path.resolve(projectPath, add.file));
     last = cssVars.addVariable(projectPath, add);
-    if (!last.ok) break;
+    if (!last.ok) {break;}
   }
-  if (last.ok) send('css:changed', {});
+  if (last.ok) {send('css:changed', {});}
   return last;
 });
 
@@ -2453,9 +2453,9 @@ ipcMain.handle('css:moveVariables', async (_e, { projectPath, moves }) => {
     markSelfWrite(path.resolve(projectPath, move.file));
     // A group carries its heading and every line under it; a row is one line.
     last = move.names ? cssVars.moveSection(projectPath, move) : cssVars.moveVariable(projectPath, move);
-    if (!last.ok) break;
+    if (!last.ok) {break;}
   }
-  if (last.ok) send('css:changed', {});
+  if (last.ok) {send('css:changed', {});}
   return last;
 });
 
@@ -2464,7 +2464,7 @@ ipcMain.handle('css:moveVariables', async (_e, { projectPath, moves }) => {
 ipcMain.handle('css:setSectionTitle', async (_e, { projectPath, ...edit }) => {
   markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.setSectionTitle(projectPath, edit);
-  if (result.ok) send('css:changed', {});
+  if (result.ok) {send('css:changed', {});}
   return result;
 });
 
@@ -2473,21 +2473,21 @@ ipcMain.handle('css:setSectionTitle', async (_e, { projectPath, ...edit }) => {
 ipcMain.handle('css:removeSection', async (_e, { projectPath, ...edit }) => {
   markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.removeSection(projectPath, edit);
-  if (result.ok) send('css:changed', {});
+  if (result.ok) {send('css:changed', {});}
   return result;
 });
 
 ipcMain.handle('css:moveHeading', async (_e, { projectPath, ...edit }) => {
   markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.moveHeading(projectPath, edit);
-  if (result.ok) send('css:changed', {});
+  if (result.ok) {send('css:changed', {});}
   return result;
 });
 
 ipcMain.handle('css:addSection', async (_e, { projectPath, ...edit }) => {
   markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.addSection(projectPath, edit);
-  if (result.ok) send('css:changed', {});
+  if (result.ok) {send('css:changed', {});}
   return result;
 });
 
@@ -2496,7 +2496,7 @@ ipcMain.handle('css:addSection', async (_e, { projectPath, ...edit }) => {
 // them move or none does.
 ipcMain.handle('css:renameVariables', async (_e, { projectPath, renames }) => {
   const result = cssVars.renameVariables(projectPath, { renames, markWrite: markSelfWrite });
-  if (result.ok) send('css:changed', {});
+  if (result.ok) {send('css:changed', {});}
   return result;
 });
 
@@ -2507,13 +2507,13 @@ ipcMain.handle('css:setVariable', async (_e, { projectPath, ...edit }) => {
   const abs = path.resolve(projectPath, edit.file);
   markSelfWrite(abs);
   const result = cssVars.setVariable(projectPath, edit);
-  if (result.ok) send('css:changed', {});
+  if (result.ok) {send('css:changed', {});}
   return result;
 });
 
 ipcMain.handle('content:collections', async (_e, projectPath) => {
   const config = await readContentConfig(projectPath);
-  if (config.missing || config.error) return { ...config, collections: [] };
+  if (config.missing || config.error) {return { ...config, collections: [] };}
   const collections = (config.collections || []).map((collection) => ({
     name: collection.name,
     editable: collection.editable,
@@ -2560,7 +2560,7 @@ ipcMain.handle('content:rename', async (_e, { projectPath, name, from, to }) => 
   const config = await readContentConfig(projectPath);
   const plan = planRename(projectPath, config.collections || [], { collection: name, from, to });
   const result = applyRename(projectPath, plan);
-  for (const file of result.files) markSelfWrite(path.resolve(projectPath, file));
+  for (const file of result.files) {markSelfWrite(path.resolve(projectPath, file));}
   send('cms:changed', {});
   return result;
 });
@@ -2583,8 +2583,8 @@ ipcMain.handle('project:resolveImport', async (_e, { projectPath, fromFile, spec
 
 ipcMain.handle('cms:setMeta', async (_e, { projectPath, rel, fields }) => {
   const meta = readCmsMeta(projectPath);
-  if (fields && Object.keys(fields).length) meta[rel] = fields;
-  else delete meta[rel];
+  if (fields && Object.keys(fields).length) {meta[rel] = fields;}
+  else {delete meta[rel];}
   const file = cmsMetaPath(projectPath);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(meta, null, 2) + '\n', 'utf8');
@@ -2621,7 +2621,7 @@ ipcMain.handle('cms:delete', async (_e, { projectPath, rel }) => {
   send('cms:changed', {});
   // Our own writes are invisible to the watcher, so tell the app directly —
   // an open page holding the old import needs to reload.
-  if (hits.length) send('fs:changed', { files: hits.map((h) => h.file) });
+  if (hits.length) {send('fs:changed', { files: hits.map((h) => h.file) });}
   return { ok: true, rewritten: hits.map((h) => h.rel) };
 });
 
@@ -2651,7 +2651,7 @@ function writeChunks(model) {
           fs.writeFileSync(node.chunkFile, next, 'utf8');
         }
       }
-      if (Array.isArray(node.children)) walk(node.children);
+      if (Array.isArray(node.children)) {walk(node.children);}
     }
   };
   walk(model.nodes);
@@ -2670,7 +2670,7 @@ ipcMain.handle('page:read', async (_e, pagePath) => {
     return { ...parseMarkdownPage(source, { mdx: isMdx(pagePath) }), source };
   }
   const parsed = parsePage(source);
-  if (parsed.editable) resolveChunks(parsed.model, pagePath);
+  if (parsed.editable) {resolveChunks(parsed.model, pagePath);}
   return { ...parsed, source };
 });
 
@@ -2687,7 +2687,7 @@ const styleNudges = new Map(); // path -> pending timer
 function writePageText(pagePath, text) {
   markSelfWrite(pagePath, text);
   fs.writeFileSync(pagePath, text, 'utf8');
-  if (!/<style[\s>]/i.test(text)) return;
+  if (!/<style[\s>]/i.test(text)) {return;}
   clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
   styleNudges.set(
     pagePath,
@@ -2696,7 +2696,7 @@ function writePageText(pagePath, text) {
       try {
         // Skip it if anything has changed the file since — the nudge must never
         // resurrect text that's already been superseded.
-        if (fs.readFileSync(pagePath, 'utf8') !== text) return;
+        if (fs.readFileSync(pagePath, 'utf8') !== text) {return;}
         markSelfWrite(pagePath, text);
         fs.writeFileSync(pagePath, text, 'utf8');
       } catch {
@@ -2725,9 +2725,9 @@ ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   let fileName = name.trim().replace(/\.astro$/i, '');
   fileName = fileName.replace(/[^a-zA-Z0-9/_-]+/g, '-');
-  if (!fileName) throw new Error('Invalid page name');
+  if (!fileName) {throw new Error('Invalid page name');}
   const pagePath = path.join(pagesDir, fileName + '.astro');
-  if (fs.existsSync(pagePath)) throw new Error('A page with that name already exists.');
+  if (fs.existsSync(pagePath)) {throw new Error('A page with that name already exists.');}
   fs.mkdirSync(path.dirname(pagePath), { recursive: true });
 
   const model = { imports: [], extraFrontmatter: '', nodes: [] };
@@ -2754,9 +2754,9 @@ ipcMain.handle('page:delete', async (_e, pagePath) => {
 ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   const dest = path.resolve(pagesDir, to);
-  if (!dest.startsWith(pagesDir + path.sep)) throw new Error('Invalid destination.');
-  if (path.resolve(from) === dest) return { newPath: dest };
-  if (fs.existsSync(dest)) throw new Error('A page with that name already exists there.');
+  if (!dest.startsWith(pagesDir + path.sep)) {throw new Error('Invalid destination.');}
+  if (path.resolve(from) === dest) {return { newPath: dest };}
+  if (fs.existsSync(dest)) {throw new Error('A page with that name already exists there.');}
   fs.mkdirSync(path.dirname(dest), { recursive: true });
 
   let source = fs.readFileSync(from, 'utf8');
@@ -2768,7 +2768,7 @@ ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
       (m, pre, spec, post) => {
         const abs = path.resolve(fromDir, spec);
         let rel = toPosix(path.relative(toDir, abs));
-        if (!rel.startsWith('.')) rel = './' + rel;
+        if (!rel.startsWith('.')) {rel = './' + rel;}
         return pre + rel + post;
       }
     );
@@ -2799,7 +2799,7 @@ ipcMain.handle('pagefolder:create', async (_e, { projectPath, dir }) => {
 ipcMain.handle('pagefolder:rename', async (_e, { projectPath, from, to }) => {
   const a = resolvePagesDir(projectPath, from);
   const b = resolvePagesDir(projectPath, to);
-  if (fs.existsSync(b)) throw new Error('A folder with that name already exists.');
+  if (fs.existsSync(b)) {throw new Error('A folder with that name already exists.');}
   fs.renameSync(a, b);
   return { ok: true };
 });
@@ -2807,7 +2807,7 @@ ipcMain.handle('pagefolder:rename', async (_e, { projectPath, from, to }) => {
 ipcMain.handle('pagefolder:delete', async (_e, { projectPath, dir }) => {
   const full = resolvePagesDir(projectPath, dir);
   const pagesDir = path.join(projectPath, 'src', 'pages');
-  if (full === pagesDir) throw new Error('Invalid folder.');
+  if (full === pagesDir) {throw new Error('Invalid folder.');}
   fs.rmSync(full, { recursive: true, force: true });
   return { ok: true };
 });
@@ -2818,7 +2818,7 @@ ipcMain.handle('pagefolder:delete', async (_e, { projectPath, dir }) => {
 function fillRoute(pattern, params) {
   const filled = pattern.replace(/\[(\.\.\.)?([^\]]+)\]/g, (_m, rest, name) => {
     const value = params?.[name];
-    if (value == null) return '';
+    if (value == null) {return '';}
     return String(value)
       .split('/')
       .map((s) => encodeURIComponent(s))
@@ -2842,11 +2842,11 @@ ipcMain.handle('project:injectedRoutes', async (_e, { projectPath }) => ({
 // page that can't answer is previewed at its own pattern, exactly as before.
 ipcMain.handle('page:dynamicPaths', async (_e, { projectPath, pagePath, devUrl }) => {
   const pattern = routeForPage(projectPath, pagePath);
-  if (!pattern.includes('[') || !devUrl) return { entries: [] };
+  if (!pattern.includes('[') || !devUrl) {return { entries: [] };}
   const rel = toPosix(path.relative(projectPath, pagePath));
   try {
     const res = await fetch(`${devUrl}/__avb/paths?p=${encodeURIComponent(rel)}`);
-    if (!res.ok) return { entries: [], error: `Dev server returned ${res.status}` };
+    if (!res.ok) {return { entries: [], error: `Dev server returned ${res.status}` };}
     const data = await res.json();
     const entries = (data.entries || []).map((e) => {
       // A dev server started before this app was updated still answers with
@@ -2870,11 +2870,11 @@ ipcMain.handle('page:dynamicPaths', async (_e, { projectPath, pagePath, devUrl }
 // of a page that lists them. Answered by the dev server because only it can
 // run the project's loaders; without one there is simply no sample.
 ipcMain.handle('content:sampleEntry', async (_e, { devUrl, name, id }) => {
-  if (!devUrl || !name) return { entry: null };
+  if (!devUrl || !name) {return { entry: null };}
   try {
     const q = `c=${encodeURIComponent(name)}${id ? `&id=${encodeURIComponent(id)}` : ''}`;
     const res = await fetch(`${devUrl}/__avb/data?${q}`);
-    if (!res.ok) return { entry: null, error: `Dev server returned ${res.status}` };
+    if (!res.ok) {return { entry: null, error: `Dev server returned ${res.status}` };}
     return await res.json();
   } catch (err) {
     return { entry: null, error: String(err?.message || err) };
@@ -2919,8 +2919,8 @@ ipcMain.handle('page:importPathFor', async (_e, { pagePath, targetPath, projectP
 // is handed back untouched.
 ipcMain.handle('page:rebaseImport', async (_e, { fromPagePath, toPagePath, spec }) => {
   const text = String(spec || '');
-  if (!text.startsWith('.')) return { path: text };
-  if (!fromPagePath || !toPagePath) return { path: text };
+  if (!text.startsWith('.')) {return { path: text };}
+  if (!fromPagePath || !toPagePath) {return { path: text };}
   const abs = path.resolve(path.dirname(fromPagePath), text);
   const rel = toPosix(path.relative(path.dirname(toPagePath), abs));
   return { path: rel.startsWith('.') ? rel : './' + rel };
@@ -2942,28 +2942,28 @@ ipcMain.handle('page:rebaseImport', async (_e, { fromPagePath, toPagePath, spec 
 // Turns "<file>#<path>" node keys into "<file>:<line>" / "<file>:<from>-<to>"
 // pointers, project-relative. Returns null when there's nothing to point at.
 function selectionTrail(state) {
-  if (!state || !state.projectPath || !Array.isArray(state.keys)) return null;
+  if (!state || !state.projectPath || !Array.isArray(state.keys)) {return null;}
   const root = path.resolve(state.projectPath);
   const trail = [];
   for (const key of state.keys) {
     const hash = typeof key === 'string' ? key.indexOf('#') : -1;
-    if (hash === -1) continue;
+    if (hash === -1) {continue;}
     // The key's file half is renderer input; keep it inside the project.
     const abs = path.resolve(root, key.slice(0, hash));
-    if (abs !== root && !abs.startsWith(root + path.sep)) continue;
+    if (abs !== root && !abs.startsWith(root + path.sep)) {continue;}
     const at = locateSelection(abs, key.slice(hash + 1));
-    if (!at) continue;
+    if (!at) {continue;}
     const file = toPosix(path.relative(root, at.file));
-    if (at.startLine == null) trail.push(file);
-    else if (at.startLine === at.endLine) trail.push(`${file}:${at.startLine}`);
-    else trail.push(`${file}:${at.startLine}-${at.endLine}`);
+    if (at.startLine == null) {trail.push(file);}
+    else if (at.startLine === at.endLine) {trail.push(`${file}:${at.startLine}`);}
+    else {trail.push(`${file}:${at.startLine}-${at.endLine}`);}
   }
   return trail.length ? trail : null;
 }
 
 ipcMain.handle('selection:copy', async (_e, state) => {
   const trail = selectionTrail(state);
-  if (!trail) return { ok: false };
+  if (!trail) {return { ok: false };}
   clipboard.writeText(trail.join('\n'));
   return { ok: true, count: trail.length };
 });
@@ -2973,8 +2973,8 @@ ipcMain.handle('selection:copy', async (_e, state) => {
 // ---------------------------------------------------------------------------
 
 function stopDevServer(cancelPending = true) {
-  if (cancelPending) devStarts.cancel();
-  if (!devServer) return;
+  if (cancelPending) {devStarts.cancel();}
+  if (!devServer) {return;}
   const { proc, daemon, bin, projectPath } = devServer;
   devServer = null;
   // Daemonized servers (Astro >= 7 forks a background process) stop via the CLI.
@@ -2996,7 +2996,7 @@ let devLogBuffer = [];
 function pushDevLog(chunk) {
   devLogBuffer.push(chunk);
   // Keep roughly the last 200 chunks.
-  if (devLogBuffer.length > 200) devLogBuffer = devLogBuffer.slice(-200);
+  if (devLogBuffer.length > 200) {devLogBuffer = devLogBuffer.slice(-200);}
   send('dev:log', chunk);
 }
 
@@ -3331,9 +3331,9 @@ const MORPH_TAG_HTML = MORPH_CLIENT ? "<script>import 'virtual:avb-morph';</scri
 function parsesAsModule(file) {
   try {
     const bin = resolveNodeBin();
-    if (!bin) return true; // nothing to check with — let Astro have its say
+    if (!bin) {return true;} // nothing to check with — let Astro have its say
     const out = spawnSync(bin, ['--check', file], { encoding: 'utf8', timeout: 10000 });
-    if (out.error || out.status === null) return true; // check could not run
+    if (out.error || out.status === null) {return true;} // check could not run
     return out.status === 0;
   } catch {
     return true;
@@ -3697,8 +3697,8 @@ async function spawnDevServer(projectPath, localBin, force, bare, assertActive) 
   // `bare` is the last resort: the project's own config, none of this app's,
   // so a preview still comes up even if what this app generates cannot run.
   const markerCfg = bare ? null : writeMarkerConfig(projectPath);
-  if (markerCfg) args.push('--config', toPosix(path.relative(projectPath, markerCfg)));
-  if (force) args.push('--force');
+  if (markerCfg) {args.push('--config', toPosix(path.relative(projectPath, markerCfg)));}
+  if (force) {args.push('--force');}
 
   const proc = spawnAstroServer(projectPath, localBin, args);
 
@@ -3709,7 +3709,7 @@ async function spawnDevServer(projectPath, localBin, force, bare, assertActive) 
   proc.stderr.on('data', (d) => pushDevLog(d.toString()));
   proc.on('error', (err) => {
     pushDevLog(`\n[spawn error] ${err.message}\n`);
-    if (devServer?.proc === proc) devServer = null;
+    if (devServer?.proc === proc) {devServer = null;}
   });
   proc.on('exit', (code) => {
     if (devServer && devServer.proc === proc) {
@@ -3738,7 +3738,7 @@ async function spawnDevServer(projectPath, localBin, force, bare, assertActive) 
         )
       );
       const tail = stdout.trim().split('\n').slice(-12).join('\n');
-      if (tail) log += `\n\n— astro dev logs —\n${tail}`;
+      if (tail) {log += `\n\n— astro dev logs —\n${tail}`;}
     } catch {
       /* no daemon logs available */
     }
@@ -3767,7 +3767,7 @@ async function serverAlive(urlString) {
   const u = new URL(urlString);
   const port = Number(u.port || 80);
   for (const host of [u.hostname, '127.0.0.1', '::1']) {
-    if (await portAnswers(port, host)) return true;
+    if (await portAnswers(port, host)) {return true;}
   }
   return false;
 }
@@ -3779,7 +3779,7 @@ function readAstroLock(projectPath) {
     const data = JSON.parse(
       fs.readFileSync(path.join(projectPath, '.astro', 'dev.json'), 'utf8')
     );
-    if (data && data.url) return data;
+    if (data && data.url) {return data;}
   } catch {
     /* no lock */
   }
@@ -3882,7 +3882,7 @@ async function doDevStart(projectPath, assertActive) {
         'running on the project\'s own. Outlines and live updates are off; the ' +
         'log above says why.\n'
     );
-    if (devServer) devServer.bare = true;
+    if (devServer) {devServer.bare = true;}
     return { url, bare: true };
   } catch {
     assertActive();
@@ -3922,11 +3922,11 @@ function listCssFiles(root) {
       return;
     }
     for (const entry of entries) {
-      if (entry.name.startsWith('.') && entry.name !== '.') continue;
+      if (entry.name.startsWith('.') && entry.name !== '.') {continue;}
       const full = path.join(dir, entry.name);
       const relPath = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
-        if (CSS_SKIP_DIRS.has(entry.name)) continue;
+        if (CSS_SKIP_DIRS.has(entry.name)) {continue;}
         walk(full, relPath);
       } else if (/\.(css|scss|sass|less)$/i.test(entry.name)) {
         let size = 0;
@@ -3950,7 +3950,7 @@ function listCssFiles(root) {
 }
 
 ipcMain.handle('style:listFiles', async (_e, projectPath) => {
-  if (!projectPath) return { files: [] };
+  if (!projectPath) {return { files: [] };}
   return { files: listCssFiles(projectPath) };
 });
 
@@ -3973,19 +3973,19 @@ function listAstroStyleFiles(root) {
       return;
     }
     for (const entry of entries) {
-      if (entry.name.startsWith('.')) continue;
+      if (entry.name.startsWith('.')) {continue;}
       const full = path.join(dir, entry.name);
       const relPath = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
-        if (CSS_SKIP_DIRS.has(entry.name)) continue;
+        if (CSS_SKIP_DIRS.has(entry.name)) {continue;}
         walk(full, relPath);
         continue;
       }
-      if (!/\.astro$/i.test(entry.name)) continue;
+      if (!/\.astro$/i.test(entry.name)) {continue;}
       try {
         const { size } = fs.statSync(full);
-        if (size > ASTRO_SCAN_LIMIT) continue;
-        if (!ASTRO_GLOBAL_STYLE.test(fs.readFileSync(full, 'utf8'))) continue;
+        if (size > ASTRO_SCAN_LIMIT) {continue;}
+        if (!ASTRO_GLOBAL_STYLE.test(fs.readFileSync(full, 'utf8'))) {continue;}
         out.push({ rel: toPosix(relPath), name: entry.name, path: full, size });
       } catch {
         /* unreadable — nothing to offer for it */
@@ -3999,7 +3999,7 @@ function listAstroStyleFiles(root) {
 }
 
 ipcMain.handle('style:listAstroStyles', async (_e, projectPath) => {
-  if (!projectPath) return { files: [] };
+  if (!projectPath) {return { files: [] };}
   return { files: listAstroStyleFiles(projectPath) };
 });
 
@@ -4025,7 +4025,7 @@ ipcMain.handle('style:writeFile', async (_e, { filePath, css }) => {
 function projectAliases(projectPath) {
   for (const name of ['tsconfig.json', 'jsconfig.json']) {
     const file = path.join(projectPath, name);
-    if (!fs.existsSync(file)) continue;
+    if (!fs.existsSync(file)) {continue;}
     try {
       // Config files allow comments and trailing commas; strip both rather
       // than pulling in a JSON5 parser for one field.
@@ -4036,7 +4036,7 @@ function projectAliases(projectPath) {
         .replace(/,(\s*[}\]])/g, '$1');
       const json = JSON.parse(raw);
       const paths = json?.compilerOptions?.paths;
-      if (!paths) continue;
+      if (!paths) {continue;}
       return Object.entries(paths).map(([k, v]) => [
         k.replace(/\*$/, ''),
         (Array.isArray(v) ? v : [v]).map((t) => String(t).replace(/\*$/, '')),
@@ -4053,11 +4053,11 @@ const SRC_EXTS = ['', '.ts', '.js', '.mjs', '.mts', '.tsx', '.jsx', '.json', '.a
 function firstExisting(base) {
   for (const ext of SRC_EXTS) {
     const p = base + ext;
-    if (fs.existsSync(p) && fs.statSync(p).isFile()) return p;
+    if (fs.existsSync(p) && fs.statSync(p).isFile()) {return p;}
   }
   for (const ext of SRC_EXTS.slice(1)) {
     const p = path.join(base, 'index' + ext);
-    if (fs.existsSync(p) && fs.statSync(p).isFile()) return p;
+    if (fs.existsSync(p) && fs.statSync(p).isFile()) {return p;}
   }
   return null;
 }
@@ -4067,25 +4067,25 @@ function firstExisting(base) {
 // resolve to nothing — node_modules isn't the user's code to edit.
 function resolveImportPath(projectPath, fromFile, spec) {
   const s = String(spec || '');
-  if (!s) return null;
+  if (!s) {return null;}
   if (s.startsWith('.')) {
     return firstExisting(path.resolve(path.dirname(fromFile), s));
   }
   for (const [prefix, targets] of projectAliases(projectPath)) {
-    if (!prefix || !s.startsWith(prefix)) continue;
+    if (!prefix || !s.startsWith(prefix)) {continue;}
     const rest = s.slice(prefix.length);
     for (const target of targets) {
       const found = firstExisting(path.resolve(projectPath, target, rest));
-      if (found) return found;
+      if (found) {return found;}
     }
   }
-  if (s.startsWith('/')) return firstExisting(path.join(projectPath, s.slice(1)));
+  if (s.startsWith('/')) {return firstExisting(path.join(projectPath, s.slice(1)));}
   return null;
 }
 
 // 1-based line of `name`'s top-level declaration, so the editor can open on it.
 function declarationLine(text, name) {
-  if (!name) return 0;
+  if (!name) {return 0;}
   const re = new RegExp(
     // `[ \t]*`, not `\s*`: with the m flag `\s` eats the newlines before the
     // declaration, and the match would start on a blank line above it.
@@ -4093,19 +4093,19 @@ function declarationLine(text, name) {
     'm'
   );
   const m = re.exec(text);
-  if (!m) return 0;
+  if (!m) {return 0;}
   return text.slice(0, m.index).split('\n').length;
 }
 
 // Opens the file an imported symbol comes from. `fromFile` is the file doing
 // the importing, so relative specifiers resolve the way the bundler sees them.
 ipcMain.handle('src:readSymbol', async (_e, { projectPath, fromFile, spec, name }) => {
-  if (!projectPath || !fromFile) return { ok: false };
+  if (!projectPath || !fromFile) {return { ok: false };}
   const abs = resolveImportPath(projectPath, path.resolve(fromFile), spec);
-  if (!abs) return { ok: false, reason: 'not-found' };
+  if (!abs) {return { ok: false, reason: 'not-found' };}
   assertInProject(abs);
   const stat = fs.statSync(abs);
-  if (stat.size > MAX_EDITABLE_BYTES) return { ok: false, reason: 'too-large' };
+  if (stat.size > MAX_EDITABLE_BYTES) {return { ok: false, reason: 'too-large' };}
   const text = fs.readFileSync(abs, 'utf8');
   return {
     ok: true,
@@ -4119,9 +4119,9 @@ ipcMain.handle('src:readSymbol', async (_e, { projectPath, fromFile, spec, name 
 // src:readSymbol, but it never reads the file — the callers here are asking
 // about images, and their bytes are none of this channel's business.
 ipcMain.handle('src:resolvePath', async (_e, { projectPath, fromFile, spec }) => {
-  if (!projectPath || !fromFile) return { ok: false };
+  if (!projectPath || !fromFile) {return { ok: false };}
   const abs = resolveImportPath(projectPath, path.resolve(fromFile), spec);
-  if (!abs) return { ok: false };
+  if (!abs) {return { ok: false };}
   assertInProject(abs);
   return { ok: true, rel: toPosix(path.relative(projectPath, abs)) };
 });
@@ -4151,7 +4151,7 @@ function imageSizeOf(abs) {
     // WebP: VP8 (lossy), VP8L (lossless) and VP8X (extended) each differ.
     if (buf.length > 30 && buf.toString('binary', 0, 4) === 'RIFF' && buf.toString('binary', 8, 12) === 'WEBP') {
       const kind = buf.toString('binary', 12, 16);
-      if (kind === 'VP8 ') return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };
+      if (kind === 'VP8 ') {return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };}
       if (kind === 'VP8L') {
         const bits = buf.readUInt32LE(21);
         return { w: (bits & 0x3fff) + 1, h: ((bits >> 14) & 0x3fff) + 1 };
@@ -4186,14 +4186,14 @@ function imageSizeOf(abs) {
       };
       const w = num('width');
       const h = num('height');
-      if (w && h) return { w, h };
+      if (w && h) {return { w, h };}
       const box = tag.match(/\bviewBox\s*=\s*["']\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)/i);
-      if (box) return { w: Math.round(parseFloat(box[1])), h: Math.round(parseFloat(box[2])) };
+      if (box) {return { w: Math.round(parseFloat(box[1])), h: Math.round(parseFloat(box[2])) };}
     }
   } catch {
     /* unreadable or a format we don't decode — the caller falls back */
   } finally {
-    if (fd !== undefined) try { fs.closeSync(fd); } catch { /* already gone */ }
+    if (fd !== undefined) {try { fs.closeSync(fd); } catch { /* already gone */ }}
   }
   return null;
 }
@@ -4234,22 +4234,22 @@ ipcMain.handle('dev:stop', async () => {
 // the point is to explain a failure that already happened, never to block a
 // launch over a range we couldn't read.
 function satisfiesRange(version, range) {
-  if (!version || !range) return true;
+  if (!version || !range) {return true;}
   const parse = (v) => {
     const m = /(\d+)\.(\d+)\.(\d+)/.exec(String(v));
     return m ? [+m[1], +m[2], +m[3]] : null;
   };
   const cur = parse(version);
-  if (!cur) return true;
+  if (!cur) {return true;}
   const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
   return range.split('||').some((partRaw) => {
     const part = partRaw.trim();
     const target = parse(part);
-    if (!target) return true; // "*", "latest", something exotic — don't judge
-    if (part.startsWith('>=')) return cmp(cur, target) >= 0;
-    if (part.startsWith('>')) return cmp(cur, target) > 0;
-    if (part.startsWith('^')) return cur[0] === target[0] && cmp(cur, target) >= 0;
-    if (part.startsWith('~')) return cur[0] === target[0] && cur[1] === target[1] && cmp(cur, target) >= 0;
+    if (!target) {return true;} // "*", "latest", something exotic — don't judge
+    if (part.startsWith('>=')) {return cmp(cur, target) >= 0;}
+    if (part.startsWith('>')) {return cmp(cur, target) > 0;}
+    if (part.startsWith('^')) {return cur[0] === target[0] && cmp(cur, target) >= 0;}
+    if (part.startsWith('~')) {return cur[0] === target[0] && cur[1] === target[1] && cmp(cur, target) >= 0;}
     return cmp(cur, target) === 0;
   });
 }
@@ -4288,9 +4288,9 @@ ipcMain.handle('dev:diagnose', async (_e, projectPath) => {
   const nodeOk = nodeVersion ? satisfiesRange(nodeVersion, requires) : false;
 
   let kind = 'unknown';
-  if (!nodePath) kind = 'no-node';
-  else if (!hasDeps || !astroVersion) kind = 'no-deps';
-  else if (!nodeOk) kind = 'node-too-old';
+  if (!nodePath) {kind = 'no-node';}
+  else if (!hasDeps || !astroVersion) {kind = 'no-deps';}
+  else if (!nodeOk) {kind = 'node-too-old';}
 
   return { kind, nodePath, nodeVersion, astroVersion, requires, launchedFromGui: !process.env.SHELL };
 });
@@ -4464,20 +4464,20 @@ async function parkedRef(projectPath, branch) {
   const tag = parkTag(branch);
   for (const line of stdout.split('\n')) {
     const [ref, subject] = line.split('\t');
-    if (ref && subject && subject.trim().endsWith(tag)) return ref.trim();
+    if (ref && subject && subject.trim().endsWith(tag)) {return ref.trim();}
   }
   return null;
 }
 
 async function park(projectPath, branch) {
-  if (!(await isDirty(projectPath))) return false;
+  if (!(await isDirty(projectPath))) {return false;}
   await git(projectPath, ['stash', 'push', '--include-untracked', '-m', parkTag(branch)]);
   return true;
 }
 
 async function unpark(projectPath, branch) {
   const ref = await parkedRef(projectPath, branch);
-  if (!ref) return { restored: false };
+  if (!ref) {return { restored: false };}
   try {
     await git(projectPath, ['stash', 'pop', ref]);
     return { restored: true };
@@ -4514,7 +4514,7 @@ ipcMain.handle('git:checkout', async (_e, { projectPath, branch, create, parkFir
     park: async () => park(projectPath, await currentBranch(projectPath)),
     unpark: (from) => unpark(projectPath, from),
   });
-  if (!r.ok) return r;
+  if (!r.ok) {return r;}
   // Whatever was last left on this branch comes back out, however the switch
   // was made — that half is always wanted.
   const back = await unpark(projectPath, branch);
@@ -4544,7 +4544,7 @@ const previewServers = new Map(); // projectPath -> {proc, url, ref, port}
 
 async function stopPreview(projectPath) {
   const cur = previewServers.get(projectPath);
-  if (!cur) return;
+  if (!cur) {return;}
   previewServers.delete(projectPath);
   stopProcessTree(cur.proc);
   try {
@@ -4555,7 +4555,7 @@ async function stopPreview(projectPath) {
 }
 
 function stopAllPreviews() {
-  for (const [projectPath] of previewServers) stopPreview(projectPath);
+  for (const [projectPath] of previewServers) {stopPreview(projectPath);}
 }
 
 ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
@@ -4590,7 +4590,7 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
   proc.on('error', (error) => { spawnError = error; });
   previewServers.set(projectPath, { proc, url, ref, port });
   proc.on('exit', () => {
-    if (previewServers.get(projectPath)?.proc === proc) previewServers.delete(projectPath);
+    if (previewServers.get(projectPath)?.proc === proc) {previewServers.delete(projectPath);}
   });
 
   // Wait for it to answer rather than guessing at a delay. An old commit can
@@ -4599,8 +4599,8 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
   // not left as a blank canvas.
   const deadline = Date.now() + 45000;
   while (Date.now() < deadline) {
-    if (spawnError || proc.exitCode !== null || proc.killed) break;
-    if (await serverAlive(url)) return { url, ref, reused: false };
+    if (spawnError || proc.exitCode !== null || proc.killed) {break;}
+    if (await serverAlive(url)) {return { url, ref, reused: false };}
     await new Promise((r) => setTimeout(r, 400));
   }
   await stopPreview(projectPath);
@@ -4731,11 +4731,11 @@ ipcMain.handle('git:publish', async (_e, { projectPath, repoName, isPrivate }) =
       /* no remote — caller just won't get a link */
     }
   }
-  if (url) url = url.replace(/[.,)]+$/, '').replace(/\.git$/, '');
+  if (url) {url = url.replace(/[.,)]+$/, '').replace(/\.git$/, '');}
   return { ok: true, url, output };
 });
 
 ipcMain.handle('shell:openExternal', async (_e, url) => {
-  if (/^https?:\/\//.test(url)) shell.openExternal(url);
+  if (/^https?:\/\//.test(url)) {shell.openExternal(url);}
   return { ok: true };
 });

@@ -90,7 +90,7 @@ export default function SegmentedControl<T extends string>({
   }
   useEffect(() => clearHoverTimer, [])
   const startHover = (index: number) => {
-    if (!options[index]?.tooltip) return
+    if (!options[index]?.tooltip) {return}
     clearHoverTimer()
     hoverTimer.current = window.setTimeout(() => {
       hoverTimer.current = null
@@ -158,7 +158,7 @@ export function HoverTooltip({ anchor, children }: { anchor: HTMLElement; childr
   useLayoutEffect(() => {
     const place = () => {
       const el = ref.current
-      if (!el) return
+      if (!el) {return}
       const margin = 8
       const gap = 8
       const a = anchor.getBoundingClientRect()
@@ -177,7 +177,7 @@ export function HoverTooltip({ anchor, children }: { anchor: HTMLElement; childr
     // and a box placed ABOVE its anchor grows downward — over the very label it
     // describes — unless it's measured again.
     const ro = typeof ResizeObserver !== 'undefined' && ref.current ? new ResizeObserver(() => place()) : null
-    if (ref.current) ro?.observe(ref.current)
+    if (ref.current) {ro?.observe(ref.current)}
     window.addEventListener('scroll', place, true)
     window.addEventListener('resize', place)
     return () => {

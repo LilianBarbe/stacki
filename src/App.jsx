@@ -121,10 +121,10 @@ const DEFAULT_TEXT = {
 // to refuse over (the fix is a prop, and only the author knows its name) but
 // very much something to say out loud.
 function usesPageScope(node) {
-  if (!node || typeof node !== 'object') return false;
-  if (['expr', 'cond', 'map', 'branch'].includes(node.kind)) return true;
+  if (!node || typeof node !== 'object') {return false;}
+  if (['expr', 'cond', 'map', 'branch'].includes(node.kind)) {return true;}
   for (const value of Object.values(node.props || {})) {
-    if (value && value.type === 'expr') return true;
+    if (value && value.type === 'expr') {return true;}
   }
   return (node.children || []).some(usesPageScope);
 }
@@ -148,7 +148,7 @@ function slotHostOf(model, id) {
 // scanned", which is never the same answer as "has no slots".
 function definitionOf(model, node, insertables) {
   const byName = insertables.find((c) => c.name === node.name);
-  if (byName) return byName;
+  if (byName) {return byName;}
   const imp = (model.imports || []).find((i) => i.name === node.name);
   const base = imp?.path.split('/').pop()?.replace(/\.astro$/i, '');
   return (base && insertables.find((c) => c.name === base)) || null;
@@ -159,10 +159,10 @@ function definitionOf(model, node, insertables) {
 // what anyone came to edit, and <body> is the page's real root.
 function findElementByTag(nodes, tag) {
   for (const n of nodes || []) {
-    if (n.kind === 'element' && String(n.name).toLowerCase() === tag) return n;
+    if (n.kind === 'element' && String(n.name).toLowerCase() === tag) {return n;}
     if (Array.isArray(n.children)) {
       const found = findElementByTag(n.children, tag);
-      if (found) return found;
+      if (found) {return found;}
     }
   }
   return null;
@@ -178,7 +178,7 @@ function openingSelection(nodes) {
       const markup = node.kind === 'element' || node.kind === 'component';
       if (SLOT_TRANSPARENT.has(node.kind) || (markup && ['Fragment', 'slot'].includes(node.name))) {
         const child = firstRendered(node.children);
-        if (child) return child;
+        if (child) {return child;}
       } else if (markup && !['head', 'script', 'style', 'link', 'meta', 'title', 'base', 'template'].includes(node.name)) {
         return node;
       }
@@ -201,8 +201,8 @@ function collectUsedNames(model) {
   const used = new Set();
   const walk = (list) => {
     for (const node of list) {
-      if (node.name) used.add(node.name);
-      if (Array.isArray(node.children)) walk(node.children);
+      if (node.name) {used.add(node.name);}
+      if (Array.isArray(node.children)) {walk(node.children);}
     }
   };
   walk(model.nodes);
@@ -233,13 +233,13 @@ function codeText(model) {
   const parts = [stripComments(model.extraFrontmatter || '')];
   const walk = (list) => {
     for (const node of list) {
-      if (node.kind === 'expr' || node.kind === 'raw-line') parts.push(node.value || '');
-      if (node.kind === 'map') parts.push(node.head || '');
-      if (node.kind === 'cond') parts.push(node.test || '');
+      if (node.kind === 'expr' || node.kind === 'raw-line') {parts.push(node.value || '');}
+      if (node.kind === 'map') {parts.push(node.head || '');}
+      if (node.kind === 'cond') {parts.push(node.test || '');}
       for (const v of Object.values(node.props || {})) {
-        if (v && (v.type === 'expr' || v.type === 'spread')) parts.push(String(v.value ?? ''));
+        if (v && (v.type === 'expr' || v.type === 'spread')) {parts.push(String(v.value ?? ''));}
       }
-      if (Array.isArray(node.children)) walk(node.children);
+      if (Array.isArray(node.children)) {walk(node.children);}
     }
   };
   walk(model.nodes);
@@ -255,11 +255,11 @@ const SAVE_DELAY = { true: 0, live: 120, false: 300 };
 // and answers the other with a 404 help page. So the project's trailingSlash
 // is applied on the way from one to the other, never before.
 function routeToPath(route, trailingSlash) {
-  if (!route || route === '/') return route || '/';
+  if (!route || route === '/') {return route || '/';}
   // An extension means a file, not a directory-style route: /rss.xml keeps
   // its shape under every setting, which is also how Astro checks it.
-  if (trailingSlash === 'always') return /\.[^/]+$/.test(route) ? route : route + '/';
-  if (trailingSlash === 'never') return route.replace(/\/$/, '');
+  if (trailingSlash === 'always') {return /\.[^/]+$/.test(route) ? route : route + '/';}
+  if (trailingSlash === 'never') {return route.replace(/\/$/, '');}
   return route; // 'ignore' — the default, and it serves either
 }
 
@@ -302,10 +302,10 @@ function pruneImports(model) {
 function chooseImportPath(model, { relative, srcRelative }) {
   if (srcRelative) {
     for (const imp of model.imports) {
-      if (imp.path.startsWith('.')) continue;
+      if (imp.path.startsWith('.')) {continue;}
       for (const marker of ['/components/', '/layouts/']) {
         const idx = imp.path.indexOf(marker);
-        if (idx > 0) return imp.path.slice(0, idx + 1) + srcRelative;
+        if (idx > 0) {return imp.path.slice(0, idx + 1) + srcRelative;}
       }
     }
   }
@@ -318,8 +318,8 @@ function chooseImportPath(model, { relative, srcRelative }) {
 // hold text. Kept in step with it by hand; the two disagreeing would mean a
 // double-click that focuses a field which isn't there.
 function holdsInlineText(node) {
-  if (!node || node.kind !== 'element') return false;
-  if (VOID_TAGS.has(String(node.name).toLowerCase())) return false;
+  if (!node || node.kind !== 'element') {return false;}
+  if (VOID_TAGS.has(String(node.name).toLowerCase())) {return false;}
   const kids = node.children;
   return isInlineOnly(kids) || !Array.isArray(kids) || kids.length === 0;
 }
@@ -477,7 +477,7 @@ export default function App() {
   // projectRef is declared further down, but this only reads it when called.
   const diagnose = useCallback(() => {
     const p = projectRef.current?.path;
-    if (!p) return;
+    if (!p) {return;}
     window.avb
       .diagnoseDev(p)
       .then((d) => setDevDiag(d))
@@ -490,7 +490,7 @@ export default function App() {
     clearAssetRequest();
     setAssetPick(null);
     setLeftTab((t) => {
-      if (t !== 'assets') return t;
+      if (t !== 'assets') {return t;}
       // Answering the field ends the errand: show the element it belongs to
       // rather than leaving the user parked in the asset browser — including
       // when the browser is where they started, which used to strand them.
@@ -500,12 +500,12 @@ export default function App() {
     tabBeforePick.current = null;
     // The navigator opens on the element that was just given an asset, not
     // wherever it happened to be scrolled.
-    if (picked === true) setRevealTick((n) => n + 1);
+    if (picked === true) {setRevealTick((n) => n + 1);}
   }, []);
 
   useEffect(() => {
     return onAssetRequest((req) => {
-      if (!req) return; // cleared from this side already
+      if (!req) {return;} // cleared from this side already
       setAssetPick({
         ...req,
         // The entry rides along: which root it came from decides whether the
@@ -516,7 +516,7 @@ export default function App() {
         },
       });
       setLeftTab((t) => {
-        if (t !== 'assets') tabBeforePick.current = t;
+        if (t !== 'assets') {tabBeforePick.current = t;}
         return 'assets';
       });
     });
@@ -566,7 +566,7 @@ export default function App() {
   // time a probe actually runs, and the watch has no reason to be rebuilt just
   // because the route changed.
   useEffect(() => {
-    if (!devUrl) return undefined;
+    if (!devUrl) {return undefined;}
     // Both of these arrive with the main process, which does not reload when the
     // renderer does (see VITE_DEV_SERVER_URL): a renderer newer than the bridge
     // would call undefined and take the app down with it. Absent means there is
@@ -587,7 +587,7 @@ export default function App() {
       // that stayed open, a machine that slept) nothing says so: the page just
       // stops updating and the only way to see an edit is the refresh button.
       // The app's own watcher saw this change, so it says it directly too.
-      if (d?.external) tellCanvas({ type: 'avb:patch-now' });
+      if (d?.external) {tellCanvas({ type: 'avb:patch-now' });}
     });
     return () => {
       offWrite();
@@ -618,14 +618,14 @@ export default function App() {
         request = latest;
         continue;
       }
-      if (failure) throw failure;
+      if (failure) {throw failure;}
       if (latest === request && !request.applied) {
         request.applied = true;
         setScan(result);
-        if (result?.trailingSlash) setTrailingSlash(result.trailingSlash);
+        if (result?.trailingSlash) {setTrailingSlash(result.trailingSlash);}
         const appliedRequest = request;
         window.avb.listProjectClasses(projectPath).then((classes) => {
-          if (scanRequestRef.current === appliedRequest) setProjectClasses(classes || []);
+          if (scanRequestRef.current === appliedRequest) {setProjectClasses(classes || []);}
         }).catch(() => {});
       }
       return result;
@@ -639,7 +639,7 @@ export default function App() {
         const { url, external, trailingSlash: resolved } =
           await window.avb.startDevServer(projectPath);
         setDevUrl(url);
-        if (resolved) setTrailingSlash(resolved);
+        if (resolved) {setTrailingSlash(resolved);}
         setDevStatus('on');
         setDevDiag(null);
         if (external) {
@@ -686,7 +686,7 @@ export default function App() {
 
       const first =
         result.pages.find((p) => p.name === 'index.astro') || result.pages[0] || null;
-      if (first) selectPage(first);
+      if (first) {selectPage(first);}
     },
     [rescan, startPreview] // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -697,7 +697,7 @@ export default function App() {
   // somebody closed, both of which belong on the welcome screen.
   const reopenedRef = useRef(false);
   useEffect(() => {
-    if (reopenedRef.current || !window.avb.pendingProject) return;
+    if (reopenedRef.current || !window.avb.pendingProject) {return;}
     reopenedRef.current = true;
     window.avb
       .pendingProject()
@@ -753,12 +753,12 @@ export default function App() {
 
   useEffect(() => {
     const offClose = window.avb.onMenu('closeProject', () => {
-      if (projectRef.current) void leaveProject(null);
+      if (projectRef.current) {void leaveProject(null);}
     });
     const offOpen = window.avb.onMenu('openProject', async () => {
       const picked = await window.avb.openProjectDialog();
       const next = picked?.projectPath || picked?.path || null;
-      if (!next) return;
+      if (!next) {return;}
       // Nothing open yet: this IS the welcome screen's own button.
       if (!projectRef.current) {
         loadProject(next);
@@ -781,28 +781,28 @@ export default function App() {
       try {
         await flushSave();
       } catch (err) {
-        if (request === pageLoadRef.current) showToast(`Save failed: ${cleanError(err)}`, 'error');
+        if (request === pageLoadRef.current) {showToast(`Save failed: ${cleanError(err)}`, 'error');}
         return;
       }
-      if (request !== pageLoadRef.current) return;
+      if (request !== pageLoadRef.current) {return;}
       const beforeRead = pageStateRef.current;
       let result;
       try {
         result = await window.avb.readPage(entry.path);
       } catch (err) {
-        if (request === pageLoadRef.current) showToast(`Couldn’t open ${entry.name}: ${cleanError(err)}`, 'error');
+        if (request === pageLoadRef.current) {showToast(`Couldn’t open ${entry.name}: ${cleanError(err)}`, 'error');}
         return;
       }
-      if (request !== pageLoadRef.current) return;
+      if (request !== pageLoadRef.current) {return;}
       // The existing editor stays mounted while reading. Save anything typed
       // in that interval before handing the editor to the destination file.
       try {
         await flushSave();
       } catch (err) {
-        if (request === pageLoadRef.current) showToast(`Save failed: ${cleanError(err)}`, 'error');
+        if (request === pageLoadRef.current) {showToast(`Save failed: ${cleanError(err)}`, 'error');}
         return;
       }
-      if (request !== pageLoadRef.current) return;
+      if (request !== pageLoadRef.current) {return;}
       const latest = pageStateRef.current;
       // Reopening the same file must not replace an edit made during the read
       // with the older snapshot that read returned.
@@ -810,12 +810,12 @@ export default function App() {
         latest.pageState.model !== beforeRead.pageState?.model ||
         latest.pageState.source !== beforeRead.pageState?.source ||
         latest.pageState.editable !== beforeRead.pageState?.editable
-      )) result = latest.pageState;
+      )) {result = latest.pageState;}
       const nextState = { ...result, dirty: false };
       // Publish path, model and stack together. Clearing the model first would
       // unmount the inspector and resize the whole preview during every drill.
       pageStateRef.current = { currentPage: entry, pageState: nextState };
-      if (nextStack) setEditStack(nextStack);
+      if (nextStack) {setEditStack(nextStack);}
       setCurrentPage(entry);
       setPageState(nextState);
       const start = result?.model?.nodes
@@ -850,7 +850,7 @@ export default function App() {
     async (entry) => {
       const request = ++pageLoadRef.current;
       await flushSave();
-      if (request !== pageLoadRef.current) return;
+      if (request !== pageLoadRef.current) {return;}
       setEditStack([]);
       setCurrentPage({ kind: 'route', name: entry.route, route: entry.route, from: entry.from });
       setPageState(null);
@@ -867,12 +867,12 @@ export default function App() {
     (typed) => {
       setUrlDraft(null);
       const raw = String(typed || '').trim();
-      if (!raw) return;
+      if (!raw) {return;}
       // Accept a full URL or a bare path.
       let route = raw;
       const m = raw.match(/^https?:\/\/[^/]+(\/.*)?$/i);
-      if (m) route = m[1] || '/';
-      if (!route.startsWith('/')) route = '/' + route;
+      if (m) {route = m[1] || '/';}
+      if (!route.startsWith('/')) {route = '/' + route;}
       route = route.replace(/\?.*$|#.*$/, '');
       const norm = (r) => (r !== '/' ? r.replace(/\/$/, '') : r);
       const page = (scan.pages || []).find((p) => norm(p.route) === norm(route));
@@ -897,14 +897,14 @@ export default function App() {
     const request = pageLoadRef.current;
     const stillCurrent = () => request === pageLoadRef.current &&
       pageStateRef.current.currentPage === open && pageStateRef.current.pageState === state;
-    if (!proj) return;
+    if (!proj) {return;}
     const result = await rescan(proj.path);
-    if (!open || !stillCurrent()) return;
+    if (!open || !stillCurrent()) {return;}
     // The open file may not exist on the branch just switched to.
     const stillThere = scanContainsFile(result, open.path);
     if (stillThere) {
       const fresh = await window.avb.readPage(open.path);
-      if (!stillCurrent()) return;
+      if (!stillCurrent()) {return;}
       setPageState({ ...fresh, dirty: false });
       setSelectedId(null);
       dropPageHistory(); // page snapshots don't apply to another page; commands stay
@@ -950,7 +950,7 @@ export default function App() {
           fromFile: host.path,
           spec,
         });
-        if (request !== pageLoadRef.current || pageStateRef.current.currentPage !== host) return;
+        if (request !== pageLoadRef.current || pageStateRef.current.currentPage !== host) {return;}
         if (file && /\.astro$/i.test(file)) {
           comp = { name: file.split('/').pop().replace(/\.astro$/i, ''), path: file };
         } else if (file) {
@@ -1015,7 +1015,7 @@ export default function App() {
   // Back out one level: to the parent component if nested, else to the page.
   const closeComponent = useCallback(async () => {
     const stack = editStackRef.current;
-    if (stack.length < 2) return;
+    if (stack.length < 2) {return;}
     const next = stack.slice(0, -1);
     await openFile(next[next.length - 1], next);
   }, [openFile]);
@@ -1041,7 +1041,7 @@ export default function App() {
   // moment the preview ends, with nothing to say it had happened.
   const previewCommit = useCallback(
     async (commit) => {
-      if (!project) return;
+      if (!project) {return;}
       setBusy('Getting that version ready…');
       try {
         const r = await window.avb.previewAtCommit({ projectPath: project.path, ref: commit.hash });
@@ -1061,20 +1061,20 @@ export default function App() {
   const exitCommitPreview = useCallback(async () => {
     setPreviewRef(null);
     setPreviewInfo(null);
-    if (project) await window.avb.previewStop({ projectPath: project.path }).catch(() => {});
+    if (project) {await window.avb.previewStop({ projectPath: project.path }).catch(() => {});}
   }, [project]);
 
   // Leaving the project (or closing it) must not leave a second server and a
   // checkout behind inside it.
   useEffect(() => {
-    if (!project) return undefined;
+    if (!project) {return undefined;}
     return () => {
       window.avb.previewStop({ projectPath: project.path }).catch(() => {});
     };
   }, [project?.path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshGit = useCallback(async () => {
-    if (!project) return null;
+    if (!project) {return null;}
     const r = await window.avb.gitInfo(project.path);
     setGitInfo(r);
     return r;
@@ -1096,14 +1096,14 @@ export default function App() {
   // dropdown hover-scrubs); structural edits (no key) always get their own.
   const pushHistory = useCallback((coalesceKey = null) => {
     const state = pageStateRef.current.pageState;
-    if (!state) return;
+    if (!state) {return;}
     const h = historyRef.current;
     const now = Date.now();
     const coalesce =
       coalesceKey !== null && coalesceKey === h.lastKey && now - h.lastPush < 800 && h.past.length > 0;
     if (!coalesce) {
       h.past.push(snapshotOf(state));
-      if (h.past.length > 100) h.past.shift();
+      if (h.past.length > 100) {h.past.shift();}
     }
     h.future = [];
     h.lastKey = coalesceKey;
@@ -1131,7 +1131,7 @@ export default function App() {
       prev.label = cmd.label ?? prev.label;
     } else {
       h.past.push({ kind: 'cmd', ...cmd });
-      if (h.past.length > 100) h.past.shift();
+      if (h.past.length > 100) {h.past.shift();}
     }
     h.future = [];
     h.lastKey = cmd.coalesceKey ?? null;
@@ -1152,7 +1152,7 @@ export default function App() {
 
   const applySnapshot = useCallback((entry) => {
     setPageState((s) => {
-      if (!s) return s;
+      if (!s) {return s;}
       if (entry.kind === 'model') {
         return { ...s, editable: true, model: structuredClone(entry.model), dirty: true };
       }
@@ -1177,7 +1177,7 @@ export default function App() {
   const undo = useCallback(async () => {
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
-    if (!h.past.length) return;
+    if (!h.past.length) {return;}
     h.lastKey = null;
     h.lastPush = 0;
     const entry = h.past.pop();
@@ -1191,7 +1191,7 @@ export default function App() {
       return;
     }
     const state = pageStateRef.current.pageState;
-    if (!state) return; // its page is gone — nothing to restore onto
+    if (!state) {return;} // its page is gone — nothing to restore onto
     h.future.push(snapshotOf(state));
     applySnapshot(entry);
   }, [applySnapshot, showToast]);
@@ -1199,7 +1199,7 @@ export default function App() {
   const redo = useCallback(async () => {
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
-    if (!h.future.length) return;
+    if (!h.future.length) {return;}
     h.lastKey = null;
     h.lastPush = 0;
     const entry = h.future.pop();
@@ -1213,7 +1213,7 @@ export default function App() {
       return;
     }
     const state = pageStateRef.current.pageState;
-    if (!state) return;
+    if (!state) {return;}
     h.past.push(snapshotOf(state));
     applySnapshot(entry);
   }, [applySnapshot, showToast]);
@@ -1246,7 +1246,7 @@ export default function App() {
     (fn, immediate = false, coalesceKey = null) => {
       pushHistory(coalesceKey);
       setPageState((s) => {
-        if (!s || !s.editable) return s;
+        if (!s || !s.editable) {return s;}
         const model = fn(structuredClone(s.model));
         return { ...s, model, dirty: true };
       });
@@ -1273,8 +1273,8 @@ export default function App() {
     const pendingFiles = new Set();
     const off = window.avb.onFsChanged(async ({ files }) => {
       const proj = projectRef.current;
-      if (!proj) return;
-      for (const file of files) pendingFiles.add(file);
+      if (!proj) {return;}
+      for (const file of files) {pendingFiles.add(file);}
       const request = ++changeVersion;
 
       // Retain all paths until the latest scan AND read finish. A newer event
@@ -1285,7 +1285,7 @@ export default function App() {
       } catch {
         return;
       }
-      if (request !== changeVersion) return;
+      if (request !== changeVersion) {return;}
 
       const { currentPage: page, pageState: state } = pageStateRef.current;
       if (!page) { pendingFiles.clear(); return; }
@@ -1319,9 +1319,9 @@ export default function App() {
       // The read may finish after a selection switch or a fresh edit. Neither
       // may be overwritten by the disk snapshot requested before it.
       const latest = pageStateRef.current;
-      if (request !== changeVersion) return;
+      if (request !== changeVersion) {return;}
       pendingFiles.clear();
-      if (latest.currentPage?.path !== page.path || latest.pageState !== state) return;
+      if (latest.currentPage?.path !== page.path || latest.pageState !== state) {return;}
 
       // Re-select the node at the same tree position (ids regenerate).
       const selId = selectedIdRef.current;
@@ -1361,7 +1361,7 @@ export default function App() {
     async (componentName, target) => {
       const comp = insertables.find((c) => c.name === componentName);
       const page = pageStateRef.current.currentPage;
-      if (!comp || !page) return;
+      if (!comp || !page) {return;}
       const paths = await resolveImportPath(comp.path);
       const id = newId();
       mutateModel((model) => {
@@ -1395,11 +1395,11 @@ export default function App() {
   // of its own. Asked twice (once to show in the dialog, once to act on) and
   // both times of the live model, so nothing can drift between them.
   const propsNeededFor = useCallback((model, node) => {
-    if (!model || !node) return [];
+    if (!model || !node) {return [];}
     const scope = namesInScope(model.extraFrontmatter || '', model.imports || []);
-    for (const v of loopVarsAt(model.nodes, node.id)) scope.add(v);
+    for (const v of loopVarsAt(model.nodes, node.id)) {scope.add(v);}
     // An imported component is carried across as an import, not passed as a prop.
-    for (const imp of model.imports || []) scope.delete(imp.name);
+    for (const imp of model.imports || []) {scope.delete(imp.name);}
     return propsForExtraction(node, scope);
   }, []);
 
@@ -1407,7 +1407,7 @@ export default function App() {
   // project (not the open file) so it covers pages and components alike; the
   // component's own file is left out — a file is not one of its own users.
   const componentUsage = useCallback(async (comp) => {
-    if (!projectRef.current?.path) return { files: [] };
+    if (!projectRef.current?.path) {return { files: [] };}
     try {
       return await window.avb.componentUsage({
         projectPath: projectRef.current.path,
@@ -1427,12 +1427,12 @@ export default function App() {
   const pageInstancesOf = useCallback(
     (name) => {
       const model = pageStateRef.current.pageState?.model;
-      if (!model) return [];
+      if (!model) {return [];}
       const out = [];
       const walk = (list) => {
         for (const n of list || []) {
-          if (n.kind === 'component' && n.name === name) out.push({ id: n.id });
-          if (Array.isArray(n.children)) walk(n.children);
+          if (n.kind === 'component' && n.name === name) {out.push({ id: n.id });}
+          if (Array.isArray(n.children)) {walk(n.children);}
         }
       };
       walk(model.nodes);
@@ -1451,7 +1451,7 @@ export default function App() {
       const page = pageStateRef.current.currentPage;
       const model = pageStateRef.current.pageState?.model;
       const node = model && selectedIdRef.current ? findNodeById(model.nodes, selectedIdRef.current) : null;
-      if (!page || !model || !node) return;
+      if (!page || !model || !node) {return;}
       const props = withProps ? propsNeededFor(model, node) : [];
       let created;
       try {
@@ -1475,7 +1475,7 @@ export default function App() {
       const id = newId();
       mutateModel((m) => {
         const found = findParentList(m, node.id);
-        if (!found) return m;
+        if (!found) {return m;}
         if (!m.imports.some((i) => i.name === name)) {
           m.imports.push({ name, path: chooseImportPath(m, paths) });
         }
@@ -1512,13 +1512,13 @@ export default function App() {
     (nodeId, target) => {
       mutateModel((model) => {
         const found = findParentList(model, nodeId);
-        if (!found) return model;
+        if (!found) {return model;}
         const node = found.list[found.index];
 
         // Prevent dropping a node into its own subtree.
         if (target?.parentId) {
-          if (target.parentId === nodeId) return model;
-          if (isDescendantOf(node, target.parentId)) return model;
+          if (target.parentId === nodeId) {return model;}
+          if (isDescendantOf(node, target.parentId)) {return model;}
         }
 
         // Capture target list before removal to fix up indices.
@@ -1548,7 +1548,7 @@ export default function App() {
         // insertIntoModel decide placement, then follow it.
         if (note) {
           const landed = findParentList(model, nodeId);
-          if (landed) landed.list.splice(landed.index, 0, note);
+          if (landed) {landed.list.splice(landed.index, 0, note);}
         }
 
         // `slot` is a word addressed to the component the node sat inside, and
@@ -1558,7 +1558,7 @@ export default function App() {
         if (slotName) {
           const host = slotHostOf(model, nodeId);
           const definition = host ? definitionOf(model, host, insertables) : null;
-          if (!keepsSlot({ slotName, host, definition })) delete node.props.slot;
+          if (!keepsSlot({ slotName, host, definition })) {delete node.props.slot;}
         }
 
         // Left a loop? Anything still reading its item would throw.
@@ -1598,8 +1598,8 @@ export default function App() {
           // Delete the node's note with it, or it would re-attach to whatever
           // now follows and read as that element's description.
           const noteAt = noteIndexAbove(found.list, found.index);
-          if (noteAt === -1) found.list.splice(found.index, 1);
-          else found.list.splice(noteAt, 2);
+          if (noteAt === -1) {found.list.splice(found.index, 1);}
+          else {found.list.splice(noteAt, 2);}
         }
         pruneImports(model);
         // The code the deleted markup was the only reader of goes with it: a
@@ -1642,7 +1642,7 @@ export default function App() {
     const clone = structuredClone(node);
     const walk = (n) => {
       n.id = newId();
-      if (Array.isArray(n.children)) n.children.forEach(walk);
+      if (Array.isArray(n.children)) {n.children.forEach(walk);}
     };
     walk(clone);
     return clone;
@@ -1651,9 +1651,9 @@ export default function App() {
   const copyNode = useCallback(
     (nodeId) => {
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) return;
+      if (!state?.editable) {return;}
       const node = findNodeById(state.model.nodes, nodeId);
-      if (!node) return;
+      if (!node) {return;}
       nodeClipboardRef.current = {
         node: structuredClone(node),
         // The loop variables this subtree may reference; pasting somewhere
@@ -1675,9 +1675,9 @@ export default function App() {
   const duplicateNode = useCallback(
     (nodeId) => {
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) return;
+      if (!state?.editable) {return;}
       const src = findNodeById(state.model.nodes, nodeId);
-      if (!src) return;
+      if (!src) {return;}
       if (src.kind === 'chunk-group' || src.chunkFile) {
         showToast('Chunk sections are defined in the page frontmatter and cannot be duplicated here.', 'error');
         return;
@@ -1685,7 +1685,7 @@ export default function App() {
       const clone = cloneWithNewIds(src);
       mutateModel((model) => {
         const found = findParentList(model, nodeId);
-        if (!found) return model;
+        if (!found) {return model;}
         found.list.splice(found.index + 1, 0, clone);
         return model;
       }, true);
@@ -1701,7 +1701,7 @@ export default function App() {
   const pasteNode = useCallback(async () => {
     const clip = nodeClipboardRef.current;
     const state = pageStateRef.current.pageState;
-    if (!clip || !state?.editable) return;
+    if (!clip || !state?.editable) {return;}
 
     // Everything the subtree reads: the components it renders and every name in
     // the code hanging off it — `options={jobs}`, a loop's `posts.map`, a
@@ -1749,8 +1749,8 @@ export default function App() {
     const clone = cloneWithNewIds(clip.node);
     const selId = selectedIdRef.current;
     const acceptsChildren = (n) => {
-      if (n.id === 'layout') return true;
-      if (n.kind === 'element') return !VOID_TAGS.has(String(n.name).toLowerCase());
+      if (n.id === 'layout') {return true;}
+      if (n.kind === 'element') {return !VOID_TAGS.has(String(n.name).toLowerCase());}
       if (n.kind === 'component') {
         return (insertables.find((c) => c.name === n.name)?.slots || []).includes('default');
       }
@@ -1763,7 +1763,7 @@ export default function App() {
         }
       }
       for (const imp of carriedImports) {
-        if (!model.imports.some((i) => i.name === imp.name)) model.imports.push(imp);
+        if (!model.imports.some((i) => i.name === imp.name)) {model.imports.push(imp);}
       }
       if (carried.statements.length) {
         model.extraFrontmatter = withStatements(model.extraFrontmatter, carried.statements);
@@ -1771,7 +1771,7 @@ export default function App() {
       if (selId) {
         const sel = findNodeById(model.nodes, selId);
         if (sel && acceptsChildren(sel)) {
-          if (!Array.isArray(sel.children)) sel.children = [];
+          if (!Array.isArray(sel.children)) {sel.children = [];}
           sel.children.push(clone);
           return model;
         }
@@ -1788,7 +1788,7 @@ export default function App() {
     // Pasted outside the loop it was copied from? Its bindings would throw.
     mutateModel((model) => {
       const landed = findNodeById(model.nodes, clone.id);
-      if (!landed) return model;
+      if (!landed) {return model;}
       const inScope = loopVarsAt(model.nodes, clone.id);
       const lost = (clip.vars || []).filter((v) => !inScope.includes(v));
       const removed = stripLostBindings(landed, lost);
@@ -1823,7 +1823,7 @@ export default function App() {
       const isToggle =
         (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'j') ||
         (e.ctrlKey && !e.metaKey && !e.altKey && e.key === '`');
-      if (!isToggle) return;
+      if (!isToggle) {return;}
       e.preventDefault();
       setTermOpen((v) => !v);
     };
@@ -1840,7 +1840,7 @@ export default function App() {
   useEffect(() => {
     let live = true;
     window.avb.settings?.().then((s) => {
-      if (live) setSoundEnabled(!!s?.sound);
+      if (live) {setSoundEnabled(!!s?.sound);}
     });
     const off = window.avb.onMenu('sound', (on) => setSoundEnabled(!!on));
     return () => {
@@ -1858,8 +1858,8 @@ export default function App() {
     };
     const offMenu = window.avb.onMenu('insert', openIfEditable);
     const onMsg = (e) => {
-      if (e.data?.type !== 'avb:shortcut') return;
-      if (e.data.name === 'insert') openIfEditable();
+      if (e.data?.type !== 'avb:shortcut') {return;}
+      if (e.data.name === 'insert') {openIfEditable();}
       // Arrow keys pressed while the canvas iframe holds focus: replay them
       // on the app window so tree navigation behaves the same whether the
       // selection was made on the canvas or in the navigator.
@@ -1903,7 +1903,7 @@ export default function App() {
     (item) => {
       setInsertOpen(false);
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) return;
+      if (!state?.editable) {return;}
       const target = insertTargetFor(state.model, selectedIdRef.current, item);
 
       if (item.type === 'component') {
@@ -1992,7 +1992,7 @@ export default function App() {
       } else if (item.type === 'style' || item.type === 'script') {
         node = { id, kind: 'raw', name: item.type, props: {}, inner: '' };
       }
-      if (!node) return;
+      if (!node) {return;}
       mutateModel((model) => {
         insertIntoModel(model, node, target);
         return model;
@@ -2021,21 +2021,21 @@ export default function App() {
       if (mod && (e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'y')) {
         const h = historyRef.current;
         const wantsRedo = e.key.toLowerCase() === 'y' || e.shiftKey;
-        if (!(wantsRedo ? h.future : h.past).length) return; // let the field's own undo have it
+        if (!(wantsRedo ? h.future : h.past).length) {return;} // let the field's own undo have it
         e.preventDefault();
-        if (wantsRedo) void redo();
-        else void undo();
+        if (wantsRedo) {void redo();}
+        else {void undo();}
         return;
       }
 
-      if (cmsOpenRef.current) return;
+      if (cmsOpenRef.current) {return;}
 
       // ⌘F / ⌘E open the insert palette (works from anywhere except the
       // code editor, which keeps its own find).
       if (mod && (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'e')) {
-        if (!pageStateRef.current.pageState?.editable) return;
+        if (!pageStateRef.current.pageState?.editable) {return;}
         const el = e.target;
-        if (el instanceof HTMLElement && el.closest('.cm-editor')) return;
+        if (el instanceof HTMLElement && el.closest('.cm-editor')) {return;}
         e.preventDefault();
         setInsertOpen(true);
         return;
@@ -2046,10 +2046,10 @@ export default function App() {
       // Before the "am I typing" guard, so it works wherever focus happens to
       // be — it acts on the selected element, not on the field.
       if (mod && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'a') {
-        if (!pageStateRef.current.pageState?.editable) return;
-        if (!selectedIdRef.current || selectedIdRef.current === 'frontmatter') return;
+        if (!pageStateRef.current.pageState?.editable) {return;}
+        if (!selectedIdRef.current || selectedIdRef.current === 'frontmatter') {return;}
         const el = e.target;
-        if (el instanceof HTMLElement && el.closest('.cm-editor')) return;
+        if (el instanceof HTMLElement && el.closest('.cm-editor')) {return;}
         e.preventDefault();
         setLeftTab('components');
         setCreateRequest((n) => n + 1);
@@ -2060,9 +2060,9 @@ export default function App() {
       // open, caret in the class input. Before the "am I typing" guard below,
       // so it also works from another field in the panel.
       if (mod && !e.altKey && !e.shiftKey && e.key === 'Enter') {
-        if (!selectedIdRef.current) return;
+        if (!selectedIdRef.current) {return;}
         const el = e.target;
-        if (el instanceof HTMLElement && el.closest('.cm-editor')) return;
+        if (el instanceof HTMLElement && el.closest('.cm-editor')) {return;}
         e.preventDefault();
         setRightTab('settings');
         setClassFocus((n) => n + 1);
@@ -2077,7 +2077,7 @@ export default function App() {
         return;
       }
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) return;
+      if (!state?.editable) {return;}
       const selId = selectedIdRef.current;
       const hasNodeSel = !!selId && selId !== 'frontmatter';
 
@@ -2088,8 +2088,8 @@ export default function App() {
         // On a focused control Enter means "activate this", not "open the
         // selection" — leave those alone (including the Edit code button
         // itself, which would otherwise fire twice).
-        if (t instanceof HTMLElement && t.closest('button, a, [role="button"]')) return;
-        if (openCodeWindowRef.current?.()) e.preventDefault();
+        if (t instanceof HTMLElement && t.closest('button, a, [role="button"]')) {return;}
+        if (openCodeWindowRef.current?.()) {e.preventDefault();}
         return;
       }
 
@@ -2107,20 +2107,20 @@ export default function App() {
       }
 
       if (!mod && (e.key === 'Delete' || e.key === 'Backspace')) {
-        if (!hasNodeSel) return;
+        if (!hasNodeSel) {return;}
         e.preventDefault();
         removeNode(selId);
       } else if (mod && e.key.toLowerCase() === 'c') {
         // Let native copy win when actual text is selected.
-        if (!hasNodeSel || String(window.getSelection() || '')) return;
+        if (!hasNodeSel || String(window.getSelection() || '')) {return;}
         e.preventDefault();
         copyNode(selId);
       } else if (mod && e.key.toLowerCase() === 'd') {
-        if (!hasNodeSel) return;
+        if (!hasNodeSel) {return;}
         e.preventDefault();
         duplicateNode(selId);
       } else if (mod && e.key.toLowerCase() === 'v') {
-        if (!nodeClipboardRef.current) return;
+        if (!nodeClipboardRef.current) {return;}
         e.preventDefault();
         pasteNode();
       }
@@ -2198,8 +2198,8 @@ export default function App() {
           projectPath: projectRef.current?.path,
           keys: selectionKeysRef.current,
         });
-        if (res?.ok) showToast('Selection copied — paste it into your AI chat.');
-        else showToast('Nothing selected to copy.', 'error');
+        if (res?.ok) {showToast('Selection copied — paste it into your AI chat.');}
+        else {showToast('Nothing selected to copy.', 'error');}
       }),
     ];
     return () => offs.forEach((off) => off());
@@ -2211,7 +2211,7 @@ export default function App() {
   // ----------------------------------------------------------------
 
   const enterPreview = useCallback(() => {
-    if (!devUrl) return;
+    if (!devUrl) {return;}
     // Whatever the canvas is showing — which for a dynamic page is one entry's
     // URL, not its pattern. Opening /blog/[...id] asks the dev server for a
     // route no page produces, and it answers with the site's 404, while the
@@ -2227,9 +2227,9 @@ export default function App() {
   const exitPreview = useCallback(() => {
     setInPreview(false);
     const raw = previewPathRef.current;
-    if (!raw) return;
+    if (!raw) {return;}
     let p = raw.split('?')[0].split('#')[0];
-    if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+    if (p.length > 1 && p.endsWith('/')) {p = p.slice(0, -1);}
     const page = scan.pages.find((pg) => pg.route === (p || '/'));
     if (page && page.path !== pageStateRef.current.currentPage?.path) {
       selectPage(page);
@@ -2240,7 +2240,7 @@ export default function App() {
   // avb:navigated from every loaded frame).
   useEffect(() => {
     const onMsg = (e) => {
-      if (e.data?.type !== 'avb:navigated' || !inPreviewRef.current) return;
+      if (e.data?.type !== 'avb:navigated' || !inPreviewRef.current) {return;}
       const ifr = previewIframeRef.current;
       if (ifr && e.source === ifr.contentWindow) {
         previewPathRef.current = e.data.path;
@@ -2255,12 +2255,12 @@ export default function App() {
     // Escape leaves either kind of looking-not-working. An older version takes
     // precedence: it is the one covering everything, so it is the one Escape
     // is about while it is up.
-    if (!inPreview && !previewRef) return undefined;
+    if (!inPreview && !previewRef) {return undefined;}
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (previewRef) exitCommitPreview();
-        else exitPreview();
+        if (previewRef) {exitCommitPreview();}
+        else {exitPreview();}
       }
     };
     document.addEventListener('keydown', onKey);
@@ -2269,9 +2269,9 @@ export default function App() {
 
   // Escape backs out of a drilled-into component, one level at a time.
   useEffect(() => {
-    if (inPreview || editStack.length < 2) return;
+    if (inPreview || editStack.length < 2) {return;}
     const onKey = (e) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape') {return;}
       const t = e.target;
       // Let fields, menus, and dialogs consume their own Escape first.
       if (
@@ -2320,13 +2320,13 @@ export default function App() {
     window.avb
       .dynamicPaths({ projectPath: project.path, pagePath: entry.path, devUrl })
       .then((r) => {
-        if (!live) return;
+        if (!live) {return;}
         setDynamicPaths(r?.entries || []);
         // Keep showing the same entry across reloads where we can — the
         // params are what identify it, not its position in the list.
         setDynamicIndex((i) => (i < (r?.entries || []).length ? i : 0));
-        if (r?.error) setDynamicError(r.error);
-        else setDynamicError(null);
+        if (r?.error) {setDynamicError(r.error);}
+        else {setDynamicError(null);}
       })
       .catch(() => live && setDynamicPaths([]));
     return () => {
@@ -2346,7 +2346,7 @@ export default function App() {
     sampleAskedRef.current = new Set();
   }, [project?.path]);
   useEffect(() => {
-    if (!project?.path) return undefined;
+    if (!project?.path) {return undefined;}
     let live = true;
     window.avb
       .contentCollections?.(project.path)
@@ -2364,7 +2364,7 @@ export default function App() {
     };
   }, [project?.path]);
   useEffect(() => {
-    if (!devUrl || devStatus !== 'on') return undefined;
+    if (!devUrl || devStatus !== 'on') {return undefined;}
     const frontmatter = pageState?.model?.extraFrontmatter || '';
     // The entry on the canvas, which is what a reference in this file resolves
     // AGAINST — this post's author, not the collection's first.
@@ -2378,7 +2378,7 @@ export default function App() {
         id: r.id,
       })),
     ].filter((w) => !(w.key in collectionSamples));
-    if (!wanted.length) return undefined;
+    if (!wanted.length) {return undefined;}
     let live = true;
     Promise.all(
       wanted.map((w) =>
@@ -2388,7 +2388,7 @@ export default function App() {
       )
     )
       .then((pairs) => {
-        if (live) setCollectionSamples((prev) => ({ ...prev, ...Object.fromEntries(pairs) }));
+        if (live) {setCollectionSamples((prev) => ({ ...prev, ...Object.fromEntries(pairs) }));}
       })
       .catch(() => {});
     return () => {
@@ -2415,11 +2415,11 @@ export default function App() {
   // waits for a pause in typing, because a half-typed name reads as unused.
   useEffect(() => {
     const current = pageState?.model;
-    if (!current?.extraFrontmatter?.includes(QUERY_MARK)) return undefined;
+    if (!current?.extraFrontmatter?.includes(QUERY_MARK)) {return undefined;}
     const timer = setTimeout(() => {
       const focused = document.activeElement;
       if (focused?.closest?.('.props-field, .rich-content, .bind-input, .expr-input, .attr-editor'))
-        return;
+        {return;}
       const fm = current.extraFrontmatter || '';
       const markup = JSON.stringify(current.nodes || []);
       const dead = markedQueries(fm).filter((q) => {
@@ -2427,10 +2427,10 @@ export default function App() {
         const elsewhere = fm.slice(0, q.start) + fm.slice(q.end);
         return !word.test(elsewhere) && !word.test(markup);
       });
-      if (!dead.length) return;
+      if (!dead.length) {return;}
       mutateModel((m) => {
         let next = m.extraFrontmatter || '';
-        for (const q of dead) next = removeMarkedQuery(next, q.name);
+        for (const q of dead) {next = removeMarkedQuery(next, q.name);}
         m.extraFrontmatter = next;
         // The import goes with the last query that needed it — but only when
         // nothing else in the file mentions it, so an import someone else put
@@ -2457,9 +2457,9 @@ export default function App() {
   // that node's row rather than giving it one of its own, and the props panel
   // edits it there — so a section's label and its note stay together.
   const commentAbove = (model, nodeId) => {
-    if (!model || !nodeId) return null;
+    if (!model || !nodeId) {return null;}
     const found = findParentList(model, nodeId);
-    if (!found || found.index === 0) return null;
+    if (!found || found.index === 0) {return null;}
     const prev = found.list[found.index - 1];
     return prev && prev.kind === 'comment' ? prev : null;
   };
@@ -2471,13 +2471,13 @@ export default function App() {
       mutateModel(
         (model) => {
           const found = findParentList(model, nodeId);
-          if (!found) return model;
+          if (!found) {return model;}
           const { list, index } = found;
           const prev = index > 0 ? list[index - 1] : null;
           const existing = prev && prev.kind === 'comment' ? prev : null;
           const body = String(text ?? '').trim();
           if (!body) {
-            if (existing) list.splice(index - 1, 1);
+            if (existing) {list.splice(index - 1, 1);}
             return model;
           }
           // The parser keeps the raw text between the delimiters, so it is
@@ -2485,8 +2485,8 @@ export default function App() {
           // reads — and a note written as a divider keeps its rule, to the
           // same width, so a column of them stays lined up.
           const value = noteValue(existing?.value, body);
-          if (existing) existing.value = value;
-          else list.splice(index, 0, { id: newId(), kind: 'comment', value });
+          if (existing) {existing.value = value;}
+          else {list.splice(index, 0, { id: newId(), kind: 'comment', value });}
           return model;
         },
         false,
@@ -2505,18 +2505,18 @@ export default function App() {
   const addClassToNode = useCallback(
     (nodeId, className) => {
       const clean = String(className || '').trim();
-      if (!nodeId || !clean) return;
+      if (!nodeId || !clean) {return;}
       let refused = false;
       mutateModel((model) => {
         const node = findNodeById(model.nodes, nodeId);
-        if (!node) return model;
-        if (hasClass(node.props, clean)) return model;
+        if (!node) {return model;}
+        if (hasClass(node.props, clean)) {return model;}
         const edit = withClass(node.props, clean);
         if (!edit) {
           refused = true;
           return model;
         }
-        if (!node.props) node.props = {};
+        if (!node.props) {node.props = {};}
         node.props[edit.key] = edit.value;
         return model;
       }, true);
@@ -2532,10 +2532,10 @@ export default function App() {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
-          if (!node) return model;
-          if (!node.props) node.props = {};
-          if (value === undefined) delete node.props[propName];
-          else node.props[propName] = value;
+          if (!node) {return model;}
+          if (!node.props) {node.props = {};}
+          if (value === undefined) {delete node.props[propName];}
+          else {node.props[propName] = value;}
           return model;
         },
         immediate,
@@ -2552,11 +2552,11 @@ export default function App() {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
-          if (!node) return model;
-          if (!node.props) node.props = {};
+          if (!node) {return model;}
+          if (!node.props) {node.props = {};}
           for (const [name, value] of Object.entries(patch)) {
-            if (value === undefined) delete node.props[name];
-            else node.props[name] = value;
+            if (value === undefined) {delete node.props[name];}
+            else {node.props[name] = value;}
           }
           return model;
         },
@@ -2579,7 +2579,7 @@ export default function App() {
   const setAssetProp = useCallback(
     async (nodeId, propName, picked) => {
       const { pageState: state, currentPage: page } = pageStateRef.current;
-      if (!state?.editable || !page || !picked?.rel) return;
+      if (!state?.editable || !page || !picked?.rel) {return;}
       const withoutRoot = picked.rel.split('/').slice(1).join('/');
       if (picked.root !== 'src') {
         setProp(nodeId, propName, { type: 'string', value: '/' + withoutRoot }, true);
@@ -2593,7 +2593,7 @@ export default function App() {
       });
       mutateModel((model) => {
         const node = findNodeById(model.nodes, nodeId);
-        if (!node) return model;
+        if (!node) {return model;}
         const spec = chooseImportPath(model, paths);
         // Reuse the binding if this file is already imported — importing the
         // same asset twice under two names is just noise.
@@ -2603,11 +2603,11 @@ export default function App() {
           let candidate = base.replace(/[^A-Za-z0-9_$]/g, '_').replace(/^(\d)/, '_$1') || 'asset';
           const taken = new Set((model.imports || []).map((i) => i.name));
           let n = 2;
-          while (taken.has(candidate)) candidate = `${base}${n++}`;
+          while (taken.has(candidate)) {candidate = `${base}${n++}`;}
           local = candidate;
           model.imports.push({ name: local, path: spec });
         }
-        if (!node.props) node.props = {};
+        if (!node.props) {node.props = {};}
         node.props[propName] = {
           type: 'expr',
           value: node.kind === 'element' ? `${local}.src` : local,
@@ -2645,19 +2645,19 @@ export default function App() {
   const changeNodeKind = useCallback(
     async (nodeId, newTag) => {
       const name = String(newTag || '').trim();
-      if (!/^[A-Z][\w$]*$/.test(name)) return false;
+      if (!/^[A-Z][\w$]*$/.test(name)) {return false;}
       const state = pageStateRef.current.pageState;
-      if (!state?.editable) return false;
+      if (!state?.editable) {return false;}
       const already = (state.model.imports || []).some((i) => i.name === name);
       const comp = insertables.find((c) => c.name === name);
       const asset = ASTRO_ASSETS.some((a) => a.name === name);
-      if (!already && !comp && !asset) return false; // nothing provides it
+      if (!already && !comp && !asset) {return false;} // nothing provides it
       const paths = comp && !already ? await resolveImportPath(comp.path) : null;
       mutateModel((model) => {
         const node = findNodeById(model.nodes, nodeId);
-        if (!node || node.name === name) return model;
+        if (!node || node.name === name) {return model;}
         if (!model.imports.some((i) => i.name === name)) {
-          if (paths) model.imports.push({ name, path: chooseImportPath(model, paths) });
+          if (paths) {model.imports.push({ name, path: chooseImportPath(model, paths) });}
           else if (asset) {
             model.imports.push({ name, imported: name, path: ASTRO_ASSETS_MODULE, named: true });
           }
@@ -2677,7 +2677,7 @@ export default function App() {
         node.name = name;
         delete node.dynamicTag;
         node.astroAsset = asset || undefined;
-        if (node.children === null) node.children = [];
+        if (node.children === null) {node.children = [];}
         pruneImports(model);
         return model;
       }, true);
@@ -2689,10 +2689,10 @@ export default function App() {
   const changeElementTag = useCallback(
     (nodeId, newTag) => {
       const tag = String(newTag || '').trim().toLowerCase();
-      if (!/^[a-z][a-z0-9-]*$/.test(tag)) return;
+      if (!/^[a-z][a-z0-9-]*$/.test(tag)) {return;}
       mutateModel((model) => {
         const node = findNodeById(model.nodes, nodeId);
-        if (!node || node.name === tag) return model;
+        if (!node || node.name === tag) {return model;}
         // A component becoming a plain tag keeps only what a tag understands:
         // its props were the component's API, and they'd serialize as junk
         // attributes on a <div>.
@@ -2718,8 +2718,8 @@ export default function App() {
         }
         node.name = tag;
         // Void elements can't have children; paired tags serialize as a pair.
-        if (VOID_TAGS.has(tag)) node.children = null;
-        else if (node.children === null) node.children = [];
+        if (VOID_TAGS.has(tag)) {node.children = null;}
+        else if (node.children === null) {node.children = [];}
         pruneImports(model);
         return model;
       }, true);
@@ -2740,23 +2740,23 @@ export default function App() {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
-          if (!node) return model;
+          if (!node) {return model;}
           if (node.kind === 'map') {
             const prev = parseLoopHead(node.head);
             node.head = value;
             for (const { from, to } of renames || []) {
-              if (from && to && from !== to) renameLoopVar(node.children || [], from, to);
+              if (from && to && from !== to) {renameLoopVar(node.children || [], from, to);}
             }
             // Renames above already re-pointed the children, so compare the
             // data sources and orphan-proof what reads from this item.
             const next = parseLoopHead(value);
             if (prev && next && prev.data !== next.data) {
               const vars = [next.item, next.index].filter(Boolean);
-              if (vars.length) disconnectDependentLoops(node.children || [], vars);
+              if (vars.length) {disconnectDependentLoops(node.children || [], vars);}
             }
           } else if (node.kind === 'cond') {
             node.test = value;
-          } else if (node.kind === 'raw') node.inner = value;
+          } else if (node.kind === 'raw') {node.inner = value;}
           else if (node.kind === 'text' || node.kind === 'expr' || node.kind === 'comment') {
             node.value = value;
           }
@@ -2793,9 +2793,9 @@ export default function App() {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
-          if (!node || node.kind !== 'cond') return model;
+          if (!node || node.kind !== 'cond') {return model;}
           const kids = node.children || (node.children = []);
-          if (!kids[0]) kids[0] = { id: newId(), kind: 'branch', name: 'then', children: [] };
+          if (!kids[0]) {kids[0] = { id: newId(), kind: 'branch', name: 'then', children: [] };}
           if (want && kids.length < 2) {
             kids[1] = { id: newId(), kind: 'branch', name: 'else', children: [] };
             node.op = '?';
@@ -2842,8 +2842,8 @@ export default function App() {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
-          if (!node || node.kind === 'text') return model;
-          if (!Array.isArray(node.children)) node.children = [];
+          if (!node || node.kind === 'text') {return model;}
+          if (!Array.isArray(node.children)) {node.children = [];}
           const at = node.children.findIndex((c) => c.kind === 'text');
           // Emptying the field takes the text node out rather than leaving an
           // empty one behind for the serializer to puzzle over — but where it
@@ -2884,7 +2884,7 @@ export default function App() {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
-          if (!node || node.kind === 'text') return model;
+          if (!node || node.kind === 'text') {return model;}
           node.children = withIds(kids);
           return model;
         },
@@ -2906,7 +2906,7 @@ export default function App() {
         ? fm.replace(/^[ \t]*layout[ \t]*:.*$/m, `layout: ${layoutPath}`)
         : fm.replace(/^[ \t]*layout[ \t]*:.*(\n|$)/m, '');
     }
-    if (!layoutPath) return fm;
+    if (!layoutPath) {return fm;}
     // First, so it reads as the page's frame rather than one field among many.
     return fm ? `layout: ${layoutPath}\n${fm}` : `layout: ${layoutPath}`;
   };
@@ -2923,12 +2923,12 @@ export default function App() {
       // Same picker, different place to write the answer.
       if (isMarkdownFormatRef.current) {
         const layout = layoutName ? scan.layouts.find((l) => l.name === layoutName) : null;
-        if (layoutName && !layout) return;
+        if (layoutName && !layout) {return;}
         // A file-relative path, not an alias: `layout:` is resolved by Astro
         // against the page, and every project has that whether or not it has
         // configured `@/…`.
         const rel = layout ? (await resolveImportPath(layout.path)).relative : null;
-        if (seq !== layoutSeq.current) return;
+        if (seq !== layoutSeq.current) {return;}
         mutateModel((model) => {
           model.extraFrontmatter = withLayoutField(model.extraFrontmatter, rel);
           model.layoutPath = rel;
@@ -2952,9 +2952,9 @@ export default function App() {
         return;
       }
       const layout = scan.layouts.find((l) => l.name === layoutName);
-      if (!layout) return;
+      if (!layout) {return;}
       const paths = await resolveImportPath(layout.path);
-      if (seq !== layoutSeq.current) return; // superseded by a newer change
+      if (seq !== layoutSeq.current) {return;} // superseded by a newer change
       mutateModel((model) => {
         const existing = findNodeById(model.nodes, 'layout');
         if (existing) {
@@ -2993,7 +2993,7 @@ export default function App() {
         });
         const result = await rescan(project.path);
         const page = result.pages.find((p) => p.path === pagePath);
-        if (page) selectPage(page);
+        if (page) {selectPage(page);}
         showToast(`Created ${name}.astro`, 'success');
       } catch (err) {
         showToast(cleanError(err), 'error');
@@ -3018,7 +3018,7 @@ export default function App() {
       const result = await rescan(project.path);
       if (currentPage?.path === page.path) {
         const next = result.pages[0] || null;
-        if (next) selectPage(next);
+        if (next) {selectPage(next);}
         else {
           setCurrentPage(null);
           setPageState(null);
@@ -3042,7 +3042,7 @@ export default function App() {
         const result = await rescan(project.path);
         if (pageStateRef.current.currentPage?.path === page.path) {
           const np = result.pages.find((p) => p.path === newPath);
-          if (np) selectPage(np);
+          if (np) {selectPage(np);}
         }
       } catch (err) {
         showToast(cleanError(err), 'error');
@@ -3056,7 +3056,7 @@ export default function App() {
   const createPageFolder = useCallback(async () => {
     const existing = new Set(scan.pageFolders || []);
     let name = 'new-folder';
-    for (let i = 2; existing.has(name); i++) name = `new-folder-${i}`;
+    for (let i = 2; existing.has(name); i++) {name = `new-folder-${i}`;}
     try {
       await window.avb.createPageFolder({ projectPath: project.path, dir: name });
       await rescan(project.path);
@@ -3079,7 +3079,7 @@ export default function App() {
             ? to + cur.name.slice(from.length)
             : null;
           const np = newName && result.pages.find((p) => p.name === newName);
-          if (np) selectPage(np);
+          if (np) {selectPage(np);}
         }
       } catch (err) {
         showToast(cleanError(err), 'error');
@@ -3109,7 +3109,7 @@ export default function App() {
         const cur = pageStateRef.current.currentPage;
         if (cur && !result.pages.some((p) => p.path === cur.path)) {
           const next = result.pages[0] || null;
-          if (next) selectPage(next);
+          if (next) {selectPage(next);}
           else {
             setCurrentPage(null);
             setPageState(null);
@@ -3137,8 +3137,8 @@ export default function App() {
   // One entry of a collection, asked for when someone opens it in the picker.
   // The ref is what stops a row that has no answer from asking again forever.
   const requestCollectionSample = (name) => {
-    if (!name || !devUrl || devStatus !== 'on') return;
-    if (sampleAskedRef.current.has(name)) return;
+    if (!name || !devUrl || devStatus !== 'on') {return;}
+    if (sampleAskedRef.current.has(name)) {return;}
     sampleAskedRef.current.add(name);
     window.avb
       .sampleEntry({ devUrl, name })
@@ -3153,7 +3153,7 @@ export default function App() {
   const ensureCollectionQuery = (collection) => {
     const fm = model?.extraFrontmatter || '';
     const existing = queriesInScope(fm).get(collection);
-    if (existing) return existing;
+    if (existing) {return existing;}
     const name = autoQueryName(collection, namesInScope(fm, model?.imports));
     mutateModel((m) => {
       if (!m.imports.some((i) => i.name === 'getCollection' && i.path === 'astro:content')) {
@@ -3184,14 +3184,14 @@ export default function App() {
   // What the Components panel's create button would act on: the name to suggest
   // for the selected element, or why there's nothing to make a component from.
   const createFrom = useMemo(() => {
-    if (!pageState?.editable) return { reason: 'Open a page to make components from it.' };
-    if (!selectedNode) return { reason: 'Select an element on the canvas first.' };
+    if (!pageState?.editable) {return { reason: 'Open a page to make components from it.' };}
+    if (!selectedNode) {return { reason: 'Select an element on the canvas first.' };}
     const node = selectedNode;
     if (node.kind === 'text' || node.kind === 'expr') {
       return { reason: 'Select the element around this, not the text itself.' };
     }
-    if (node.kind === 'frontmatter') return { reason: 'Select an element on the canvas first.' };
-    if (node.id === 'layout') return { reason: 'A layout is already a component of its own.' };
+    if (node.kind === 'frontmatter') {return { reason: 'Select an element on the canvas first.' };}
+    if (node.id === 'layout') {return { reason: 'A layout is already a component of its own.' };}
     if (node.kind !== 'element' && node.kind !== 'component') {
       return { reason: 'Select an element on the canvas first.' };
     }
@@ -3221,7 +3221,7 @@ export default function App() {
   // by the time the gap stops being a gap. In practice the report lands first
   // and the timer never fires.
   useEffect(() => {
-    if (classesForRef.current === selectedId) return undefined;
+    if (classesForRef.current === selectedId) {return undefined;}
     const t = setTimeout(() => setSelectedClasses((prev) => (prev.length ? [] : prev)), 600);
     return () => clearTimeout(t);
   }, [selectedId, classesTick]);
@@ -3240,16 +3240,16 @@ export default function App() {
       const base = m?.[1].replace(/^['"]|['"]$/g, '').split('/').pop()?.replace(/\.astro$/i, '');
       return base && scan.layouts.some((l) => l.name === base) ? base : '';
     }
-    if (!layoutNode) return '';
+    if (!layoutNode) {return '';}
     const imp = (model.imports || []).find((i) => i.name === layoutNode.name);
     const base = imp?.path.split('/').pop()?.replace(/\.astro$/i, '');
-    if (base && scan.layouts.some((l) => l.name === base)) return base;
+    if (base && scan.layouts.some((l) => l.name === base)) {return base;}
     return layoutNode.name;
   })();
   // A component whose Props extends HTMLAttributes<"tag"> also accepts that
   // element's built-in attributes — merge them in after its own props.
   const schemaFor = (entry) => {
-    if (!entry) return [];
+    if (!entry) {return [];}
     const own = entry.schema || [];
     const ownNames = new Set(own.map((f) => f.name));
     const inherited = entry.extendsTag
@@ -3341,7 +3341,7 @@ export default function App() {
       try {
         const read = await window.avb.readPage(hostFile.path);
         const hostModel = read?.model;
-        if (dropped || !hostModel) return;
+        if (dropped || !hostModel) {return;}
         const trail = String(focusOf).split('|').pop().split('.').map(Number);
         const instance = nodeAtPath(hostModel.nodes, trail);
         if (!instance) { setInstanceProps(null); return }
@@ -3359,7 +3359,7 @@ export default function App() {
           })
         );
       } catch {
-        if (!dropped) setInstanceProps(null);
+        if (!dropped) {setInstanceProps(null);}
       }
     })();
     return () => { dropped = true };
@@ -3377,7 +3377,7 @@ export default function App() {
   // dynamic `<Tag>`. The page reports what each node rendered with, so the
   // breadcrumb and the canvas chip can say the same thing the navigator does.
   const liveLabel = (n, fromSource) => {
-    if (fromSource && fromSource !== n.name) return fromSource;
+    if (fromSource && fromSource !== n.name) {return fromSource;}
     const live = liveClassesById?.get(n.id);
     return live?.length ? live[0] : fromSource;
   };
@@ -3391,20 +3391,20 @@ export default function App() {
     const out = [];
     const seen = new Set();
     const add = (name, kind) => {
-      if (!name || seen.has(name)) return;
+      if (!name || seen.has(name)) {return;}
       seen.add(name);
       out.push({ name, kind });
     };
-    for (const t of HTML_TAGS) add(t, 'element');
-    for (const c of insertables) add(c.name, c.isLayout ? 'layout' : 'component');
-    for (const a of ASTRO_ASSETS) add(a.name, 'astroAsset');
-    for (const i of model?.imports || []) add(i.name, 'component');
+    for (const t of HTML_TAGS) {add(t, 'element');}
+    for (const c of insertables) {add(c.name, c.isLayout ? 'layout' : 'component');}
+    for (const a of ASTRO_ASSETS) {add(a.name, 'astroAsset');}
+    for (const i of model?.imports || []) {add(i.name, 'component');}
     return out;
   }, [insertables, model]);
 
   // Breadcrumb trail for the canvas toolbar: page → ancestors → selection.
   const crumbLabel = (n) => {
-    if (n.id === 'layout') return currentLayoutName || n.name;
+    if (n.id === 'layout') {return currentLayoutName || n.name;}
     switch (n.kind) {
       case 'text':
         return 'text';
@@ -3429,7 +3429,7 @@ export default function App() {
       default:
         // `<Tag>` from `const Tag = tag` renders a real element and its name
         // is a variable, so the class it rendered with names it better.
-        if (n.dynamicTag) return liveLabel(n, elementLabel(n));
+        if (n.dynamicTag) {return liveLabel(n, elementLabel(n));}
         return n.name;
     }
   };
@@ -3453,7 +3453,7 @@ export default function App() {
   // Returns whether the selection actually has a code editor, so the Enter
   // shortcut below knows whether it handled the key.
   const openCodeWindow = () => {
-    if (!selectedNode) return false;
+    if (!selectedNode) {return false;}
     if (selectedNode.kind === 'frontmatter') {
       setCodeWin({ targetId: 'frontmatter', title: 'Frontmatter', language: 'javascript' });
       return true;
@@ -3496,12 +3496,12 @@ export default function App() {
   // in place, in the panel (see the props panel's source popup).
   const openSymbolFile = useCallback(
     async (name) => {
-      if (!project) return false;
+      if (!project) {return false;}
       const imp = findImportOf(frontmatterCode, name);
-      if (!imp) return false;
+      if (!imp) {return false;}
       const stack = editStackRef.current;
       const fromFile = stack[stack.length - 1]?.path || currentPage?.path;
-      if (!fromFile) return false;
+      if (!fromFile) {return false;}
       try {
         const r = await window.avb.readSymbolSource({
           projectPath: project.path,
@@ -3540,7 +3540,7 @@ export default function App() {
   const setAssetFileText = useCallback(
     (text) => {
       setFileText(text);
-      if (!codeWin || codeWin.kind !== 'file') return;
+      if (!codeWin || codeWin.kind !== 'file') {return;}
       const { rel, area } = codeWin;
       // Source files live anywhere in the project; assets are rooted in public/.
       const write = area === 'src' ? window.avb.writeSourceText : window.avb.writeAssetText;
@@ -3554,7 +3554,7 @@ export default function App() {
 
   // Close the window if its target disappears (page switch, node deleted).
   useEffect(() => {
-    if (codeWin && !isFileWin && codeWinValue === null) setCodeWin(null);
+    if (codeWin && !isFileWin && codeWinValue === null) {setCodeWin(null);}
   }, [codeWin, isFileWin, codeWinValue]);
 
   const editedRel =
@@ -3576,7 +3576,7 @@ export default function App() {
   // own data (`pages/index.astro#rotatingWords`).
   const openFileSrcRel = (() => {
     const p = editStack[editStack.length - 1]?.path || currentPage?.path;
-    if (!p || !project?.path) return null;
+    if (!p || !project?.path) {return null;}
     const rel = p.startsWith(project.path + '/') ? p.slice(project.path.length + 1) : p;
     return rel.startsWith('src/') ? rel.slice(4) : rel;
   })();
@@ -3598,7 +3598,7 @@ export default function App() {
   const [spacingHover, setSpacingHover] = useState(null);
 
   const crumbs = [];
-  if (currentPage) crumbs.push({ id: null, label: currentPage.name.replace(/\.(astro|md)$/i, '') });
+  if (currentPage) {crumbs.push({ id: null, label: currentPage.name.replace(/\.(astro|md)$/i, '') });}
   if (model && selectedId === 'frontmatter') {
     crumbs.push({ id: 'frontmatter', label: 'Frontmatter' });
   } else if (model && selectedId) {
@@ -3627,13 +3627,13 @@ export default function App() {
   // including nodes inside a component that never evaluated its slot, whose
   // markers were never emitted at all.
   const emptyNodeIds = React.useMemo(() => {
-    if (!renderedPaths || !model) return null;
+    if (!renderedPaths || !model) {return null;}
     const prefix = editedRel ? `${editedRel}|` : '';
     const live = new Set();
     for (const p of renderedPaths) {
       const local = prefix && p.startsWith(prefix) ? p.slice(prefix.length) : p;
       const parts = local.split('.');
-      for (let i = parts.length; i > 0; i--) live.add(parts.slice(0, i).join('.'));
+      for (let i = parts.length; i > 0; i--) {live.add(parts.slice(0, i).join('.'));}
     }
     // Only kinds where "renders nothing" is a fact about the page. A comment,
     // the frontmatter row or a doctype line never renders and saying so on
@@ -3655,8 +3655,8 @@ export default function App() {
     const walk = (list, trail, unmarked) => {
       list.forEach((n, i) => {
         const t = [...trail, i];
-        if (!unmarked && answers(n) && !live.has(t.join('.'))) ids.add(n.id);
-        if (Array.isArray(n.children)) walk(n.children, t, unmarked || isInlineRun(n.children));
+        if (!unmarked && answers(n) && !live.has(t.join('.'))) {ids.add(n.id);}
+        if (Array.isArray(n.children)) {walk(n.children, t, unmarked || isInlineRun(n.children));}
       });
     };
     walk(model.nodes, [], false);
@@ -3667,14 +3667,14 @@ export default function App() {
   // knowing anything about index paths.
   const stateIds = React.useMemo(() => {
     const empty = { hidden: new Set(), inert: new Set() };
-    if (!nodeStates || !model) return empty;
+    if (!nodeStates || !model) {return empty;}
     const prefix = editedRel ? `${editedRel}|` : '';
     const local = (p) => (prefix && p.startsWith(prefix) ? p.slice(prefix.length) : p);
     const ids = (paths) => {
       const set = new Set();
       for (const p of paths || []) {
         const id = tree.byPath.get(local(p))?.id;
-        if (id) set.add(id);
+        if (id) {set.add(id);}
       }
       return set;
     };
@@ -3682,9 +3682,9 @@ export default function App() {
   }, [nodeStates, model, editedRel, tree]);
 
   const pathFor = (id) => {
-    if (!model || !id) return null;
+    if (!model || !id) {return null;}
     const path = tree.path(id);
-    if (path === null) return null;
+    if (path === null) {return null;}
     return editedRel ? `${editedRel}|${path}` : path;
   };
   // The right panel stays on whichever tab the user picked, whatever gets
@@ -3731,16 +3731,16 @@ export default function App() {
     };
     measure();
     const strip = rightTabRefs.current[rightTab]?.parentElement;
-    if (!strip || typeof ResizeObserver === 'undefined') return;
+    if (!strip || typeof ResizeObserver === 'undefined') {return;}
     const ro = new ResizeObserver(measure);
     ro.observe(strip);
     return () => ro.disconnect();
   }, [rightTab, pageState?.editable]);
 
   const overlayInfo = (p) => {
-    if (!model || !p) return null;
+    if (!model || !p) {return null;}
     const n = nodeAtPath(model.nodes, trailOf(p));
-    if (!n) return null;
+    if (!n) {return null;}
     const label = n.id === 'layout' ? currentLayoutName || n.name : crumbLabel(n);
     // A dynamic tag renders an element, so it shouldn't wear the component
     // colour on the canvas either.
@@ -3911,7 +3911,7 @@ export default function App() {
                 e.currentTarget.blur();
                 return;
               }
-              if (e.key !== 'Enter') return;
+              if (e.key !== 'Enter') {return;}
               e.currentTarget.blur();
               goToUrl(e.currentTarget.value);
             }}
@@ -4065,11 +4065,11 @@ export default function App() {
                 onSelect={(r) => {
                   setCmsRel(r);
                   setCmsSettings(false);
-                  if (r) setContentName(null);
+                  if (r) {setContentName(null);}
                   // Closing a collection leaves nothing selected anywhere, so
                   // the right-hand panels show their empty state rather than
                   // the node that happened to be picked before.
-                  if (!r) setSelectedId(null);
+                  if (!r) {setSelectedId(null);}
                 }}
                 onOpenSettings={(r) => {
                   setCmsRel(r);
@@ -4093,8 +4093,8 @@ export default function App() {
                   // show it on, so the row says where it is and does nothing —
                   // better than opening an empty editor onto a stylesheet.
                   const page = scan.pages.find((p) => p.path.endsWith(f.path));
-                  if (page) selectPage(page);
-                  else showToast(`${f.path} isn’t a page — nothing to open on the canvas.`, 'info');
+                  if (page) {selectPage(page);}
+                  else {showToast(`${f.path} isn’t a page — nothing to open on the canvas.`, 'info');}
                 }}
                 onPreviewCommit={previewCommit}
                 onExitPreview={exitCommitPreview}
@@ -4263,7 +4263,7 @@ export default function App() {
               // opposite things: a click the open file doesn't own, and a click
               // on something inside it the canvas couldn't name.
               const reveal = (node) => {
-                if (!node) return;
+                if (!node) {return;}
                 setSelectedId(node.id);
                 // Selecting from the canvas jumps to the node in the tree.
                 setLeftTab('navigator');
@@ -4275,7 +4275,7 @@ export default function App() {
                 focusPath,
                 scope: editedRel ? `${editedRel}|` : '',
               });
-              if (kind === 'nothing') return;
+              if (kind === 'nothing') {return;}
               if (kind === 'close') { closeComponent(); return; }
               if (kind === 'layout') { reveal(model && findNodeById(model.nodes, 'layout')); return; }
               reveal(model && nodeAtPath(model.nodes, trailOf(p)));
@@ -4290,11 +4290,11 @@ export default function App() {
               // footer) — that markup belongs to the layout, so open the layout,
               // matching what a single click there selects.
               if (!p) {
-                if (layoutNode) openComponent(layoutNode.name, pathFor('layout'));
+                if (layoutNode) {openComponent(layoutNode.name, pathFor('layout'));}
                 return;
               }
               const n = model && nodeAtPath(model.nodes, trailOf(p));
-              if (!n) return;
+              if (!n) {return;}
               // Astro built-ins have no project component file to open.
               if (n.kind === 'component' && !n.astroAsset && n.name !== 'Fragment') {
                 openComponent(n.name, p, occ);
@@ -4414,7 +4414,7 @@ export default function App() {
                   // like a save. Report it instead — the panel holds the edit
                   // and writes it when the component closes.
                   const model = pageStateRef.current.pageState?.model;
-                  if (!model || !findNodeById(model.nodes, nodeId)) return false;
+                  if (!model || !findNodeById(model.nodes, nodeId)) {return false;}
                   setNodeText(nodeId, css, undefined, immediate || 'live');
                   return true;
                 }}
@@ -4554,7 +4554,7 @@ function insertIntoModel(model, node, target) {
     model.nodes.push(node);
     return;
   }
-  if (!Array.isArray(parent.children)) parent.children = [];
+  if (!Array.isArray(parent.children)) {parent.children = [];}
   const index = Math.min(target.index, parent.children.length);
   parent.children.splice(index, 0, node);
 }

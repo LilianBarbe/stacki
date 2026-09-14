@@ -18,7 +18,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -468,8 +468,8 @@ const check = (what, condition, detail) => {
     check('the value edits in the rich field', !!field);
     // Put the caret just before the ")".
     const findParen = (n) => {
-      if (n.nodeType === 3 && n.textContent.includes(')')) return n;
-      for (const c of n.childNodes) { const r = findParen(c); if (r) return r; }
+      if (n.nodeType === 3 && n.textContent.includes(')')) {return n;}
+      for (const c of n.childNodes) { const r = findParen(c); if (r) {return r;} }
       return null;
     };
     await act(async () => {

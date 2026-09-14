@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import FieldLabel from './components/FieldLabel'
@@ -41,7 +39,7 @@ type Props = {
 type Display = { present: boolean; isSelected: boolean; overridden: boolean; winnerSelector: string; value: string; important: boolean }
 
 function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }
+  if (!resolved) {return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }}
   const isSelected = resolved.source === 'selected'
   const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner
   return { present: true, isSelected, overridden: resolved.overridden, winnerSelector: resolved.winner.selectorText, value: source.value, important: source.important }
@@ -49,7 +47,7 @@ function displayOf(resolved: ResolvedProp | undefined): Display {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 
@@ -255,7 +253,7 @@ const facetExternal = (d: Display) => (d.present ? (d.important ? `${d.value} !i
 function facetWrite(facet: Facet, side: Side, props: Props) {
   return (next: string, live: boolean) => {
     const trimmed = next.trim()
-    if (!trimmed) { if (!live) props.clearProp(facetClear(facet, side)); return }
+    if (!trimmed) { if (!live) {props.clearProp(facetClear(facet, side));} return }
     const { value, important } = parseImportant(trimmed)
     const set = live ? props.liveSetProp : props.setProp
     if (side === 'all') {
@@ -268,7 +266,7 @@ function facetWrite(facet: Facet, side: Side, props: Props) {
       // — but only when some exist, so a plain "all" edit stays a single write.
       if (!live) {
         const strays = EDGES.map((s) => `border-${s}-${facet}`).filter((p) => displayOf(props.read(p)).present)
-        if (strays.length) props.clearProp(strays)
+        if (strays.length) {props.clearProp(strays)}
       }
     } else {
       set(`border-${side}-${facet}`, value, important)
@@ -282,7 +280,7 @@ function facetWrite(facet: Facet, side: Side, props: Props) {
 function appliedBorderSides(read: Read): Set<Side> {
   const applied = new Set<Side>()
   const owns = (prop: string) => displayOf(read(prop)).isSelected
-  if (['border', 'border-style', 'border-width', 'border-color'].some(owns)) applied.add('all')
+  if (['border', 'border-style', 'border-width', 'border-color'].some(owns)) {applied.add('all')}
   for (const side of EDGES) {
     if ([`border-${side}`, `border-${side}-style`, `border-${side}-width`, `border-${side}-color`].some(owns)) {
       applied.add(side)
@@ -362,19 +360,19 @@ function StyleControl({ value, prop, busy, write, clear }: {
   const focused = useRef(false)
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
   }, [open])
-  useEffect(() => { if (customMode && !focused.current) setDraft(value) }, [customMode, value])
+  useEffect(() => { if (customMode && !focused.current) {setDraft(value)} }, [customMode, value])
   useEffect(() => {
     if (customMode && wantFocus.current && !busy) { wantFocus.current = false; inputRef.current?.focus(); inputRef.current?.select() }
   }, [customMode, busy])
 
-  const pick = (next: string) => { setOpen(false); if (next !== lower) write(next, false) }
+  const pick = (next: string) => { setOpen(false); if (next !== lower) {write(next, false)} }
   const enterCustom = () => { setOpen(false); wantFocus.current = true; write('unset', false) }
   const commitCustom = () => {
     const trimmed = draft.trim()
@@ -395,10 +393,10 @@ function StyleControl({ value, prop, busy, write, clear }: {
           placeholder="custom value"
           spellCheck={false}
           disabled={busy}
-          onChange={(event) => { setDraft(event.target.value); const t = event.target.value.trim(); if (t) write(t, true) }}
+          onChange={(event) => { setDraft(event.target.value); const t = event.target.value.trim(); if (t) {write(t, true)} }}
           onFocus={() => { focused.current = true }}
           onBlur={() => { focused.current = false; commitCustom() }}
-          onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+          onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
           aria-label="Border style value"
         />
         </VariableConnect>
@@ -471,8 +469,8 @@ export function ColorVariableInput({
         ariaLabel={ariaLabel}
         onChange={(color, live) => {
           noteLive(live ? color : null)
-          if (live) onLive(color)
-          else onCommit(color)
+          if (live) {onLive(color)}
+          else {onCommit(color)}
         }}
       />
       <LiveInput

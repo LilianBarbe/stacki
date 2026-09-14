@@ -33,7 +33,7 @@ let checked = 0;
 
 function check(what, condition, detail) {
   checked++;
-  if (condition) return;
+  if (condition) {return;}
   failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
 }
 
@@ -77,7 +77,7 @@ const read = (root, rel) => fs.readFileSync(path.join(root, rel), 'utf8');
   const edit = (name, pick, edits, options) => {
     const listed = entriesOf(name);
     const entry = typeof pick === 'function' ? listed.entries.find(pick) : listed.entries[pick];
-    if (!entry) throw new Error(`${name}: no entry to edit`);
+    if (!entry) {throw new Error(`${name}: no entry to edit`);}
     const before = read(root, entry.file);
     writeEntry(root, entry, edits, options);
     return { entry, before, after: read(root, entry.file), listed };

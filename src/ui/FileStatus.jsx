@@ -27,7 +27,7 @@ const WORDS = {
  * a file did the changing, and "was changed" is what it says.
  */
 export default function FileStatus({ status, inCommit = false }) {
-  if (!status) return null;
+  if (!status) {return null;}
   const known = WORDS[status];
   // An unrecognised letter keeps the letter. Inventing a word for something
   // git meant differently would be worse than showing what git said.

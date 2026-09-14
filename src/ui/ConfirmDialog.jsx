@@ -63,7 +63,7 @@ export function ConfirmHost() {
   const cancelRef = useRef(null);
 
   useEffect(() => {
-    if (ask) setChecked(ask.checkbox?.defaultChecked ?? false);
+    if (ask) {setChecked(ask.checkbox?.defaultChecked ?? false);}
   }, [ask]);
 
   useEffect(() => {
@@ -76,13 +76,13 @@ export function ConfirmHost() {
   // The safe button takes focus on a destructive question, so Return cannot
   // confirm something unrecoverable by accident.
   useEffect(() => {
-    if (!ask) return;
+    if (!ask) {return;}
     const el = ask.danger ? cancelRef.current : confirmRef.current;
     el?.focus();
   }, [ask]);
 
   useEffect(() => {
-    if (!ask) return undefined;
+    if (!ask) {return undefined;}
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -102,13 +102,13 @@ export function ConfirmHost() {
   });
 
   const answer = (value) => {
-    if (!ask) return;
+    if (!ask) {return;}
     // With a tick box the answer is not just yes or no — it is yes-and-what.
     ask.resolve(value && ask.checkbox ? { checked } : value);
     setAsk(null);
   };
 
-  if (!ask) return null;
+  if (!ask) {return null;}
 
   return (
     <div

@@ -33,7 +33,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const rowLabels = (block) => block.rows.map((r) => r.label);
@@ -53,10 +53,10 @@ const cssFiles = (root) => {
       return;
     }
     for (const e of entries) {
-      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      if (e.name === 'node_modules' || e.name.startsWith('.')) {continue;}
       const full = path.join(dir, e.name);
-      if (e.isDirectory()) walk(full);
-      else if (e.name.endsWith('.css')) out.push(full);
+      if (e.isDirectory()) {walk(full);}
+      else if (e.name.endsWith('.css')) {out.push(full);}
     }
   };
   walk(path.join(root, 'src'));
@@ -324,12 +324,12 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
       const text = fs.readFileSync(f, 'utf8');
       const hits = [...text.matchAll(new RegExp(`${name}\\s*:\\s*([^;{}]+);`, 'g'))];
       const last = hits[hits.length - 1];
-      if (last && /^#[0-9a-f]{3,8}$/i.test(last[1].trim())) return last[1].trim().toLowerCase();
+      if (last && /^#[0-9a-f]{3,8}$/i.test(last[1].trim())) {return last[1].trim().toLowerCase();}
     }
     return null;
   };
   const through = (cell) => {
-    if (!cell?.ref) return null;
+    if (!cell?.ref) {return null;}
     const want = declaredColor(cell.ref);
     return want ? cell.color?.toLowerCase() === want : null;
   };
@@ -357,7 +357,7 @@ if (!fs.existsSync(path.join(source, 'src', 'styles'))) {
     .flatMap((r) => r.entries.filter((e) => e.kind === 'var').map((e) => e.name));
   const shown = new Set();
   for (const group of base.groups) {
-    for (const block of group.blocks) for (const row of block.rows) for (const cell of row.cells) if (cell) shown.add(cell.name);
+    for (const block of group.blocks) {for (const row of block.rows) {for (const cell of row.cells) {if (cell) {shown.add(cell.name);}}}}
   }
   const missing = [...new Set(declared)].filter((n) => !shown.has(n));
   check('every variable in the file is shown somewhere', missing.length === 0, missing.slice(0, 8).join(', '));

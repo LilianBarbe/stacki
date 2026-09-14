@@ -65,7 +65,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
   // The full list, not the capped summary git:info carries for the chip: a
   // file missing from this list is a file that silently cannot be saved.
   useEffect(() => {
-    if (!picking || !open) return;
+    if (!picking || !open) {return;}
     window.avb
       .gitStatus({ projectPath: project.path })
       .then((f) => {
@@ -86,8 +86,8 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
       await refresh();
       // Checkout/pull rewrite the working tree — re-read what's open so the
       // editor and preview show the branch that's actually checked out.
-      if (onWorktreeChanged) await onWorktreeChanged();
-      if (successMsg) showToast(successMsg, 'success');
+      if (onWorktreeChanged) {await onWorktreeChanged();}
+      if (successMsg) {showToast(successMsg, 'success');}
     } catch (err) {
       const msg = cleanError(err);
       // A failed branch switch leaves you on the branch you were already on,
@@ -118,7 +118,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
   // The question only gets put when git refuses, which it does cleanly and
   // without moving HEAD, and only for the files it names.
   const requestSwitch = (branch) => {
-    if (branch === info.branch) return;
+    if (branch === info.branch) {return;}
     const wasDirty = info.dirty;
     setOpen(false);
     act(
@@ -131,10 +131,10 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
           setOpen(true);
           return;
         }
-        if (r?.error) showToast(r.error, 'error');
-        else if (r?.restored) showToast(`Picked your changes back up on ${branch}`, 'success');
-        else if (wasDirty) showToast(`On ${branch} — your changes came with you`, 'success');
-        else showToast(`Switched to ${branch}`, 'success');
+        if (r?.error) {showToast(r.error, 'error');}
+        else if (r?.restored) {showToast(`Picked your changes back up on ${branch}`, 'success');}
+        else if (wasDirty) {showToast(`On ${branch} — your changes came with you`, 'success');}
+        else {showToast(`Switched to ${branch}`, 'success');}
       },
       null,
       'Switching…'
@@ -160,8 +160,8 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
           parkFirst: true,
         });
         // The switch worked; anything else to say is about the changes.
-        if (r?.error) showToast(r.error, 'error');
-        else if (r?.restored) showToast(`Picked your changes back up on ${branch}`, 'success');
+        if (r?.error) {showToast(r.error, 'error');}
+        else if (r?.restored) {showToast(`Picked your changes back up on ${branch}`, 'success');}
         return r;
       },
       `On ${branch} — your changes are waiting on ${from}`,
@@ -234,7 +234,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
     }
   };
 
-  if (!info) return null;
+  if (!info) {return null;}
 
   if (!info.isRepo) {
     return (
@@ -384,7 +384,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
               value={commitMsg}
               onChange={(e) => setCommitMsg(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && info.dirty && !working) commit();
+                if (e.key === 'Enter' && info.dirty && !working) {commit();}
               }}
             />
             {/* The list is closed by default. Someone who just wants to save
@@ -517,7 +517,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
               null,
               'Merging…'
             );
-            if (done) setConflict(null);
+            if (done) {setConflict(null);}
           }}
         />
       )}
@@ -530,10 +530,10 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
           busy={busy}
           onCancel={() => setSwitchTo(null)}
           onLeaveHere={async () => {
-            if (await parkThenSwitch(switchTo.branch)) setSwitchTo(null);
+            if (await parkThenSwitch(switchTo.branch)) {setSwitchTo(null);}
           }}
           onCommitFirst={async (message) => {
-            if (await commitThenSwitch(switchTo.branch, message)) setSwitchTo(null);
+            if (await commitThenSwitch(switchTo.branch, message)) {setSwitchTo(null);}
           }}
         />
       )}
@@ -603,7 +603,7 @@ function MergeConflictModal({ conflict, busy, onCancel, onResolve }) {
     Object.fromEntries(
       conflict.files.map((f) => {
         const list = picks[f.path] || [];
-        if (!f.parts || !list.length) return [f.path, list[0] === 'theirs' ? 'theirs' : 'ours'];
+        if (!f.parts || !list.length) {return [f.path, list[0] === 'theirs' ? 'theirs' : 'ours'];}
         return [f.path, list];
       })
     );
@@ -613,9 +613,9 @@ function MergeConflictModal({ conflict, busy, onCancel, onResolve }) {
   const contextAround = (parts, clashIndex) => {
     let seen = -1;
     for (let i = 0; i < parts.length; i++) {
-      if (parts[i].kind !== 'clash') continue;
+      if (parts[i].kind !== 'clash') {continue;}
       seen++;
-      if (seen !== clashIndex) continue;
+      if (seen !== clashIndex) {continue;}
       const before = parts[i - 1]?.kind === 'same' ? parts[i - 1].text.split('\n').filter(Boolean).slice(-1)[0] : null;
       const after = parts[i + 1]?.kind === 'same' ? parts[i + 1].text.split('\n').filter(Boolean)[0] : null;
       return { before, after };
@@ -852,7 +852,7 @@ function SwitchBranchModal({ from, to, files, busy, onCancel, onLeaveHere, onCom
               disabled={working}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !working) onCommitFirst(message.trim() || `Update ${from}`);
+                if (e.key === 'Enter' && !working) {onCommitFirst(message.trim() || `Update ${from}`);}
               }}
             />
           </div>
@@ -977,7 +977,7 @@ function PublishModal({ defaultName, branch, onClose, onPublish, openExternal })
                   disabled={publishing}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && name.trim() && ready && !publishing) go();
+                    if (e.key === 'Enter' && name.trim() && ready && !publishing) {go();}
                   }}
                 />
               </div>

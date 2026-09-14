@@ -30,11 +30,11 @@ import {
 // looks the same wherever you meet it.
 function outlineIcon(info) {
   const size = 11;
-  if (info.isLayout) return <LayoutIcon size={size} />;
+  if (info.isLayout) {return <LayoutIcon size={size} />;}
   if (info.nodeKind === 'component') {
     // Same order the Navigator uses: a dynamic tag (`const Tag = tag`) is an
     // element with no file behind it, then astro:assets, then real components.
-    if (info.dynamicTag) return <CustomElementIcon size={size} />;
+    if (info.dynamicTag) {return <CustomElementIcon size={size} />;}
     return info.astroAsset
       ? astroAssetIcon(info.label, size)
       : <ElementComponentIcon size={size} />;
@@ -74,7 +74,7 @@ const DEVICES = [
 // checked on its own — the measurement that feeds it comes from a
 // ResizeObserver, which only fires while the window is actually rendering.
 export function deviceForWidth(px) {
-  if (!Number.isFinite(px) || px <= 0) return null;
+  if (!Number.isFinite(px) || px <= 0) {return null;}
   return DEVICES.find((d) => d.from !== undefined && px >= d.from).key;
 }
 
@@ -128,7 +128,7 @@ export default function PreviewPane({
   React.useEffect(() => setCrumbsExpanded(false), [crumbKey]);
   const shownCrumbs = React.useMemo(() => {
     const all = crumbs || [];
-    if (crumbsExpanded || all.length <= CRUMB_HEAD + CRUMB_TAIL + 1) return all;
+    if (crumbsExpanded || all.length <= CRUMB_HEAD + CRUMB_TAIL + 1) {return all;}
     return [
       ...all.slice(0, CRUMB_HEAD),
       { ellipsis: true, hidden: all.slice(CRUMB_HEAD, all.length - CRUMB_TAIL) },
@@ -216,13 +216,13 @@ export default function PreviewPane({
       return;
     }
     lastClickRef.current = null;
-    if (sameCopy(previous, selPath)) return;
+    if (sameCopy(previous, selPath)) {return;}
     setSelOcc(null);
   }, [selPath]);
 
   React.useEffect(() => {
     const onMsg = (e) => {
-      if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
+      if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) {return;}
       const d = e.data;
       if (d?.type === 'avb:rects') {
         setRects(d.rects || {});
@@ -314,7 +314,7 @@ export default function PreviewPane({
 
   const sendTrack = React.useCallback(() => {
     const w = iframeRef.current?.contentWindow;
-    if (!w) return;
+    if (!w) {return;}
     w.postMessage(
       {
         type: 'avb:track',
@@ -341,7 +341,7 @@ export default function PreviewPane({
     const previous = prevContextRef.current;
     const contextChanged = previous.focusPath !== focusPath || previous.pathScope !== pathScope;
     prevContextRef.current = { focusPath, pathScope };
-    if (!w || !selPath) return;
+    if (!w || !selPath) {return;}
     // Any selection that came from a click on the page: whatever it resolved to
     // is already on screen under the pointer. Notably the layout, whose box is
     // the whole page — scrolling to it always jumps to the top.
@@ -354,7 +354,7 @@ export default function PreviewPane({
     // still shows the same page and the instance is already under the pointer.
     // Nested components keep the same outer focus, so the edited file's scope
     // must count too. Opening or closing one should not scroll to its root.
-    if (contextChanged) return;
+    if (contextChanged) {return;}
     // Repeated nodes: aim at the instance in play, not the first on the page.
     w.postMessage({ type: 'avb:scroll-to', path: selPath, occ: selOccRef.current }, '*');
   }, [selPath, focusPath, pathScope]);
@@ -378,7 +378,7 @@ export default function PreviewPane({
   const [wrapWidth, setWrapWidth] = React.useState(null);
   React.useLayoutEffect(() => {
     const el = wrapRef.current;
-    if (!el) return;
+    if (!el) {return;}
     const measure = () => setWrapWidth(el.clientWidth);
     measure();
     const ro = new ResizeObserver(measure);
@@ -399,7 +399,7 @@ export default function PreviewPane({
   // frame is narrower than 768, so the page is laying out as a phone.
   const shownWidth = Math.min(width ?? Infinity, wrapWidth ?? Infinity);
   const activeDevice = React.useMemo(() => {
-    if (device === 'canvas') return 'canvas';
+    if (device === 'canvas') {return 'canvas';}
     return deviceForWidth(shownWidth) || device;
   }, [device, shownWidth]);
 
@@ -407,9 +407,9 @@ export default function PreviewPane({
   // keypress, or App resetting the pane to desktop when a project opens.
   // 'custom' is the drag itself, so it must not clear what the drag just set.
   React.useEffect(() => {
-    if (device === 'custom') return;
+    if (device === 'custom') {return;}
     setCustomW(null);
-    if (device === 'desktop' || device === 'canvas') setCustomH(null); // fills, so reset the height too
+    if (device === 'desktop' || device === 'canvas') {setCustomH(null);} // fills, so reset the height too
   }, [device]);
 
   // Sliding highlight behind the active device button.
@@ -430,7 +430,7 @@ export default function PreviewPane({
   // while typing in a field so prop values can still contain digits).
   React.useEffect(() => {
     const onKey = (e) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) {return;}
       const t = e.target;
       if (
         t instanceof HTMLElement &&
@@ -439,7 +439,7 @@ export default function PreviewPane({
         return;
       }
       const key = { 1: 'desktop', 2: 'tablet', 3: 'phone', 4: 'canvas' }[e.key];
-      if (key) onDeviceRef.current(key);
+      if (key) {onDeviceRef.current(key);}
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -448,11 +448,11 @@ export default function PreviewPane({
   // Drag-resize from the edge handles. The frame is horizontally centered,
   // so a side handle changes the width by twice the pointer movement.
   const startResize = (edge) => (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0) {return;}
     e.preventDefault();
     const frame = frameRef.current;
     const wrap = wrapRef.current;
-    if (!frame || !wrap) return;
+    if (!frame || !wrap) {return;}
     const startX = e.clientX;
     const startY = e.clientY;
     const startW = frame.offsetWidth;
@@ -611,7 +611,7 @@ export default function PreviewPane({
                   // page still says what it is.
                   const all = rects[o.path];
                   const info = overlayInfo ? overlayInfo(o.path) : null;
-                  if (!all || !info) return [];
+                  if (!all || !info) {return [];}
                   // One box, not one per loop item, unless the hover came from
                   // the navigator (which points at the node, not an instance) —
                   // and then one per place, since the same place reported twice

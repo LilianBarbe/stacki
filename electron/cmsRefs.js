@@ -32,7 +32,7 @@ function aliasMap(projectPath) {
     readJsonc(path.join(projectPath, 'tsconfig.json')) ||
     readJsonc(path.join(projectPath, 'jsconfig.json'));
   const paths = config?.compilerOptions?.paths;
-  if (!paths) return [];
+  if (!paths) {return [];}
   const base = path.resolve(projectPath, config.compilerOptions.baseUrl || '.');
   return Object.entries(paths).map(([pattern, targets]) => ({
     prefix: pattern.replace(/\*$/, ''),
@@ -42,7 +42,7 @@ function aliasMap(projectPath) {
 }
 
 function resolveSpec(spec, fromFile, aliases) {
-  if (spec.startsWith('.')) return [path.resolve(path.dirname(fromFile), spec)];
+  if (spec.startsWith('.')) {return [path.resolve(path.dirname(fromFile), spec)];}
   for (const alias of aliases) {
     if (alias.wildcard ? spec.startsWith(alias.prefix) : spec === alias.prefix) {
       const rest = spec.slice(alias.prefix.length);
@@ -67,10 +67,10 @@ function boundNames(clause) {
       .split(/\s+as\s+/)
       .pop()
       ?.trim();
-    if (name && /^[A-Za-z_$][\w$]*$/.test(name)) names.push(name);
+    if (name && /^[A-Za-z_$][\w$]*$/.test(name)) {names.push(name);}
   };
-  for (const part of outside.split(',')) add(part);
-  if (braces) for (const part of braces[1].split(',')) add(part);
+  for (const part of outside.split(',')) {add(part);}
+  if (braces) {for (const part of braces[1].split(',')) {add(part);}}
   return names;
 }
 
@@ -82,10 +82,10 @@ function walkCodeFiles(dir, out = []) {
     return out;
   }
   for (const entry of entries) {
-    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+    if (entry.name.startsWith('.') || entry.name === 'node_modules') {continue;}
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) walkCodeFiles(full, out);
-    else if (CODE_EXT.test(entry.name)) out.push(full);
+    if (entry.isDirectory()) {walkCodeFiles(full, out);}
+    else if (CODE_EXT.test(entry.name)) {out.push(full);}
   }
   return out;
 }
@@ -103,14 +103,14 @@ function importersOf(projectPath, targetAbs) {
     } catch {
       continue;
     }
-    if (!text.includes('import')) continue;
+    if (!text.includes('import')) {continue;}
     let names = [];
     const next = text.replace(IMPORT_RE, (match, indent, clause, spec) => {
       const resolved = resolveSpec(spec, file, aliases);
-      if (!resolved.some((r) => r === target)) return match;
+      if (!resolved.some((r) => r === target)) {return match;}
       const bound = boundNames(clause);
       names.push(...bound);
-      if (!bound.length) return ''; // side-effect import — just drop it
+      if (!bound.length) {return '';} // side-effect import — just drop it
       return bound.map((n) => `${indent}const ${n} = [];\n`).join('');
     });
     if (names.length || next !== text) {
@@ -130,7 +130,7 @@ function resolveImport(projectPath, fromFile, spec) {
     for (const ext of IMPORT_EXTS) {
       const candidate = base + ext;
       try {
-        if (fs.statSync(candidate).isFile()) return candidate;
+        if (fs.statSync(candidate).isFile()) {return candidate;}
       } catch {
         /* keep looking */
       }
@@ -138,7 +138,7 @@ function resolveImport(projectPath, fromFile, spec) {
     for (const ext of IMPORT_EXTS.slice(1)) {
       const candidate = path.join(base, `index${ext}`);
       try {
-        if (fs.statSync(candidate).isFile()) return candidate;
+        if (fs.statSync(candidate).isFile()) {return candidate;}
       } catch {
         /* keep looking */
       }

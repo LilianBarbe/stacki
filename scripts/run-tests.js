@@ -21,13 +21,13 @@ for (const [index, name] of names.entries()) {
   // Run the existing command verbatim (including Node flags and Electron tests),
   // without spawning an additional npm process for every test file.
   const result = spawnSync(scripts[name], { cwd: root, env, shell: true, stdio: 'inherit' });
-  if (result.signal === 'SIGINT' || result.signal === 'SIGTERM') process.exit(130);
+  if (result.signal === 'SIGINT' || result.signal === 'SIGTERM') {process.exit(130);}
   if (result.status !== 0 || result.error) {
     failed.push(name);
-    if (result.error) console.error(result.error.message);
+    if (result.error) {console.error(result.error.message);}
   }
 }
 
 console.log(`\n${names.length - failed.length}/${names.length} test commands passed in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
-if (failed.length) console.error(`Failed: ${failed.join(', ')}`);
+if (failed.length) {console.error(`Failed: ${failed.join(', ')}`);}
 process.exitCode = failed.length ? 1 : 0;

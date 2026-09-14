@@ -7,7 +7,7 @@ function skipString(code, i) {
   const q = code[i];
   i++;
   while (i < code.length && code[i] !== q) {
-    if (code[i] === '\\') i++;
+    if (code[i] === '\\') {i++;}
     i++;
   }
   return i;
@@ -23,13 +23,13 @@ function scanValue(code, start) {
       i = skipString(code, i);
       continue;
     }
-    if ('([{'.includes(ch)) depth++;
+    if ('([{'.includes(ch)) {depth++;}
     else if (')]}'.includes(ch)) {
       depth--;
-      if (depth < 0) return i;
-    } else if (depth === 0 && ch === ';') return i;
+      if (depth < 0) {return i;}
+    } else if (depth === 0 && ch === ';') {return i;}
     else if (depth === 0 && ch === '\n') {
-      if (!/^\s*(\.|\)|\]|\}|,|\|\||&&|\?|:)/.test(code.slice(i))) return i;
+      if (!/^\s*(\.|\)|\]|\}|,|\|\||&&|\?|:)/.test(code.slice(i))) {return i;}
     }
   }
   return code.length;
@@ -56,13 +56,13 @@ export function parseDeclarations(code) {
 export function findDeclaration(code, name) {
   const src = String(code || '');
   const ident = String(name || '');
-  if (!/^[A-Za-z_$][\w$]*$/.test(ident)) return null;
+  if (!/^[A-Za-z_$][\w$]*$/.test(ident)) {return null;}
   const re = new RegExp(
     `(?:^|\\n)([ \\t]*)((?:export\\s+)?(?:const|let|var)\\s+${ident.replace(/\$/g, '\\$')}\\s*=\\s*)`,
     'g'
   );
   const m = re.exec(src);
-  if (!m) return null;
+  if (!m) {return null;}
   const valueStart = m.index + m[0].length;
   const start = valueStart - m[2].length;
   const valueEnd = scanValue(src, valueStart);
@@ -83,7 +83,7 @@ export function findDeclaration(code, name) {
  */
 export function findImportOf(code, name) {
   const ident = String(name || '');
-  if (!/^[A-Za-z_$][\w$]*$/.test(ident)) return null;
+  if (!/^[A-Za-z_$][\w$]*$/.test(ident)) {return null;}
   const re = /import\s+(?:type\s+)?([\s\S]*?)\s+from\s*['"]([^'"]+)['"]/g;
   let m;
   while ((m = re.exec(String(code || ''))) !== null) {
@@ -96,27 +96,27 @@ export function findImportOf(code, name) {
     const outside = clause.replace(/\{[\s\S]*\}/, '').replace(/\*\s+as\s+/, '');
     for (const part of outside.split(',')) {
       const t = part.trim();
-      if (t) names.push(t);
+      if (t) {names.push(t);}
     }
     if (braced) {
       for (const part of braced[1].split(',')) {
         const t = part.trim();
-        if (!t) continue;
+        if (!t) {continue;}
         const as = t.split(/\s+as\s+/);
         names.push((as[1] || as[0]).trim());
       }
     }
-    if (names.includes(ident)) return { name: ident, spec };
+    if (names.includes(ident)) {return { name: ident, spec };}
   }
   return null;
 }
 
 // The first '{…}' object inside an array literal (or the object itself).
 export function firstObjectIn(text) {
-  if (!text) return null;
+  if (!text) {return null;}
   const t = text.trim();
-  if (t.startsWith('{')) return t;
-  if (!t.startsWith('[')) return null;
+  if (t.startsWith('{')) {return t;}
+  if (!t.startsWith('[')) {return null;}
   let depth = 0;
   for (let i = 0; i < t.length; i++) {
     const ch = t[i];
@@ -132,16 +132,16 @@ export function firstObjectIn(text) {
           j = skipString(t, j);
           continue;
         }
-        if (c === '{') d++;
+        if (c === '{') {d++;}
         else if (c === '}') {
           d--;
-          if (d === 0) return t.slice(i, j + 1);
+          if (d === 0) {return t.slice(i, j + 1);}
         }
       }
       return null;
     }
-    if ('([{'.includes(ch)) depth++;
-    else if (')]}'.includes(ch)) depth--;
+    if ('([{'.includes(ch)) {depth++;}
+    else if (')]}'.includes(ch)) {depth--;}
   }
   return null;
 }
@@ -149,9 +149,9 @@ export function firstObjectIn(text) {
 // Top-level entries of an object literal: [{key, value}]. Shorthand keys
 // ({ name, url }) yield empty value text.
 export function objectEntries(text) {
-  if (!text) return [];
+  if (!text) {return [];}
   const t = text.trim();
-  if (!t.startsWith('{')) return [];
+  if (!t.startsWith('{')) {return [];}
   const entries = [];
   let depth = 0;
   let i = 0;
@@ -188,11 +188,11 @@ export function objectEntries(text) {
             j = skipString(t, j) + 1;
             continue;
           }
-          if ('([{'.includes(c)) d++;
+          if ('([{'.includes(c)) {d++;}
           else if (')]}'.includes(c)) {
             d--;
-            if (d === 0) break;
-          } else if (c === ',' && d === 1) break;
+            if (d === 0) {break;}
+          } else if (c === ',' && d === 1) {break;}
           j++;
         }
         entries.push({ key: m[1], value: t.slice(vs, j).trim() });
@@ -206,13 +206,13 @@ export function objectEntries(text) {
 }
 
 function kindOf(value) {
-  if (!value) return '';
+  if (!value) {return '';}
   const t = value.trim();
-  if (t.startsWith('[')) return 'list';
-  if (t.startsWith('{')) return 'object';
-  if (/^['"`]/.test(t)) return 'text';
-  if (/^-?\d/.test(t)) return 'number';
-  if (/^(true|false)$/.test(t)) return 'boolean';
+  if (t.startsWith('[')) {return 'list';}
+  if (t.startsWith('{')) {return 'object';}
+  if (/^['"`]/.test(t)) {return 'text';}
+  if (/^-?\d/.test(t)) {return 'number';}
+  if (/^(true|false)$/.test(t)) {return 'boolean';}
   return '';
 }
 
@@ -232,7 +232,7 @@ const TOOL_MODULE = /^(astro(:|$)|node:)/;
 
 function mayHoldData(imp) {
   const path = String(imp?.path || '');
-  if (NON_DATA_EXT.test(path) || TOOL_MODULE.test(path)) return false;
+  if (NON_DATA_EXT.test(path) || TOOL_MODULE.test(path)) {return false;}
   return !/^[A-Z]/.test(String(imp?.name || ''));
 }
 
@@ -243,7 +243,7 @@ function resolvePath(rootValue, parts) {
   for (const part of parts) {
     const obj = cur && cur.trim().startsWith('[') ? firstObjectIn(cur) : cur;
     const entry = objectEntries(obj || '').find((e) => e.key === part);
-    if (!entry) return null;
+    if (!entry) {return null;}
     cur = entry.value;
   }
   return cur;
@@ -261,8 +261,8 @@ function splitTopLevel(text) {
       i = skipString(text, i);
       continue;
     }
-    if ('([{'.includes(c)) depth++;
-    else if (')]}'.includes(c)) depth--;
+    if ('([{'.includes(c)) {depth++;}
+    else if (')]}'.includes(c)) {depth--;}
     else if (c === ',' && depth === 0) {
       out.push(text.slice(start, i));
       start = i + 1;
@@ -282,9 +282,9 @@ function topIndexOf(text, ch) {
       i = skipString(text, i);
       continue;
     }
-    if ('([{'.includes(c)) depth++;
-    else if (')]}'.includes(c)) depth--;
-    else if (c === ch && depth === 0) return i;
+    if ('([{'.includes(c)) {depth++;}
+    else if (')]}'.includes(c)) {depth--;}
+    else if (c === ch && depth === 0) {return i;}
   }
   return -1;
 }
@@ -316,7 +316,7 @@ export function parseDestructures(code) {
         i = skipString(src, i);
         continue;
       }
-      if ('([{'.includes(c)) depth++;
+      if ('([{'.includes(c)) {depth++;}
       else if (')]}'.includes(c)) {
         depth--;
         if (depth === 0) {
@@ -325,18 +325,18 @@ export function parseDestructures(code) {
         }
       }
     }
-    if (close === -1) break;
+    if (close === -1) {break;}
     re.lastIndex = close + 1;
     const eq = src.slice(close + 1).match(/^\s*=\s*/);
-    if (!eq) continue;
+    if (!eq) {continue;}
     const valueStart = close + 1 + eq[0].length;
     const from = src.slice(valueStart, scanValue(src, valueStart)).trim();
     for (const part of splitTopLevel(src.slice(open + 1, close))) {
       const t = part.trim();
-      if (!t) continue;
+      if (!t) {continue;}
       if (t.startsWith('...')) {
         const rest = t.slice(3).trim();
-        if (/^[A-Za-z_$][\w$]*$/.test(rest)) out.push({ name: rest, from, kind: 'rest' });
+        if (/^[A-Za-z_$][\w$]*$/.test(rest)) {out.push({ name: rest, from, kind: 'rest' });}
         continue;
       }
       const colon = topIndexOf(t, ':');
@@ -346,7 +346,7 @@ export function parseDestructures(code) {
       local = (eqAt === -1 ? local : local.slice(0, eqAt)).trim();
       // A nested pattern (`{ data: { title } }`) binds names one level down —
       // this reads the flat cases, and skips what it can't name.
-      if (!/^[A-Za-z_$][\w$]*$/.test(local)) continue;
+      if (!/^[A-Za-z_$][\w$]*$/.test(local)) {continue;}
       out.push({ name: local, from, kind: kindOf(def) });
     }
   }
@@ -392,13 +392,13 @@ export function sampleAt(sample, path) {
   let cur = sample;
   for (const step of String(path || '').split('.')) {
     const m = step.match(/^([^[]*)((?:\[\d+\])*)$/);
-    if (!m) return undefined;
+    if (!m) {return undefined;}
     if (m[1]) {
-      if (!cur || typeof cur !== 'object') return undefined;
+      if (!cur || typeof cur !== 'object') {return undefined;}
       cur = cur[m[1]];
     }
     for (const idx of m[2].match(/\d+/g) || []) {
-      if (!Array.isArray(cur)) return undefined;
+      if (!Array.isArray(cur)) {return undefined;}
       cur = cur[Number(idx)];
     }
   }
@@ -424,22 +424,22 @@ export const sampleKey = (collection, id) => (id ? `${collection}#${id}` : colle
  * props sample, since the reference's target is in the data, not the source.
  */
 export function referencesInScope(frontmatter, propsSample) {
-  if (!propsSample) return [];
+  if (!propsSample) {return [];}
   const out = [];
   const seen = new Set();
   const consider = (valueText) => {
     const call = referenceCallIn(valueText);
-    if (!call) return;
+    if (!call) {return;}
     const at = sampleAt(propsSample, call.path);
     const ref = Array.isArray(at) ? at.find(isRef) : at;
-    if (!isRef(ref)) return;
+    if (!isRef(ref)) {return;}
     const key = sampleKey(ref.collection, ref.id);
-    if (seen.has(key)) return;
+    if (seen.has(key)) {return;}
     seen.add(key);
     out.push({ key, collection: ref.collection, id: ref.id });
   };
-  for (const [, value] of parseDeclarations(frontmatter || '')) consider(value);
-  for (const d of parseDestructures(frontmatter || '')) consider(d.from);
+  for (const [, value] of parseDeclarations(frontmatter || '')) {consider(value);}
+  for (const d of parseDestructures(frontmatter || '')) {consider(d.from);}
   return out;
 }
 
@@ -452,12 +452,12 @@ export function referencesInScope(frontmatter, propsSample) {
 const marker = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v.__stacki : null);
 
 export function sampleKind(v) {
-  if (v === null || v === undefined) return 'empty';
-  if (Array.isArray(v)) return 'list';
-  if (typeof v === 'object') return marker(v) || 'object';
-  if (typeof v === 'string') return 'text';
-  if (typeof v === 'number') return 'number';
-  if (typeof v === 'boolean') return 'boolean';
+  if (v === null || v === undefined) {return 'empty';}
+  if (Array.isArray(v)) {return 'list';}
+  if (typeof v === 'object') {return marker(v) || 'object';}
+  if (typeof v === 'string') {return 'text';}
+  if (typeof v === 'number') {return 'number';}
+  if (typeof v === 'boolean') {return 'boolean';}
   return 'empty';
 }
 
@@ -484,12 +484,12 @@ const clip = (text, max) =>
 // it rather than showing a wall of JSON; that's what expanding it is for.
 export function samplePreview(v) {
   const kind = sampleKind(v);
-  if (kind === 'date') return v.value ? String(v.value).slice(0, 10) : 'date';
-  if (kind === 'deep') return 'deeper…';
-  if (kind === 'more') return `${v.count} more`;
-  if (kind === 'empty') return '—';
-  if (kind === 'text') return v === '' ? '""' : clip(`"${v}"`, 42);
-  if (kind === 'number' || kind === 'boolean') return String(v);
+  if (kind === 'date') {return v.value ? String(v.value).slice(0, 10) : 'date';}
+  if (kind === 'deep') {return 'deeper…';}
+  if (kind === 'more') {return `${v.count} more`;}
+  if (kind === 'empty') {return '—';}
+  if (kind === 'text') {return v === '' ? '""' : clip(`"${v}"`, 42);}
+  if (kind === 'number' || kind === 'boolean') {return String(v);}
   if (kind === 'list') {
     const more = v.find((x) => marker(x) === 'more');
     const shown = v.length - (more ? 1 : 0);
@@ -505,7 +505,7 @@ const MAX_TREE_DEPTH = 6;
 // A value the app has actually seen — every key is real, so the tree is the
 // data rather than a guess at it.
 function fromSample(value, base, depth) {
-  if (depth >= MAX_TREE_DEPTH) return null;
+  if (depth >= MAX_TREE_DEPTH) {return null;}
   const kind = sampleKind(value);
   if (kind === 'object') {
     return shownKeys(value).map((k) => sampleNode(`${base}.${k}`, k, value[k], depth + 1));
@@ -537,7 +537,7 @@ const MAX_LITERAL_DEPTH = 4;
 // A list contributes its FIRST item, which is the only one whose shape is
 // knowable — and the one a loop over it will be handed.
 function fromLiteral(text, base, depth) {
-  if (depth >= MAX_LITERAL_DEPTH) return null;
+  if (depth >= MAX_LITERAL_DEPTH) {return null;}
   const t = String(text || '').trim();
   if (t.startsWith('{')) {
     const entries = objectEntries(t);
@@ -547,7 +547,7 @@ function fromLiteral(text, base, depth) {
   }
   if (t.startsWith('[')) {
     const first = firstObjectIn(t);
-    if (!first) return null;
+    if (!first) {return null;}
     const item = literalNode(`${base}[0]`, '0', first, depth + 1);
     return item.children ? [item] : null;
   }
@@ -596,11 +596,11 @@ export function markedQueries(frontmatter) {
  */
 export function removeMarkedQuery(frontmatter, name) {
   const found = markedQueries(frontmatter).find((q) => q.name === name);
-  if (!found) return frontmatter;
+  if (!found) {return frontmatter;}
   const src = String(frontmatter);
   let { start, end } = found;
-  if (start > 0 && src[start - 1] === '\n') start -= 1;
-  else if (src[end] === '\n') end += 1;
+  if (start > 0 && src[start - 1] === '\n') {start -= 1;}
+  else if (src[end] === '\n') {end += 1;}
   return src.slice(0, start) + src.slice(end);
 }
 
@@ -615,9 +615,9 @@ export function queriesInScope(frontmatter) {
     // `export const getStaticPaths = async () => { … getCollection("blog") … }`
     // mentions a collection without holding one. Binding to it would name a
     // function where a list was meant.
-    if (looksCallable(value)) continue;
+    if (looksCallable(value)) {continue;}
     const call = collectionCallIn(value);
-    if (call?.fn === 'getCollection' && !out.has(call.name)) out.set(call.name, name);
+    if (call?.fn === 'getCollection' && !out.has(call.name)) {out.set(call.name, name);}
   }
   return out;
 }
@@ -625,9 +625,9 @@ export function queriesInScope(frontmatter) {
 /** Every name the frontmatter already binds — what an auto-named query must avoid. */
 export function namesInScope(frontmatter, imports) {
   const taken = new Set();
-  for (const [name] of parseDeclarations(frontmatter || '')) taken.add(name);
-  for (const d of parseDestructures(frontmatter || '')) taken.add(d.name);
-  for (const i of imports || []) taken.add(i.name);
+  for (const [name] of parseDeclarations(frontmatter || '')) {taken.add(name);}
+  for (const d of parseDestructures(frontmatter || '')) {taken.add(d.name);}
+  for (const i of imports || []) {taken.add(i.name);}
   return taken;
 }
 
@@ -645,7 +645,7 @@ export function scopeCompletions(context = {}) {
   const out = [];
   const seen = new Set();
   const add = (label, detail) => {
-    if (!label || seen.has(label)) return;
+    if (!label || seen.has(label)) {return;}
     seen.add(label);
     out.push({ label, detail });
   };
@@ -654,7 +654,7 @@ export function scopeCompletions(context = {}) {
       add(node.path, node.preview ? String(node.preview).slice(0, 40) : node.section || '');
       // One level in is the useful depth: `post.data` earns its place, every
       // field of every collection does not — the picker is for browsing.
-      if (depth < 2 && Array.isArray(node.children)) walk(node.children, depth + 1);
+      if (depth < 2 && Array.isArray(node.children)) {walk(node.children, depth + 1);}
     }
   };
   try {
@@ -682,7 +682,7 @@ export function scopeCompletions(context = {}) {
 export function scopeChips(text, names) {
   const src = String(text ?? '');
   const inScope = names instanceof Set ? names : new Set(names || []);
-  if (!inScope.size) return [];
+  if (!inScope.size) {return [];}
   const out = [];
   let i = 0;
   while (i < src.length) {
@@ -690,7 +690,7 @@ export function scopeChips(text, names) {
     // Skip over a string whole — quotes, escapes and all.
     if (ch === '"' || ch === "'" || ch === '`') {
       i += 1;
-      while (i < src.length && src[i] !== ch) i += src[i] === '\\' ? 2 : 1;
+      while (i < src.length && src[i] !== ch) {i += src[i] === '\\' ? 2 : 1;}
       i += 1;
       continue;
     }
@@ -701,10 +701,10 @@ export function scopeChips(text, names) {
     // A name, plus any `.field` chain hanging off it: `post.data.title` is one
     // value, not three.
     let j = i;
-    while (j < src.length && /[\w$]/.test(src[j])) j += 1;
+    while (j < src.length && /[\w$]/.test(src[j])) {j += 1;}
     while (src[j] === '.' && /[A-Za-z_$]/.test(src[j + 1] || '')) {
       j += 1;
-      while (j < src.length && /[\w$]/.test(src[j])) j += 1;
+      while (j < src.length && /[\w$]/.test(src[j])) {j += 1;}
     }
     let path = src.slice(i, j);
     let end = j;
@@ -738,8 +738,8 @@ export function autoQueryName(collection, taken = new Set()) {
     .replace(/[^A-Za-z0-9]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ''))
     .replace(/^[0-9]+/, '');
   const base = `${camel || 'collection'}Entries`;
-  if (!taken.has(base)) return base;
-  for (let i = 2; i < 50; i++) if (!taken.has(`${base}${i}`)) return `${base}${i}`;
+  if (!taken.has(base)) {return base;}
+  for (let i = 2; i < 50; i++) {if (!taken.has(`${base}${i}`)) {return `${base}${i}`;}}
   return `${base}X`;
 }
 
@@ -748,11 +748,11 @@ export function collectionsInScope(frontmatter) {
   const out = new Set();
   for (const [, value] of parseDeclarations(frontmatter)) {
     const c = collectionCallIn(value);
-    if (c) out.add(c.name);
+    if (c) {out.add(c.name);}
   }
   for (const d of parseDestructures(frontmatter)) {
     const c = collectionCallIn(d.from);
-    if (c) out.add(c.name);
+    if (c) {out.add(c.name);}
   }
   return [...out];
 }
@@ -825,7 +825,7 @@ export function dataTree(context) {
   const seen = new Set();
 
   const add = (list, node) => {
-    if (!node || seen.has(node.path)) return;
+    if (!node || seen.has(node.path)) {return;}
     seen.add(node.path);
     list.push(node);
   };
@@ -835,7 +835,7 @@ export function dataTree(context) {
   // Props` is the only description of its data there is — and a loop over
   // `times?: ServiceTime[]` offered nothing at all without it.
   const fromShape = (field, base) => {
-    if (!field?.shape?.length) return null;
+    if (!field?.shape?.length) {return null;}
     const fields = (at) =>
       field.shape.map((f) => ({
         path: `${at}.${f.name}`,
@@ -854,7 +854,7 @@ export function dataTree(context) {
   // 1. This file's own props. Real values when the canvas is showing an entry
   //    that carries them; the declared type otherwise.
   for (const d of destructures) {
-    if (!/^Astro\.props\b/.test(d.from)) continue;
+    if (!/^Astro\.props\b/.test(d.from)) {continue;}
     const known = sample && Object.prototype.hasOwnProperty.call(sample, d.name);
     if (known) {
       add(props, sampleNode(d.name, d.name, sample[d.name], 0));
@@ -877,7 +877,7 @@ export function dataTree(context) {
   // A prop the file declares but destructures elsewhere (or reads off
   // Astro.props directly) is still a prop of this file.
   for (const f of schema) {
-    if (seen.has(f.name)) continue;
+    if (seen.has(f.name)) {continue;}
     const known = sample && Object.prototype.hasOwnProperty.call(sample, f.name);
     add(
       props,
@@ -896,7 +896,7 @@ export function dataTree(context) {
   // 2. The frontmatter's own values, and one level of any object literal.
   const samples = context?.collectionSamples || {};
   for (const [name, value] of decls) {
-    if (looksCallable(value)) continue; // getStaticPaths and friends are code, not data
+    if (looksCallable(value)) {continue;} // getStaticPaths and friends are code, not data
     // A collection read by name gets the real thing: one entry, sampled, with
     // the query's own shape around it — `getCollection` hands back a list.
     const call = collectionCallIn(value);
@@ -925,7 +925,7 @@ export function dataTree(context) {
     add(values, literalNode(name, name, value, 0));
   }
   for (const d of destructures) {
-    if (/^Astro\.props\b/.test(d.from)) continue;
+    if (/^Astro\.props\b/.test(d.from)) {continue;}
     const shape = /\brender\s*\(/.test(d.from) ? RENDER_SHAPE[d.name] : null;
     add(
       values,
@@ -935,8 +935,8 @@ export function dataTree(context) {
     );
   }
   for (const imp of context?.imports || []) {
-    if (decls.has(imp.name)) continue;
-    if (!mayHoldData(imp)) continue;
+    if (decls.has(imp.name)) {continue;}
+    if (!mayHoldData(imp)) {continue;}
     add(values, { path: imp.name, key: imp.name, kind: 'import', preview: '', children: null });
   }
 
@@ -945,13 +945,13 @@ export function dataTree(context) {
   // which was declared first.
   const byName = new Map();
   const indexNames = (list) => {
-    for (const n of list) byName.set(n.path, n);
+    for (const n of list) {byName.set(n.path, n);}
   };
   indexNames(props);
   indexNames(values);
   for (const [name, value] of decls) {
     const node = byName.get(name);
-    if (!node || node.children) continue;
+    if (!node || node.children) {continue;}
     const src = String(value).trim();
     const m = src.match(KEEPS_SHAPE);
     const base = m && byName.get(m[1]);
@@ -967,7 +967,7 @@ export function dataTree(context) {
     const one = src.match(PICKS_ONE);
     const from = one && byName.get(one[1]);
     const item = from?.kind === 'list' && from.children?.length === 1 ? from.children[0] : null;
-    if (!item?.children) continue;
+    if (!item?.children) {continue;}
     node.kind = item.kind;
     // "portfolio entries" describes the list; this is one of them.
     node.preview = /\bentries$/.test(from.preview || '')
@@ -983,7 +983,7 @@ export function dataTree(context) {
   const queried = queriesInScope(fm);
   const taken = namesInScope(fm, context?.imports);
   for (const c of context?.collections || []) {
-    if (queried.has(c.name)) continue; // already read here, so it is above
+    if (queried.has(c.name)) {continue;} // already read here, so it is above
     const identifier = autoQueryName(c.name, taken);
     taken.add(identifier);
     const entry = samples[c.name];
@@ -1008,7 +1008,7 @@ export function dataTree(context) {
   const index = (list) => {
     for (const n of list) {
       byPath.set(n.path, n);
-      if (n.children) index(n.children);
+      if (n.children) {index(n.children);}
     }
   };
   index(props);
@@ -1021,7 +1021,7 @@ export function dataTree(context) {
 // row; and which entry you are reading is a thing you can move.
 const everyField = (entries, at = 0) => {
   const first = entries?.[0];
-  if (!first) return null;
+  if (!first) {return null;}
   const out = [];
   const seenKeys = new Set();
   // The entry being read leads, in its own order, so stepping to it shows what
@@ -1035,7 +1035,7 @@ const everyField = (entries, at = 0) => {
     const home = entries[at] || first;
     const kids = entry === home ? entry.children || [] : rebase(entry.children, entry.path, home.path) || [];
     for (const child of kids) {
-      if (seenKeys.has(child.key)) continue;
+      if (seenKeys.has(child.key)) {continue;}
       seenKeys.add(child.key);
       out.push(child);
     }
@@ -1049,7 +1049,7 @@ const everyField = (entries, at = 0) => {
   const loops = [];
   for (const head of [...(context?.ancestorHeads || [])].reverse()) {
     const m = String(head).trim().match(MAP_HEAD_RE);
-    if (!m) continue;
+    if (!m) {continue;}
     const item = m[2];
     const source = byPath.get(m[1].trim());
     const first = source?.kind === 'list' ? source.children?.[0] : null;
@@ -1074,7 +1074,7 @@ const everyField = (entries, at = 0) => {
       // a value the picker was already holding.
       children: shown ? rebase(everyField(entries, at), shown.path, item) : null,
     });
-    if (m[3]) add(loops, { path: m[3], key: m[3], kind: 'number', preview: '0', children: null });
+    if (m[3]) {add(loops, { path: m[3], key: m[3], kind: 'number', preview: '0', children: null });}
   }
 
   // The loop item leads: inside a loop, it is what the markup is FOR — every
@@ -1099,7 +1099,7 @@ export function listsOnly(nodes) {
   for (const n of nodes || []) {
     const children = listsOnly(n.children);
     const pickable = LOOPABLE.has(n.kind);
-    if (!pickable && !children.length) continue;
+    if (!pickable && !children.length) {continue;}
     out.push({ ...n, pickable, children: children.length ? children : null });
   }
   return out;
@@ -1107,7 +1107,7 @@ export function listsOnly(nodes) {
 
 // `posts[0].data.title` seen from inside the loop is `post.data.title`.
 function rebase(nodes, from, to) {
-  if (!nodes) return null;
+  if (!nodes) {return null;}
   return nodes.map((n) => ({
     ...n,
     path: to + n.path.slice(from.length),

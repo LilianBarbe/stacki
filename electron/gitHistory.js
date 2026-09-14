@@ -72,15 +72,15 @@ async function log(git, { projectPath, ref, limit = 50, skip = 0, withFiles = fa
   // show` per commit to find out what it touched — is fifty processes to draw
   // one screen, and the panel needs the files to say "you changed Home"
   // rather than just the subject line.
-  if (withFiles) args.push('--name-status', ...DIFF_FLAGS);
-  if (ref) args.push(ref);
+  if (withFiles) {args.push('--name-status', ...DIFF_FLAGS);}
+  if (ref) {args.push(ref);}
   let stdout;
   try {
     ({ stdout } = await git(projectPath, args));
   } catch (err) {
     // A project that has just been initialised has a branch and no commits.
     // That is an empty history, not a broken one.
-    if (isEmptyRepo(err)) return { commits: [], atEnd: true };
+    if (isEmptyRepo(err)) {return { commits: [], atEnd: true };}
     throw err;
   }
   const commits = stdout
@@ -128,7 +128,7 @@ async function commitFiles(git, { projectPath, ref }) {
 function parseNameStatus(stdout) {
   const files = [];
   for (const line of stdout.split('\n')) {
-    if (!line.trim()) continue;
+    if (!line.trim()) {continue;}
     const parts = line.split('\t');
     const code = parts[0];
     // A rename or copy is "R100\told\tnew" — a similarity score on the code
@@ -152,7 +152,7 @@ async function status(git, { projectPath }) {
   const { stdout } = await git(projectPath, ['status', '--porcelain']);
   const files = [];
   for (const line of stdout.split('\n')) {
-    if (!line.trim()) continue;
+    if (!line.trim()) {continue;}
     // Porcelain v1 is "XY path": two status columns, a space, then the path.
     // Not trimmed before slicing — the first column is a space for changes
     // that are only in the working tree, and trimming loses that distinction.
@@ -216,7 +216,7 @@ async function allFiles(git, { projectPath }) {
   // A deleted file is gone from the working tree, so ls-files still lists it
   // from the index — but a file deleted and staged is not listed at all, and
   // it is exactly the one somebody may want to find and put back.
-  for (const [p, f] of changed) if (!paths.includes(p)) paths.push(p);
+  for (const [p, f] of changed) {if (!paths.includes(p)) {paths.push(p);}}
   return paths.sort().map((p) => {
     const c = changed.get(p);
     return { path: p, status: c ? c.status : null, staged: c ? c.staged : false };
@@ -232,7 +232,7 @@ async function fileAt(git, { projectPath, ref, path: filePath }) {
     // Not an error worth raising: a file that did not exist yet is a normal
     // answer to "what did this look like then", and the caller wants to say
     // "this page didn't exist yet" rather than show a failure.
-    if (/does not exist|exists on disk, but not in/i.test(String(err.stderr || ''))) return null;
+    if (/does not exist|exists on disk, but not in/i.test(String(err.stderr || ''))) {return null;}
     throw err;
   }
 }
@@ -252,11 +252,11 @@ async function worktrees(git, { projectPath }) {
         const sp = line.indexOf(' ');
         const key = sp === -1 ? line : line.slice(0, sp);
         const value = sp === -1 ? '' : line.slice(sp + 1);
-        if (key === 'worktree') out.path = value;
-        else if (key === 'HEAD') out.head = value;
-        else if (key === 'branch') out.branch = value.replace(/^refs\/heads\//, '');
-        else if (key === 'detached') out.detached = true;
-        else if (key === 'bare') out.bare = true;
+        if (key === 'worktree') {out.path = value;}
+        else if (key === 'HEAD') {out.head = value;}
+        else if (key === 'branch') {out.branch = value.replace(/^refs\/heads\//, '');}
+        else if (key === 'detached') {out.detached = true;}
+        else if (key === 'bare') {out.bare = true;}
       }
       return out;
     })
@@ -292,20 +292,20 @@ function describeFile(relPath) {
   const page = p.match(/^src\/pages\/(.+)\.(astro|mdx?)$/i);
   if (page) {
     let route = page[1];
-    if (route === 'index') return { path: p, kind: 'page', label: 'Home' };
+    if (route === 'index') {return { path: p, kind: 'page', label: 'Home' };}
     // "about/index" is the same page as "about" — the folder is the route.
-    if (route.endsWith('/index')) route = route.slice(0, -'/index'.length);
+    if (route.endsWith('/index')) {route = route.slice(0, -'/index'.length);}
     return { path: p, kind: 'page', label: route.split('/').map(TITLE).join(' / ') };
   }
   const comp = p.match(/^src\/components\/(.+)\.(astro|jsx?|tsx?|vue|svelte)$/i);
-  if (comp) return { path: p, kind: 'component', label: comp[1].split('/').pop() };
+  if (comp) {return { path: p, kind: 'component', label: comp[1].split('/').pop() };}
 
   const layout = p.match(/^src\/layouts\/(.+)\.(astro|jsx?|tsx?)$/i);
-  if (layout) return { path: p, kind: 'layout', label: layout[1].split('/').pop() };
+  if (layout) {return { path: p, kind: 'layout', label: layout[1].split('/').pop() };}
 
-  if (/^src\/content\//i.test(p)) return { path: p, kind: 'content', label: base };
-  if (/^public\//i.test(p)) return { path: p, kind: 'asset', label: base };
-  if (/\.(css|scss|sass|less)$/i.test(p)) return { path: p, kind: 'style', label: base };
+  if (/^src\/content\//i.test(p)) {return { path: p, kind: 'content', label: base };}
+  if (/^public\//i.test(p)) {return { path: p, kind: 'asset', label: base };}
+  if (/\.(css|scss|sass|less)$/i.test(p)) {return { path: p, kind: 'style', label: base };}
   if (/\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i.test(p)) {
     return { path: p, kind: 'asset', label: base };
   }
@@ -316,8 +316,8 @@ function describeFile(relPath) {
   // Script and prose get named rather than falling into the catch-all. Both
   // are things people change on purpose and go looking for by type — a
   // stylesheet is offered as a stylesheet, and a script should be too.
-  if (/\.(m|c)?[jt]sx?$/i.test(p)) return { path: p, kind: 'script', label: base };
-  if (/\.mdx?$/i.test(p)) return { path: p, kind: 'doc', label: base };
+  if (/\.(m|c)?[jt]sx?$/i.test(p)) {return { path: p, kind: 'script', label: base };}
+  if (/\.mdx?$/i.test(p)) {return { path: p, kind: 'doc', label: base };}
   // Anything genuinely unrecognised keeps its own path. Guessing a category
   // for it would be worse than saying where it is.
   return { path: p, kind: 'file', label: p };

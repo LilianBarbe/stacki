@@ -28,7 +28,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -80,7 +80,7 @@ const check = (what, condition, detail) => {
     for (const pointer of before) {
       const data = frontmatter.parseData(read(pointer.file)) || jsonFormat.parseData(read(pointer.file));
       const value = pointer.path.reduce((node, key) => (node == null ? node : node[key]), data);
-      if (value === 'avery-chen-jones') rewritten++;
+      if (value === 'avery-chen-jones') {rewritten++;}
     }
     check('authors: every pointer rewritten', rewritten === before.length, `${rewritten}/${before.length}`);
     check(

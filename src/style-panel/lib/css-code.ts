@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // A CSS value field that behaves like a code editor: the value is coloured as
 // you type, and the number under the caret answers to the arrow keys.
 //
@@ -34,17 +32,17 @@ export function cssTokens(value: string): CssToken[] {
   const push = (kind: string, text: string) => {
     // Runs of the same kind merge, so `((` is one span rather than two.
     const last = out[out.length - 1]
-    if (last && last.kind === kind) last.text += text
-    else out.push({ kind, text })
+    if (last && last.kind === kind) {last.text += text}
+    else {out.push({ kind, text })}
   }
   let rest = value
   while (rest) {
     let m: RegExpMatchArray | null
-    if ((m = rest.match(COMMENT))) push('comment', m[0])
-    else if ((m = rest.match(STRING))) push('string', m[0])
-    else if ((m = rest.match(CUSTOM_PROP))) push('prop', m[0])
-    else if ((m = rest.match(FUNCTION))) push('fn', m[0])
-    else if ((m = rest.match(HEX))) push('hex', m[0])
+    if ((m = rest.match(COMMENT))) {push('comment', m[0])}
+    else if ((m = rest.match(STRING))) {push('string', m[0])}
+    else if ((m = rest.match(CUSTOM_PROP))) {push('prop', m[0])}
+    else if ((m = rest.match(FUNCTION))) {push('fn', m[0])}
+    else if ((m = rest.match(HEX))) {push('hex', m[0])}
     else if ((m = rest.match(NUMBER))) {
       push('num', m[0])
       const unit = rest.slice(m[0].length).match(UNIT)
@@ -52,7 +50,7 @@ export function cssTokens(value: string): CssToken[] {
         push('unit', unit[0])
         m = [m[0] + unit[0]] as RegExpMatchArray
       }
-    } else if ((m = rest.match(IDENT))) push('ident', m[0])
+    } else if ((m = rest.match(IDENT))) {push('ident', m[0])}
     else {
       push('plain', rest[0])
       m = [rest[0]] as RegExpMatchArray
@@ -78,8 +76,8 @@ export function highlightCss(value: string): string {
 
 /** How much one press moves the number: a tenth with alt, ten with shift. */
 export function stepSize(e: { altKey?: boolean; shiftKey?: boolean }): number {
-  if (e.altKey) return 0.1
-  if (e.shiftKey) return 10
+  if (e.altKey) {return 0.1}
+  if (e.shiftKey) {return 10}
   return 1
 }
 
@@ -121,15 +119,15 @@ export function stepNumberAt(
       hit = { start, end, text: match[0] }
       break
     }
-    if (start > caret) break // numbers only get further away from here
+    if (start > caret) {break} // numbers only get further away from here
   }
-  if (!hit) return null
+  if (!hit) {return null}
   // A `-` immediately before, and not part of a larger expression, is this
   // number's sign — `-4px` steps up to `-3px`, not to `-5px`.
   const signed = hit.start > 0 && text[hit.start - 1] === '-' && !/[\d.\w%)]\s*$/.test(text.slice(0, hit.start - 1))
   const start = signed ? hit.start - 1 : hit.start
   const current = Number((signed ? '-' : '') + hit.text)
-  if (!Number.isFinite(current)) return null
+  if (!Number.isFinite(current)) {return null}
   const next = min == null ? current + delta : Math.max(min, current + delta)
   // Float arithmetic: 0.1 + 0.2 must read 0.3 in a field someone is watching.
   const shown = next.toFixed(precisionOf(hit.text, delta)).replace(/^(-?)0\./, '$1.').replace(/\.$/, '')
@@ -152,18 +150,18 @@ const isChip = (n: Node): boolean => n instanceof HTMLElement && n.dataset.chip 
 /** Where the caret is, as an offset into the field's text. */
 export function caretOffset(root: HTMLElement): number | null {
   const sel = root.ownerDocument.getSelection()
-  if (!sel || sel.rangeCount === 0) return null
+  if (!sel || sel.rangeCount === 0) {return null}
   const range = sel.getRangeAt(0)
-  if (!root.contains(range.endContainer)) return null
+  if (!root.contains(range.endContainer)) {return null}
   let offset = 0
   let found = false
   const walk = (node: Node) => {
-    if (found) return
+    if (found) {return}
     if (node === range.endContainer && node.nodeType !== Node.TEXT_NODE) {
       // A container-level position counts the children before it.
       let i = 0
       for (const child of Array.from(node.childNodes)) {
-        if (i++ >= range.endOffset) break
+        if (i++ >= range.endOffset) {break}
         walk(child)
       }
       found = true
@@ -192,28 +190,31 @@ export function caretOffset(root: HTMLElement): number | null {
 export function setCaretOffset(root: HTMLElement, offset: number): void {
   const doc = root.ownerDocument
   const sel = doc.getSelection()
-  if (!sel) return
+  if (!sel) {return}
   let left = offset
   let target: { node: Node; at: number } | null = null
   const walk = (node: Node) => {
-    if (target) return
+    if (target) {return}
     if (node.nodeType === Node.TEXT_NODE) {
       const len = (node.textContent ?? '').length
-      if (left <= len) target = { node, at: left }
-      else left -= len
+      if (left <= len) {target = { node, at: left }}
+      else {left -= len}
       return
     }
     if (isChip(node)) {
-      if (left <= 0) target = { node: node.parentNode as Node, at: Array.from((node.parentNode as Node).childNodes).indexOf(node as ChildNode) }
-      else left -= 1
+      if (left <= 0) {target = { node: node.parentNode as Node, at: Array.from((node.parentNode as Node).childNodes).indexOf(node as ChildNode) }}
+      else {left -= 1}
       return
     }
     node.childNodes.forEach(walk)
   }
   root.childNodes.forEach(walk)
   const range = doc.createRange()
-  if (target) range.setStart(target.node, target.at)
-  else range.selectNodeContents(root), range.collapse(false)
+  if (target) {range.setStart(target.node, target.at)}
+  else {
+    range.selectNodeContents(root)
+    range.collapse(false)
+  }
   range.collapse(true)
   sel.removeAllRanges()
   sel.addRange(range)

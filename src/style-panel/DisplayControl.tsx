@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import SegmentPill from './components/SegmentPill'
@@ -70,7 +68,7 @@ export function isDisplayValueSupported(value: string): boolean {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 const joinImportant = (value: string, important: boolean) => (important ? `${value} !important` : value)
@@ -115,7 +113,7 @@ function CustomValueField({
   const focused = useRef(false)
 
   // Mirror external edits, but never clobber what the user is typing.
-  useEffect(() => { if (!focused.current) setDraft(joinImportant(value, important)) }, [value, important])
+  useEffect(() => { if (!focused.current) {setDraft(joinImportant(value, important))} }, [value, important])
 
   const commit = () => {
     const parsed = parseImportant(draft)
@@ -132,7 +130,7 @@ function CustomValueField({
       onChange={(event) => setDraft(event.target.value)}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; commit() }}
-      onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
       disabled={busy}
       spellCheck={false}
       aria-label="Value"
@@ -168,12 +166,12 @@ export default function DisplayControl({
 
   // Close the menu on outside click / Escape.
   useEffect(() => {
-    if (!open) return
+    if (!open) {return}
     const onDown = (event: MouseEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return
+      if (rootRef.current?.contains(event.target as Node)) {return}
       setOpen(false)
     }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
@@ -196,7 +194,7 @@ export default function DisplayControl({
   // committing without it also drops any prior !important (back to the buttons).
   const pick = (next: string) => {
     setOpen(false)
-    if (next !== current || important) onCommit(next, false)
+    if (next !== current || important) {onCommit(next, false)}
   }
   // Switch to a free value: default it to `unset`, then focus for typing.
   const enterCustom = () => {
@@ -213,7 +211,7 @@ export default function DisplayControl({
   const clearHoverTimer = () => { if (hoverTimer.current != null) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null } }
   useEffect(() => clearHoverTimer, [])
   const startHover = (segValue: string, el: HTMLElement) => {
-    if (!TOOLTIPS[segValue]) return
+    if (!TOOLTIPS[segValue]) {return}
     clearHoverTimer()
     hoverTimer.current = window.setTimeout(() => {
       hoverTimer.current = null

@@ -22,7 +22,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const root = path.join(__dirname, '..');
@@ -97,7 +97,7 @@ const sheet = postcss.parse(read('src/styles.css'));
 const panelRules = [];
 const narrowRules = [];
 sheet.walkRules((rule) => {
-  if (!/\.cm-panel|\.cm-panels|\.cm-search/.test(rule.selector)) return;
+  if (!/\.cm-panel|\.cm-panels|\.cm-search/.test(rule.selector)) {return;}
   const inContainer = rule.parent?.type === 'atrule' && rule.parent.name === 'container';
   ;(inContainer ? narrowRules : panelRules).push(rule);
 });
@@ -119,7 +119,7 @@ for (const rule of [...panelRules, ...narrowRules]) {
   for (const selector of rule.selectors) {
     let hit = false;
     try { hit = doc.querySelectorAll(queryableForm(selector)).length > 0 } catch { hit = false }
-    if (!hit) dead.push(selector);
+    if (!hit) {dead.push(selector);}
   }
 }
 check('and no rule is written against a panel that no longer exists', dead.length === 0, dead.join('\n    '));

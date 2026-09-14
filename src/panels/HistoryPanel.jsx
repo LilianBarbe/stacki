@@ -35,16 +35,16 @@ const PAGE = 30;
 // ago" stops being something you can place and a date starts being one.
 export function relativeTime(iso, now = Date.now()) {
   const t = Date.parse(iso);
-  if (Number.isNaN(t)) return '';
+  if (Number.isNaN(t)) {return '';}
   const secs = Math.round((now - t) / 1000);
-  if (secs < 45) return 'just now';
+  if (secs < 45) {return 'just now';}
   const mins = Math.round(secs / 60);
-  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+  if (mins < 60) {return `${mins} minute${mins === 1 ? '' : 's'} ago`;}
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  if (hours < 24) {return `${hours} hour${hours === 1 ? '' : 's'} ago`;}
   const days = Math.round(hours / 24);
-  if (days === 1) return 'yesterday';
-  if (days < 7) return `${days} days ago`;
+  if (days === 1) {return 'yesterday';}
+  if (days < 7) {return `${days} days ago`;}
   const d = new Date(t);
   const sameYear = d.getFullYear() === new Date(now).getFullYear();
   return d.toLocaleDateString(undefined, {
@@ -58,16 +58,16 @@ export function relativeTime(iso, now = Date.now()) {
 // dated for the same reason.
 export function dayGroup(iso, now = Date.now()) {
   const t = Date.parse(iso);
-  if (Number.isNaN(t)) return '';
+  if (Number.isNaN(t)) {return '';}
   const startOf = (ms) => {
     const d = new Date(ms);
     d.setHours(0, 0, 0, 0);
     return d.getTime();
   };
   const days = Math.round((startOf(now) - startOf(t)) / 86400000);
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days} days ago`;
+  if (days <= 0) {return 'Today';}
+  if (days === 1) {return 'Yesterday';}
+  if (days < 7) {return `${days} days ago`;}
   const d = new Date(t);
   const sameYear = d.getFullYear() === new Date(now).getFullYear();
   return d.toLocaleDateString(undefined, {
@@ -83,13 +83,13 @@ export function dayGroup(iso, now = Date.now()) {
 // at a glance — "that's the one where I did the hero" — not to be complete.
 // The full list is one click away.
 export function summarize(files) {
-  if (!files || !files.length) return 'No files changed';
+  if (!files || !files.length) {return 'No files changed';}
   const labels = [...new Set(files.map((f) => f.label))];
   const pages = files.filter((f) => f.kind === 'page').length;
   // What to call them: if it's all pages, say pages. Mixed, say files.
   const noun = pages === files.length ? 'page' : 'file';
-  if (labels.length === 1) return labels[0];
-  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  if (labels.length === 1) {return labels[0];}
+  if (labels.length === 2) {return `${labels[0]} and ${labels[1]}`;}
   // Three distinct names or more, so the remainder is always at least two and
   // the plural is not a case that needs deciding.
   return `${labels[0]} and ${labels.length - 1} other ${noun}s`;
@@ -140,7 +140,7 @@ export default function HistoryPanel({
 
   const load = useCallback(
     async (append = false) => {
-      if (!project) return;
+      if (!project) {return;}
       setError(null);
       try {
         const skip = append ? commits.length : 0;
@@ -175,7 +175,7 @@ export default function HistoryPanel({
   // section is opened and again whenever anything lands, so it says what is
   // true now rather than what was true when the panel was first shown.
   useEffect(() => {
-    if (!project || !open.files) return;
+    if (!project || !open.files) {return;}
     window.avb
       .gitAllFiles({ projectPath: project.path })
       .then((f) => setAllFiles(f || []))
@@ -183,7 +183,7 @@ export default function HistoryPanel({
   }, [project, open.files, branch, gitInfo?.head, gitInfo?.dirty]);
 
   useEffect(() => {
-    if (!project || !open.worktrees) return;
+    if (!project || !open.worktrees) {return;}
     window.avb
       .gitWorktrees({ projectPath: project.path })
       .then((w) => setWorktrees(w || []))
@@ -192,7 +192,7 @@ export default function HistoryPanel({
 
   const toggle = (id) => setOpen((o) => ({ ...o, [id]: !o[id] }));
 
-  if (!project) return null;
+  if (!project) {return null;}
   if (gitInfo && !gitInfo.isRepo) {
     return (
       <div className="panel-section grow">

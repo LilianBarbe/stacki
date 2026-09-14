@@ -30,7 +30,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // The shape from the report, trimmed to the props it turns on.
@@ -157,11 +157,11 @@ const BUTTON = [
     // switch draws its options as buttons, a longer list opens a dropdown.
     const offered = async (name) => {
       const field = fieldFor(name);
-      if (!field) return null;
+      if (!field) {return null;}
       const seg = [...field.querySelectorAll('.props-seg-btn, .seg-btn, button[data-value]')];
-      if (seg.length) return seg.map((b) => b.textContent.trim());
+      if (seg.length) {return seg.map((b) => b.textContent.trim());}
       const trigger = field.querySelector('.dd-trigger');
-      if (!trigger) return null;
+      if (!trigger) {return null;}
       await act(async () => {
         trigger.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });

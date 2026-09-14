@@ -155,7 +155,7 @@ export const SECTIONS: readonly SectionDef[] = [
 export const PROPERTY_SECTION: ReadonlyMap<string, SectionId> = (() => {
   const map = new Map<string, SectionId>()
   for (const section of SECTIONS) {
-    for (const prop of section.order) map.set(prop, section.id)
+    for (const prop of section.order) {map.set(prop, section.id)}
   }
   return map
 })()
@@ -188,7 +188,7 @@ const NO_CONTROL: ReadonlySet<string> = new Set([
 
 /** The section a property belongs to, or 'other' when unclassified. */
 export function sectionOf(prop: string): SectionId {
-  if (NO_CONTROL.has(prop)) return 'other'
+  if (NO_CONTROL.has(prop)) {return 'other'}
   return PROPERTY_SECTION.get(prop) ?? 'other'
 }
 
@@ -217,15 +217,15 @@ export function groupDeclarations(
   decls.forEach((decl) => {
     const id = sectionOf(decl.prop)
     const list = buckets.get(id)
-    if (list) list.push(decl)
-    else buckets.set(id, [decl])
+    if (list) {list.push(decl)}
+    else {buckets.set(id, [decl])}
   })
 
   const groups: SectionGroup[] = []
   for (const def of SECTIONS) {
     const bucket = buckets.get(def.id)
     const has = bucket != null && bucket.length > 0
-    if (!has && !alwaysShow.includes(def.id)) continue
+    if (!has && !alwaysShow.includes(def.id)) {continue}
     const list = has ? bucket! : []
     if (has && def.id !== 'other') {
       // Stable sort by canonical index; equal ranks keep their source order.
@@ -247,15 +247,15 @@ export function groupProps(propNames: string[], alwaysShow: readonly SectionId[]
   propNames.forEach((prop) => {
     const id = sectionOf(prop)
     const list = buckets.get(id)
-    if (list) list.push(prop)
-    else buckets.set(id, [prop])
+    if (list) {list.push(prop)}
+    else {buckets.set(id, [prop])}
   })
 
   const groups: SectionPropGroup[] = []
   for (const def of SECTIONS) {
     const bucket = buckets.get(def.id)
     const has = bucket != null && bucket.length > 0
-    if (!has && !alwaysShow.includes(def.id)) continue
+    if (!has && !alwaysShow.includes(def.id)) {continue}
     const list = has ? bucket! : []
     if (has && def.id !== 'other') {
       list

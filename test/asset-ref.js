@@ -35,7 +35,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const jc = require('../electron/jsCollections.js');
@@ -47,7 +47,7 @@ const read = (src) => jc.findCollections(src, SCAN).find((c) => c.name === 'SCRE
 // and a writer that throws are both answers this file has to be able to report
 // rather than die on.
 const writeBack = (src, data) => {
-  if (!data) return '(read-only)';
+  if (!data) {return '(read-only)';}
   try {
     return jc.replaceCollection(src, 'SCREENS', data, SCAN);
   } catch (e) {

@@ -15,15 +15,15 @@ function isLength(token: string): boolean {
 /** Parse a `text-shadow` value into an ordered shadow list (`none`/'' → empty). */
 export function parseShadows(value: string): Shadow[] {
   const v = value.trim()
-  if (!v || v.toLowerCase() === 'none') return []
+  if (!v || v.toLowerCase() === 'none') {return []}
   return splitTopLevelCommas(v)
     .filter(Boolean)
     .map((part) => {
       const lengths: string[] = []
       let color = ''
       for (const token of splitTopLevelSpaces(part)) {
-        if (isLength(token)) lengths.push(token)
-        else color = color ? `${color} ${token}` : token
+        if (isLength(token)) {lengths.push(token)}
+        else {color = color ? `${color} ${token}` : token}
       }
       return {
         x: lengths[0] ?? '0px',
@@ -36,7 +36,7 @@ export function parseShadows(value: string): Shadow[] {
 
 /** Serialize a shadow list back to a `text-shadow` value ('' when empty). */
 export function serializeShadows(shadows: Shadow[]): string {
-  if (!shadows.length) return ''
+  if (!shadows.length) {return ''}
   return shadows
     .map((s) => `${s.x || '0px'} ${s.y || '0px'} ${s.blur || '0px'}${s.color ? ` ${s.color}` : ''}`)
     .join(', ')

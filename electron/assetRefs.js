@@ -48,8 +48,8 @@ function importInsertAt(source) {
   const anyImport = /^[ \t]*import\b[^\n]*$/gm;
   let end = null;
   let m;
-  while ((m = anyImport.exec(String(source || ''))) !== null) end = m.index + m[0].length;
-  if (all.length) end = Math.max(end ?? 0, all[all.length - 1].end);
+  while ((m = anyImport.exec(String(source || ''))) !== null) {end = m.index + m[0].length;}
+  if (all.length) {end = Math.max(end ?? 0, all[all.length - 1].end);}
   return end === null ? 0 : end;
 }
 
@@ -58,7 +58,7 @@ function addImport(source, name, spec) {
   const text = String(source || '');
   const line = `import ${name} from '${spec}';`;
   const at = importInsertAt(text);
-  if (at === 0) return `${line}\n${text.startsWith('\n') ? '' : '\n'}${text}`;
+  if (at === 0) {return `${line}\n${text.startsWith('\n') ? '' : '\n'}${text}`;}
   return `${text.slice(0, at)}\n${line}${text.slice(at)}`;
 }
 
@@ -77,11 +77,11 @@ function importName(fileRel, taken = []) {
     .map((part, i) => (i === 0 ? part : part[0].toUpperCase() + part.slice(1)))
     .join('');
   let candidate = /^[A-Za-z_$]/.test(camel) ? camel : `_${camel}`;
-  if (!candidate) candidate = 'asset';
+  if (!candidate) {candidate = 'asset';}
   const used = new Set(taken);
-  if (!used.has(candidate)) return candidate;
+  if (!used.has(candidate)) {return candidate;}
   let n = 2;
-  while (used.has(`${candidate}${n}`)) n += 1;
+  while (used.has(`${candidate}${n}`)) {n += 1;}
   return `${candidate}${n}`;
 }
 
@@ -93,10 +93,10 @@ function importName(fileRel, taken = []) {
 function importSpecFor({ imports = [], srcRelative, relative }) {
   if (srcRelative) {
     for (const imp of imports) {
-      if (imp.spec.startsWith('.')) continue;
+      if (imp.spec.startsWith('.')) {continue;}
       for (const marker of ['/components/', '/layouts/', '/assets/']) {
         const idx = imp.spec.indexOf(marker);
-        if (idx > 0) return imp.spec.slice(0, idx + 1) + srcRelative;
+        if (idx > 0) {return imp.spec.slice(0, idx + 1) + srcRelative;}
       }
     }
   }
@@ -108,14 +108,14 @@ function importSpecFor({ imports = [], srcRelative, relative }) {
 // picture instead of the word. `resolve` answers what a name imports, as a
 // project-relative path, or null.
 function withAssets(value, resolve) {
-  if (Array.isArray(value)) return value.map((v) => withAssets(v, resolve));
-  if (!value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) {return value.map((v) => withAssets(v, resolve));}
+  if (!value || typeof value !== 'object') {return value;}
   if (typeof value.__expr === 'string') {
     const rel = resolve(value.__expr);
     return rel ? { ...value, __asset: rel } : value;
   }
   const out = {};
-  for (const [k, v] of Object.entries(value)) out[k] = withAssets(v, resolve);
+  for (const [k, v] of Object.entries(value)) {out[k] = withAssets(v, resolve);}
   return out;
 }
 

@@ -45,13 +45,13 @@ export function sanitizeBranchName(text) {
  */
 export function branchNameError(name, existing = []) {
   const n = String(name ?? '').trim();
-  if (!n) return null;
-  if (n === '@') return '“@” is git’s own name for the current branch.';
-  if (n.endsWith('/')) return 'A name can’t end with “/”.';
-  if (n.endsWith('.')) return 'A name can’t end with “.”.';
-  if (n.split('/').some((part) => part.endsWith('.lock'))) return '“.lock” is reserved by git.';
+  if (!n) {return null;}
+  if (n === '@') {return '“@” is git’s own name for the current branch.';}
+  if (n.endsWith('/')) {return 'A name can’t end with “/”.';}
+  if (n.endsWith('.')) {return 'A name can’t end with “.”.';}
+  if (n.split('/').some((part) => part.endsWith('.lock'))) {return '“.lock” is reserved by git.';}
   const clash = existing.find((b) => String(b).toLowerCase() === n.toLowerCase());
-  if (clash === n) return `${n} already exists.`;
+  if (clash === n) {return `${n} already exists.`;}
   if (clash) {
     // Not pedantry: on macOS and Windows these are one file in .git/refs, so
     // git refuses the second one — with a message about a file, not a branch.

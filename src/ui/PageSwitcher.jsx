@@ -25,13 +25,13 @@ export default function PageSwitcher({ pages, currentPage, onSelect }) {
     .sort((a, b) => comparePageNames(a.name, b.name));
 
   useLayoutEffect(() => {
-    if (!open || !btnRef.current) return;
+    if (!open || !btnRef.current) {return;}
     const r = btnRef.current.getBoundingClientRect();
     setPos({ left: Math.max(8, r.left + r.width / 2 - 140), top: r.bottom + 6 });
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {return;}
     setQuery('');
     setHighlight(0);
     const t = setTimeout(() => inputRef.current?.focus(), 0);
@@ -57,7 +57,7 @@ export default function PageSwitcher({ pages, currentPage, onSelect }) {
 
   const pick = (p) => {
     setOpen(false);
-    if (p && p.path !== currentPage?.path) onSelect(p);
+    if (p && p.path !== currentPage?.path) {onSelect(p);}
   };
 
   const onInputKey = (e) => {
@@ -69,7 +69,7 @@ export default function PageSwitcher({ pages, currentPage, onSelect }) {
       setHighlight((h) => Math.max(h - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (filtered.length) pick(filtered[Math.min(highlight, filtered.length - 1)]);
+      if (filtered.length) {pick(filtered[Math.min(highlight, filtered.length - 1)]);}
     }
   };
 

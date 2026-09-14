@@ -21,7 +21,7 @@ const cache = createQueryCache(async (path, props) => {
   const expected = selectedTag()
   const answer = await queryCanvas(path, [], [], props)
   const tag = answer?.identity?.tag
-  if (tag && expected && tag !== expected) return null
+  if (tag && expected && tag !== expected) {return null}
   return answer?.computedProps
     ? Object.fromEntries(Object.entries(answer.computedProps).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : null]))
     : null
@@ -49,7 +49,7 @@ function pathOfSelection(): string | null {
 function selectedTag(): string | null {
   const host = getHost()
   const node = host.selectedId ? findNode(host.nodes, host.selectedId) : null
-  if (node?.kind !== 'element') return null
+  if (node?.kind !== 'element') {return null}
   const name = node.name ?? ''
   return /^[a-z][a-z0-9-]*$/.test(name) ? name : null
 }
@@ -68,13 +68,13 @@ type Answer = { value: string; pending: boolean; path: string | null }
  * is the truth and it is synchronous, so it is read synchronously.
  */
 function answeredNow(prop: string): Answer {
-  if (!prop) return { value: '', pending: false, path: null }
+  if (!prop) {return { value: '', pending: false, path: null }}
   // `hasCanvas` is checked HERE, not once on mount: the panel can render before
   // the preview frame registers, and that first pass must not opt out for good.
   const path = hasCanvas() ? pathOfSelection() : null
   // Nothing to ask — so nothing is pending either. No answer is ever coming, and
   // a control waiting forever would never show anything.
-  if (!path) return { value: '', pending: false, path: null }
+  if (!path) {return { value: '', pending: false, path: null }}
   const known = currentCache().read(path, prop)
   return { value: known ?? '', pending: known === undefined, path }
 }
@@ -86,7 +86,7 @@ function useComputedAnswer(prop: string): Answer {
   const [, bump] = useState(0)
 
   useEffect(() => {
-    if (!prop) return undefined
+    if (!prop) {return undefined}
     const sync = () => bump((n) => n + 1)
     const offCache = cache.subscribe(sync)
     // The selection moves, or the page re-renders under it: ask for the element
@@ -103,7 +103,7 @@ function useComputedAnswer(prop: string): Answer {
   // answer was missing. `request` is idempotent — already answered, or already
   // queued for this flush, and it does nothing.
   useEffect(() => {
-    if (answer.pending && answer.path) void currentCache().request(answer.path, prop)
+    if (answer.pending && answer.path) {void currentCache().request(answer.path, prop)}
   })
 
   return answer

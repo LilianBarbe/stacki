@@ -51,11 +51,11 @@ export default function CanvasView({ url, refreshKey }) {
   // Page heights reported by the preload inside each preview iframe.
   React.useEffect(() => {
     const onMessage = (e) => {
-      if (e.data?.type !== 'avb:page-height' || !Number.isFinite(e.data.height)) return;
+      if (e.data?.type !== 'avb:page-height' || !Number.isFinite(e.data.height)) {return;}
       const entry = Object.entries(iframeRefs.current).find(
         ([, el]) => el && el.contentWindow === e.source
       );
-      if (!entry) return;
+      if (!entry) {return;}
       const [key] = entry;
       const height = clamp(Math.round(e.data.height), 200, MAX_PAGE_HEIGHT);
       setHeights((h) => (h[key] === height ? h : { ...h, [key]: height }));
@@ -66,7 +66,7 @@ export default function CanvasView({ url, refreshKey }) {
 
   const fit = React.useCallback(() => {
     const el = wrapRef.current;
-    if (!el) return;
+    if (!el) {return;}
     const { w, h } = worldRef.current;
     const pad = 56;
     const s = clamp(
@@ -84,7 +84,7 @@ export default function CanvasView({ url, refreshKey }) {
   React.useLayoutEffect(() => {
     fit();
     const observer = new ResizeObserver(() => {
-      if (!userMovedRef.current) fit();
+      if (!userMovedRef.current) {fit();}
     });
     observer.observe(wrapRef.current);
     return () => observer.disconnect();
@@ -94,7 +94,7 @@ export default function CanvasView({ url, refreshKey }) {
   // until the user pans or zooms, then leave their view alone.
   const userMovedRef = React.useRef(false);
   React.useEffect(() => {
-    if (!userMovedRef.current) fit();
+    if (!userMovedRef.current) {fit();}
   }, [worldW, worldH, fit]);
 
   // A newly loaded page may be shorter than the previous one. Discard its
@@ -105,7 +105,7 @@ export default function CanvasView({ url, refreshKey }) {
   // preventDefault (needed to stop history-swipe/page zoom) requires our own.
   React.useEffect(() => {
     const el = wrapRef.current;
-    if (!el) return;
+    if (!el) {return;}
     const onWheel = (e) => {
       e.preventDefault();
       userMovedRef.current = true;
@@ -113,7 +113,7 @@ export default function CanvasView({ url, refreshKey }) {
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
       setView((v) => {
-        if (!v) return v;
+        if (!v) {return v;}
         if (e.ctrlKey || e.metaKey) {
           // Trackpad pinch arrives as ctrl+wheel; zoom toward the cursor.
           const s = clamp(v.s * Math.exp(-e.deltaY * 0.01), MIN_ZOOM, MAX_ZOOM);
@@ -128,9 +128,9 @@ export default function CanvasView({ url, refreshKey }) {
   }, []);
 
   const onPointerDown = (e) => {
-    if (e.button !== 0 && e.button !== 1) return;
+    if (e.button !== 0 && e.button !== 1) {return;}
     const v0 = viewRef.current;
-    if (!v0) return;
+    if (!v0) {return;}
     e.preventDefault();
     userMovedRef.current = true;
     setPanning(true);
@@ -146,7 +146,7 @@ export default function CanvasView({ url, refreshKey }) {
   const zoomTo = (nextS) => {
     const el = wrapRef.current;
     const v = viewRef.current;
-    if (!el || !v) return;
+    if (!el || !v) {return;}
     userMovedRef.current = true;
     const s = clamp(nextS, MIN_ZOOM, MAX_ZOOM);
     const cx = el.clientWidth / 2;

@@ -23,7 +23,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // The measuring function, lifted out of preload.js. It is defined inside a
@@ -33,10 +33,10 @@ const check = (what, condition, detail) => {
 function loadGapBandsFor(window) {
   const src = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
   const start = src.indexOf('  const gapBandsFor = (el, cs) => {');
-  if (start === -1) throw new Error('gapBandsFor not found in preload.js — has it been renamed?');
+  if (start === -1) {throw new Error('gapBandsFor not found in preload.js — has it been renamed?');}
   const end = src.indexOf('\n  };', start);
   const body = src.slice(start, end + '\n  };'.length);
-  // eslint-disable-next-line no-new-func
+   
   return new Function('window', `${body}\nreturn gapBandsFor;`)(window);
 }
 

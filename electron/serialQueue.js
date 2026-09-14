@@ -20,17 +20,17 @@ function createKeyedQueue() {
   let era = 0;
   return {
     run(key, task) {
-      if (pending.has(key)) return pending.get(key);
+      if (pending.has(key)) {return pending.get(key);}
       const startedIn = era;
       const assertActive = () => {
-        if (startedIn !== era) throw new Error('The operation was cancelled.');
+        if (startedIn !== era) {throw new Error('The operation was cancelled.');}
       };
       const result = queue(() => {
         assertActive();
         return task(assertActive);
       });
       pending.set(key, result);
-      const clear = () => { if (pending.get(key) === result) pending.delete(key); };
+      const clear = () => { if (pending.get(key) === result) {pending.delete(key);} };
       result.then(clear, clear);
       return result;
     },

@@ -18,12 +18,12 @@ const toPosix = (p) => p.split(path.sep).join('/');
 /** Every file that can hold an instance: .astro anywhere, and markdown pages,
  *  which render components too. The same set the palette's own count walks. */
 function astroFiles(dir) {
-  if (!fs.existsSync(dir)) return [];
+  if (!fs.existsSync(dir)) {return [];}
   const out = [];
   const walk = (d) => {
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, entry.name);
-      if (entry.isDirectory()) walk(full);
+      if (entry.isDirectory()) {walk(full);}
       else if (entry.name.endsWith('.astro') || (d.includes(`${path.sep}pages`) && /\.mdx?$/i.test(entry.name))) {
         out.push(full);
       }
@@ -49,7 +49,7 @@ function templateOf(source) {
 /** How many times `source` uses `<Name …>`. Closing tags and frontmatter code
  *  don't count. */
 function countIn(source, name) {
-  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(String(name || ''))) return 0;
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(String(name || ''))) {return 0;}
   return (templateOf(source).match(new RegExp(`<${name}[\\s/>]`, 'g')) || []).length;
 }
 
@@ -73,14 +73,14 @@ function importsOf(source, file, aliases) {
   let m;
   while ((m = IMPORT_RE.exec(String(source))) !== null) {
     const names = boundNames(m[1]);
-    if (!names.length) continue;
+    if (!names.length) {continue;}
     const candidates = new Set();
     for (const base of resolveSpec(m[2], file, aliases)) {
       candidates.add(base);
       // A specifier can leave the extension off; components are .astro.
-      if (!/\.[a-z]+$/i.test(base)) candidates.add(`${base}.astro`);
+      if (!/\.[a-z]+$/i.test(base)) {candidates.add(`${base}.astro`);}
     }
-    if (candidates.size) out.push({ names, candidates });
+    if (candidates.size) {out.push({ names, candidates });}
   }
   return out;
 }
@@ -97,13 +97,13 @@ function instancesIn(source, { file, targetPath, name, aliases = [] }) {
     const imports = importsOf(source, file, aliases);
     const local = [];
     for (const imp of imports) {
-      if ([...imp.candidates].some((c) => path.resolve(c) === target)) local.push(...imp.names);
+      if ([...imp.candidates].some((c) => path.resolve(c) === target)) {local.push(...imp.names);}
     }
-    if (local.length) return local.reduce((n, alias) => n + countIn(source, alias), 0);
+    if (local.length) {return local.reduce((n, alias) => n + countIn(source, alias), 0);}
     // The name is taken by something else here. `import Section from
     // './ui/Section.astro'` in a file that doesn't use OURS means every
     // `<Section>` on the page belongs to that one, not to this component.
-    if (imports.some((imp) => imp.names.includes(name))) return 0;
+    if (imports.some((imp) => imp.names.includes(name))) {return 0;}
   }
   return countIn(source, name);
 }
@@ -125,15 +125,15 @@ function componentUsage({ projectPath, name, exclude }) {
   const aliases = aliasMap(projectPath);
   const kindOf = (file) => {
     const rel = toPosix(path.relative(src, file));
-    if (rel.startsWith('pages/')) return 'page';
-    if (rel.startsWith('layouts/')) return 'layout';
-    if (rel.startsWith('components/')) return 'component';
+    if (rel.startsWith('pages/')) {return 'page';}
+    if (rel.startsWith('layouts/')) {return 'layout';}
+    if (rel.startsWith('components/')) {return 'component';}
     return 'file';
   };
 
   const files = [];
   for (const file of astroFiles(src)) {
-    if (skip && path.resolve(file) === skip) continue;
+    if (skip && path.resolve(file) === skip) {continue;}
     let text;
     try {
       text = fs.readFileSync(file, 'utf8');
@@ -141,7 +141,7 @@ function componentUsage({ projectPath, name, exclude }) {
       continue;
     }
     const count = instancesIn(text, { file, targetPath: exclude, name, aliases });
-    if (!count) continue;
+    if (!count) {continue;}
     files.push({
       rel: toPosix(path.relative(projectPath, file)),
       path: file,

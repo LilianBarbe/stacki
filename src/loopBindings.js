@@ -43,8 +43,8 @@ export function renameLoopVar(nodes, from, to) {
         // freely as the markup does.
         // A nested loop that re-declares the name shadows the outer one, so
         // everything below it means something else by it.
-        if (p.item === from || p.index === from) continue;
-        if (Array.isArray(n.body)) n.body = n.body.map((line) => renameIdent(line, from, to));
+        if (p.item === from || p.index === from) {continue;}
+        if (Array.isArray(n.body)) {n.body = n.body.map((line) => renameIdent(line, from, to));}
       } else {
         n.head = renameIdent(n.head, from, to); // custom head — best effort
       }
@@ -56,9 +56,9 @@ export function renameLoopVar(nodes, from, to) {
       n.value = renameInBraces(n.value, from, to);
     }
     for (const [key, v] of Object.entries(n.props || {})) {
-      if (v?.type === 'expr') n.props[key] = { ...v, value: renameIdent(v.value, from, to) };
+      if (v?.type === 'expr') {n.props[key] = { ...v, value: renameIdent(v.value, from, to) };}
     }
-    if (Array.isArray(n.children)) renameLoopVar(n.children, from, to);
+    if (Array.isArray(n.children)) {renameLoopVar(n.children, from, to);}
   }
 }
 
@@ -79,7 +79,7 @@ const readsVar = (expr, v) =>
 // and the child markup is preserved for re-pointing by hand.
 export function disconnectDependentLoops(list, vars) {
   for (const n of list || []) {
-    if (!Array.isArray(n.children)) continue;
+    if (!Array.isArray(n.children)) {continue;}
     if (n.kind === 'map') {
       const h = parseLoopHead(n.head);
       if (h && vars.some((v) => readsVar(h.data, v))) {
@@ -92,11 +92,11 @@ export function disconnectDependentLoops(list, vars) {
       // refers to the inner one and is still valid.
       const shadowed = new Set([h?.item, h?.index].filter(Boolean));
       const rest = vars.filter((v) => !shadowed.has(v));
-      if (rest.length) disconnectDependentLoops(n.children, rest);
+      if (rest.length) {disconnectDependentLoops(n.children, rest);}
     } else if (n.kind === 'cond') {
       // Same for a condition reading the item: false renders the else branch
       // instead of throwing.
-      if (vars.some((v) => readsVar(n.test, v))) n.test = 'false';
+      if (vars.some((v) => readsVar(n.test, v))) {n.test = 'false';}
       disconnectDependentLoops(n.children, vars);
     } else {
       disconnectDependentLoops(n.children, vars);
@@ -125,7 +125,7 @@ const UNBOUND_TEXT = 'content';
 // nested loops that read from the departed item are pointed at an empty
 // array.
 export function stripLostBindings(node, vars) {
-  if (!vars.length) return 0;
+  if (!vars.length) {return 0;}
   let removed = 0;
   const walk = (n, vars) => {
     for (const [k, v] of Object.entries(n.props || {})) {
@@ -160,7 +160,7 @@ export function stripLostBindings(node, vars) {
         removed++;
       }
       vars = vars.filter((v) => v !== h?.item && v !== h?.index);
-      if (!vars.length) return;
+      if (!vars.length) {return;}
       if (Array.isArray(n.body)) {
         // This loop can still run (its own data may be fine), so a
         // declaration reading a lost variable would throw. Dropping the line
@@ -168,9 +168,9 @@ export function stripLostBindings(node, vars) {
         // binding and swap what it's assigned, the same placeholder a lost
         // text binding gets.
         n.body = n.body.map((line) => {
-          if (!vars.some((x) => readsVar(line, x))) return line;
+          if (!vars.some((x) => readsVar(line, x))) {return line;}
           const decl = line.match(/^((?:const|let)\s+[^=]+=\s*)/);
-          if (!decl) return line;
+          if (!decl) {return line;}
           removed++;
           return `${decl[1]}'${UNBOUND_TEXT}';`;
         });

@@ -52,11 +52,11 @@ export function languageFor(filePath) {
 }
 
 function extensionFor(language) {
-  if (language === 'css') return css();
+  if (language === 'css') {return css();}
   // An .astro file is markup with a fenced script at the top and expressions
   // inside it. The HTML parser is the one that gets the tags and attributes
   // right, which is the bulk of what is on screen in this editor's files.
-  if (language === 'html') return html({ matchClosingTags: false });
+  if (language === 'html') {return html({ matchClosingTags: false });}
   if (language === 'markdown') {
     return markdown({
       base: markdownLanguage,
@@ -71,7 +71,7 @@ function extensionFor(language) {
       ],
     });
   }
-  if (language === 'javascript') return javascript({ typescript: true, jsx: true });
+  if (language === 'javascript') {return javascript({ typescript: true, jsx: true });}
   return null;
 }
 

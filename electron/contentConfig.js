@@ -35,7 +35,7 @@ const CONFIG_FILES = [
 function configPathOf(projectPath) {
   for (const rel of CONFIG_FILES) {
     const abs = path.join(projectPath, rel);
-    if (fs.existsSync(abs)) return { abs, rel };
+    if (fs.existsSync(abs)) {return { abs, rel };}
   }
   return null;
 }
@@ -186,15 +186,15 @@ const services = new Map(); // projectPath -> service, including one still start
 const IDLE_TIMEOUT = 5 * 60 * 1000;
 
 function stopService(projectPath, service = services.get(projectPath), error = new Error('The content config was reloaded.')) {
-  if (!service || service.stopped) return;
+  if (!service || service.stopped) {return;}
   // An old child's exit can arrive after its replacement starts. It must only
   // clean up its own requests and process, never the replacement's registry.
-  if (services.get(projectPath) === service) services.delete(projectPath);
+  if (services.get(projectPath) === service) {services.delete(projectPath);}
   service.stopped = true;
   clearTimeout(service.idle);
   clearTimeout(service.timer);
   service.rejectManifest?.(error);
-  for (const pending of service.pending.values()) pending.reject(error);
+  for (const pending of service.pending.values()) {pending.reject(error);}
   service.pending.clear();
   try {
     service.child?.kill();
@@ -204,7 +204,7 @@ function stopService(projectPath, service = services.get(projectPath), error = n
 }
 
 function touch(service) {
-  if (service.stopped) return;
+  if (service.stopped) {return;}
   clearTimeout(service.idle);
   service.idle = setTimeout(() => stopService(service.projectPath, service), IDLE_TIMEOUT);
   service.idle.unref?.();
@@ -213,14 +213,14 @@ function touch(service) {
 async function startService(service) {
   const { projectPath, configAbs } = service;
   try {
-    if (service.stopped) throw new Error('The content config was reloaded.');
+    if (service.stopped) {throw new Error('The content config was reloaded.');}
     const esbuild = esbuildOf(projectPath);
-    if (!esbuild) throw new Error('Reading the content config needs the project dependencies installed.');
+    if (!esbuild) {throw new Error('Reading the content config needs the project dependencies installed.');}
     const { dir, entry } = stageRunner(projectPath, configAbs);
     const { outfile, inputs } = await bundle(esbuild, projectPath, dir, entry);
     // Closing a project while esbuild is running must not leave a new child
     // behind once the asynchronous build eventually finishes.
-    if (service.stopped) throw new Error('The content config was reloaded.');
+    if (service.stopped) {throw new Error('The content config was reloaded.');}
     service.inputs = inputs;
     service.stamp = stampOf(projectPath, inputs);
     const child = service.child = spawn(process.execPath, [outfile], {
@@ -241,15 +241,15 @@ async function startService(service) {
         const line = buffer.slice(0, at);
         buffer = buffer.slice(at + 1);
         const start = line.indexOf(SENTINEL);
-        if (start === -1) continue;
+        if (start === -1) {continue;}
         let message;
         try {
           message = JSON.parse(line.slice(start + SENTINEL.length));
         } catch {
           continue;
         }
-        if (message.type === 'manifest') service.resolveManifest(message.value);
-        else if (message.type === 'reply') service.pending.get(message.id)?.resolve(message.value);
+        if (message.type === 'manifest') {service.resolveManifest(message.value);}
+        else if (message.type === 'reply') {service.pending.get(message.id)?.resolve(message.value);}
       }
     });
     child.stderr.on('data', (chunk) => (service.stderr = (service.stderr + chunk).slice(-4000)));
@@ -259,7 +259,7 @@ async function startService(service) {
     service.timer = setTimeout(() => fail(new Error('Reading the content config timed out.')), RUN_TIMEOUT);
     service.timer.unref?.();
     service.manifest = await manifest;
-    if (service.stopped) throw new Error('The content config was reloaded.');
+    if (service.stopped) {throw new Error('The content config was reloaded.');}
     touch(service);
     return service;
   } catch (error) {
@@ -282,7 +282,7 @@ function serviceFor(projectPath, { force = false } = {}) {
   if (existing && !force && existing.configAbs === found.abs &&
       (!existing.manifest || existing.stamp === stampOf(projectPath, existing.inputs))) {
     return existing.ready.then((service) => {
-      if (service.stopped) throw new Error('The content config was reloaded.');
+      if (service.stopped) {throw new Error('The content config was reloaded.');}
       touch(service);
       return service;
     });
@@ -329,8 +329,8 @@ async function validateEntry(projectPath, { collection, data }) {
   } catch (err) {
     return { issues: [], error: cleanError(err.message) };
   }
-  if (!service) return { issues: [], unchecked: true };
-  if (service.stopped) return { issues: [], error: 'The content config was reloaded.' };
+  if (!service) {return { issues: [], unchecked: true };}
+  if (service.stopped) {return { issues: [], error: 'The content config was reloaded.' };}
   touch(service);
   const id = service.nextId++;
   try {
@@ -351,7 +351,7 @@ async function validateEntry(projectPath, { collection, data }) {
       });
       try {
         service.child.stdin.write(message, (error) => {
-          if (error) service.pending.get(id)?.reject(error);
+          if (error) {service.pending.get(id)?.reject(error);}
         });
       } catch (error) {
         service.pending.get(id)?.reject(error);
@@ -363,7 +363,7 @@ async function validateEntry(projectPath, { collection, data }) {
 }
 
 const stopAllServices = () => {
-  for (const projectPath of [...services.keys()]) stopService(projectPath);
+  for (const projectPath of [...services.keys()]) {stopService(projectPath);}
 };
 
 module.exports = { readContentConfig, validateEntry, configPathOf, stopService, stopAllServices };

@@ -27,7 +27,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -116,7 +116,7 @@ const check = (what, condition, detail) => {
 
   const dotOf = (label) => {
     const dot = sectionNamed(label)?.querySelector('.embed-editor_section-dot');
-    if (!dot) return 'none';
+    if (!dot) {return 'none';}
     return dot.classList.contains('is-own') ? 'blue' : 'orange';
   };
 

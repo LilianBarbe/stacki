@@ -93,7 +93,7 @@ test('content readers share a pending build and wait for the completed manifest'
   h.children[0].reply({ type: 'manifest', value: { collections: [{ name: 'posts' }] } });
   const results = await Promise.all([first, second, third]);
   assert.equal(h.children.length, 1);
-  for (const result of results) assert.equal(result.collections[0].name, 'posts');
+  for (const result of results) {assert.equal(result.collections[0].name, 'posts');}
 });
 
 test('an old content worker exiting cannot terminate its replacement', async (t) => {
@@ -200,13 +200,13 @@ test('project watchers route batched edits once and cancel all pending events on
     mediaPattern: /\.png$/,
   });
   const emit = (name, root = 'src') => handlers.get(root)('change', name);
-  for (const name of ['page.astro', 'page.astro', 'ours.astro', 'info.json', 'hero.png', 'style.css', 'code.ts']) emit(name);
+  for (const name of ['page.astro', 'page.astro', 'ours.astro', 'info.json', 'hero.png', 'style.css', 'code.ts']) {emit(name);}
   await sleep(250);
   assert.equal(checks.length, 7, 'each event reads its self-write contents at most once');
   assert.equal(pokes.length, 6, 'every external source type nudges preview recovery');
   assert.equal(events.length, 4);
   assert.deepEqual(events.find((event) => event.channel === 'fs:changed').payload.files, [path.join(projectPath, 'src', 'page.astro')]);
-  for (const name of ['next.astro', 'next.json', 'next.png', 'next.css']) emit(name);
+  for (const name of ['next.astro', 'next.json', 'next.png', 'next.css']) {emit(name);}
   emit('public.png', 'public');
   watcher.close();
   emit('late.astro');
@@ -340,7 +340,7 @@ test('legacy schema conversion resolves Astro private dependencies without root 
   const astro = path.join(storeModules, 'astro');
   const converter = path.join(storeModules, 'zod-to-json-schema');
   const staging = path.join(modules, '.stacki');
-  for (const dir of [astro, converter, staging]) fs.mkdirSync(dir, { recursive: true });
+  for (const dir of [astro, converter, staging]) {fs.mkdirSync(dir, { recursive: true });}
   fs.writeFileSync(path.join(astro, 'package.json'), JSON.stringify({
     name: 'astro', type: 'module', exports: { './package.json': './package.json', './zod': './zod.mjs' },
   }));

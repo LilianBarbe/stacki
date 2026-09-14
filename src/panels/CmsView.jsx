@@ -180,7 +180,7 @@ export default function CmsView({
     clearTimeout(saveTimer.current);
     const next = pending.current;
     pending.current = null;
-    if (!next || !collection) return;
+    if (!next || !collection) {return;}
     try {
       const before = onDiskRef.current;
       const after = reassemble(collection, next);
@@ -212,7 +212,7 @@ export default function CmsView({
       );
       // The collection was deleted while this edit was in flight — the delete
       // was deliberate, so there's nothing to report.
-      if (/no longer exists/.test(message)) return;
+      if (/no longer exists/.test(message)) {return;}
       showToast(message, 'error');
     }
   }, [collection, project.path, rel, showToast, onSaved, onRecordUndo, load]);
@@ -222,7 +222,7 @@ export default function CmsView({
 
   // Write the last edit out when leaving, so a quick change followed by a
   // panel switch isn't lost.
-  useEffect(() => () => { if (pending.current) flushRef.current(); }, []);
+  useEffect(() => () => { if (pending.current) {flushRef.current();} }, []);
 
   const commit = (next) => {
     setItems(next);
@@ -254,7 +254,7 @@ export default function CmsView({
     disabled: !!query,
   });
 
-  if (!collection) return <div className={`cms-view ${hidden ? 'hidden' : ''}`} />;
+  if (!collection) {return <div className={`cms-view ${hidden ? 'hidden' : ''}`} />;}
 
   const single = collection.single;
   const item = items[sel];
@@ -292,7 +292,7 @@ export default function CmsView({
   };
 
   const move = (from, to) => {
-    if (from === to || to == null) return;
+    if (from === to || to == null) {return;}
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to > from ? to - 1 : to, 0, moved);
@@ -321,8 +321,8 @@ export default function CmsView({
   };
 
   const addFieldAt = (path, key, type) => {
-    if (!key) return;
-    if (fieldsAt(items, path).some((f) => f.key === key)) return;
+    if (!key) {return;}
+    if (fieldsAt(items, path).some((f) => f.key === key)) {return;}
     saveDeclared({ ...declared, [[...path, key].join('.')]: type });
     commit(applyToItems(items, path, putKey(key, type)));
   };
@@ -330,7 +330,7 @@ export default function CmsView({
   // Returns false when the name can't be used, so the row can put the old
   // one back rather than showing a name the data doesn't have.
   const renameFieldAt = (path, from, to) => {
-    if (!to || to === from) return false;
+    if (!to || to === from) {return false;}
     if (fieldsAt(items, path).some((f) => f.key === to)) {
       showToast(`This level already has a “${labelize(to)}” field.`, 'error');
       return false;
@@ -353,7 +353,7 @@ export default function CmsView({
     if (declared[gone] || Object.keys(declared).some((k) => k.startsWith(gone + '.'))) {
       const next = {};
       for (const [k, v] of Object.entries(declared)) {
-        if (k !== gone && !k.startsWith(gone + '.')) next[k] = v;
+        if (k !== gone && !k.startsWith(gone + '.')) {next[k] = v;}
       }
       saveDeclared(next);
     }
@@ -632,7 +632,7 @@ function FieldSchema({ items, declared, path, ...ops }) {
   // Each level reorders its own fields; nesting is handled by the hook being
   // per-FieldSchema, so a nested list never answers the level above it.
   const move = (from, to) => {
-    if (from === to || to == null) return;
+    if (from === to || to == null) {return;}
     const keys = fields.map((f) => f.key);
     const [moved] = keys.splice(from, 1);
     keys.splice(to > from ? to - 1 : to, 0, moved);
@@ -679,7 +679,7 @@ function FieldSchema({ items, declared, path, ...ops }) {
                 defaultValue={field.label}
                 spellCheck={false}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') e.currentTarget.blur();
+                  if (e.key === 'Enter') {e.currentTarget.blur();}
                   if (e.key === 'Escape') {
                     e.currentTarget.value = field.label;
                     e.currentTarget.blur();
@@ -743,10 +743,10 @@ function FieldSchema({ items, declared, path, ...ops }) {
 const STRUCTURAL = ['object', 'objects', 'list', 'boolean', 'number'];
 
 function withDeclaredTypes(fields, declared, path) {
-  if (!declared) return fields;
+  if (!declared) {return fields;}
   return fields.map((field) => {
     const chosen = declared[[...path, field.key].join('.')];
-    if (!chosen || STRUCTURAL.includes(field.type)) return field;
+    if (!chosen || STRUCTURAL.includes(field.type)) {return field;}
     return { ...field, type: chosen };
   });
 }
@@ -755,13 +755,13 @@ function withDeclaredTypes(fields, declared, path) {
 // its shape (a field that's a list here and a string there).
 function bestType(collectionType, value) {
   const own = inferType(value);
-  if (own === 'empty') return collectionType;
+  if (own === 'empty') {return collectionType;}
   const structural = ['object', 'objects', 'list', 'boolean', 'number'];
-  if (structural.includes(own) || structural.includes(collectionType)) return own;
+  if (structural.includes(own) || structural.includes(collectionType)) {return own;}
   // A logo the sniffer can't recognise ("/logo", "/img?id=2") is still the
   // collection's image field — keep the picker rather than dropping to a
   // bare text box for one odd value.
-  if (collectionType === 'image' || collectionType === 'date') return collectionType;
+  if (collectionType === 'image' || collectionType === 'date') {return collectionType;}
   return collectionType === 'longtext' ? 'longtext' : own;
 }
 
@@ -775,7 +775,7 @@ function FieldRow({ label, type, value, onChange, projectPath, baseDir, pickAsse
   // The control only changes shape while the field is idle.
   const [focused, setFocused] = useState(false);
   const shown = useRef(type);
-  if (!focused) shown.current = type;
+  if (!focused) {shown.current = type;}
 
   return (
     <div
@@ -999,12 +999,12 @@ function RepeaterEditor({ value, onChange, projectPath, baseDir, depth }) {
 
   const removeAt = (i) => {
     onChange(value.filter((_, j) => j !== i));
-    if (openIndex === i) setOpenIndex(null);
-    else if (openIndex != null && openIndex > i) setOpenIndex(openIndex - 1);
+    if (openIndex === i) {setOpenIndex(null);}
+    else if (openIndex != null && openIndex > i) {setOpenIndex(openIndex - 1);}
   };
 
   const move = (from, to) => {
-    if (from == null || to == null || from === to) return;
+    if (from == null || to == null || from === to) {return;}
     const next = [...value];
     const [moved] = next.splice(from, 1);
     next.splice(to > from ? to - 1 : to, 0, moved);
@@ -1080,9 +1080,9 @@ function NestedItemDialog({ entry, title, projectPath, baseDir, depth, onChange,
   // repeater, so these stack.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape') {return;}
       const open = document.querySelectorAll('.cms-modal-overlay');
-      if (open[open.length - 1] !== overlayRef.current) return;
+      if (open[open.length - 1] !== overlayRef.current) {return;}
       e.preventDefault();
       onClose();
     };
@@ -1164,9 +1164,9 @@ function NewFieldDialog({ onAdd, onClose }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape') {return;}
       const open = document.querySelectorAll('.cms-modal-overlay');
-      if (open[open.length - 1] !== overlayRef.current) return;
+      if (open[open.length - 1] !== overlayRef.current) {return;}
       e.preventDefault();
       onClose();
     };
@@ -1177,7 +1177,7 @@ function NewFieldDialog({ onAdd, onClose }) {
   const info = type ? typeInfo(type) : null;
   const submit = () => {
     const key = keyFor(name);
-    if (key) onAdd(key, type);
+    if (key) {onAdd(key, type);}
   };
 
   return (
@@ -1220,7 +1220,7 @@ function NewFieldDialog({ onAdd, onClose }) {
                   placeholder={`e.g. ${info.label === 'Text' ? 'Subtitle' : info.label}`}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submit();
+                    if (e.key === 'Enter') {submit();}
                   }}
                 />
               </div>

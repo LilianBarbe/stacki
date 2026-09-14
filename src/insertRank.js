@@ -17,18 +17,18 @@
 /** The words in a name, including the pieces of a camelCase one. */
 function wordsOf(text) {
   const raw = String(text || '').toLowerCase();
-  if (!raw) return [];
+  if (!raw) {return [];}
   const out = new Set();
   // The whole thing, so `astro:assets` and `<form>` can be said as they read.
   out.add(raw);
   for (const part of raw.split(/[^a-z0-9]+/i)) {
-    if (part) out.add(part);
+    if (part) {out.add(part);}
   }
   // FormattedDate → formatted, date. Written on the original text, because the
   // capitals are what say where the pieces are.
   for (const part of String(text || '').split(/[^A-Za-z0-9]+/)) {
     for (const piece of part.split(/(?<=[a-z0-9])(?=[A-Z])/)) {
-      if (piece) out.add(piece.toLowerCase());
+      if (piece) {out.add(piece.toLowerCase());}
     }
   }
   return [...out];
@@ -55,15 +55,15 @@ function scoreToken(item, token, whole) {
   let best = null;
   for (const field of FIELDS) {
     const text = String(field.of(item) || '').toLowerCase();
-    if (!text) continue;
+    if (!text) {continue;}
     const words = wordsOf(field.of(item));
     let score = null;
-    if (text === token || words.includes(token)) score = field.base;
-    else if (whole) score = null;
-    else if (text.startsWith(token)) score = field.base + 1;
-    else if (words.some((w) => w.startsWith(token))) score = field.base + 2;
-    else if (text.includes(token)) score = field.base + 3;
-    if (score !== null && (best === null || score < best)) best = score;
+    if (text === token || words.includes(token)) {score = field.base;}
+    else if (whole) {score = null;}
+    else if (text.startsWith(token)) {score = field.base + 1;}
+    else if (words.some((w) => w.startsWith(token))) {score = field.base + 2;}
+    else if (text.includes(token)) {score = field.base + 3;}
+    if (score !== null && (best === null || score < best)) {best = score;}
   }
   return best;
 }
@@ -84,7 +84,7 @@ const CATEGORY = { components: 0, elements: 1, other: 2 };
 export function rankInsertItems(items, query) {
   const text = String(query || '').toLowerCase();
   const tokens = text.split(/\s+/).filter(Boolean);
-  if (!tokens.length) return [...(items || [])];
+  if (!tokens.length) {return [...(items || [])];}
   // A trailing space means the last word is finished too.
   const finished = /\s$/.test(text);
   const scored = [];
@@ -100,7 +100,7 @@ export function rankInsertItems(items, query) {
       }
       total += score;
     }
-    if (matched) scored.push({ item, total, index });
+    if (matched) {scored.push({ item, total, index });}
   }
   scored.sort(
     (a, b) =>

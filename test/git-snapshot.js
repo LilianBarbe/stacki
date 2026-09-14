@@ -27,7 +27,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const git = (cwd, args) =>
@@ -37,7 +37,7 @@ const git = (cwd, args) =>
         err.stdout = stdout;
         err.stderr = stderr;
         reject(err);
-      } else resolve({ stdout: String(stdout), stderr: String(stderr) });
+      } else {resolve({ stdout: String(stdout), stderr: String(stderr) });}
     });
   });
 
@@ -261,7 +261,7 @@ const caught = async (fn) => {
     check('the work is recoverable', (await sh(dir, 'stash', 'list')).includes('test-park'));
   }
 
-  for (const dir of cleanup) fs.rmSync(dir, { recursive: true, force: true });
+  for (const dir of cleanup) {fs.rmSync(dir, { recursive: true, force: true });}
 
   if (failures.length) {
     console.error(`git-snapshot: ${failures.length} of ${checked} failed\n${failures.join('\n')}`);

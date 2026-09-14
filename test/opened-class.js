@@ -26,7 +26,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const PRELOAD = path.join(__dirname, '..', 'electron', 'preload.js');
@@ -71,7 +71,7 @@ const frame = (url) => {
   // element that renders a box of its own, stacked down the page.
   let top = 0;
   window.Element.prototype.getBoundingClientRect = function () {
-    if (['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META', 'TITLE', 'HEAD'].includes(this.tagName)) return NO_BOX;
+    if (['SCRIPT', 'STYLE', 'TEMPLATE', 'LINK', 'META', 'TITLE', 'HEAD'].includes(this.tagName)) {return NO_BOX;}
     const y = (top += 50);
     return { x: 0, y, width: 200, height: 40, left: 0, top: y, right: 200, bottom: y + 40 };
   };

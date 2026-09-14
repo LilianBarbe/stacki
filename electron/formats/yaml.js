@@ -35,7 +35,7 @@ const DELETE = Symbol('delete');
  * Applies { path, value } edits to YAML source text. `DELETE` removes the key.
  */
 function applyEdits(text, edits) {
-  if (!edits.length) return text;
+  if (!edits.length) {return text;}
   const doc = parseDocument(text);
   // What the serializer makes of this file before anything is changed. When it
   // differs from the file on disk — a folded scalar it writes flat, a quote it
@@ -48,11 +48,11 @@ function applyEdits(text, edits) {
     if (rename !== undefined) {
       const parent = path.length > 1 ? doc.getIn(path.slice(0, -1), true) : doc.contents;
       const pair = parent?.items?.find((item) => item?.key?.value === path[path.length - 1]);
-      if (pair?.key) pair.key.value = rename;
+      if (pair?.key) {pair.key.value = rename;}
       continue;
     }
     if (!path.length) {
-      if (value === DELETE) continue;
+      if (value === DELETE) {continue;}
       const next = parseDocument(YAML.stringify(value, STRINGIFY_OPTIONS));
       doc.contents = next.contents;
       continue;

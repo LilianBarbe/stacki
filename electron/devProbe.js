@@ -17,7 +17,7 @@
  * and none of it is wanted.
  */
 async function probeUrl(url, fetchImpl = fetch) {
-  if (!url || typeof url !== 'string') return { ok: false, status: 0 }
+  if (!url || typeof url !== 'string') {return { ok: false, status: 0 }}
   try {
     const res = await fetchImpl(url, { redirect: 'follow' })
     try {

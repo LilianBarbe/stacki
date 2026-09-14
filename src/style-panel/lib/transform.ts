@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // `transform` is a SPACE-separated list of functions (translate/scale/rotate/skew).
 // We model each as one editable layer with up to three axes and parse/serialize back,
 // splitting on TOP-LEVEL spaces/commas only so calc()/var() with inner separators
@@ -34,14 +32,14 @@ const fnName = (fn: string): string => fn.slice(0, fn.indexOf('(')).trim().toLow
 const fnArgs = (fn: string): string[] => {
   const open = fn.indexOf('(')
   const close = fn.lastIndexOf(')')
-  if (open < 0 || close <= open) return []
+  if (open < 0 || close <= open) {return []}
   return splitTopLevelCommas(fn.slice(open + 1, close)).map((s) => cleanAxis(s.trim())).filter(Boolean)
 }
 
 /** Parse a `transform` value into ordered layers (`none`/'' → empty). */
 export function parseTransforms(value: string): Transform[] {
   const v = value.trim()
-  if (!v || v.toLowerCase() === 'none') return []
+  if (!v || v.toLowerCase() === 'none') {return []}
   const fns = splitTopLevelSpaces(v).filter((f) => f.includes('('))
   const out: Transform[] = []
   let i = 0
@@ -50,17 +48,17 @@ export function parseTransforms(value: string): Transform[] {
     const args = fnArgs(fns[i])
     if (name.startsWith('translate')) {
       const t: Transform = { type: 'move', x: '0px', y: '0px', z: '0px' }
-      if (name === 'translatex') t.x = args[0] ?? '0px'
-      else if (name === 'translatey') t.y = args[0] ?? '0px'
-      else if (name === 'translatez') t.z = args[0] ?? '0px'
+      if (name === 'translatex') {t.x = args[0] ?? '0px'}
+      else if (name === 'translatey') {t.y = args[0] ?? '0px'}
+      else if (name === 'translatez') {t.z = args[0] ?? '0px'}
       else if (name === 'translate3d') { t.x = args[0] ?? '0px'; t.y = args[1] ?? '0px'; t.z = args[2] ?? '0px' }
       else { t.x = args[0] ?? '0px'; t.y = args[1] ?? '0px' }
       out.push(t); i += 1
     } else if (name.startsWith('scale')) {
       const t: Transform = { type: 'scale', x: '1', y: '1', z: '1' }
-      if (name === 'scalex') t.x = args[0] ?? '1'
-      else if (name === 'scaley') t.y = args[0] ?? '1'
-      else if (name === 'scalez') t.z = args[0] ?? '1'
+      if (name === 'scalex') {t.x = args[0] ?? '1'}
+      else if (name === 'scaley') {t.y = args[0] ?? '1'}
+      else if (name === 'scalez') {t.z = args[0] ?? '1'}
       else if (name === 'scale3d') { t.x = args[0] ?? '1'; t.y = args[1] ?? '1'; t.z = args[2] ?? '1' }
       else { t.x = args[0] ?? '1'; t.y = args[1] ?? args[0] ?? '1' }
       out.push(t); i += 1
@@ -69,17 +67,17 @@ export function parseTransforms(value: string): Transform[] {
       const t: Transform = { type: 'rotate', x: '0deg', y: '0deg', z: '0deg' }
       while (i < fns.length && fnName(fns[i]).startsWith('rotate')) {
         const rn = fnName(fns[i]); const ra = fnArgs(fns[i])
-        if (rn === 'rotatex') t.x = ra[0] ?? '0deg'
-        else if (rn === 'rotatey') t.y = ra[0] ?? '0deg'
-        else if (rn === 'rotatez' || rn === 'rotate') t.z = ra[0] ?? '0deg'
-        else break
+        if (rn === 'rotatex') {t.x = ra[0] ?? '0deg'}
+        else if (rn === 'rotatey') {t.y = ra[0] ?? '0deg'}
+        else if (rn === 'rotatez' || rn === 'rotate') {t.z = ra[0] ?? '0deg'}
+        else {break}
         i += 1
       }
       out.push(t)
     } else if (name.startsWith('skew')) {
       const t: Transform = { type: 'skew', x: '0deg', y: '0deg', z: '0deg' }
-      if (name === 'skewx') t.x = args[0] ?? '0deg'
-      else if (name === 'skewy') t.y = args[0] ?? '0deg'
+      if (name === 'skewx') {t.x = args[0] ?? '0deg'}
+      else if (name === 'skewy') {t.y = args[0] ?? '0deg'}
       else { t.x = args[0] ?? '0deg'; t.y = args[1] ?? '0deg' }
       out.push(t); i += 1
     } else {

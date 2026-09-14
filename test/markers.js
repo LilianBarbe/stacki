@@ -34,7 +34,7 @@ const { parsePage, serializePageMarked } = require('../electron/astroParser.js')
 function checkInlineRun() {
   const source = '---\n---\n<nav>\n  <a href="/docs">Docs</a>\n  <span>/</span>\n  <span>Here</span>\n</nav>\n';
   const parsed = parsePage(source);
-  if (!parsed.editable) return fail('inline run tags', '    page did not parse');
+  if (!parsed.editable) {return fail('inline run tags', '    page did not parse');}
   const marked = serializePageMarked(parsed.model);
   // The <nav> is node 0; its children are the run, spaces included, so the
   // tags land on the odd indices.
@@ -101,7 +101,7 @@ async function check(compilers, label, source) {
   let marked;
   try {
     const parsed = parsePage(source);
-    if (!parsed.editable) return { skipped: true };
+    if (!parsed.editable) {return { skipped: true };}
     marked = serializePageMarked(parsed.model);
   } catch (err) {
     fail(label, `    serializePageMarked threw: ${err.message}`);
@@ -146,10 +146,10 @@ function indented(text) {
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) {continue;}
     const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) walk(p, out);
-    else if (entry.name.endsWith('.astro')) out.push(p);
+    if (entry.isDirectory()) {walk(p, out);}
+    else if (entry.name.endsWith('.astro')) {out.push(p);}
   }
   return out;
 }
@@ -169,7 +169,7 @@ function walk(dir, out = []) {
   let skipped = 0;
   for (const [label, source] of Object.entries(CASES)) {
     const { skipped: s } = await check(compilers, label, source);
-    if (s) skipped++;
+    if (s) {skipped++;}
   }
 
   for (const dir of process.argv.slice(2)) {
@@ -181,7 +181,7 @@ function walk(dir, out = []) {
     for (const file of walk(root)) {
       const rel = path.relative(path.dirname(root), file);
       const { skipped: s } = await check(compilers, rel, fs.readFileSync(file, 'utf8'));
-      if (s) skipped++;
+      if (s) {skipped++;}
     }
   }
 

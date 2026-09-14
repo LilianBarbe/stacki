@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import { useHighlight } from './lib/computed-style'
 import type { ReactNode } from 'react'
@@ -18,7 +16,7 @@ export type SegOption = { value: string; label: ReactNode; menuLabel: string; ar
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 const joinImportant = (value: string, important: boolean) => (important ? `${value} !important` : value)
@@ -49,10 +47,10 @@ function CustomField({ value, important, busy, inputRef, onCommit }: {
 }) {
   const [draft, setDraft] = useState(joinImportant(value, important))
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(joinImportant(value, important)) }, [value, important])
+  useEffect(() => { if (!focused.current) {setDraft(joinImportant(value, important))} }, [value, important])
   const commit = () => {
     const parsed = parseImportant(draft)
-    if (parsed.value && (parsed.value !== value.trim() || parsed.important !== important)) onCommit(parsed.value, parsed.important)
+    if (parsed.value && (parsed.value !== value.trim() || parsed.important !== important)) {onCommit(parsed.value, parsed.important)}
   }
   return (
     <input
@@ -62,7 +60,7 @@ function CustomField({ value, important, busy, inputRef, onCommit }: {
       onChange={(e) => setDraft(e.target.value)}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; commit() }}
-      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+      onKeyDown={(e) => { if (e.key === 'Enter') {e.currentTarget.blur()} }}
       disabled={busy}
       spellCheck={false}
       aria-label="Value"
@@ -96,9 +94,9 @@ export default function SegmentedField({ value, important, options, prop, fallba
   const wantFocus = useRef(false)
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) setOpen(false) }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) {setOpen(false)} }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
@@ -113,7 +111,7 @@ export default function SegmentedField({ value, important, options, prop, fallba
     }
   }, [customMode, busy])
 
-  const pick = (next: string) => { setOpen(false); if (next !== current || important) onCommit(next, false) }
+  const pick = (next: string) => { setOpen(false); if (next !== current || important) {onCommit(next, false)} }
   const enterCustom = () => { setOpen(false); wantFocus.current = true; onCommit('unset', false) }
 
   return (

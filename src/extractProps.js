@@ -30,15 +30,15 @@ function loopHead(head) {
 function expressionsOf(node) {
   const out = [];
   for (const value of Object.values(node.props || {})) {
-    if (value?.type === 'expr') out.push(String(value.value ?? ''));
+    if (value?.type === 'expr') {out.push(String(value.value ?? ''));}
   }
-  if (node.kind === 'expr') out.push(String(node.value ?? ''));
-  if (node.kind === 'cond') out.push(String(node.test ?? ''));
+  if (node.kind === 'expr') {out.push(String(node.value ?? ''));}
+  if (node.kind === 'cond') {out.push(String(node.test ?? ''));}
   // A loop's data is read outside the loop; its body runs inside it.
-  if (node.kind === 'map') out.push(loopHead(node.head)?.data ?? String(node.head ?? ''));
+  if (node.kind === 'map') {out.push(loopHead(node.head)?.data ?? String(node.head ?? ''));}
   // `Some {count} words` — the holes in a text run are expressions too.
   if (node.kind === 'text' && String(node.value ?? '').includes('{')) {
-    for (const m of String(node.value).matchAll(/\{([^{}]*)\}/g)) out.push(m[1]);
+    for (const m of String(node.value).matchAll(/\{([^{}]*)\}/g)) {out.push(m[1]);}
   }
   return out;
 }
@@ -53,19 +53,19 @@ function expressionsOf(node) {
  */
 export function propsForExtraction(node, scope) {
   const inScope = scope instanceof Set ? new Set(scope) : new Set(scope || []);
-  if (!inScope.size || !node) return [];
+  if (!inScope.size || !node) {return [];}
   const found = [];
   const take = (text, shadowed) => {
     for (const chip of scopeChips(text, inScope)) {
       const root = chip.path.split('.')[0];
-      if (shadowed.has(root) || found.includes(root)) continue;
+      if (shadowed.has(root) || found.includes(root)) {continue;}
       found.push(root);
     }
   };
 
   const walk = (n, shadowed) => {
-    if (!n || typeof n !== 'object') return;
-    for (const text of expressionsOf(n)) take(text, shadowed);
+    if (!n || typeof n !== 'object') {return;}
+    for (const text of expressionsOf(n)) {take(text, shadowed);}
     let inner = shadowed;
     if (n.kind === 'map') {
       // The item and index belong to this loop, and so does anything its body
@@ -78,9 +78,9 @@ export function propsForExtraction(node, scope) {
       for (const line of Array.isArray(n.body) ? n.body : []) {
         take(line, new Set([...shadowed, ...bound]));
       }
-      if (bound.length || declared.length) inner = new Set([...shadowed, ...bound, ...declared]);
+      if (bound.length || declared.length) {inner = new Set([...shadowed, ...bound, ...declared]);}
     }
-    for (const child of n.children || []) walk(child, inner);
+    for (const child of n.children || []) {walk(child, inner);}
   };
 
   walk(node, new Set());
@@ -90,6 +90,6 @@ export function propsForExtraction(node, scope) {
 /** The frontmatter line a component with these props opens with. */
 export function propsDestructure(props) {
   const names = (props || []).filter(Boolean);
-  if (!names.length) return '';
+  if (!names.length) {return '';}
   return `const { ${names.join(', ')} } = Astro.props;`;
 }

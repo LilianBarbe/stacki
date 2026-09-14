@@ -54,18 +54,18 @@ function fingerprint(projectPath) {
     }
   };
   const walk = (dir, depth) => {
-    if (depth > 8) return;
+    if (depth > 8) {return;}
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
-      if (entry.name.startsWith('.') || SKIP.has(entry.name)) continue;
+      if (entry.name.startsWith('.') || SKIP.has(entry.name)) {continue;}
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full, depth + 1);
-      else include(full);
+      if (entry.isDirectory()) {walk(full, depth + 1);}
+      else {include(full);}
     }
   };
-  for (const dir of SOURCE_DIRS) walk(path.join(projectPath, dir), 0);
+  for (const dir of SOURCE_DIRS) {walk(path.join(projectPath, dir), 0);}
   for (const name of ['astro.config.mjs', 'astro.config.ts', 'astro.config.js', 'astro.config.mts', 'astro.config.cjs', 'package.json']) {
     include(path.join(projectPath, name));
   }
@@ -86,7 +86,7 @@ function readMeta(userDataPath, projectPath) {
  */
 function isStale(userDataPath, projectPath) {
   const meta = readMeta(userDataPath, projectPath);
-  if (!meta || !fs.existsSync(thumbPathFor(userDataPath, projectPath))) return true;
+  if (!meta || !fs.existsSync(thumbPathFor(userDataPath, projectPath))) {return true;}
   return meta.fingerprint !== fingerprint(projectPath);
 }
 
@@ -198,7 +198,7 @@ async function capture(userDataPath, projectPath, url) {
       width: VIEWPORT.width,
       height: VIEWPORT.height,
     });
-    if (image.isEmpty()) return { ok: false, error: 'the capture came back empty' };
+    if (image.isEmpty()) {return { ok: false, error: 'the capture came back empty' };}
 
     fs.mkdirSync(thumbsDir(userDataPath), { recursive: true });
     fs.writeFileSync(thumbPathFor(userDataPath, projectPath), image.resize({ width: THUMB_WIDTH }).toPNG());
@@ -211,7 +211,7 @@ async function capture(userDataPath, projectPath, url) {
     return { ok: false, error: String(err?.message || err) };
   } finally {
     try {
-      if (win && !win.isDestroyed()) win.destroy();
+      if (win && !win.isDestroyed()) {win.destroy();}
     } catch {
       /* already gone */
     }

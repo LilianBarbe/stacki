@@ -50,7 +50,7 @@ export async function mergeBranchAction({
           defaultChecked: true,
         },
   });
-  if (!answer) return;
+  if (!answer) {return;}
   const deleteAfter = !isTrunk && !!answer.checked;
   run(async () => {
     const r = await window.avb.gitMerge({ projectPath, branch });
@@ -68,7 +68,7 @@ export async function mergeBranchAction({
         body: `${named} ${r.files?.length === 1 ? 'has' : 'have'} changes that aren’t saved, and the merge needs to write there. Your work can be set aside and put back afterwards — nothing is lost either way.`,
         confirmLabel: 'Set it aside and merge',
       });
-      if (!park) return;
+      if (!park) {return;}
       const parked = await window.avb.gitPark({ projectPath });
       if (!parked?.ok) {
         showToast(parked?.error || 'Could not set your work aside.', 'error');
@@ -87,7 +87,7 @@ export async function mergeBranchAction({
         showToast('Still blocked — your work is back where it was.', 'error');
         return;
       }
-      if (back?.error) showToast(back.error, 'error');
+      if (back?.error) {showToast(back.error, 'error');}
       if (deleteAfter) {
         await tidyUp({ projectPath, branch, into, changed: again?.changed, showToast });
         return;
@@ -168,7 +168,7 @@ export async function deleteBranchAction({ projectPath, branch, parked, run, sho
     confirmLabel: 'Delete branch',
     danger: true,
   });
-  if (!yes) return;
+  if (!yes) {return;}
   run(async () => {
     const r = await window.avb.gitDeleteBranch({ projectPath, branch });
     if (r?.unmerged) {
@@ -180,7 +180,7 @@ export async function deleteBranchAction({ projectPath, branch, parked, run, sho
         confirmLabel: 'Delete anyway',
         danger: true,
       });
-      if (!anyway) return;
+      if (!anyway) {return;}
       await window.avb.gitDeleteBranch({ projectPath, branch, force: true });
     }
     showToast(`Deleted ${branch}`, 'success');

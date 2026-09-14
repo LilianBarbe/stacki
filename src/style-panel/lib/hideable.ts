@@ -42,7 +42,7 @@ function splitRuns(value: string): Array<{ text: string; hidden: boolean }> {
   let start = 0
   const pushVisible = (end: number) => {
     const piece = text.slice(start, end).trim()
-    if (piece) runs.push({ text: piece, hidden: false })
+    if (piece) {runs.push({ text: piece, hidden: false })}
   }
   while (i < text.length) {
     if (!text.startsWith('/*', i)) {
@@ -56,12 +56,12 @@ function splitRuns(value: string): Array<{ text: string; hidden: boolean }> {
     if (close === -1) {
       pushVisible(i)
       const rest = text.slice(i + 2).trim()
-      if (rest) runs.push({ text: rest, hidden: true })
+      if (rest) {runs.push({ text: rest, hidden: true })}
       return runs
     }
     pushVisible(i)
     const inner = text.slice(i + 2, close).trim()
-    if (inner) runs.push({ text: inner, hidden: true })
+    if (inner) {runs.push({ text: inner, hidden: true })}
     i = close + 2
     start = i
   }
@@ -85,14 +85,14 @@ export function parseHideable<T>(
   for (const run of splitRuns(value)) {
     // The placeholder written when every layer is hidden — not a layer, and a
     // row for it would be a row nobody added.
-    if (!run.hidden && run.text.toLowerCase() === 'none') continue
+    if (!run.hidden && run.text.toLowerCase() === 'none') {continue}
     // A hidden run carries the comma that was hidden along with it (see
     // serializeHideable) — punctuation from the list, not part of the layer,
     // and enough to make the property's own parser see an empty entry.
     const text = run.hidden ? run.text.replace(/^\s*,\s*/, '').replace(/\s*,\s*$/, '') : run.text
-    if (!text) continue
+    if (!text) {continue}
     for (const item of parseAll(text) ?? []) {
-      if (item === undefined || item === null) continue
+      if (item === undefined || item === null) {continue}
       out.push({ item, hidden: run.hidden })
     }
   }
@@ -125,7 +125,7 @@ export function serializeHideable<T>(
   const parts = rows
     .map((row) => ({ text: serializeAll([row.item]).trim(), hidden: row.hidden }))
     .filter((p) => p.text)
-  if (!parts.length) return ''
+  if (!parts.length) {return ''}
 
   let out = ''
   let shown = false

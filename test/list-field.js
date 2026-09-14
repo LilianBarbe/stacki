@@ -23,7 +23,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -71,7 +71,7 @@ const check = (what, condition, detail) => {
   // question a drop can be asked.
   const ROW = 30;
   dom.window.Element.prototype.getBoundingClientRect = function () {
-    if (!this.classList.contains('list-field-row')) return { x: 0, y: 0, width: 200, height: 0, top: 0, left: 0, right: 200, bottom: 0 };
+    if (!this.classList.contains('list-field-row')) {return { x: 0, y: 0, width: 200, height: 0, top: 0, left: 0, right: 200, bottom: 0 };}
     const rows = [...this.parentElement.querySelectorAll('.list-field-row')];
     const top = rows.indexOf(this) * ROW;
     return { x: 0, y: top, width: 200, height: ROW, top, left: 0, right: 200, bottom: top + ROW };
@@ -114,7 +114,7 @@ const check = (what, condition, detail) => {
     const fieldNames = () => [...document.querySelectorAll('.list-item-field > span')].map((s) => s.textContent);
     const typeInto = async (text, at = 0) => {
       const input = document.querySelectorAll('.list-item-editor input')[at];
-      if (!input) return false;
+      if (!input) {return false;}
       await act(async () => {
         const setter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set;
         setter.call(input, text);

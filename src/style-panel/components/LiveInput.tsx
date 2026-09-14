@@ -50,7 +50,7 @@ export default function LiveInput({
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
   const liveTimer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancelLive = () => { if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null } }
   useEffect(() => cancelLive, [])
   const scheduleLive = (text: string) => {
@@ -77,7 +77,7 @@ export default function LiveInput({
           onKeyDown={(event) => {
             if (event.key === 'Enter') { commitInPlace(event.currentTarget); return }
             const stepped = handleArrowStep(event, min)
-            if (!stepped) return
+            if (!stepped) {return}
             event.preventDefault()
             const el = event.currentTarget
             el.value = stepped.text

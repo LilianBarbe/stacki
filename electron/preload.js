@@ -25,7 +25,7 @@ if (!process.isMainFrame) {
   // inert — navigation only happens in the interactive preview mode.
   if (location.hash.includes('avb-design')) {
     const injectDesignStyle = () => {
-      if (document.getElementById('avb-design-style')) return;
+      if (document.getElementById('avb-design-style')) {return;}
       const style = document.createElement('style');
       style.id = 'avb-design-style';
       style.textContent =
@@ -42,7 +42,7 @@ if (!process.isMainFrame) {
       'click',
       (e) => {
         const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
-        if (a) e.preventDefault();
+        if (a) {e.preventDefault();}
       },
       true
     );
@@ -64,7 +64,7 @@ if (!process.isMainFrame) {
     window.addEventListener(
       'mousedown',
       (e) => {
-        if (e.button !== 0) return;
+        if (e.button !== 0) {return;}
         e.preventDefault();
         window.focus();
       },
@@ -79,7 +79,7 @@ if (!process.isMainFrame) {
     let held = { shiftKey: false, altKey: false };
     const tellModifiers = (e) => {
       const next = { shiftKey: !!e.shiftKey, altKey: !!e.altKey };
-      if (next.shiftKey === held.shiftKey && next.altKey === held.altKey) return;
+      if (next.shiftKey === held.shiftKey && next.altKey === held.altKey) {return;}
       held = next;
       try {
         window.parent.postMessage({ type: 'avb:modifiers', ...held }, '*');
@@ -117,7 +117,7 @@ if (!process.isMainFrame) {
             t.tagName === 'TEXTAREA' ||
             t.tagName === 'SELECT' ||
             t.isContentEditable);
-        if (typing) return;
+        if (typing) {return;}
 
         // Clicking the canvas puts keyboard focus inside this frame, so the
         // app's own arrow-key navigation would never see the keys. Forward
@@ -215,11 +215,11 @@ if (!process.isMainFrame) {
       }
       let inner = '';
       try {
-        for (const r of rule.styleSheet.cssRules) inner += filterRule(r);
+        for (const r of rule.styleSheet.cssRules) {inner += filterRule(r);}
       } catch {
         return ''; // cross-origin import — can't read it
       }
-      if (!inner) return '';
+      if (!inner) {return '';}
       // Keep whatever layer it was imported into, or the copy would outrank
       // (or be outranked by) the original.
       const layer = /\blayer\(([^)]*)\)/i.exec(rule.cssText || '');
@@ -230,12 +230,12 @@ if (!process.isMainFrame) {
     if (rule.cssRules && rule.cssRules.length && !isStyleRule) {
       // Grouping rule (@media, @supports, @layer, @keyframes …) — recurse.
       let inner = '';
-      for (const r of rule.cssRules) inner += filterRule(r);
-      if (!inner) return '';
+      for (const r of rule.cssRules) {inner += filterRule(r);}
+      if (!inner) {return '';}
       const head = rule.cssText.slice(0, rule.cssText.indexOf('{'));
       return head + '{\n' + inner + '}\n';
     }
-    if (!isStyleRule) return '';
+    if (!isStyleRule) {return '';}
     // With CSS nesting a style rule is BOTH: it has its own declarations and
     // it contains rules. Taking the grouping branch above on the strength of
     // `cssRules` alone skipped everything the rule itself declared — which is
@@ -243,7 +243,7 @@ if (!process.isMainFrame) {
     // a frame with that in its stylesheet grew without end.
     let nested = '';
     if (rule.cssRules && rule.cssRules.length) {
-      for (const r of rule.cssRules) nested += filterRule(r);
+      for (const r of rule.cssRules) {nested += filterRule(r);}
     }
     let decls = '';
     for (const prop of rule.style) {
@@ -252,7 +252,7 @@ if (!process.isMainFrame) {
       VH_RE.lastIndex = 0;
       const hasVh = VH_RE.test(val);
       const isFixed = prop === 'position' && /fixed/.test(val);
-      if (!hasVh && !isFixed) continue;
+      if (!hasVh && !isFixed) {continue;}
       VH_RE.lastIndex = 0;
       // position:fixed anchors to the stretched frame, so it becomes
       // absolute — headers/overlays sit at their page position instead of
@@ -264,34 +264,34 @@ if (!process.isMainFrame) {
     }
     // Nested matches are re-emitted inside their parent, keeping the nesting
     // (and so the `&` context) they were written with.
-    if (!decls && !nested) return '';
+    if (!decls && !nested) {return '';}
     return `${selector} { ${decls}${nested ? '\n' + nested : ''}}\n`;
   };
 
   let importsPending = false;
   let importRetries = 0;
   const rewriteSheets = () => {
-    if (!document.head) return;
+    if (!document.head) {return;}
     importsPending = false;
     // Un-stretch html/body so the frame's height comes from content, not
     // from the (stretched) viewport — kills height:100% feedback.
     let css = 'html, body { height: auto !important; }\n';
     for (const sheet of document.styleSheets) {
-      if (sheet.ownerNode === overrideEl) continue;
+      if (sheet.ownerNode === overrideEl) {continue;}
       let rules;
       try {
         rules = sheet.cssRules;
       } catch {
         continue; // cross-origin stylesheet — can't read, leave it be
       }
-      for (const rule of rules) css += filterRule(rule);
+      for (const rule of rules) {css += filterRule(rule);}
     }
     if (!overrideEl) {
       overrideEl = document.createElement('style');
       overrideEl.id = 'avb-vh-override';
     }
-    if (overrideEl.textContent !== css) overrideEl.textContent = css;
-    if (document.head.lastElementChild !== overrideEl) document.head.appendChild(overrideEl);
+    if (overrideEl.textContent !== css) {overrideEl.textContent = css;}
+    if (document.head.lastElementChild !== overrideEl) {document.head.appendChild(overrideEl);}
     // An @import that hadn't finished loading has rules we still need, and it
     // won't touch <head> when it arrives — so nothing else would bring us
     // back. Try again shortly, a bounded number of times.
@@ -353,7 +353,7 @@ if (!process.isMainFrame) {
   // patched page rebuilds the regions these come from.
   let focusCache;
   const focusRoots = () => {
-    if (focusCache !== undefined) return focusCache;
+    if (focusCache !== undefined) {return focusCache;}
     focusCache = null;
     if (focusPath) {
       const runs = (regions.get(focusPath) || []).filter(isLive);
@@ -368,7 +368,7 @@ if (!process.isMainFrame) {
       // Zero runs still doesn't narrow: a layout's marker pair is split across
       // <head> and <body> and never pairs up, and narrowing to nothing would
       // hide the page.
-      if (runs.length) focusCache = runs[focusOcc] || runs[0];
+      if (runs.length) {focusCache = runs[focusOcc] || runs[0];}
       else {
         // No marker pair at all: the instance is addressed by attribute — a
         // component rendered into another one's slot, or one whose root is a
@@ -388,14 +388,14 @@ if (!process.isMainFrame) {
         // the answer, rather than recurring.
         const places = taggedPlaces(focusPath);
         const one = places[focusOcc] || places[0];
-        if (one) focusCache = [one.el];
+        if (one) {focusCache = [one.el];}
       }
     }
     return focusCache;
   };
   const inFocus = (n) => {
     const roots = focusRoots();
-    if (!roots) return true;
+    if (!roots) {return true;}
     return roots.some((f) => f === n || (f.nodeType === 1 && f.contains(n)));
   };
   // The occurrences of a path that are on the page, narrowed to the focused
@@ -403,7 +403,7 @@ if (!process.isMainFrame) {
   // read this, so "the second copy" means the same thing to all of them.
   const runsOf = (p) => {
     const runs = regions.get(p);
-    if (!runs) return runs;
+    if (!runs) {return runs;}
     const live = runs.filter(isLive);
     return focusRoots() ? live.filter((run) => run.some(inFocus)) : live;
   };
@@ -453,11 +453,11 @@ if (!process.isMainFrame) {
     const out = new Map();
     for (const p of pathsOf(el)) {
       const bar = p.indexOf('|');
-      if (bar === -1) continue;
+      if (bar === -1) {continue;}
       const file = p.slice(0, bar + 1);
       const inner = p.slice(bar + 1);
       const had = out.get(file);
-      if (had === undefined || inner.length < had.length) out.set(file, inner);
+      if (had === undefined || inner.length < had.length) {out.set(file, inner);}
     }
     return out;
   };
@@ -469,7 +469,7 @@ if (!process.isMainFrame) {
     let up = el.parentElement ? el.parentElement.closest(`[${PATH_ATTR}]`) : null;
     while (up) {
       const theirs = nsOf(up).get(file);
-      if (theirs !== undefined && inner.startsWith(`${theirs}.`)) return up;
+      if (theirs !== undefined && inner.startsWith(`${theirs}.`)) {return up;}
       up = up.parentElement ? up.parentElement.closest(`[${PATH_ATTR}]`) : null;
     }
     return null;
@@ -521,33 +521,33 @@ if (!process.isMainFrame) {
   const promoteInstanceTags = () => {
     for (const el of [...document.querySelectorAll(`[${PATH_ATTR}]`)]) {
       const page = pathsOf(el).filter((p) => !p.includes('|') && rodeIn(el, p));
-      if (!page.length) continue;
+      if (!page.length) {continue;}
       const ns = nsOf(el);
-      if (!ns.size) continue;
+      if (!ns.size) {continue;}
       let file = null;
       for (const [f, inner] of ns) {
         if (!nsParent(el, f, inner)) { file = null; break } // a root: leave it alone
-        if (!file) file = f;
+        if (!file) {file = f;}
       }
-      if (!file) continue;
+      if (!file) {continue;}
       let at = el;
       for (;;) {
         const up = nsParent(at, file, nsOf(at).get(file));
-        if (!up) break;
+        if (!up) {break;}
         at = up;
       }
-      if (at === el) continue;
-      for (const p of page) addPath(at, p);
+      if (at === el) {continue;}
+      for (const p of page) {addPath(at, p);}
     }
   };
 
   const addPath = (el, p) => {
     const list = pathsOf(el);
-    if (list.includes(p)) return;
+    if (list.includes(p)) {return;}
     list.push(p);
     el.setAttribute(PATH_ATTR, list.join(' '));
     let mine = ourTags.get(el);
-    if (!mine) ourTags.set(el, (mine = new Set()));
+    if (!mine) {ourTags.set(el, (mine = new Set()));}
     mine.add(p);
   };
   // The elements a path is on, one per copy — outermost only. A path can land
@@ -567,12 +567,12 @@ if (!process.isMainFrame) {
 
   // The path a node marks, or null when it isn't a marker. `kind` is 's'/'e'.
   const markerPath = (n, kind) => {
-    if (!n) return null;
+    if (!n) {return null;}
     if (n.nodeType === 8) {
       const tag = `avb-${kind}:`;
       return n.data.startsWith(tag) ? n.data.slice(tag.length) : null;
     }
-    if (n.nodeType === 1 && n.tagName === 'TEMPLATE') return n.getAttribute(`data-avb-${kind}`);
+    if (n.nodeType === 1 && n.tagName === 'TEMPLATE') {return n.getAttribute(`data-avb-${kind}`);}
     return null;
   };
 
@@ -583,8 +583,8 @@ if (!process.isMainFrame) {
     // copy of the node, however many times the page is edited.
     for (const [p, runs] of regions) {
       const live = runs.filter(isLive);
-      if (live.length) regions.set(p, live);
-      else regions.delete(p);
+      if (live.length) {regions.set(p, live);}
+      else {regions.delete(p);}
     }
     // One pass in document order over both marker forms — the deeper path has
     // to be seen last so that it wins the tag on an element they share.
@@ -598,9 +598,9 @@ if (!process.isMainFrame) {
     const visit = (parent) => {
       for (let n = parent.firstChild; n; n = n.nextSibling) {
         const isStart = markerPath(n, 's') !== null;
-        if (isStart) starts.push(n);
-        if (isStart || markerPath(n, 'e') !== null) markers.push(n);
-        if (n.nodeType === 1) visit(n);
+        if (isStart) {starts.push(n);}
+        if (isStart || markerPath(n, 'e') !== null) {markers.push(n);}
+        if (n.nodeType === 1) {visit(n);}
       }
     };
     visit(document);
@@ -622,15 +622,15 @@ if (!process.isMainFrame) {
       }
       const run = [];
       for (let n = s.nextSibling; n && n !== end; n = n.nextSibling) {
-        if (!end) break;
+        if (!end) {break;}
         run.push(n);
         // A chunk group's run contains its members, which are marked too —
         // document order puts the deeper path last, so it wins the tag.
-        if (n.nodeType === 1 && n.tagName !== 'TEMPLATE') addPath(n, p);
+        if (n.nodeType === 1 && n.tagName !== 'TEMPLATE') {addPath(n, p);}
       }
-      if (!collected.has(p)) collected.set(p, new Set());
-      for (const n of run) collected.get(p).add(n);
-      if (!regions.has(p)) regions.set(p, []);
+      if (!collected.has(p)) {collected.set(p, new Set());}
+      for (const n of run) {collected.get(p).add(n);}
+      if (!regions.has(p)) {regions.set(p, []);}
       const runs = regions.get(p);
       // The same place, collected again: it replaces itself. Appending would
       // make one node look like many — the same box drawn over and over (and
@@ -638,8 +638,8 @@ if (!process.isMainFrame) {
       // was painted fourteen times, an opaque wash over the page), and every
       // count of "which copy" off by however many edits had been made.
       const again = runs.findIndex((r) => r.some((n) => run.includes(n)));
-      if (again >= 0) runs[again] = run;
-      else runs.push(run);
+      if (again >= 0) {runs[again] = run;}
+      else {runs.push(run);}
     }
     // A tag WE added is only good while the region still holds the element. They
     // used to accumulate and never come off, so one bad pass — a marker briefly
@@ -659,22 +659,22 @@ if (!process.isMainFrame) {
       const kept = pathsOf(el).filter(
         (p) => !mine?.has(p) || !collected.has(p) || collected.get(p).has(el)
       );
-      if (kept.length === pathsOf(el).length) continue;
-      for (const p of pathsOf(el)) if (!kept.includes(p)) mine?.delete(p);
-      if (kept.length) el.setAttribute(PATH_ATTR, kept.join(' '));
-      else el.removeAttribute(PATH_ATTR);
+      if (kept.length === pathsOf(el).length) {continue;}
+      for (const p of pathsOf(el)) {if (!kept.includes(p)) {mine?.delete(p);}}
+      if (kept.length) {el.setAttribute(PATH_ATTR, kept.join(' '));}
+      else {el.removeAttribute(PATH_ATTR);}
     }
-    for (const n of markers) n.remove();
+    for (const n of markers) {n.remove();}
     promoteInstanceTags();
     focusCache = undefined; // new runs — the focused instance may be among them
   };
 
   // Grows `acc` (a left/top/right/bottom box, or null) by one node's box.
   const addNode = (acc, n) => {
-    if (!n.isConnected) return acc;
+    if (!n.isConnected) {return acc;}
     let b = null;
     if (n.nodeType === 1) {
-      if (n.tagName === 'TEMPLATE') return acc;
+      if (n.tagName === 'TEMPLATE') {return acc;}
       b = n.getBoundingClientRect();
       // `display: contents` generates no box of its own, so the element
       // measures zero however big its content is. Astro sets it on
@@ -682,7 +682,7 @@ if (!process.isMainFrame) {
       // selected fine (hover walks the DOM) but drew no outline. Fall back to
       // the children, which do generate boxes.
       if (b.width === 0 && b.height === 0) {
-        for (const c of n.childNodes) acc = addNode(acc, c);
+        for (const c of n.childNodes) {acc = addNode(acc, c);}
         return acc;
       }
     } else if (n.nodeType === 8) {
@@ -692,8 +692,8 @@ if (!process.isMainFrame) {
       range.selectNode(n);
       b = range.getBoundingClientRect();
     }
-    if (!b || (b.width === 0 && b.height === 0)) return acc;
-    if (!acc) return { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+    if (!b || (b.width === 0 && b.height === 0)) {return acc;}
+    if (!acc) {return { left: b.left, top: b.top, right: b.right, bottom: b.bottom };}
     return {
       left: Math.min(acc.left, b.left),
       top: Math.min(acc.top, b.top),
@@ -717,18 +717,18 @@ if (!process.isMainFrame) {
     let best = Infinity;
     const paths = [];
     for (const key of regions.keys()) {
-      if (!key.startsWith(prefix)) continue;
+      if (!key.startsWith(prefix)) {continue;}
       const depth = key.split('.').length;
       if (depth < best) {
         best = depth;
         paths.length = 0;
       }
-      if (depth === best) paths.push(key);
+      if (depth === best) {paths.push(key);}
     }
     let acc = null;
     for (const key of paths) {
       for (const run of runsOf(key) || []) {
-        for (const n of run) acc = addNode(acc, n);
+        for (const n of run) {acc = addNode(acc, n);}
       }
     }
     return acc ? [toRect(acc)] : null;
@@ -766,7 +766,7 @@ if (!process.isMainFrame) {
     const out = [];
     for (const el of elementsWithPath(p)) {
       const acc = addNode(null, el);
-      if (acc) out.push({ el, rect: toRect(acc) });
+      if (acc) {out.push({ el, rect: toRect(acc) });}
     }
     // A line splitter leaves hollow copies of an element behind; they are not
     // places, and counting them would shift every occurrence after them.
@@ -783,8 +783,8 @@ if (!process.isMainFrame) {
     const out = [];
     for (const run of runs) {
       let acc = null;
-      for (const n of run) acc = addNode(acc, n);
-      if (acc) out.push(toRect(acc));
+      for (const n of run) {acc = addNode(acc, n);}
+      if (acc) {out.push(toRect(acc));}
     }
     // A single node can still be many elements on the page — see PATH_ATTR:
     // a split paragraph's original element covers only its last line, and
@@ -793,11 +793,11 @@ if (!process.isMainFrame) {
     // stay separate boxes, so they keep the per-run rects above.
     if (runs.length === 1) {
       let acc = (runs[0] || []).reduce(addNode, null);
-      for (const el of elementsWithPath(p)) acc = addNode(acc, el);
+      for (const el of elementsWithPath(p)) {acc = addNode(acc, el);}
       // Nothing measurable: fall through to the children (see below).
-      if (acc) return [toRect(acc)];
+      if (acc) {return [toRect(acc)];}
     }
-    if (out.length) return out;
+    if (out.length) {return out;}
     // Every run measured nothing, yet the node may well be on screen: a page
     // script can replace the recorded nodes outright (a marquee that clones its
     // track, a slider that rebuilds slides). The tag survives on the clones, so
@@ -809,10 +809,10 @@ if (!process.isMainFrame) {
     if (tagged.length) {
       for (const el of tagged) {
         const acc = addNode(null, el);
-        if (acc) out.push(toRect(acc));
+        if (acc) {out.push(toRect(acc));}
       }
       const real = withoutHollow(out);
-      if (real.length) return real;
+      if (real.length) {return real;}
     }
     // A region that exists but contains nothing with a box — the layout case:
     // its start marker is orphaned in <head>, so the walk collected the head's
@@ -836,7 +836,7 @@ if (!process.isMainFrame) {
     const out = [];
     for (const run of runsOf(p) || []) {
       const el = run.find((n) => n.nodeType === 1 && n.tagName !== 'TEMPLATE');
-      if (el) out.push(ownClasses(el));
+      if (el) {out.push(ownClasses(el));}
     }
     if (!out.length) {
       for (const el of elementsWithPath(p)) {
@@ -870,22 +870,22 @@ if (!process.isMainFrame) {
   // actually responsible for.
   const gapBandsFor = (el, cs) => {
     const display = cs.display;
-    if (!/(^|\s)(flex|grid|inline-flex|inline-grid)$/.test(display)) return [];
+    if (!/(^|\s)(flex|grid|inline-flex|inline-grid)$/.test(display)) {return [];}
     const colGap = parseFloat(cs.columnGap) || 0;
     const rowGap = parseFloat(cs.rowGap) || 0;
-    if (colGap <= 0 && rowGap <= 0) return [];
+    if (colGap <= 0 && rowGap <= 0) {return [];}
 
     const kids = [];
     for (const child of el.children) {
-      if (child.tagName === 'TEMPLATE') continue;
+      if (child.tagName === 'TEMPLATE') {continue;}
       const r = child.getBoundingClientRect();
       // A child with no box is not somewhere a gap can be seen.
-      if (r.width <= 0 && r.height <= 0) continue;
+      if (r.width <= 0 && r.height <= 0) {continue;}
       const cd = window.getComputedStyle(child).display;
-      if (cd === 'none' || cd === 'contents') continue;
+      if (cd === 'none' || cd === 'contents') {continue;}
       kids.push(r);
     }
-    if (kids.length < 2) return [];
+    if (kids.length < 2) {return [];}
 
     // Children grouped into visual rows: two that overlap vertically are on
     // the same line, whether that line came from flex-wrap or from grid.
@@ -911,7 +911,7 @@ if (!process.isMainFrame) {
         for (let i = 1; i < across.length; i++) {
           const space = across[i].left - across[i - 1].right;
           const w = Math.min(space, colGap);
-          if (w <= 0.5) continue;
+          if (w <= 0.5) {continue;}
           bands.push({ axis: 'column', x: across[i - 1].right, y: row.top, w, h: row.bottom - row.top });
         }
       }
@@ -921,7 +921,7 @@ if (!process.isMainFrame) {
       for (let i = 1; i < rows.length; i++) {
         const space = rows[i].top - rows[i - 1].bottom;
         const h = Math.min(space, rowGap);
-        if (h <= 0.5) continue;
+        if (h <= 0.5) {continue;}
         const span = [...rows[i - 1].items, ...rows[i].items];
         const left = Math.min(...span.map((r) => r.left));
         const right = Math.max(...span.map((r) => r.right));
@@ -935,9 +935,9 @@ if (!process.isMainFrame) {
     const out = [];
     for (const run of runsOf(p) || []) {
       const el = run.find((n) => n.nodeType === 1 && n.tagName !== 'TEMPLATE');
-      if (el) out.push(el);
+      if (el) {out.push(el);}
     }
-    if (!out.length) out.push(...elementsWithPath(p));
+    if (!out.length) {out.push(...elementsWithPath(p));}
     return out.map((el) => {
       try {
         const cs = window.getComputedStyle(el);
@@ -957,7 +957,7 @@ if (!process.isMainFrame) {
   let lastSentRects = {};
 
   const sendRects = () => {
-    if (!trackedPaths.length) return;
+    if (!trackedPaths.length) {return;}
     const rects = {};
     const classes = {};
     const spacing = {};
@@ -992,10 +992,10 @@ if (!process.isMainFrame) {
   const LOOK_EVERY = 200; // ms between looks while the page is holding still
 
   const boxesMoved = (before, now) => {
-    if (!before || !now || before.length !== now.length) return true;
+    if (!before || !now || before.length !== now.length) {return true;}
     for (let i = 0; i < now.length; i++) {
       for (const k of ['x', 'y', 'w', 'h']) {
-        if (Math.abs((before[i]?.[k] ?? 0) - (now[i]?.[k] ?? 0)) > MOVE_SLACK) return true;
+        if (Math.abs((before[i]?.[k] ?? 0) - (now[i]?.[k] ?? 0)) > MOVE_SLACK) {return true;}
       }
     }
     return false;
@@ -1005,8 +1005,8 @@ if (!process.isMainFrame) {
     for (const p of trackedPaths) {
       // Never reported yet is not movement: the send that reports it is
       // already on its way.
-      if (!lastSentRects[p]) continue;
-      if (boxesMoved(lastSentRects[p], rectsForPath(p))) return true;
+      if (!lastSentRects[p]) {continue;}
+      if (boxesMoved(lastSentRects[p], rectsForPath(p))) {return true;}
     }
     return false;
   };
@@ -1034,7 +1034,7 @@ if (!process.isMainFrame) {
   };
 
   const watchMotion = () => {
-    if (following || !trackedPaths.length || !trackedMoved()) return;
+    if (following || !trackedPaths.length || !trackedMoved()) {return;}
     following = true;
     stillFor = 0;
     requestAnimationFrame(followMotion);
@@ -1062,32 +1062,32 @@ if (!process.isMainFrame) {
   const sendRendered = () => {
     const rendered = [];
     for (const p of regions.keys()) {
-      if (!inScope(p)) continue;
+      if (!inScope(p)) {continue;}
       let live = false;
       for (const run of runsOf(p) || []) {
         for (const n of run) {
-          if (!n.isConnected) continue;
-          if (n.nodeType === 1 && n.tagName !== 'TEMPLATE') live = true;
-          else if (n.nodeType === 3 && n.textContent.trim()) live = true;
-          if (live) break;
+          if (!n.isConnected) {continue;}
+          if (n.nodeType === 1 && n.tagName !== 'TEMPLATE') {live = true;}
+          else if (n.nodeType === 3 && n.textContent.trim()) {live = true;}
+          if (live) {break;}
         }
-        if (live) break;
+        if (live) {break;}
       }
       // The tag survives on clones when a script rebuilds the DOM, so a node
       // whose recorded run went stale is still rendering something.
-      if (!live && elementsWithPath(p).length) live = true;
-      if (live) rendered.push(p);
+      if (!live && elementsWithPath(p).length) {live = true;}
+      if (live) {rendered.push(p);}
     }
     // A slotted node is never wrapped in markers — it's addressed by the tag
     // alone (see pathsOf) — so it has no region to be found above. Anything
     // carrying a tag is on the page by definition.
     for (const el of document.querySelectorAll(`[${PATH_ATTR}]`)) {
-      if (!inFocus(el)) continue;
-      for (const p of pathsOf(el)) if (inScope(p) && !rendered.includes(p)) rendered.push(p);
+      if (!inFocus(el)) {continue;}
+      for (const p of pathsOf(el)) {if (inScope(p) && !rendered.includes(p)) {rendered.push(p);}}
     }
     sendStates(rendered);
     const key = rendered.join('\n');
-    if (key === lastRenderedKey) return;
+    if (key === lastRenderedKey) {return;}
     lastRenderedKey = key;
     window.parent.postMessage({ type: 'avb:rendered-nodes', paths: rendered }, '*');
   };
@@ -1106,7 +1106,7 @@ if (!process.isMainFrame) {
   const firstElementFor = (p) => {
     for (const run of runsOf(p) || []) {
       const el = run.find((n) => n.nodeType === 1 && n.tagName !== 'TEMPLATE');
-      if (el && el.isConnected) return el;
+      if (el && el.isConnected) {return el;}
     }
     return elementsWithPath(p)[0] || null;
   };
@@ -1115,17 +1115,17 @@ if (!process.isMainFrame) {
     const inert = [];
     for (const p of rendered) {
       const el = firstElementFor(p);
-      if (!el) continue;
+      if (!el) {continue;}
       try {
         const cs = window.getComputedStyle(el);
-        if (cs.display === 'none') hidden.push(p);
-        if (cs.pointerEvents === 'none') inert.push(p);
+        if (cs.display === 'none') {hidden.push(p);}
+        if (cs.pointerEvents === 'none') {inert.push(p);}
       } catch {
         /* an element that cannot be measured says nothing about itself */
       }
     }
     const key = `${hidden.join(' ')}|${inert.join(' ')}`;
-    if (key === lastStatesKey) return;
+    if (key === lastStatesKey) {return;}
     lastStatesKey = key;
     window.parent.postMessage({ type: 'avb:node-states', hidden, inert }, '*');
   };
@@ -1140,20 +1140,20 @@ if (!process.isMainFrame) {
   const sendClasses = () => {
     const out = {};
     for (const p of regions.keys()) {
-      if (!inScope(p)) continue;
+      if (!inScope(p)) {continue;}
       const list = classesForPath(p)[0];
-      if (list && list.length) out[p] = list;
+      if (list && list.length) {out[p] = list;}
     }
     // Slotted nodes have no marker pair, so they never appear above.
     for (const el of document.querySelectorAll(`[${PATH_ATTR}]`)) {
       const own = ownClasses(el);
-      if (!own.length || !inFocus(el)) continue;
+      if (!own.length || !inFocus(el)) {continue;}
       for (const p of pathsOf(el)) {
-        if (inScope(p) && !out[p]) out[p] = own;
+        if (inScope(p) && !out[p]) {out[p] = own;}
       }
     }
     const key = JSON.stringify(out);
-    if (key === lastClassKey) return;
+    if (key === lastClassKey) {return;}
     lastClassKey = key;
     window.parent.postMessage({ type: 'avb:node-classes', classes: out }, '*');
   };
@@ -1167,13 +1167,13 @@ if (!process.isMainFrame) {
   // otherwise enough to bring it in. A box longer than the viewport is aligned
   // to its start rather than centred, which would push the beginning of it out.
   const revealAlong = (start, length, viewport, at) => {
-    if (start >= SCROLL_MARGIN && start + length <= viewport - SCROLL_MARGIN) return at;
+    if (start >= SCROLL_MARGIN && start + length <= viewport - SCROLL_MARGIN) {return at;}
     const offset = length >= viewport - SCROLL_MARGIN * 2 ? SCROLL_MARGIN : (viewport - length) / 2;
     return Math.max(0, at + start - offset);
   };
   const scrollPathIntoView = (p, occ) => {
     const rects = rectsForPath(p);
-    if (!rects || !rects.length) return;
+    if (!rects || !rects.length) {return;}
     // One path can render many times (a node inside a loop, a component used
     // repeatedly). Scroll to the instance being worked in, not whichever one
     // happens to come first in the document.
@@ -1187,7 +1187,7 @@ if (!process.isMainFrame) {
     // to the left with no scrollbar to say otherwise. Selecting something is
     // how you ask to see it, so it is also how you get back.
     const left = revealAlong(r.x, r.w, vw, window.scrollX);
-    if (top === window.scrollY && left === window.scrollX) return;
+    if (top === window.scrollY && left === window.scrollX) {return;}
     window.scrollTo({ top, left, behavior: 'smooth' });
   };
 
@@ -1223,9 +1223,9 @@ if (!process.isMainFrame) {
     // is still a write, and the canvas re-measures on any mutation — so a
     // repaint that changed nothing scheduled the next repaint, once a frame,
     // for as long as the component stayed open.
-    if (next.length === openedEls.length && next.every((el, i) => el === openedEls[i])) return;
-    for (const el of openedEls) if (!next.includes(el)) el.classList.remove('stacki-opened');
-    for (const el of next) el.classList.add('stacki-opened');
+    if (next.length === openedEls.length && next.every((el, i) => el === openedEls[i])) {return;}
+    for (const el of openedEls) {if (!next.includes(el)) {el.classList.remove('stacki-opened');}}
+    for (const el of next) {el.classList.add('stacki-opened');}
     openedEls = next;
   };
 
@@ -1250,7 +1250,7 @@ if (!process.isMainFrame) {
     thinCache = null; // scrolled, resized or rebuilt — every box moved
     focusCache = undefined; // …including the instance being edited
     pageQueued = pageQueued || pageToo;
-    if (rectsQueued) return;
+    if (rectsQueued) {return;}
     rectsQueued = true;
     requestAnimationFrame(() => {
       rectsQueued = false;
@@ -1287,8 +1287,8 @@ if (!process.isMainFrame) {
     if (runs && runs.length > 1) {
       for (let i = 0; i < runs.length; i++) {
         for (const n of runs[i]) {
-          if (!n.isConnected) continue;
-          if (n === target || (n.nodeType === 1 && n.contains(target))) return i;
+          if (!n.isConnected) {continue;}
+          if (n === target || (n.nodeType === 1 && n.contains(target))) {return i;}
         }
       }
       return 0;
@@ -1301,7 +1301,7 @@ if (!process.isMainFrame) {
     if (places.length > 1) {
       for (let i = 0; i < places.length; i++) {
         const el = places[i].el;
-        if (el === target || el.contains(target)) return i;
+        if (el === target || el.contains(target)) {return i;}
       }
     }
     return 0;
@@ -1317,17 +1317,17 @@ if (!process.isMainFrame) {
   const THIN_SLACK = 5; // …so accept the cursor this near it
   let thinCache = null;
   const thinTargets = () => {
-    if (thinCache) return thinCache;
+    if (thinCache) {return thinCache;}
     thinCache = [];
     for (const el of document.querySelectorAll(`[${PATH_ATTR}]`)) {
-      if (!inFocus(el)) continue;
+      if (!inFocus(el)) {continue;}
       const p = pathsOf(el).find(inScope);
-      if (!p) continue;
+      if (!p) {continue;}
       const b = el.getBoundingClientRect();
       // Fully collapsed (0×0) is left alone: the app draws no outline for it,
       // so snapping to it would highlight nothing.
-      if (b.width < 1 && b.height < 1) continue;
-      if (b.height > THIN && b.width > THIN) continue;
+      if (b.width < 1 && b.height < 1) {continue;}
+      if (b.height > THIN && b.width > THIN) {continue;}
       thinCache.push({ path: p, el, box: b });
     }
     return thinCache;
@@ -1340,12 +1340,12 @@ if (!process.isMainFrame) {
     let hit = null;
     let hitDepth = best ? best.split('.').length : 0;
     for (const t of thinTargets()) {
-      if (best && !t.path.startsWith(best + '.')) continue;
+      if (best && !t.path.startsWith(best + '.')) {continue;}
       const depth = t.path.split('.').length;
-      if (depth <= hitDepth) continue;
+      if (depth <= hitDepth) {continue;}
       const b = t.box;
-      if (x < b.left - THIN_SLACK || x > b.right + THIN_SLACK) continue;
-      if (y < b.top - THIN_SLACK || y > b.bottom + THIN_SLACK) continue;
+      if (x < b.left - THIN_SLACK || x > b.right + THIN_SLACK) {continue;}
+      if (y < b.top - THIN_SLACK || y > b.bottom + THIN_SLACK) {continue;}
       hit = t;
       hitDepth = depth;
     }
@@ -1377,7 +1377,7 @@ if (!process.isMainFrame) {
     const holdsPoint = (el) => {
       const b = el.getBoundingClientRect();
       // No box at all — a <template>, something display:none — cannot answer.
-      if (b.width === 0 && b.height === 0) return true;
+      if (b.width === 0 && b.height === 0) {return true;}
       return x >= b.left - EDGE && x <= b.right + EDGE && y >= b.top - EDGE && y <= b.bottom + EDGE;
     };
     while (x !== null && tagged && !holdsPoint(tagged)) {
@@ -1399,10 +1399,10 @@ if (!process.isMainFrame) {
     let best = tagged ? pathsOf(tagged).find(inScope) ?? null : null;
     let bestDepth = best ? best.split('.').length : -1;
     for (const p of regions.keys()) {
-      if (!inScope(p)) continue;
+      if (!inScope(p)) {continue;}
       const runs = runsOf(p) || [];
       const depth = p.split('.').length;
-      if (depth <= bestDepth) continue;
+      if (depth <= bestDepth) {continue;}
       for (const run of runs) {
         let hit = false;
         for (const n of run) {
@@ -1414,7 +1414,7 @@ if (!process.isMainFrame) {
         if (hit) {
           // Same rule for a node addressed by markers rather than by a tag:
           // its run has to be where the pointer is.
-          if (x !== null && !run.some((n) => n.nodeType === 1 && holdsPoint(n))) break;
+          if (x !== null && !run.some((n) => n.nodeType === 1 && holdsPoint(n))) {break;}
           best = p;
           bestDepth = depth;
           break;
@@ -1425,7 +1425,7 @@ if (!process.isMainFrame) {
     // node that did win: a zero-height child of it takes precedence.
     if (x !== null) {
       const thin = thinAt(x, y, best);
-      if (thin) return { path: thin.path, occurrence: occurrenceOf(thin.path, thin.el), outside: false };
+      if (thin) {return { path: thin.path, occurrence: occurrenceOf(thin.path, thin.el), outside: false };}
     }
     // Resolved separately from the search above: when the winning path came
     // from the tag, its own runs were never scanned.
@@ -1468,7 +1468,7 @@ if (!process.isMainFrame) {
     // answer, and withholding it would leave every question waiting out its
     // timeout.
     announceMapped();
-    if (!regions.size) return;
+    if (!regions.size) {return;}
     // Wrapped, not passed straight in: a listener is handed the Event, and
     // queueRects reads its first argument as "the page may have changed too".
     // An Event is not false, so every scroll asked for the whole-page walk —
@@ -1493,7 +1493,7 @@ if (!process.isMainFrame) {
     try {
       const ro = new ResizeObserver(remeasure);
       ro.observe(document.documentElement);
-      if (document.body) ro.observe(document.body);
+      if (document.body) {ro.observe(document.body);}
     } catch {
       /* no ResizeObserver: the observers above still cover the common cases */
     }
@@ -1525,7 +1525,7 @@ if (!process.isMainFrame) {
     document.addEventListener(
       'dblclick',
       (e) => {
-        if (!designMode) return;
+        if (!designMode) {return;}
         e.preventDefault();
         e.stopPropagation();
         // Report even when nothing in scope matched: markup the layout renders
@@ -1549,7 +1549,7 @@ if (!process.isMainFrame) {
     document.addEventListener(
       'click',
       (e) => {
-        if (!designMode) return;
+        if (!designMode) {return;}
         e.preventDefault();
         e.stopPropagation();
         // A click that hits no marked node still reports (path null), with
@@ -1580,19 +1580,19 @@ if (!process.isMainFrame) {
     const out = [];
     for (const run of runsOf(p) || []) {
       for (const n of run) {
-        if (n.nodeType !== 1) continue;
+        if (n.nodeType !== 1) {continue;}
         // A run holds everything between the marker pair, which includes the
         // markers of anything nested. Those are detached once collected, and a
         // <template> among them — from a page served before this app was
         // updated — never describes the element anyway: reporting one as the
         // node's identity tells the style panel the tag is `template` and there
         // are no classes. Same rule the rect measuring uses.
-        if (!n.isConnected || n.tagName === 'TEMPLATE') continue;
+        if (!n.isConnected || n.tagName === 'TEMPLATE') {continue;}
         out.push(n);
       }
     }
     for (const el of elementsWithPath(p)) {
-      if (!out.includes(el)) out.push(el);
+      if (!out.includes(el)) {out.push(el);}
     }
     // A node that renders nothing of its own (a component wrapping a fragment,
     // `display: contents`) still has descendants that do — the first of those
@@ -1601,7 +1601,7 @@ if (!process.isMainFrame) {
       const first = [...document.querySelectorAll(`[${PATH_ATTR}]`)].find((el) =>
         pathsOf(el).some((x) => x.startsWith(p + '.'))
       );
-      if (first) out.push(first);
+      if (first) {out.push(first);}
     }
     return out;
   };
@@ -1618,7 +1618,7 @@ if (!process.isMainFrame) {
   });
 
   window.addEventListener('message', (e) => {
-    if (e.source !== window.parent) return;
+    if (e.source !== window.parent) {return;}
     const d = e.data;
     if (d?.type === 'avb:query' && typeof d.id === 'number') {
       const els = typeof d.path === 'string' ? elementsForPath(d.path) : [];
@@ -1671,17 +1671,17 @@ if (!process.isMainFrame) {
         // and otherwise every element would report `default`.
         const designStyle = document.getElementById('avb-design-style');
         try {
-          if (designStyle) designStyle.disabled = true;
+          if (designStyle) {designStyle.disabled = true;}
           const cs = getComputedStyle(els[0]);
           for (const prop of props) {
-            if (typeof prop !== 'string') continue;
+            if (typeof prop !== 'string') {continue;}
             computedProps[prop] = cs.getPropertyValue(prop) || null;
           }
         } catch {
           // A detached or cross-document element answers nothing; the panel
           // falls back to its own defaults.
         } finally {
-          if (designStyle) designStyle.disabled = false;
+          if (designStyle) {designStyle.disabled = false;}
         }
       }
       for (const sel of d.selectors || []) {
@@ -1772,7 +1772,7 @@ if (!process.isMainFrame) {
     try {
       const ro = new ResizeObserver(report);
       ro.observe(document.documentElement);
-      if (document.body) ro.observe(document.body);
+      if (document.body) {ro.observe(document.body);}
     } catch {
       /* old engines: load event still reports */
     }

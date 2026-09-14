@@ -23,11 +23,11 @@ const DELETE = Symbol('delete');
 const isDateLike = (v) => v instanceof Date || (v && typeof v.toISOString === 'function');
 
 function print(value) {
-  if (value === null || value === undefined) return '""';
-  if (typeof value === 'boolean') return String(value);
-  if (typeof value === 'number') return String(value);
-  if (isDateLike(value)) return String(value.toISOString ? value.toISOString() : value);
-  if (Array.isArray(value)) return `[${value.map(print).join(', ')}]`;
+  if (value === null || value === undefined) {return '""';}
+  if (typeof value === 'boolean') {return String(value);}
+  if (typeof value === 'number') {return String(value);}
+  if (isDateLike(value)) {return String(value.toISOString ? value.toISOString() : value);}
+  if (Array.isArray(value)) {return `[${value.map(print).join(', ')}]`;}
   if (typeof value === 'object') {
     return `{ ${Object.entries(value)
       .map(([k, v]) => `${printKey(k)} = ${print(v)}`)
@@ -45,7 +45,7 @@ function headerPath(header) {
   const out = [];
   const re = /"([^"]*)"|'([^']*)'|([^.\s]+)/g;
   let m;
-  while ((m = re.exec(header))) out.push(m[1] ?? m[2] ?? m[3]);
+  while ((m = re.exec(header))) {out.push(m[1] ?? m[2] ?? m[3]);}
   return out;
 }
 
@@ -65,7 +65,7 @@ function index(text) {
   }
   const lineAt = (pos) => {
     let at = 0;
-    while (at + 1 < lineStarts.length && lineStarts[at + 1] <= pos) at++;
+    while (at + 1 < lineStarts.length && lineStarts[at + 1] <= pos) {at++;}
     return at;
   };
 
@@ -76,7 +76,7 @@ function index(text) {
     const line = lines[li];
     const start = lineStarts[li];
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
+    if (!trimmed || trimmed.startsWith('#')) {continue;}
 
     const arrayHeader = trimmed.match(/^\[\[([^\]]+)\]\]/);
     if (arrayHeader) {
@@ -94,7 +94,7 @@ function index(text) {
     }
 
     const assignment = line.match(/^(\s*)((?:"[^"]*"|'[^']*'|[A-Za-z0-9_.-])+)(\s*=\s*)/);
-    if (!assignment) continue;
+    if (!assignment) {continue;}
     const valueStart = start + assignment[0].length;
     const valueEnd = spanEnd(text, valueStart);
     entries.push({
@@ -106,7 +106,7 @@ function index(text) {
     });
     // A value that ran past its own line — a multi-line array — has consumed
     // the lines it spans, so the scan carries on after it.
-    if (valueEnd > start + line.length) li = lineAt(valueEnd - 1);
+    if (valueEnd > start + line.length) {li = lineAt(valueEnd - 1);}
   }
   return entries;
 }
@@ -119,21 +119,21 @@ function spanEnd(text, from) {
   for (let i = from; i < text.length; i++) {
     const ch = text[i];
     if (quote) {
-      if (ch === '\\') i++;
-      else if (ch === quote) quote = null;
+      if (ch === '\\') {i++;}
+      else if (ch === quote) {quote = null;}
       continue;
     }
     if (ch === '"' || ch === "'") {
       quote = ch;
       continue;
     }
-    if (ch === '[' || ch === '{') depth++;
+    if (ch === '[' || ch === '{') {depth++;}
     else if (ch === ']' || ch === '}') {
       depth--;
       // The value started inside a table of its own: this brace closes the one
       // holding it, so the value ended before it.
-      if (depth < 0) return trimEnd(text, from, i);
-      if (depth === 0) return i + 1;
+      if (depth < 0) {return trimEnd(text, from, i);}
+      if (depth === 0) {return i + 1;}
     } else if (depth === 0 && (ch === '#' || ch === '\n' || ch === ',')) {
       // A comma at this level only happens inside an inline table, where it is
       // what separates this value from the next key.
@@ -145,7 +145,7 @@ function spanEnd(text, from) {
 
 const trimEnd = (text, from, to) => {
   let end = to;
-  while (end > from && /\s/.test(text[end - 1])) end--;
+  while (end > from && /\s/.test(text[end - 1])) {end--;}
   return end;
 };
 
@@ -156,7 +156,7 @@ function patchInline(source, key, value) {
   if (!m) {
     // Add it before the closing brace.
     const close = source.lastIndexOf('}');
-    if (close === -1) return null;
+    if (close === -1) {return null;}
     const body = source.slice(1, close).trim();
     const inner = body ? `${body}, ${printKey(key)} = ${print(value)}` : `${printKey(key)} = ${print(value)}`;
     return `{ ${inner} }`;
@@ -189,7 +189,7 @@ function applyEdits(text, edits) {
       const from = path.map(String);
       out = out.replace(/^([ \t]*)\[(\[?)([^\]]+)(\]?)\]/gm, (line, indent, open, header, close) => {
         const segments = headerPath(header);
-        if (segments.length < from.length || from.some((seg, i) => segments[i] !== seg)) return line;
+        if (segments.length < from.length || from.some((seg, i) => segments[i] !== seg)) {return line;}
         const next = [...from.slice(0, -1), rename, ...segments.slice(from.length)];
         return `${indent}[${open}${next.map(printKey).join('.')}${close}]`;
       });
@@ -212,7 +212,7 @@ function applyEdits(text, edits) {
     let inline = null;
     for (let cut = path.length - 1; cut > 0 && !inline; cut--) {
       const found = entries.find((e) => samePath(e.path, path.slice(0, cut)));
-      if (found && out[found.valueStart] === '{') inline = { entry: found, rest: path.slice(cut) };
+      if (found && out[found.valueStart] === '{') {inline = { entry: found, rest: path.slice(cut) };}
     }
     if (inline && inline.rest.length === 1) {
       const source = out.slice(inline.entry.valueStart, inline.entry.valueEnd);
@@ -222,7 +222,7 @@ function applyEdits(text, edits) {
         continue;
       }
     }
-    if (value === DELETE) continue;
+    if (value === DELETE) {continue;}
 
     // Nothing to patch: write it into its table, after the last key already
     // there, or as a new table at the end of the file.

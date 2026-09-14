@@ -89,18 +89,18 @@ const run = (cmd, args, cwd, onLog) =>
  */
 async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog } = {}) {
   const template = STARTERS[starter];
-  if (!template) throw new Error(`${starter} is not a starter this app knows.`);
+  if (!template) {throw new Error(`${starter} is not a starter this app knows.`);}
   if (!parentPath || !fs.existsSync(parentPath)) {
     throw new Error('Choose where the site should go first.');
   }
 
   const folder = String(name || '').trim();
-  if (!folder) throw new Error('Give the site a name.');
+  if (!folder) {throw new Error('Give the site a name.');}
   if (!NAME_RE.test(folder)) {
     throw new Error('Use letters, numbers, dashes, dots or underscores for the folder name.');
   }
   const dir = path.join(parentPath, folder);
-  if (fs.existsSync(dir)) throw new Error(`${folder} already exists in that folder.`);
+  if (fs.existsSync(dir)) {throw new Error(`${folder} already exists in that folder.`);}
 
   // `--no-install`: the app installs afterwards, where a failure is an error
   // the wizard can show rather than a line in a log that scrolled past.

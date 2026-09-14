@@ -42,7 +42,7 @@ export function createPreviewWatch({
   let askedAt = -Infinity
 
   const ask = async () => {
-    if (stopped || inFlight) return
+    if (stopped || inFlight) {return}
     inFlight = true
     askedAt = now()
     let answer = null
@@ -55,7 +55,7 @@ export function createPreviewWatch({
     } finally {
       inFlight = false
     }
-    if (stopped) return
+    if (stopped) {return}
     if (!answer?.ok) {
       serving = false
       clearT(timer)
@@ -74,7 +74,7 @@ export function createPreviewWatch({
   return {
     /** Something may have changed the site — worth asking, once it settles. */
     poke() {
-      if (stopped) return
+      if (stopped) {return}
       // Asking is not free. The question is "is the dev server serving a page",
       // and the only way to ask it is to request the page — which makes the
       // server render the whole thing, for a status code. On a big page that is
@@ -90,7 +90,7 @@ export function createPreviewWatch({
       // the canvas shows the error screen on its own, and the recovery that
       // matters is the one after the fix, which the retry loop is already
       // watching for by then.
-      if (serving && now() - askedAt < quietMs) return
+      if (serving && now() - askedAt < quietMs) {return}
       clearT(timer)
       timer = setT(ask, settleMs)
     },

@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // The `transition` property is a comma-separated list of transitions, each
 // `<property> <duration> <timing-function> <delay>` (property first, the two times
 // in order). We parse it into an ordered list (index 0 = first) and serialize back,
@@ -72,7 +70,7 @@ function isTime(token: string): boolean {
  *  dropped it — here we key off position instead. */
 export function parseTransitions(value: string): Transition[] {
   const v = value.trim()
-  if (!v || v.toLowerCase() === 'none') return []
+  if (!v || v.toLowerCase() === 'none') {return []}
   return splitTopLevelCommas(v).filter(Boolean).map((part) => {
     const tokens = splitTopLevelSpaces(part).map((t) => t.trim()).filter(Boolean)
     // A leading token that's neither a time nor an easing is the property. Our own
@@ -87,14 +85,14 @@ export function parseTransitions(value: string): Transition[] {
     if (rest.length && !isTiming(rest[0])) { duration = rest[0]; rest = rest.slice(1) }
     let timing = ''
     let delay = ''
-    for (const t of rest) { if (isTime(t)) delay = t; else timing = t }
+    for (const t of rest) { if (isTime(t)) {delay = t;} else {timing = t} }
     return { property, duration, delay, timing }
   })
 }
 
 /** Serialize a transition list back to a `transition` value ('' when empty). */
 export function serializeTransitions(list: Transition[]): string {
-  if (!list.length) return ''
+  if (!list.length) {return ''}
   return list
     .map((t) => [t.property || 'all', t.duration || '0s', t.timing, t.delay].filter((p) => p && p.trim()).join(' '))
     .join(', ')
@@ -123,7 +121,7 @@ export function transitionLabel(t: Transition): string {
  */
 export function isEasing(value: string): boolean {
   const v = String(value ?? '').trim().toLowerCase()
-  if (/^(?:ease|linear|ease-in|ease-out|ease-in-out)$/.test(v)) return true
+  if (/^(?:ease|linear|ease-in|ease-out|ease-in-out)$/.test(v)) {return true}
   return /^cubic-bezier\(\s*[\d.-]+\s*,\s*[\d.-]+\s*,\s*[\d.-]+\s*,\s*[\d.-]+\s*\)$/.test(v)
 }
 
@@ -133,9 +131,9 @@ export function easingToBezier(timing: string): [number, number, number, number]
     ease: [0.25, 0.1, 0.25, 1], linear: [0, 0, 1, 1],
     'ease-in': [0.42, 0, 1, 1], 'ease-out': [0, 0, 0.58, 1], 'ease-in-out': [0.42, 0, 0.58, 1],
   }
-  if (named[v]) return named[v]
+  if (named[v]) {return named[v]}
   const m = v.match(/^cubic-bezier\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)$/)
-  if (m) return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]), parseFloat(m[4])]
+  if (m) {return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]), parseFloat(m[4])]}
   return [0.25, 0.1, 0.25, 1] // fall back to ease
 }
 

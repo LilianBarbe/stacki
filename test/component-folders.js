@@ -20,7 +20,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // The scan main.js does over src: walk for .astro, and call the folder the path
@@ -29,13 +29,13 @@ const check = (what, condition, detail) => {
 // checked is that a walk of a real tree with folders inside folders produces
 // the records the panel and the search are written against.
 const listAstroFiles = (dir) => {
-  if (!fs.existsSync(dir)) return [];
+  if (!fs.existsSync(dir)) {return [];}
   const out = [];
   const walk = (d) => {
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
       const full = path.join(d, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith('.astro')) out.push(full);
+      if (entry.isDirectory()) {walk(full);}
+      else if (entry.name.endsWith('.astro')) {out.push(full);}
     }
   };
   walk(dir);
@@ -90,7 +90,7 @@ const toPosix = (p) => p.split(path.sep).join('/');
     const byFolder = new Map();
     for (const c of list) {
       const key = c.folder || '';
-      if (!byFolder.has(key)) byFolder.set(key, []);
+      if (!byFolder.has(key)) {byFolder.set(key, []);}
       byFolder.get(key).push(c);
     }
     return [...byFolder.entries()].sort(([a], [b]) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));

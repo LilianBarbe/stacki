@@ -26,18 +26,18 @@ function parse(text) {
   };
 
   const skip = () => {
-    while (i < text.length && WS.test(text[i])) i++;
+    while (i < text.length && WS.test(text[i])) {i++;}
   };
 
   const string = () => {
     const start = i;
     i++; // opening quote
     while (i < text.length) {
-      if (text[i] === '\\') i += 2;
+      if (text[i] === '\\') {i += 2;}
       else if (text[i] === '"') {
         i++;
         return { start, end: i };
-      } else i++;
+      } else {i++;}
     }
     return fail('Unterminated string');
   };
@@ -50,14 +50,14 @@ function parse(text) {
       i++;
       const members = [];
       skip();
-      if (text[i] === '}') return { type: 'object', start, end: ++i, members };
+      if (text[i] === '}') {return { type: 'object', start, end: ++i, members };}
       for (;;) {
         skip();
-        if (text[i] !== '"') return fail('Expected a key');
+        if (text[i] !== '"') {return fail('Expected a key');}
         const keySpan = string();
         const key = JSON.parse(text.slice(keySpan.start, keySpan.end));
         skip();
-        if (text[i] !== ':') return fail('Expected ":"');
+        if (text[i] !== ':') {return fail('Expected ":"');}
         i++;
         const v = value();
         members.push({ key, keyStart: keySpan.start, keyEnd: keySpan.end, start: keySpan.start, end: v.end, value: v });
@@ -66,7 +66,7 @@ function parse(text) {
           i++;
           continue;
         }
-        if (text[i] === '}') return { type: 'object', start, end: ++i, members };
+        if (text[i] === '}') {return { type: 'object', start, end: ++i, members };}
         return fail('Expected "," or "}"');
       }
     }
@@ -74,7 +74,7 @@ function parse(text) {
       i++;
       const items = [];
       skip();
-      if (text[i] === ']') return { type: 'array', start, end: ++i, items };
+      if (text[i] === ']') {return { type: 'array', start, end: ++i, items };}
       for (;;) {
         items.push(value());
         skip();
@@ -82,7 +82,7 @@ function parse(text) {
           i++;
           continue;
         }
-        if (text[i] === ']') return { type: 'array', start, end: ++i, items };
+        if (text[i] === ']') {return { type: 'array', start, end: ++i, items };}
         return fail('Expected "," or "]"');
       }
     }
@@ -90,8 +90,8 @@ function parse(text) {
       const s = string();
       return { type: 'scalar', start: s.start, end: s.end };
     }
-    while (i < text.length && !WS.test(text[i]) && !',}]'.includes(text[i])) i++;
-    if (i === start) return fail('Expected a value');
+    while (i < text.length && !WS.test(text[i]) && !',}]'.includes(text[i])) {i++;}
+    if (i === start) {return fail('Expected a value');}
     return { type: 'scalar', start, end: i };
   };
 
@@ -113,20 +113,20 @@ function indentAt(text, pos) {
 // One indent level, as the file writes it.
 function indentUnit(text) {
   const m = text.match(/\n([ \t]+)\S/);
-  if (!m) return '  ';
+  if (!m) {return '  ';}
   return m[1][0] === '\t' ? '\t' : m[1];
 }
 
 // A value, printed the way the surrounding file would have printed it.
 function print(value, baseIndent, unit) {
   const body = JSON.stringify(value, null, unit);
-  if (body === undefined) return 'null';
+  if (body === undefined) {return 'null';}
   return body.split('\n').join(`\n${baseIndent}`);
 }
 
 function childAt(node, key) {
-  if (!node) return null;
-  if (node.type === 'object') return node.members.find((m) => m.key === String(key)) || null;
+  if (!node) {return null;}
+  if (node.type === 'object') {return node.members.find((m) => m.key === String(key)) || null;}
   if (node.type === 'array') {
     const item = node.items[Number(key)];
     return item ? { key: Number(key), start: item.start, end: item.end, value: item } : null;
@@ -140,8 +140,8 @@ function locate(root, path) {
   let node = root;
   for (let d = 0; d < path.length; d++) {
     const member = childAt(node, path[d]);
-    if (!member) return d === path.length - 1 ? { parent: node, key: path[d], member: null } : null;
-    if (d === path.length - 1) return { parent: node, key: path[d], member };
+    if (!member) {return d === path.length - 1 ? { parent: node, key: path[d], member: null } : null;}
+    if (d === path.length - 1) {return { parent: node, key: path[d], member };}
     node = member.value;
   }
   return { parent: null, key: null, member: node ? { start: node.start, end: node.end, value: node } : null };
@@ -200,7 +200,7 @@ function applyEdits(text, edits) {
     let depth = 0;
     while (depth < path.length - 1) {
       const member = childAt(node, path[depth]);
-      if (!member) break;
+      if (!member) {break;}
       node = member.value;
       depth++;
     }
@@ -209,7 +209,7 @@ function applyEdits(text, edits) {
     const target = childAt(node, remaining[0]);
 
     if (edit.value === DELETE) {
-      if (remaining.length > 1 || !target) continue; // nothing to remove
+      if (remaining.length > 1 || !target) {continue;} // nothing to remove
       out = removeMember(out, node, target);
       continue;
     }

@@ -8,8 +8,8 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 
 export function pageRank(name) {
   const base = String(name || '').replace(/\.(astro|mdx?)$/i, '');
-  if (/^index$/i.test(base)) return 0;
-  if (/^\d/.test(base)) return 2;
+  if (/^index$/i.test(base)) {return 0;}
+  if (/^\d/.test(base)) {return 2;}
   return 1;
 }
 

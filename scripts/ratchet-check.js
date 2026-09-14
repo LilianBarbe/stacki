@@ -16,25 +16,25 @@ const root = path.join(__dirname, '..');
 const headers = [];
 const walk = (dir) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) {continue;}
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) walk(full);
+    if (entry.isDirectory()) {walk(full);}
     else if (/\.(ts|tsx|js|jsx|mjs)$/.test(entry.name)) {
       // The scan skips itself: its own comments contain the directive literal.
-      if (path.relative(root, full) === path.join('scripts', 'ratchet-check.js')) continue;
+      if (path.relative(root, full) === path.join('scripts', 'ratchet-check.js')) {continue;}
       const head = fs.readFileSync(full, 'utf8').slice(0, 4096);
-      if (head.includes('@ts-nocheck')) headers.push(path.relative(root, full));
+      if (head.includes('@ts-nocheck')) {headers.push(path.relative(root, full));}
     }
   }
 };
 for (const dir of ROOTS) {
   const full = path.join(root, dir);
-  if (fs.existsSync(full)) walk(full);
+  if (fs.existsSync(full)) {walk(full);}
 }
 
 headers.sort();
 console.log(`${headers.length} file(s) under @ts-nocheck (baseline ${BASELINE}):`);
-for (const file of headers) console.log(`  ${file}`);
+for (const file of headers) {console.log(`  ${file}`);}
 if (headers.length > BASELINE) {
   console.error(`\nRatchet slipped: ${headers.length - BASELINE} new @ts-nocheck header(s). Convert the file instead.`);
   process.exit(1);

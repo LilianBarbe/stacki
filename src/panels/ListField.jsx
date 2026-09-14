@@ -31,7 +31,7 @@ function ItemEditor({ item, pos, onChange, onClose }) {
 
   useEffect(() => {
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
+      if (ref.current && !ref.current.contains(e.target)) {onClose();}
     };
     const onKey = (e) => {
       if (e.key === 'Escape') { e.stopPropagation(); onClose() }
@@ -122,18 +122,18 @@ export default function ListField({ value, placeholder, onChange }) {
       top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 220)),
       width,
     };
-    if (index == null) setPending({ item, pos });
-    else setOpen({ index, pos });
+    if (index == null) {setPending({ item, pos });}
+    else {setOpen({ index, pos });}
   };
 
   const closePending = () => {
     const held = pending;
     setPending(null);
-    if (!held) return;
+    if (!held) {return;}
     const said = held.item.fields
       ? held.item.fields.some((f) => String(f.text).trim())
       : String(held.item.text).trim();
-    if (said) write([...items, held.item]);
+    if (said) {write([...items, held.item]);}
   };
 
   const remove = (at) => {
@@ -147,7 +147,7 @@ export default function ListField({ value, placeholder, onChange }) {
       // A row dropped where it already sits has not moved, and writing the same
       // array back would be an edit — an undo step, a save, a canvas patch —
       // for a drag that did nothing.
-      if (next.some((it, i) => it !== items[i])) write(next);
+      if (next.some((it, i) => it !== items[i])) {write(next);}
     }
     setDragging(null);
     setGap(null);
@@ -181,7 +181,7 @@ export default function ListField({ value, placeholder, onChange }) {
           }}
           onDragEnd={() => { setDragging(null); setGap(null) }}
           onDragOver={(e) => {
-            if (dragging == null) return;
+            if (dragging == null) {return;}
             e.preventDefault();
             setGap(gapFor(e, i));
           }}

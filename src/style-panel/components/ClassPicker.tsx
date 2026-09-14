@@ -53,11 +53,11 @@ export function ClassPicker({
     // Keep the combo order matching the token order.
     const ordered = [...next].sort((a, b) => order.indexOf(a) - order.indexOf(b))
     // No-op guard so a click on the sole selected token doesn't churn.
-    if (ordered.length === selected.length && ordered.every((entry, index) => entry === selected[index])) return
+    if (ordered.length === selected.length && ordered.every((entry, index) => entry === selected[index])) {return}
     onChange(ordered)
   }
 
-  if (!tokens.length) return null
+  if (!tokens.length) {return null}
 
   return (
     <div className={`class-picker${className ? ` ${className}` : ''}`} role="group" aria-label={ariaLabel}>

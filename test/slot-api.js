@@ -26,7 +26,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const { parseSlots, defaultSlotInline } = require('../electron/astroParser.js');
@@ -160,7 +160,7 @@ const findComponent = (dir, name) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       const hit = findComponent(full, name);
-      if (hit) return hit;
+      if (hit) {return hit;}
     } else if (entry.name === `${name}.astro`) {
       return fs.readFileSync(full, 'utf8');
     }
@@ -171,7 +171,7 @@ if (fs.existsSync(LUMOS)) {
   const read = (n) => findComponent(LUMOS, n);
   const onceReal = (what, name, run) => {
     const source = read(name);
-    if (source == null) return; // that component is not in this project any more
+    if (source == null) {return;} // that component is not in this project any more
     run(source, what);
   };
   onceReal('the real <Paragraph> takes content', 'Paragraph', (src) => {

@@ -62,7 +62,7 @@ function componentFile({ projectPath, pagePath, name, nodes, imports = [], props
   const pageDir = path.dirname(pagePath);
   const moved = used.map((imp) => {
     const spec = String(imp.path || '');
-    if (!spec.startsWith('.')) return { ...imp };
+    if (!spec.startsWith('.')) {return { ...imp };}
     const rel = toPosix(path.relative(componentsDir, path.resolve(pageDir, spec)));
     return { ...imp, path: rel.startsWith('.') ? rel : './' + rel };
   });

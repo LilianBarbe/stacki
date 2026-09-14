@@ -31,7 +31,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const { parsePage, serializePage, locateSelection } = require('../electron/astroParser.js');
@@ -53,9 +53,9 @@ function onDisk(body) {
 // The first loop node anywhere in a tree, and every node under it.
 const find = (nodes, kind) => {
   for (const n of nodes || []) {
-    if (n.kind === kind) return n;
+    if (n.kind === kind) {return n;}
     const deeper = find(n.children, kind);
-    if (deeper) return deeper;
+    if (deeper) {return deeper;}
   }
   return null;
 };

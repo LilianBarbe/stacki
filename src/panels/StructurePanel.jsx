@@ -90,10 +90,10 @@ export default function StructurePanel({
   // ↑ to the parent, ↓ to the first child (expanding a collapsed node so
   // the child is visible).
   useEffect(() => {
-    if (!pageState?.editable || !selectedId) return;
+    if (!pageState?.editable || !selectedId) {return;}
     const onKey = (e) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {return;}
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {return;}
       const t = e.target;
       if (
         t instanceof HTMLElement &&
@@ -102,13 +102,13 @@ export default function StructurePanel({
         return;
       }
       const found = findWithParent(pageState.model.nodes, selectedId, null);
-      if (!found) return;
+      if (!found) {return;}
       e.preventDefault(); // keep arrows from scrolling the panel
       const { node, parent, siblings, index } = found;
       let next = null;
-      if (e.key === 'ArrowLeft') next = siblings[index - 1];
-      else if (e.key === 'ArrowRight') next = siblings[index + 1];
-      else if (e.key === 'ArrowUp') next = parent;
+      if (e.key === 'ArrowLeft') {next = siblings[index - 1];}
+      else if (e.key === 'ArrowRight') {next = siblings[index + 1];}
+      else if (e.key === 'ArrowUp') {next = parent;}
       else if (
         e.key === 'ArrowDown' &&
         rowChildren(node).length > 0 &&
@@ -116,10 +116,10 @@ export default function StructurePanel({
         !hidesChildRows(node, rowChildren(node))
       ) {
         const collapsed = toggled.has(node.id) ? toggled.get(node.id) : defaultCollapsed(node);
-        if (collapsed) setToggled((prev) => new Map(prev).set(node.id, false));
+        if (collapsed) {setToggled((prev) => new Map(prev).set(node.id, false));}
         next = rowChildren(node)[0];
       }
-      if (next) onSelect(next.id);
+      if (next) {onSelect(next.id);}
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -128,7 +128,7 @@ export default function StructurePanel({
   // Reveal the selection: with everything collapsed by default, selecting a
   // node from the canvas or breadcrumbs must expand its ancestors.
   useEffect(() => {
-    if (!pageState?.editable || !selectedId || selectedId === 'frontmatter') return;
+    if (!pageState?.editable || !selectedId || selectedId === 'frontmatter') {return;}
     const chain = [];
     const walk = (list, trail) => {
       for (const n of list) {
@@ -136,12 +136,12 @@ export default function StructurePanel({
           chain.push(...trail);
           return true;
         }
-        if (walk(rowChildren(n), [...trail, n])) return true;
+        if (walk(rowChildren(n), [...trail, n])) {return true;}
       }
       return false;
     };
     walk(pageState.model.nodes, []);
-    if (!chain.length) return;
+    if (!chain.length) {return;}
     setToggled((prev) => {
       let changed = false;
       const next = new Map(prev);
@@ -163,16 +163,16 @@ export default function StructurePanel({
   const bodyRef = useRef(null);
   const lastReveal = useRef(revealTick);
   useEffect(() => {
-    if (revealTick === lastReveal.current) return; // a plain selection change
+    if (revealTick === lastReveal.current) {return;} // a plain selection change
     lastReveal.current = revealTick;
-    if (!selectedId) return;
+    if (!selectedId) {return;}
     const frame = requestAnimationFrame(() => {
       const body = bodyRef.current;
       const row = body?.querySelector(`[data-node-id="${CSS.escape(selectedId)}"]`);
-      if (!row) return;
+      if (!row) {return;}
       const b = body.getBoundingClientRect();
       const r = row.getBoundingClientRect();
-      if (r.top >= b.top && r.bottom <= b.bottom) return;
+      if (r.top >= b.top && r.bottom <= b.bottom) {return;}
       body.scrollTop += r.top - b.top - (b.height - r.height) / 2;
     });
     return () => cancelAnimationFrame(frame);
@@ -238,8 +238,8 @@ export default function StructurePanel({
     clearDrop();
     const compName = e.dataTransfer.getData('avb/component');
     const nodeId = e.dataTransfer.getData('avb/node');
-    if (compName) onDropComponent(compName, target);
-    else if (nodeId) onMoveNode(nodeId, target);
+    if (compName) {onDropComponent(compName, target);}
+    else if (nodeId) {onMoveNode(nodeId, target);}
   };
 
   const isCollapsed = (node) =>
@@ -355,10 +355,10 @@ export default function StructurePanel({
           onClose={() => setCtxMenu(null)}
           onAction={(action) => {
             setCtxMenu(null);
-            if (action === 'copy') onCopyNode(ctxMenu.nodeId);
-            else if (action === 'duplicate') onDuplicateNode(ctxMenu.nodeId);
-            else if (action === 'paste') onPasteNode();
-            else if (action === 'delete') onRemoveNode(ctxMenu.nodeId);
+            if (action === 'copy') {onCopyNode(ctxMenu.nodeId);}
+            else if (action === 'duplicate') {onDuplicateNode(ctxMenu.nodeId);}
+            else if (action === 'paste') {onPasteNode();}
+            else if (action === 'delete') {onRemoveNode(ctxMenu.nodeId);}
           }}
         />
       )}
@@ -372,13 +372,13 @@ function ContextMenu({ pos, canPaste, onClose, onAction }) {
 
   useEffect(() => {
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
+      if (ref.current && !ref.current.contains(e.target)) {onClose();}
     };
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {onClose();}
     };
     const onScroll = (e) => {
-      if (ref.current && ref.current.contains(e.target)) return;
+      if (ref.current && ref.current.contains(e.target)) {return;}
       onClose();
     };
     document.addEventListener('mousedown', onDown);
@@ -433,7 +433,7 @@ function NodeList({ nodes, parentId, depth, ...ctx }) {
   const noteFor = new Map(); // index of the annotated node -> comment node
   const folded = new Set(); // indices that render as part of the row below
   nodes.forEach((n, i) => {
-    if (n.kind !== 'comment') return;
+    if (n.kind !== 'comment') {return;}
     const next = nodes[i + 1];
     if (next && ANNOTATABLE.has(next.kind)) {
       noteFor.set(i + 1, n);
@@ -472,10 +472,10 @@ function NodeList({ nodes, parentId, depth, ...ctx }) {
 
 function findNodeIn(nodes, id) {
   for (const n of nodes) {
-    if (n.id === id) return n;
+    if (n.id === id) {return n;}
     if (Array.isArray(n.children)) {
       const found = findNodeIn(n.children, id);
-      if (found) return found;
+      if (found) {return found;}
     }
   }
   return null;
@@ -486,8 +486,8 @@ function findNodeIn(nodes, id) {
 // unknown, so they're never blocked.
 function acceptsDrag(parent) {
   const d = getDrag();
-  if (!d || !d.tag || d.nodeKind !== 'element') return true;
-  if (!parent || parent.kind !== 'element') return true;
+  if (!d || !d.tag || d.nodeKind !== 'element') {return true;}
+  if (!parent || parent.kind !== 'element') {return true;}
   return canContainTag(parent.name, d.tag);
 }
 
@@ -537,7 +537,7 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
   // Keep the selected row visible while navigating with the arrow keys.
   const rowRef = useRef(null);
   useEffect(() => {
-    if (isSelected) rowRef.current?.scrollIntoView({ block: 'nearest' });
+    if (isSelected) {rowRef.current?.scrollIntoView({ block: 'nearest' });}
   }, [isSelected]);
 
   // Reported by the page: this node's markers wrap nothing.
@@ -579,7 +579,7 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
   if (isLayoutNode) {
     icon = <LayoutIcon size={13} />;
     label = node.name || currentLayoutName;
-    if (currentLayoutName && currentLayoutName !== label) hint = currentLayoutName;
+    if (currentLayoutName && currentLayoutName !== label) {hint = currentLayoutName;}
   }
 
   return (
@@ -624,8 +624,8 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
           // astro:assets and the built-in Fragment have no project file to
           // open, so a double-click does nothing rather than
           // hunting for one that can't be found.
-          if (!isComponent || node.astroAsset) return;
-          if (!onOpenComponent) return;
+          if (!isComponent || node.astroAsset) {return;}
+          if (!onOpenComponent) {return;}
           e.stopPropagation();
           onOpenComponent(node.name, node.id);
         }}
@@ -703,9 +703,9 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
 function findWithParent(nodes, id, parent) {
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
-    if (n.id === id) return { node: n, parent, siblings: nodes, index: i };
+    if (n.id === id) {return { node: n, parent, siblings: nodes, index: i };}
     const found = findWithParent(rowChildren(n), id, n);
-    if (found) return found;
+    if (found) {return found;}
   }
   return null;
 }
@@ -721,7 +721,7 @@ function defaultCollapsed(node) {
 // The row's icon already says what kind a node is, so no trailing kind badge
 // ("comment", "loop", …) — it only repeated the icon in words.
 function describeNode(node, live) {
-  if (isFragmentNode(node)) return { icon: <LayersIcon size={13} />, label: 'Fragment' };
+  if (isFragmentNode(node)) {return { icon: <LayersIcon size={13} />, label: 'Fragment' };}
   switch (node.kind) {
     case 'text':
       return { icon: <TextIcon size={12} />, label: truncate(node.value, 34) };

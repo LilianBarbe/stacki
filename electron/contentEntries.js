@@ -56,7 +56,7 @@ function globToRegExp(pattern) {
       if (pattern[i + 1] === '*') {
         out += pattern[i + 2] === '/' ? '(?:.*\\/)?' : '.*';
         i += pattern[i + 2] === '/' ? 2 : 1;
-      } else out += '[^/]*';
+      } else {out += '[^/]*';}
     } else if (ch === '{') {
       const close = pattern.indexOf('}', i);
       out += `(?:${pattern
@@ -65,8 +65,8 @@ function globToRegExp(pattern) {
         .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
         .join('|')})`;
       i = close;
-    } else if (ch === '?') out += '[^/]';
-    else out += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    } else if (ch === '?') {out += '[^/]';}
+    else {out += ch.replace(/[.+^${}()|[\]\\]/g, '\\$&');}
   }
   return new RegExp(`^${out}$`);
 }
@@ -79,10 +79,10 @@ function walkFiles(dir, base = dir, out = []) {
     return out;
   }
   for (const entry of entries) {
-    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+    if (entry.name.startsWith('.') || entry.name === 'node_modules') {continue;}
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) walkFiles(full, base, out);
-    else out.push(toPosix(path.relative(base, full)));
+    if (entry.isDirectory()) {walkFiles(full, base, out);}
+    else {out.push(toPosix(path.relative(base, full)));}
   }
   return out;
 }
@@ -95,7 +95,7 @@ function titleOf(data, id) {
   if (isPlainObject(data)) {
     for (const key of TITLE_KEYS) {
       const value = data[key];
-      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (typeof value === 'string' && value.trim()) {return value.trim();}
     }
   }
   return id;
@@ -108,8 +108,8 @@ function titleOf(data, id) {
  */
 function listEntries(projectPath, collection) {
   const loader = collection.loader || {};
-  if (loader.kind === 'glob') return globEntries(projectPath, collection);
-  if (loader.kind === 'file') return fileEntries(projectPath, collection);
+  if (loader.kind === 'glob') {return globEntries(projectPath, collection);}
+  if (loader.kind === 'file') {return fileEntries(projectPath, collection);}
   return { entries: [], readOnly: true, reason: readOnlyReason(collection) };
 }
 
@@ -132,10 +132,10 @@ function globEntries(projectPath, collection) {
   for (const rel of files) {
     const abs = path.join(root, rel);
     const format = formatFor(rel);
-    if (!format) continue;
+    if (!format) {continue;}
     let text = '';
     try {
-      if (fs.statSync(abs).size > MAX_BYTES) continue;
+      if (fs.statSync(abs).size > MAX_BYTES) {continue;}
       text = fs.readFileSync(abs, 'utf8');
     } catch {
       continue;
@@ -185,7 +185,7 @@ function globEntries(projectPath, collection) {
 //                          what a parser-shaped file looks like
 function locateRecords(data) {
   if (Array.isArray(data)) {
-    if (!data.length || !data.every(isPlainObject)) return { shape: 'array', records: [] };
+    if (!data.length || !data.every(isPlainObject)) {return { shape: 'array', records: [] };}
     return {
       shape: 'array',
       records: data.map((record, index) => ({
@@ -196,7 +196,7 @@ function locateRecords(data) {
       })),
     };
   }
-  if (!isPlainObject(data)) return { shape: 'unknown', records: [] };
+  if (!isPlainObject(data)) {return { shape: 'unknown', records: [] };}
 
   const keys = Object.keys(data).filter((k) => k !== '$schema');
   if (keys.length && keys.every((k) => isPlainObject(data[k]))) {
@@ -215,12 +215,12 @@ function locateRecords(data) {
       node.forEach((item, index) => visit(item, [...locator, index]));
       return;
     }
-    if (!isPlainObject(node)) return;
+    if (!isPlainObject(node)) {return;}
     if (typeof node.id === 'string' && locator.length) {
       records.push({ id: node.id, idKey: 'id', locator, record: node });
       return;
     }
-    for (const [key, value] of Object.entries(node)) visit(value, [...locator, key]);
+    for (const [key, value] of Object.entries(node)) {visit(value, [...locator, key]);}
   };
   visit(data, []);
   return { shape: records.length ? 'nested' : 'single', records };
@@ -283,7 +283,7 @@ function fileEntries(projectPath, collection) {
 function writeEntry(projectPath, entry, edits, { body } = {}) {
   const abs = path.resolve(projectPath, entry.file);
   const format = formatFor(entry.file);
-  if (!format) throw new Error(`Stacki cannot write ${path.extname(entry.file)} files.`);
+  if (!format) {throw new Error(`Stacki cannot write ${path.extname(entry.file)} files.`);}
   const text = fs.readFileSync(abs, 'utf8');
 
   const locator = entry.locator || [];
@@ -299,7 +299,7 @@ function writeEntry(projectPath, entry, edits, { body } = {}) {
     format === frontmatter
       ? frontmatter.applyEdits(text, prefixed, { body })
       : format.applyEdits(text, prefixed);
-  if (next === text) return { ok: true, changed: false };
+  if (next === text) {return { ok: true, changed: false };}
   fs.writeFileSync(abs, next, 'utf8');
   return { ok: true, changed: true };
 }
@@ -336,8 +336,8 @@ function coveredPaths(collections) {
   const dirs = [];
   for (const collection of collections) {
     const loader = collection.loader || {};
-    if (loader.kind === 'file' && loader.file) files.push(toPosix(loader.file).replace(/^\.\//, ''));
-    if (loader.kind === 'glob' && loader.base) dirs.push(toPosix(loader.base).replace(/^\.\//, '').replace(/\/$/, ''));
+    if (loader.kind === 'file' && loader.file) {files.push(toPosix(loader.file).replace(/^\.\//, ''));}
+    if (loader.kind === 'glob' && loader.base) {dirs.push(toPosix(loader.base).replace(/^\.\//, '').replace(/\/$/, ''));}
   }
   return { files, dirs };
 }

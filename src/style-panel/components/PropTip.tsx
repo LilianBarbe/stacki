@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { HoverTooltip } from './SegmentedControl'
@@ -59,10 +57,10 @@ export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
   // this, and the tooltip stays up. So while one is open, watch for the pointer being
   // anywhere but on the anchor (or the anchor being gone) and drop it.
   useEffect(() => {
-    if (!open) return undefined
+    if (!open) {return undefined}
     const away = (event: Event) => {
       const el = ref.current
-      if (!el || !el.isConnected || !el.contains(event.target as Node)) hide()
+      if (!el || !el.isConnected || !el.contains(event.target as Node)) {hide()}
     }
     const close = () => hide()
     document.addEventListener('pointermove', away, true)

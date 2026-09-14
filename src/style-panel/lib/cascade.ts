@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Cascade resolution → a rule-centric, editable model.
 //
 // We surface each matching rule as its own card (selector + its declaration
@@ -71,9 +69,9 @@ export function compareCascade(
   aOrder: number,
   bOrder: number,
 ): number {
-  if (a.important !== b.important) return a.important ? -1 : 1
+  if (a.important !== b.important) {return a.important ? -1 : 1}
   const spec = compareSpecificity(b.specificity, a.specificity)
-  if (spec !== 0) return spec
+  if (spec !== 0) {return spec}
   return bOrder - aOrder // later wins on a tie
 }
 
@@ -93,7 +91,7 @@ export async function computeRuleModel(rules: ParsedRule[], target: MatchTarget)
   for (const rule of rules) {
     const results = await matchSelectorList(rule.selectorText, target)
     const matchedSelectors = rule.selectors.filter((_, index) => results[index]?.matched)
-    if (!matchedSelectors.length) continue
+    if (!matchedSelectors.length) {continue}
 
     // Show every selector in the rule that actually targets this element — so a
     // grouped rule like `::before, ::after { … }` lists both halves.
@@ -130,7 +128,7 @@ export async function computeRuleModel(rules: ParsedRule[], target: MatchTarget)
   const contributions: Contribution[] = []
   let seq = 0
   for (const hit of hits) {
-    if (hit.conditional || !hit.strongestBase) continue
+    if (hit.conditional || !hit.strongestBase) {continue}
     for (const decl of hit.rule.declarations) {
       contributions.push({
         declId: decl.declId,

@@ -40,7 +40,7 @@
 function lineDiff(a, b) {
   // A conflict big enough to make this expensive is one nobody is going to
   // resolve line by line anyway; left whole, it still works as one choice.
-  if (a.length * b.length > 250000) return [{ ours: a, theirs: b }];
+  if (a.length * b.length > 250000) {return [{ ours: a, theirs: b }];}
   const m = a.length;
   const n = b.length;
   const dp = Array.from({ length: m + 1 }, () => new Uint32Array(n + 1));
@@ -57,7 +57,7 @@ function lineDiff(a, b) {
     // Adjacent runs of the same sort are one run: two changed lines next to
     // each other are one edit, not two decisions.
     if (last && !!last.common === !!run.common) {
-      if (run.common) last.common.push(...run.common);
+      if (run.common) {last.common.push(...run.common);}
       else {
         last.ours.push(...run.ours);
         last.theirs.push(...run.theirs);
@@ -79,7 +79,7 @@ function lineDiff(a, b) {
       j++;
     }
   }
-  if (i < m || j < n) push({ ours: a.slice(i), theirs: b.slice(j) });
+  if (i < m || j < n) {push({ ours: a.slice(i), theirs: b.slice(j) });}
   return runs;
 }
 
@@ -148,8 +148,8 @@ function threeWay(base, ours, theirs) {
       end = Math.max(end, B[bi].end);
       yours.push(B[bi++]);
     };
-    if (ai < A.length && A[ai].start === start) takeA();
-    if (bi < B.length && B[bi].start === start) takeB();
+    if (ai < A.length && A[ai].start === start) {takeA();}
+    if (bi < B.length && B[bi].start === start) {takeB();}
     for (let moved = true; moved; ) {
       moved = false;
       while (ai < A.length && overlaps(A[ai])) {
@@ -182,7 +182,7 @@ function threeWay(base, ours, theirs) {
     });
     i = end;
   }
-  if (i < base.length) runs.push({ common: base.slice(i) });
+  if (i < base.length) {runs.push({ common: base.slice(i) });}
   return runs;
 }
 
@@ -205,12 +205,12 @@ const tokenize = (text) => String(text ?? '').match(/\s+|[A-Za-z0-9_]+|[^\s A-Za
  * there is a genuine choice to make.
  */
 function mergeInline(base, ours, theirs) {
-  if (base == null) return null;
+  if (base == null) {return null;}
   const runs = threeWay(tokenize(base), tokenize(ours), tokenize(theirs));
   // Any region both sides rewrote is a real disagreement; combining it would
   // be inventing a version neither branch wrote.
-  if (runs.some((r) => !r.common && r.changedBy === 'both')) return null;
-  if (!runs.some((r) => !r.common)) return null; // nothing to combine
+  if (runs.some((r) => !r.common && r.changedBy === 'both')) {return null;}
+  if (!runs.some((r) => !r.common)) {return null;} // nothing to combine
   return runs
     .map((r) => (r.common ? r.common : r.changedBy === 'theirs' ? r.theirs : r.ours).join(''))
     .join('');
@@ -221,12 +221,12 @@ function mergeInline(base, ours, theirs) {
 // other side's edit is the only edit, and defaulting to it loses nothing.
 // Only when both moved is there a real disagreement to put to the user.
 function whoChanged(ours, theirs, base) {
-  if (base == null) return 'both';
+  if (base == null) {return 'both';}
   const inBase = (text) => text.trim() === '' || base.includes(text.trim());
   const o = inBase(ours);
   const t = inBase(theirs);
-  if (o && !t) return 'theirs';
-  if (t && !o) return 'ours';
+  if (o && !t) {return 'theirs';}
+  if (t && !o) {return 'ours';}
   return 'both';
 }
 
@@ -252,7 +252,7 @@ function parseConflict(text) {
   let i = 0;
 
   const flushSame = () => {
-    if (same.length) parts.push({ kind: 'same', text: same.join('\n') });
+    if (same.length) {parts.push({ kind: 'same', text: same.join('\n') });}
     same = [];
   };
 
@@ -326,7 +326,7 @@ function parseConflict(text) {
       // not overlap, keeping both is the answer nobody has to think about.
       if (clash.changedBy === 'both' && run.base) {
         const merged = mergeInline(run.base.join('\n'), clash.ours, clash.theirs);
-        if (merged !== null) clash.merged = merged;
+        if (merged !== null) {clash.merged = merged;}
       }
       parts.push(clash);
     }
@@ -352,13 +352,13 @@ function renderResolved(parts, picks = []) {
   let n = -1;
   return (parts || [])
     .map((part) => {
-      if (part.kind === 'same') return part.text;
+      if (part.kind === 'same') {return part.text;}
       n++;
       const pick = picks[n];
       // Both edits, combined — only offered where they were found not to
       // overlap, so this is the two changes and not a duplication.
-      if (pick === 'merged' && part.merged != null) return part.merged;
-      if (pick === 'theirs') return part.theirs;
+      if (pick === 'merged' && part.merged != null) {return part.merged;}
+      if (pick === 'theirs') {return part.theirs;}
       // Both sides, in the order they appear in the file. A heading changed on
       // two branches is usually one or the other; a list that gained an item on
       // each is usually both.

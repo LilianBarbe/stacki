@@ -9,7 +9,7 @@
 const parseLines = (text) =>
   text.split('\n').map((line, index) => {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('//')) return { index, line, record: null };
+    if (!trimmed || trimmed.startsWith('//')) {return { index, line, record: null };}
     try {
       return { index, line, record: JSON.parse(trimmed) };
     } catch {
@@ -22,14 +22,14 @@ const parseData = (text) => parseLines(text).filter((l) => l.record).map((l) => 
 const DELETE = Symbol('delete');
 
 const setIn = (target, path, value) => {
-  if (!path.length) return value;
+  if (!path.length) {return value;}
   const [key, ...rest] = path;
   const isIndex = typeof key === 'number';
   const next = target == null ? (isIndex ? [] : {}) : target;
   if (rest.length === 0) {
     if (value === DELETE) {
-      if (Array.isArray(next)) next.splice(key, 1);
-      else delete next[key];
+      if (Array.isArray(next)) {next.splice(key, 1);}
+      else {delete next[key];}
       return next;
     }
     next[key] = value;
@@ -44,14 +44,14 @@ const setIn = (target, path, value) => {
  * the file holds rather than its lines — blank lines and comments are neither.
  */
 function applyEdits(text, edits) {
-  if (!edits.length) return text;
+  if (!edits.length) {return text;}
   const lines = parseLines(text);
   const records = lines.filter((l) => l.record);
   const touched = new Set();
 
   for (const { path, value } of edits) {
     const entry = records[path[0]];
-    if (!entry) continue;
+    if (!entry) {continue;}
     if (path.length === 1 && value === DELETE) {
       entry.removed = true;
       touched.add(entry.index);

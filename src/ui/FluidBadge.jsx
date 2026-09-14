@@ -82,7 +82,7 @@ export default function FluidBadge({ fluid }) {
   const ref = useRef(null);
   const [anchor, setAnchor] = useState(null);
 
-  if (!fluid || fluid.status === 'ok') return null;
+  if (!fluid || fluid.status === 'ok') {return null;}
   const error = fluid.status === 'error';
   const message = COPY[fluid.status];
   const label = `${error ? 'Accessibility error' : 'Accessibility warning'}: ${message}`;

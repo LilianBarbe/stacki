@@ -68,9 +68,9 @@ const TerminalPane = forwardRef(function TerminalPane(
   // Fitting a zero-sized or half-built terminal throws from deep inside
   // xterm's viewport, so every fit goes through here.
   const safeFit = () => {
-    if (!ready.current || !fitRef.current || !termRef.current || !hostRef.current) return;
+    if (!ready.current || !fitRef.current || !termRef.current || !hostRef.current) {return;}
     const { offsetWidth, offsetHeight } = hostRef.current;
-    if (offsetWidth === 0 || offsetHeight === 0) return;
+    if (offsetWidth === 0 || offsetHeight === 0) {return;}
     try {
       fitRef.current.fit();
       const dims = fitRef.current.proposeDimensions();
@@ -90,7 +90,7 @@ const TerminalPane = forwardRef(function TerminalPane(
   }));
 
   useEffect(() => {
-    if (!hostRef.current) return;
+    if (!hostRef.current) {return;}
     const host = hostRef.current;
 
     // Reset the lifecycle flags for THIS run. They're refs, so they outlive the
@@ -108,14 +108,14 @@ const TerminalPane = forwardRef(function TerminalPane(
     // xterm's built-in paste is text-only; decideTerminalPaste classifies the
     // clipboard's actual shape. See src/terminalPaste.js.
     const pasteImage = async (file) => {
-      const forwardCtrlV = () => { if (!runDisposed) window.avb.terminalInput(terminalId, '\x16'); };
-      if (!file) return forwardCtrlV();
+      const forwardCtrlV = () => { if (!runDisposed) {window.avb.terminalInput(terminalId, '\x16');} };
+      if (!file) {return forwardCtrlV();}
       try {
         const bytes = new Uint8Array(await file.arrayBuffer());
-        if (runDisposed) return;
+        if (runDisposed) {return;}
         const result = await window.avb.terminalClipboardImage(bytes, file.type || 'image/png');
-        if (runDisposed) return;
-        if (!result?.ok || !result.path) return forwardCtrlV();
+        if (runDisposed) {return;}
+        if (!result?.ok || !result.path) {return forwardCtrlV();}
         const escaped = isWindows()
           ? quoteWindowsPath(result.path)
           : escapePosixPath(result.path);
@@ -129,20 +129,20 @@ const TerminalPane = forwardRef(function TerminalPane(
 
     const onPaste = (e) => {
       const data = e.clipboardData;
-      if (!data) return;
+      if (!data) {return;}
       const action = decideTerminalPaste(
         Array.from(data.items),
         data.getData('text/plain'),
         window.avb.getFilePath,
         isWindows()
       );
-      if (action.kind === 'text') return; // xterm handles it
+      if (action.kind === 'text') {return;} // xterm handles it
       // Capture phase + stopImmediatePropagation runs ahead of xterm's own
       // textarea paste listener, so its text-only path never fires.
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (action.kind === 'paths') termRef.current?.paste(action.text);
-      else void pasteImage(action.file);
+      if (action.kind === 'paths') {termRef.current?.paste(action.text);}
+      else {void pasteImage(action.file);}
     };
 
     // Dropping a file onto a native terminal inserts its escaped path;
@@ -150,13 +150,13 @@ const TerminalPane = forwardRef(function TerminalPane(
     // these a drop does nothing useful. dragover must preventDefault for the
     // drop event to fire at all.
     const onDragOver = (e) => {
-      if (!e.dataTransfer) return;
+      if (!e.dataTransfer) {return;}
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     };
     const onDrop = (e) => {
       const data = e.dataTransfer;
-      if (!data) return;
+      if (!data) {return;}
       e.preventDefault();
       e.stopImmediatePropagation();
       const action = decideTerminalPaste(
@@ -165,12 +165,12 @@ const TerminalPane = forwardRef(function TerminalPane(
         window.avb.getFilePath,
         isWindows()
       );
-      if (action.kind === 'paths') termRef.current?.paste(action.text);
-      else if (action.kind === 'image') void pasteImage(action.file);
+      if (action.kind === 'paths') {termRef.current?.paste(action.text);}
+      else if (action.kind === 'image') {void pasteImage(action.file);}
       else {
         // Dropped text has no xterm fallback (unlike paste) — insert it here.
         const text = data.getData('text/plain');
-        if (text) termRef.current?.paste(text);
+        if (text) {termRef.current?.paste(text);}
       }
     };
 
@@ -184,7 +184,7 @@ const TerminalPane = forwardRef(function TerminalPane(
       const wantsPaste = isMac()
         ? e.metaKey && e.shiftKey && !e.ctrlKey && !e.altKey
         : e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey;
-      if (!wantsPaste || e.key.toLowerCase() !== 'v') return;
+      if (!wantsPaste || e.key.toLowerCase() !== 'v') {return;}
       e.preventDefault();
       e.stopImmediatePropagation();
       window.avb.nativePaste();
@@ -196,9 +196,9 @@ const TerminalPane = forwardRef(function TerminalPane(
     host.addEventListener('drop', onDrop, true);
 
     const init = () => {
-      if (initialized.current) return;
+      if (initialized.current) {return;}
       // Wait for the host to have dimensions — the dock starts collapsed.
-      if (host.offsetWidth === 0 || host.offsetHeight === 0) return;
+      if (host.offsetWidth === 0 || host.offsetHeight === 0) {return;}
       initialized.current = true;
 
       const term = new Terminal({
@@ -223,7 +223,7 @@ const TerminalPane = forwardRef(function TerminalPane(
         // RAF waits it out, then unlocks fits.
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
-            if (runDisposed) return;
+            if (runDisposed) {return;}
             ready.current = true;
             safeFit();
             term.focus();
@@ -239,7 +239,7 @@ const TerminalPane = forwardRef(function TerminalPane(
       // that do this re-emit on every prompt, so the dock drops repeats rather
       // than re-rendering the tab bar.
       term.onTitleChange((title) => {
-        if (!runDisposed) onTitleChangeRef.current?.(title);
+        if (!runDisposed) {onTitleChangeRef.current?.(title);}
       });
 
       // Show the scroll-to-bottom button when the user has scrolled up. Uses
@@ -254,7 +254,7 @@ const TerminalPane = forwardRef(function TerminalPane(
       });
 
       const offData = window.avb.onTerminalData(({ id, data }) => {
-        if (id !== terminalId || runDisposed || !termRef.current) return;
+        if (id !== terminalId || runDisposed || !termRef.current) {return;}
         try {
           // The write callback fires once xterm has actually parsed this chunk,
           // so acking from here reports real render progress and lets main
@@ -267,7 +267,7 @@ const TerminalPane = forwardRef(function TerminalPane(
         }
       });
       const offExit = window.avb.onTerminalExit(({ id, exitCode }) => {
-        if (id !== terminalId || runDisposed || !termRef.current) return;
+        if (id !== terminalId || runDisposed || !termRef.current) {return;}
         termRef.current.write(
           `\r\n\x1b[90m[process exited${exitCode ? ` with code ${exitCode}` : ''}]\x1b[0m\r\n`
         );
@@ -280,13 +280,13 @@ const TerminalPane = forwardRef(function TerminalPane(
       window.avb
         .startTerminal({ id: terminalId, cwd: projectPath, autoLaunch: autoLaunchRef.current })
         .then((result) => {
-          if (runDisposed) return;
+          if (runDisposed) {return;}
           if (!result?.ok && result?.error) {
             term.writeln(`\r\n\x1b[31m${result.error}\x1b[0m\r\n`);
           }
         })
         .catch((err) => {
-          if (runDisposed) return;
+          if (runDisposed) {return;}
           // The IPC handler rejected outright. Without this the failure is
           // swallowed and the pane just stays blank — no prompt, no error.
           term.writeln(`\r\n\x1b[31mFailed to start terminal: ${err?.message || err}\x1b[0m\r\n`);

@@ -296,7 +296,7 @@ async function switchBranch(git, { projectPath, branch, create, parkFirst, park,
   let parked = false;
   // Only when asked. Creating a branch carries the work onto it, which is what
   // starting a branch from what is in front of you means.
-  if (parkFirst && !create && park) parked = await park();
+  if (parkFirst && !create && park) {parked = await park();}
   // `switch`, not `checkout`: it does one thing, and it cannot silently detach
   // HEAD or restore a file over a mistyped branch name.
   try {
@@ -304,7 +304,7 @@ async function switchBranch(git, { projectPath, branch, create, parkFirst, park,
   } catch (err) {
     // Put the work straight back rather than leaving it stashed behind a
     // branch change that never happened.
-    if (parked && unpark) await unpark(from);
+    if (parked && unpark) {await unpark(from);}
     const detail = String(err.stderr || err.message || '');
     if (/would be overwritten|Please commit your changes|overwritten by/i.test(detail)) {
       const files = detail

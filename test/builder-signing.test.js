@@ -28,7 +28,7 @@ function loadSigning(source) {
       exec: async (command, args) => {
         assert.equal(command, '/usr/bin/security');
         calls.push([...args]);
-        if (args[0] === 'create-keychain') keychainPassword = args[args.indexOf('-p') + 1];
+        if (args[0] === 'create-keychain') {keychainPassword = args[args.indexOf('-p') + 1];}
         if (args[0] === 'set-key-partition-list') {
           assert.equal(args[args.indexOf('-k') + 1], keychainPassword, 'ACL must authenticate with the keychain password');
         }
@@ -38,7 +38,7 @@ function loadSigning(source) {
     'bluebird-lst': { default: {
       map: (items, callback) => Promise.all(items.map(callback)),
       mapSeries: async (items, callback) => {
-        for (const item of items) await callback(item);
+        for (const item of items) {await callback(item);}
       },
     } },
     'lazy-val': { Lazy: class {} },

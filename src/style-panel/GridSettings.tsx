@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
@@ -29,7 +27,7 @@ type LabelProps = { read: Read; busy: boolean; clearProp: ClearProp; onProvenanc
 
 const val = (read: Read, prop: string): string => {
   const r = read(prop)
-  if (!r) return ''
+  if (!r) {return ''}
   return (r.source === 'selected' && r.selectedValue ? r.selectedValue.value : r.winner.value).trim()
 }
 
@@ -85,7 +83,7 @@ function TrackInput({ value, placeholder, ariaLabel, busy, onCommit }: {
 }) {
   const [text, setText] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setText(value) }, [value])
+  useEffect(() => { if (!focused.current) {setText(value)} }, [value])
   // No onInput: a track list has no preview channel, only the real write, so the drag
   // moves the field's text and writes once on release rather than at pointer speed.
   const scrub = useScrub({
@@ -111,7 +109,7 @@ function TrackInput({ value, placeholder, ariaLabel, busy, onCommit }: {
         if (e.key === 'Enter') { e.currentTarget.blur(); return }
         // ↑/↓ step the number under the caret (unit preserved) and apply immediately.
         const stepped = handleArrowStep(e)
-        if (!stepped) return
+        if (!stepped) {return}
         e.preventDefault()
         e.currentTarget.value = stepped.text
         e.currentTarget.setSelectionRange(stepped.caret, stepped.caret)
@@ -143,17 +141,17 @@ function TrackSizeEditor({ track, busy, autoFit, onChange }: { track: string; bu
     return m ? parseTrackSize(m[1].trim()) : null
   })()
   const switchMode = (mode: 'default' | 'minmax') => {
-    if (mode === size.mode) return
+    if (mode === size.mode) {return}
     const base = autoFitInner ?? size
     if (mode === 'minmax') {
-      if (base.mode === 'minmax') onChange(base)
+      if (base.mode === 'minmax') {onChange(base)}
       // Min 0px (Webflow's minmax default) so a track can shrink to nothing rather than
       // being held open by its content — matches the count stepper's new-column default.
       // The unit matters: a bare `0` makes Webflow read the grid-template as a custom value.
-      else onChange({ mode: 'minmax', min: '0px', max: base.value || '1fr' })
+      else {onChange({ mode: 'minmax', min: '0px', max: base.value || '1fr' })}
     } else {
-      if (base.mode === 'default') onChange(base)
-      else onChange({ mode: 'default', value: base.max || base.min || 'auto' })
+      if (base.mode === 'default') {onChange(base)}
+      else {onChange({ mode: 'default', value: base.max || base.min || 'auto' })}
     }
   }
   return (
@@ -210,7 +208,7 @@ function TrackPopover({ anchorEl, onClose, children }: { anchorEl: HTMLElement; 
   const [span] = useState(() => panelSpan(anchorEl))
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el) {return}
     const anchor = anchorEl.getBoundingClientRect()
     const gap = 8
     const h = el.offsetHeight
@@ -226,9 +224,9 @@ function TrackPopover({ anchorEl, onClose, children }: { anchorEl: HTMLElement; 
     // if this handler closed it first, that same click would immediately re-open it.
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node
-      if (!ref.current?.contains(t) && !anchorEl.contains(t)) onClose()
+      if (!ref.current?.contains(t) && !anchorEl.contains(t)) {onClose()}
     }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
     const onScroll = () => onClose()
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -276,7 +274,7 @@ function ExpressionField({ prop, value, title, busy, onCommit }: {
 }) {
   const [text, setText] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setText(value) }, [value])
+  useEffect(() => { if (!focused.current) {setText(value)} }, [value])
   // Whatever is in the field is the value, `!important` included — this is the
   // way in for everything the track controls have no way to say.
   const commit = (typed: string) => {
@@ -365,8 +363,8 @@ function TrackSection({ title, prop, axis, setProp, labels }: {
   // A value that says which form it is IS the setting; remember it for the next
   // time the value can't say (emptied, down to one track).
   useEffect(() => {
-    if (form === 'repeat') setPreferRepeat(true)
-    else if (form === 'list') setPreferRepeat(false)
+    if (form === 'repeat') {setPreferRepeat(true)}
+    else if (form === 'list') {setPreferRepeat(false)}
   }, [form])
   // Under two tracks there is nothing a repeat() would say differently, so the
   // switch stays available and simply waits.
@@ -376,7 +374,7 @@ function TrackSection({ title, prop, axis, setProp, labels }: {
   // adding a track to a repeat() keeps it one.
   const asWritten = (next: string[]) =>
     repeatOn && same(next) ? `repeat(${next.length}, ${next[0]})` : serializeTrackList(next)
-  const write = (next: string[]) => { const s = asWritten(next); if (s) setProp(prop, s, false); else clearProp(prop) }
+  const write = (next: string[]) => { const s = asWritten(next); if (s) {setProp(prop, s, false);} else {clearProp(prop)} }
   // Auto-fit wraps the whole track list in repeat(auto-fit, …) — valid only when every
   // track is a `<fixed-size>` (a fixed length or a minmax() with a fixed min, e.g.
   // minmax(20rem, 1fr)); otherwise the warning explains why.
@@ -434,7 +432,7 @@ function TrackSection({ title, prop, axis, setProp, labels }: {
   const setTrack = (i: number, size: TrackSize) => write(tracks.map((t, k) => (k === i ? serializeTrackSize(size) : t)))
   const duplicate = (i: number) => write([...tracks.slice(0, i + 1), tracks[i], ...tracks.slice(i + 1)])
   const reorder = (from: number, to: number) => {
-    if (from === to) return
+    if (from === to) {return}
     const next = [...tracks]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
@@ -461,9 +459,9 @@ function TrackSection({ title, prop, axis, setProp, labels }: {
           title={title}
           onChange={(next) => {
             setPreferRepeat(next)
-            if (!tracks.length) return
+            if (!tracks.length) {return}
             const value = next ? asRepeat(rawTemplate) : asTrackList(rawTemplate)
-            if (value) setProp(prop, value, false)
+            if (value) {setProp(prop, value, false)}
           }}
         />
         <button
@@ -493,7 +491,7 @@ function TrackSection({ title, prop, axis, setProp, labels }: {
           value={shown}
           title={title}
           busy={busy}
-          onCommit={(v, imp) => { if (v) setProp(prop, v, imp); else clearProp(prop) }}
+          onCommit={(v, imp) => { if (v) {setProp(prop, v, imp);} else {clearProp(prop)} }}
         />
       ) : tracks.length ? (
         <ul className="embed-editor_grid-track-list">
@@ -504,7 +502,7 @@ function TrackSection({ title, prop, axis, setProp, labels }: {
                 key={i}
                 className={`embed-editor_grid-track ${isOpen ? 'is-open' : ''} ${dragOver === i ? 'is-drop-target' : ''} ${dragFrom === i ? 'is-dragging' : ''}`}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(i) }}
-                onDrop={(e) => { e.preventDefault(); if (dragFrom != null) reorder(dragFrom, i); setDragFrom(null); setDragOver(null) }}
+                onDrop={(e) => { e.preventDefault(); if (dragFrom != null) {reorder(dragFrom, i);} setDragFrom(null); setDragOver(null) }}
               >
                 <div className="embed-editor_grid-track-row">
                   <span
@@ -554,7 +552,7 @@ function AutoSection({ title, prop, axis, setProp, labels }: {
     : 'Define the sizing for all automatically created rows.'
   const setSize = (size: TrackSize) => {
     const v = serializeTrackSize(size)
-    if (v && v.toLowerCase() !== 'auto') setProp(prop, v, false); else clearProp(prop)
+    if (v && v.toLowerCase() !== 'auto') {setProp(prop, v, false);} else {clearProp(prop)}
   }
   return (
     <section className="embed-editor_grid-section">
@@ -599,8 +597,8 @@ const AreaIcon = () => (
 function AreaNameInput({ value, busy, onCommit }: { value: string; busy: boolean; onCommit: (v: string) => void }) {
   const [text, setText] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setText(value) }, [value])
-  const commit = () => { const t = text.trim(); if (t) onCommit(t); else setText(value) }
+  useEffect(() => { if (!focused.current) {setText(value)} }, [value])
+  const commit = () => { const t = text.trim(); if (t) {onCommit(t);} else {setText(value)} }
   return (
     <input
       className="u-input embed-editor_size-input"
@@ -611,7 +609,7 @@ function AreaNameInput({ value, busy, onCommit }: { value: string; busy: boolean
       onChange={(e) => setText(e.target.value.replace(/\s+/g, ''))}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; commit() }}
-      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+      onKeyDown={(e) => { if (e.key === 'Enter') {e.currentTarget.blur()} }}
     />
   )
 }
@@ -620,7 +618,7 @@ function AreaNameInput({ value, busy, onCommit }: { value: string; busy: boolean
 function AreaNumInput({ value, ariaLabel, busy, onCommit }: { value: number; ariaLabel: string; busy: boolean; onCommit: (n: number) => void }) {
   const [text, setText] = useState(String(value))
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setText(String(value)) }, [value])
+  useEffect(() => { if (!focused.current) {setText(String(value))} }, [value])
   const clampN = (n: number) => Math.max(1, Math.min(999, n))
   const commit = (t: string) => { const n = parseInt(t, 10); if (Number.isNaN(n)) { setText(String(value)); return } onCommit(clampN(n)) }
   return (
@@ -680,7 +678,7 @@ function AreaEditor({ area, busy, onChange }: { area: GridArea; busy: boolean; o
 function AreasSection({ setProp, labels }: { setProp: SetProp; labels: LabelProps }) {
   const { read, busy, clearProp, onProvenance, onSelectSelector } = labels
   const areas = parseAreas(val(read, 'grid-template-areas'))
-  const write = (next: GridArea[]) => { const s = serializeAreas(next); if (s) setProp('grid-template-areas', s, false); else clearProp('grid-template-areas') }
+  const write = (next: GridArea[]) => { const s = serializeAreas(next); if (s) {setProp('grid-template-areas', s, false);} else {clearProp('grid-template-areas')} }
   const [openName, setOpenName] = useState<string | null>(null)
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const openArea = openName != null ? areas.find((a) => a.name === openName) ?? null : null
@@ -691,7 +689,7 @@ function AreasSection({ setProp, labels }: { setProp: SetProp; labels: LabelProp
   }
   const update = (name: string, patch: Partial<GridArea>) => {
     write(areas.map((a) => (a.name === name ? { ...a, ...patch } : a)))
-    if (patch.name) setOpenName(patch.name) // follow a rename so the editor stays open
+    if (patch.name) {setOpenName(patch.name)} // follow a rename so the editor stays open
   }
   const remove = (name: string) => { write(areas.filter((a) => a.name !== name)); setOpenName((o) => (o === name ? null : o)) }
   const openAt = (name: string, el: HTMLElement) => {
@@ -742,12 +740,12 @@ function AreasSection({ setProp, labels }: { setProp: SetProp; labels: LabelProp
 
 function Modal({ onClose, children }: { onClose: () => void; children: ReactNode }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
   return createPortal(
-    <div className="embed-editor_bg-modal-backdrop style-panel-surface" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="embed-editor_bg-modal-backdrop style-panel-surface" onMouseDown={(e) => { if (e.target === e.currentTarget) {onClose()} }}>
       <div className="embed-editor_grid-modal u-surface-surface" role="dialog" aria-modal="true" aria-label="Grid settings">
         <div className="embed-editor_grid-modal-head">
           <span className="embed-editor_grid-modal-title">Grid settings</span>

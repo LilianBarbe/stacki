@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { parseHideable, serializeHideable, type Hideable } from './lib/hideable'
 import TransformSettings from './TransformSettings'
@@ -59,7 +57,7 @@ type Props = {
 type Display = { present: boolean; isSelected: boolean; overridden: boolean; winnerSelector: string; value: string; important: boolean }
 
 function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }
+  if (!resolved) {return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }}
   const isSelected = resolved.source === 'selected'
   const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner
   return { present: true, isSelected, overridden: resolved.overridden, winnerSelector: resolved.winner.selectorText, value: source.value, important: source.important }
@@ -67,7 +65,7 @@ function displayOf(resolved: ResolvedProp | undefined): Display {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 
@@ -111,8 +109,8 @@ function OutlineColor({ props, value }: { props: Props; value: string }) {
         ariaLabel="Outline color"
         onChange={(c, live) => {
           noteLive(live ? c : null)
-          if (live) liveSetProp('outline-color', c, false)
-          else setProp('outline-color', c, false)
+          if (live) {liveSetProp('outline-color', c, false)}
+          else {setProp('outline-color', c, false)}
         }}
       />
       <LiveText prop="outline-color" placeholder="currentColor" props={props} dragging={shown === value ? undefined : shown} />
@@ -129,7 +127,7 @@ function LiveText({ prop, placeholder, props, dragging }: { prop: string; placeh
   const [draft, setDraft] = useState(external)
   const focused = useRef(false)
   const timer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
+  useEffect(() => { if (!focused.current) {setDraft(external)} }, [external])
   const cancel = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null } }
   useEffect(() => cancel, [])
   // Undelayed live write for the scrub, which throttles its own — see useScrub.
@@ -164,7 +162,7 @@ function LiveText({ prop, placeholder, props, dragging }: { prop: string; placeh
       onKeyDown={(e) => {
         if (e.key === 'Enter') { commitInPlace(e.currentTarget); return }
         const stepped = handleArrowStep(e)
-        if (!stepped) return
+        if (!stepped) {return}
         e.preventDefault()
         e.currentTarget.value = stepped.text
         e.currentTarget.setSelectionRange(stepped.caret, stepped.caret)
@@ -240,7 +238,7 @@ function CustomInput({ prop, value, placeholder, busy, autoFocus, setProp, liveS
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
   const timer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancel = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null } }
   useEffect(() => cancel, [])
   const live = (text: string) => {
@@ -262,7 +260,7 @@ function CustomInput({ prop, value, placeholder, busy, autoFocus, setProp, liveS
       onChange={(e) => { setDraft(e.target.value); live(e.target.value) }}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; cancel(); commit() }}
-      onKeyDown={(e) => { if (e.key === 'Enter') commitInPlace(e.currentTarget) }}
+      onKeyDown={(e) => { if (e.key === 'Enter') {commitInPlace(e.currentTarget)} }}
       disabled={busy}
       spellCheck={false}
       placeholder={placeholder}
@@ -334,9 +332,9 @@ function OpacityRow({ props }: { props: Props }) {
   /** The percentage a value reads as, or null when it isn't a number at all. */
   const pctOf = (v: string): number | null => {
     const t = v.trim()
-    if (!t) return null
+    if (!t) {return null}
     const n = parseFloat(t)
-    if (Number.isNaN(n) || !/^[-+]?[\d.]+%?$/.test(t)) return null
+    if (Number.isNaN(n) || !/^[-+]?[\d.]+%?$/.test(t)) {return null}
     return Math.round(t.includes('%') ? n : n * 100)
   }
   const authored = pctOf(raw)
@@ -362,14 +360,14 @@ function OpacityRow({ props }: { props: Props }) {
   const fieldText = asNumber ? shown(pct) : raw
   const [text, setText] = useState(fieldText)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setText(fieldText) }, [fieldText])
+  useEffect(() => { if (!focused.current) {setText(fieldText)} }, [fieldText])
   const parse = (t: string) => { const n = parseFloat(t); return Number.isNaN(n) ? null : clamp(n) }
   const scrub = useScrub({
     value: text,
     disabled: busy,
     onPreview: setText,
-    onInput: (t) => { const n = parse(t); if (n != null) live(n) },
-    onCommit: (t) => { setText(t); const n = parse(t); if (n != null) commit(n); else setText(String(pct)) },
+    onInput: (t) => { const n = parse(t); if (n != null) {live(n)} },
+    onCommit: (t) => { setText(t); const n = parse(t); if (n != null) {commit(n);} else {setText(String(pct))} },
   })
 
   return (
@@ -377,9 +375,9 @@ function OpacityRow({ props }: { props: Props }) {
       <EffLabel label="Opacity" prop="opacity" props={props} />
       <div className="embed-editor_shadow-field">
         <DragSlider value={pct} min={0} max={100} disabled={busy} ariaLabel="Opacity"
-          onPreview={(p) => { if (!focused.current) setText(shown(p)) }}
+          onPreview={(p) => { if (!focused.current) {setText(shown(p))} }}
           onInput={live}
-          onCommit={(p) => { if (!focused.current) setText(shown(p)); commit(p) }} />
+          onCommit={(p) => { if (!focused.current) {setText(shown(p));} commit(p) }} />
         <div className="embed-editor_field embed-editor_grad-num embed-editor_opacity-num">
           <VariableConnect className="is-fill" ariaLabel="Connect Opacity to a variable" disabled={busy} prop="opacity" onPick={(binding) => setProp('opacity', binding, false)}>
           <input
@@ -391,27 +389,27 @@ function OpacityRow({ props }: { props: Props }) {
             disabled={busy}
             aria-label="Opacity percent"
             onFocus={() => { focused.current = true }}
-            onChange={(e) => { setText(e.target.value); const n = pctOf(e.target.value); if (n != null) live(n) }}
+            onChange={(e) => { setText(e.target.value); const n = pctOf(e.target.value); if (n != null) {live(n)} }}
             onBlur={() => {
               focused.current = false
               const t = text.trim()
-              if (t === fieldText) return // untouched — a var()/expression stays as it is
+              if (t === fieldText) {return} // untouched — a var()/expression stays as it is
               const n = pctOf(t)
               // A number becomes an opacity; anything else (a var(), a calc()) is
               // written as it stands, so a variable typed in here survives.
               if (n != null) { commit(n); setText(shown(clamp(n))) }
-              else if (t) setProp('opacity', t, false)
-              else setText(fieldText)
+              else if (t) {setProp('opacity', t, false)}
+              else {setText(fieldText)}
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') { commitInPlace(e.currentTarget); return }
               const stepped = handleArrowStep(e)
-              if (!stepped) return
+              if (!stepped) {return}
               e.preventDefault()
               e.currentTarget.value = stepped.text
               e.currentTarget.setSelectionRange(stepped.caret, stepped.caret)
               setText(stepped.text)
-              const n = parse(stepped.text); if (n != null) live(n)
+              const n = parse(stepped.text); if (n != null) {live(n)}
             }}
           />
           </VariableConnect>
@@ -453,13 +451,13 @@ function FiltersRow({ prop, label, props }: { prop: string; label: string; props
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const write = (next: Array<Hideable<Filter>>, live: boolean) => {
     const value = serializeHideable(next, ' ', serializeFilters)
-    if (live) { if (value) liveSetProp(prop, value, false); return }
-    if (value) setProp(prop, value, false); else clearProp(prop)
+    if (live) { if (value) {liveSetProp(prop, value, false);} return }
+    if (value) {setProp(prop, value, false);} else {clearProp(prop)}
   }
   const add = () => { const next = [...rows, { item: blankFilter(), hidden: false }]; write(next, false); setOpenIdx(next.length - 1) }
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
+    if (from === to) {return}
     const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
@@ -509,7 +507,7 @@ const AXIS_CFG: Record<TransformType, { unit: string; min: number; max: number; 
 // unit); null for var()/calc()/… so the slider disables but the field stays editable.
 function parseAxis(value: string, fallbackUnit: string): { num: number; unit: string } | null {
   const m = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i)
-  if (!m) return null
+  if (!m) {return null}
   // `none` isn't a real axis unit — never re-attach it (that's what produces `1none`).
   const raw = m[2].toLowerCase() === 'none' ? '' : m[2]
   return { num: parseFloat(m[1]), unit: raw || fallbackUnit }
@@ -533,10 +531,10 @@ function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, o
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
   const timer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancel = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null } }
   useEffect(() => cancel, [])
-  const liveNow = (text: string) => { const t = text.trim(); if (t) onLive(t) }
+  const liveNow = (text: string) => { const t = text.trim(); if (t) {onLive(t)} }
   const live = (text: string) => { cancel(); timer.current = window.setTimeout(() => liveNow(text), 100) }
   const commit = (text = draft) => { const t = text.trim(); onCommit(t || placeholder) }
   const scrub = useScrub({
@@ -556,7 +554,7 @@ function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, o
           max={cfg.max * cfg.steps}
           disabled={busy || !parsed}
           ariaLabel={label}
-          onPreview={(s) => { const v = fmt(s); if (!focused.current) setDraft(v); onPreview?.(v) }}
+          onPreview={(s) => { const v = fmt(s); if (!focused.current) {setDraft(v);} onPreview?.(v) }}
           onInput={(s) => onLive(fmt(s))}
           onCommit={(s) => onCommit(fmt(s))}
         />
@@ -570,7 +568,7 @@ function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, o
           onKeyDown={(e) => {
             if (e.key === 'Enter') { commitInPlace(e.currentTarget); return }
             const stepped = handleArrowStep(e)
-            if (!stepped) return
+            if (!stepped) {return}
             e.preventDefault()
             e.currentTarget.value = stepped.text
             e.currentTarget.setSelectionRange(stepped.caret, stepped.caret)
@@ -674,15 +672,15 @@ function TransformsRow({ props }: { props: Props }) {
   const settingsRef = useRef<HTMLButtonElement>(null)
   const put = (next: Array<Hideable<Transform>>, distance: string, live: boolean) => {
     const value = withSelfPerspective(serializeHideable(next, ' ', serializeTransforms), distance)
-    if (live) { if (value) liveSetProp('transform', value, false); return }
-    if (value) setProp('transform', value, false); else clearProp('transform')
+    if (live) { if (value) {liveSetProp('transform', value, false);} return }
+    if (value) {setProp('transform', value, false);} else {clearProp('transform')}
   }
   const write = (next: Array<Hideable<Transform>>, live: boolean) => put(next, selfPerspective, live)
   const setSelfPerspective = (distance: string, live: boolean) => put(rows, distance, live)
   const add = () => { const next = [...rows, { item: blankTransform(), hidden: false }]; write(next, false); setOpenIdx(next.length - 1) }
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
+    if (from === to) {return}
     const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
@@ -752,7 +750,7 @@ function EaseCurveIcon({ timing }: { timing: string }) {
 
 function durationToMs(v: string): number {
   const m = v.trim().toLowerCase().match(/^(-?[\d.]+)(ms|s)?$/)
-  if (!m) return 0
+  if (!m) {return 0}
   const n = parseFloat(m[1])
   return m[2] === 's' ? Math.round(n * 1000) : Math.round(n)
 }
@@ -855,13 +853,13 @@ function TransitionsRow({ props }: { props: Props }) {
   const [easingOpen, setEasingOpen] = useState(false)
   const write = (next: Array<Hideable<Transition>>, live: boolean) => {
     const value = serializeHideable(next, ',', serializeTransitions)
-    if (live) { if (value) liveSetProp('transition', value, false); return }
-    if (value) setProp('transition', value, false); else clearProp('transition')
+    if (live) { if (value) {liveSetProp('transition', value, false);} return }
+    if (value) {setProp('transition', value, false);} else {clearProp('transition')}
   }
   const add = () => { const next = [...rows, { item: blankTransition(), hidden: false }]; write(next, false); setOpenIdx(next.length - 1) }
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
+    if (from === to) {return}
     const next = [...rows]; const [m] = next.splice(from, 1); next.splice(to, 0, m); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
@@ -937,13 +935,13 @@ function BoxShadowsRow({ props }: { props: Props }) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const write = (next: Array<Hideable<BoxShadow>>, live: boolean) => {
     const value = serializeHideable(next, ',', serializeBoxShadows)
-    if (live) { if (value) liveSetProp('box-shadow', value, false); return }
-    if (value) setProp('box-shadow', value, false); else clearProp('box-shadow')
+    if (live) { if (value) {liveSetProp('box-shadow', value, false);} return }
+    if (value) {setProp('box-shadow', value, false);} else {clearProp('box-shadow')}
   }
   const add = () => { const next = [...rows, { item: blankBoxShadow(), hidden: false }]; write(next, false); setOpenIdx(next.length - 1) }
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
+    if (from === to) {return}
     const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
@@ -1009,15 +1007,15 @@ function ClipGlyph({ type }: { type: string }) {
 // editor module (and its full parser) into the main bundle.
 function clipPathType(value: string): string {
   const v = value.trim().toLowerCase()
-  if (!v || v === 'none') return 'None'
-  if (v.startsWith('polygon')) return 'Polygon'
-  if (v.startsWith('circle')) return 'Circle'
-  if (v.startsWith('ellipse')) return 'Ellipse'
-  if (v.startsWith('inset') || v.startsWith('rect') || v.startsWith('xywh')) return 'Inset'
-  if (v.startsWith('path')) return 'Path'
-  if (v.startsWith('shape')) return 'Shape'
-  if (v.startsWith('url')) return 'SVG'
-  if (v.startsWith('var')) return 'Variable'
+  if (!v || v === 'none') {return 'None'}
+  if (v.startsWith('polygon')) {return 'Polygon'}
+  if (v.startsWith('circle')) {return 'Circle'}
+  if (v.startsWith('ellipse')) {return 'Ellipse'}
+  if (v.startsWith('inset') || v.startsWith('rect') || v.startsWith('xywh')) {return 'Inset'}
+  if (v.startsWith('path')) {return 'Path'}
+  if (v.startsWith('shape')) {return 'Shape'}
+  if (v.startsWith('url')) {return 'SVG'}
+  if (v.startsWith('var')) {return 'Variable'}
   return 'Custom'
 }
 
@@ -1041,7 +1039,7 @@ function ClipPathModal({ props, onClose }: { props: Props; onClose: () => void }
   const onApply = (value: string) => {
     liveSetProp('clip-path', value, false)
     pending.current = value
-    if (timer.current != null) window.clearTimeout(timer.current)
+    if (timer.current != null) {window.clearTimeout(timer.current)}
     timer.current = window.setTimeout(commit, 350)
   }
   const onClear = () => {
@@ -1050,7 +1048,7 @@ function ClipPathModal({ props, onClose }: { props: Props; onClose: () => void }
     clearProp('clip-path')
   }
   return createPortal(
-    <div className="embed-editor_bg-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="embed-editor_bg-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) {onClose()} }}>
       <div className="embed-editor_clip-modal u-surface-page" role="dialog" aria-modal="true" aria-label="Clip path">
         <div className="embed-editor_clip-modal-head">
           <span className="embed-editor_clip-modal-title">Clip path</span>

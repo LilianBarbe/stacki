@@ -35,8 +35,8 @@ function align(a, b) {
       map.set(i, j);
       i++;
       j++;
-    } else if (table[(i + 1) * (m + 1) + j] >= table[i * (m + 1) + j + 1]) i++;
-    else j++;
+    } else if (table[(i + 1) * (m + 1) + j] >= table[i * (m + 1) + j + 1]) {i++;}
+    else {j++;}
   }
   return map;
 }
@@ -50,7 +50,7 @@ function hunks(a, b) {
   for (let i = 0; i <= a.length; i++) {
     const j = i < a.length ? map.get(i) : b.length;
     if (j === undefined) {
-      if (!open) open = { start: i, from: prevB + 1 };
+      if (!open) {open = { start: i, from: prevB + 1 };}
       continue;
     }
     if (open || j > prevB + 1) {
@@ -72,13 +72,13 @@ function hunks(a, b) {
  * written anyway.
  */
 function transplant(original, before, after) {
-  if (before === after) return original;
+  if (before === after) {return original;}
   const O = original.split('\n');
   const A = before.split('\n');
   const B = after.split('\n');
   const toOriginal = align(A, O);
   const changes = hunks(A, B);
-  if (!changes.length) return original;
+  if (!changes.length) {return original;}
 
   const out = O.slice();
   for (const hunk of changes.reverse()) {
@@ -86,7 +86,7 @@ function transplant(original, before, after) {
     // the same way the original has them, so they can be found in the original
     // and swapped on their own.
     const mapped = [];
-    for (let i = hunk.start; i < hunk.end; i++) mapped.push(toOriginal.get(i));
+    for (let i = hunk.start; i < hunk.end; i++) {mapped.push(toOriginal.get(i));}
     if (mapped.length && mapped.every((at) => at !== undefined)) {
       out.splice(mapped[0], mapped[mapped.length - 1] - mapped[0] + 1, ...hunk.lines);
       continue;
@@ -97,13 +97,13 @@ function transplant(original, before, after) {
     // to anchor against. It is taken along: the region it belongs to can only
     // be replaced whole, so the diff grows by those lines and stops there.
     let start = hunk.start;
-    while (start > 0 && !toOriginal.has(start - 1)) start--;
+    while (start > 0 && !toOriginal.has(start - 1)) {start--;}
     let end = hunk.end;
-    while (end < A.length && !toOriginal.has(end)) end++;
+    while (end < A.length && !toOriginal.has(end)) {end++;}
 
     const from = start === 0 ? 0 : toOriginal.get(start - 1) + 1;
     const to = end === A.length ? O.length : toOriginal.get(end);
-    if (to < from) return after;
+    if (to < from) {return after;}
 
     const lines = [...A.slice(start, hunk.start), ...hunk.lines, ...A.slice(hunk.end, end)];
     out.splice(from, to - from, ...lines);

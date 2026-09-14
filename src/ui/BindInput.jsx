@@ -50,7 +50,7 @@ function readParts(host) {
   const out = [];
   for (const node of host.childNodes) {
     if (node.nodeType === Node.TEXT_NODE) {
-      if (node.nodeValue) out.push({ text: node.nodeValue });
+      if (node.nodeValue) {out.push({ text: node.nodeValue });}
     } else if (node.classList?.contains('expr-chip')) {
       out.push({ expr: node.getAttribute('data-expr') || node.textContent });
     } else if (node.tagName === 'BR') {
@@ -75,7 +75,7 @@ const BindInput = forwardRef(function BindInput(
 
   const emit = () => {
     const host = hostRef.current;
-    if (!host) return;
+    if (!host) {return;}
     lastHtmlRef.current = host.innerHTML;
     onChange?.(readParts(host));
   };
@@ -83,14 +83,14 @@ const BindInput = forwardRef(function BindInput(
   const saveRange = () => {
     const host = hostRef.current;
     const sel = window.getSelection();
-    if (!host || !sel?.rangeCount) return;
+    if (!host || !sel?.rangeCount) {return;}
     const r = sel.getRangeAt(0);
-    if (host.contains(r.commonAncestorContainer)) rangeRef.current = r.cloneRange();
+    if (host.contains(r.commonAncestorContainer)) {rangeRef.current = r.cloneRange();}
   };
 
   useEffect(() => {
     const host = hostRef.current;
-    if (!host) return;
+    if (!host) {return;}
     const html = partsToHtml(parts);
     lastHtmlRef.current = html;
     host.innerHTML = html;
@@ -102,7 +102,7 @@ const BindInput = forwardRef(function BindInput(
   // Never while focused: what's on screen is then the newer of the two.
   useEffect(() => {
     const host = hostRef.current;
-    if (!host || document.activeElement === host) return;
+    if (!host || document.activeElement === host) {return;}
     const html = partsToHtml(parts);
     if (html !== lastHtmlRef.current) {
       lastHtmlRef.current = html;
@@ -115,7 +115,7 @@ const BindInput = forwardRef(function BindInput(
     // nobody has clicked into yet leaves it.
     insert(path) {
       const host = hostRef.current;
-      if (!host) return;
+      if (!host) {return;}
       host.focus();
       const sel = window.getSelection();
       const saved = rangeRef.current;
@@ -136,7 +136,7 @@ const BindInput = forwardRef(function BindInput(
     // Same chip, different data: the one already in the field is repointed
     // rather than replaced, so the text around it never moves.
     replace(chip, path) {
-      if (!chip) return;
+      if (!chip) {return;}
       const full = chip.getAttribute('data-full');
       if (full) {
         // A chip reached through a `?` writes only its tail. Repointing it
@@ -213,7 +213,7 @@ const BindInput = forwardRef(function BindInput(
       }}
       onMouseDown={(e) => {
         const chip = e.target.closest?.('.expr-chip');
-        if (!chip) return;
+        if (!chip) {return;}
         // The caret must not land inside a chip: it is one thing, and half of
         // a path is not a value.
         e.preventDefault();

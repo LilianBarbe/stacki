@@ -16,7 +16,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -112,7 +112,7 @@ const STYLESHEET = `/* =========================================================
     cssVariables: async () => cssVars.readVariables(dir),
     addCssVariables: async ({ adds }) => {
       let last = { ok: true };
-      for (const a of adds) last = cssVars.addVariable(dir, a);
+      for (const a of adds) {last = cssVars.addVariable(dir, a);}
       return last;
     },
     setCssVariable: async ({ projectPath, ...edit }) => cssVars.setVariable(dir, edit),
@@ -188,7 +188,7 @@ const STYLESHEET = `/* =========================================================
     const swatchFor = (name) => {
       const named = all('.vars-fixed .vars-name-text').find((n) => n.textContent === name);
       const table = named?.closest('.vars-table');
-      if (!table) return null;
+      if (!table) {return null;}
       const at = [...table.querySelectorAll('.vars-fixed .vars-name-text')].findIndex(
         (n) => n.textContent === name
       );
@@ -249,7 +249,7 @@ const STYLESHEET = `/* =========================================================
   {
     const badgeFor = (name) => {
       const row = all('.vars-fixed .vars-name-text').findIndex((n) => n.textContent === name);
-      if (row < 0) return null;
+      if (row < 0) {return null;}
       const table = all('.vars-fixed .vars-name-text')[row].closest('.vars-table');
       const at = [...table.querySelectorAll('.vars-fixed .vars-name-text')].findIndex((n) => n.textContent === name);
       const valueRows = table.querySelectorAll('.vars-scroll .vars-row:not(.is-head):not(.vars-section)');
@@ -874,7 +874,7 @@ const STYLESHEET = `/* =========================================================
   await show(0);
   const clickName = async (label) => {
     const button = all('.vars-name .vars-rename').find((b) => b.textContent === label);
-    if (!button) return null;
+    if (!button) {return null;}
     await act(async () => {
       button.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       await settle(20);
@@ -933,7 +933,7 @@ const STYLESHEET = `/* =========================================================
     const openMenu = async (title) => {
       const head = all('.vars-section').find((h) => h.textContent.includes(title));
       const dots = head?.querySelector('.vars-section-menu');
-      if (!dots) return null;
+      if (!dots) {return null;}
       await act(async () => {
         dots.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
         await settle(20);
@@ -1002,7 +1002,7 @@ const STYLESHEET = `/* =========================================================
     const openMenu = async (title) => {
       const head = all('.vars-section').find((h) => h.textContent.includes(title));
       const dots = head?.querySelector('.vars-section-menu');
-      if (!dots) return null;
+      if (!dots) {return null;}
       await act(async () => {
         dots.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
         await settle(20);
@@ -1157,7 +1157,7 @@ const STYLESHEET = `/* =========================================================
     const title = swatches?.textContent.trim();
     const firstName = () => (fs.readFileSync(file, 'utf8').match(/--[\w-]+:/) || [''])[0].replace(':', '');
     check('there are headings to drag', !!swatches && !!headings, heads.map((h) => h.textContent.trim()).join('|'));
-    if (!swatches || !headings) return;
+    if (!swatches || !headings) {return;}
     // jsdom measures nothing, so the two headings are given boxes and the drop
     // lands past everything — the end of the rule.
     const box = (node, top) => {

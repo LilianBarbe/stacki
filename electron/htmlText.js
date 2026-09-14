@@ -43,14 +43,14 @@ function decodeEntities(text) {
         body[1] === 'x' || body[1] === 'X'
           ? parseInt(body.slice(2), 16)
           : parseInt(body.slice(1), 10);
-      if (!Number.isFinite(code) || code < 1 || code > 0x10ffff) return whole;
+      if (!Number.isFinite(code) || code < 1 || code > 0x10ffff) {return whole;}
       try {
         return String.fromCodePoint(code);
       } catch {
         return whole;
       }
     }
-    if (Object.hasOwn(NAMED, body)) return NAMED[body];
+    if (Object.hasOwn(NAMED, body)) {return NAMED[body];}
     const lower = body.toLowerCase();
     return Object.hasOwn(NAMED, lower) ? NAMED[lower] : whole;
   });

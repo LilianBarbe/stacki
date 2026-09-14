@@ -19,7 +19,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -97,7 +97,7 @@ const check = (what, condition, detail) => {
     const box = () => host.querySelector('.bind-input');
     const type = async (text) => {
       const el = box();
-      if (!el) return false;
+      if (!el) {return false;}
       await act(async () => {
         el.textContent = text;
         el.dispatchEvent(new dom.window.Event('input', { bubbles: true }));

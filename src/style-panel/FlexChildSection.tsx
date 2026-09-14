@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import { SegBar, StackedField, LiveInput, PropLabel, GroupLabel, displayOf, type Props, type Seg } from './TypographySection'
 import { parseFlexShorthand } from './lib/webflow'
@@ -167,13 +165,13 @@ function flexCurrent(read: Props['read']): string {
   let grow: string, shrink: string, basis: string
   if (shorthand.present) {
     const parsed = parseFlexShorthand(shorthand.value)
-    if (!parsed) return norm(shorthand.value) // a CSS-wide keyword etc. → custom
+    if (!parsed) {return norm(shorthand.value)} // a CSS-wide keyword etc. → custom
     grow = parsed['flex-grow']; shrink = parsed['flex-shrink']; basis = parsed['flex-basis']
   } else {
     const g = displayOf(read('flex-grow'))
     const s = displayOf(read('flex-shrink'))
     const b = displayOf(read('flex-basis'))
-    if (!g.present && !s.present && !b.present) return '0 1 auto'
+    if (!g.present && !s.present && !b.present) {return '0 1 auto'}
     grow = g.present ? norm(g.value) : '0'
     shrink = s.present ? norm(s.value) : '1'
     basis = b.present ? norm(b.value) : 'auto'
@@ -193,19 +191,19 @@ function flexLabelProp(read: Props['read']): string {
 
 function alignSelfCurrent(read: Props['read']): string {
   const d = displayOf(read('align-self'))
-  if (!d.present) return 'auto'
+  if (!d.present) {return 'auto'}
   const v = norm(d.value)
-  if (v === 'start' || v === 'self-start') return 'flex-start'
-  if (v === 'end' || v === 'self-end') return 'flex-end'
+  if (v === 'start' || v === 'self-start') {return 'flex-start'}
+  if (v === 'end' || v === 'self-end') {return 'flex-end'}
   return v || 'auto'
 }
 
 function justifySelfCurrent(read: Props['read']): string {
   const d = displayOf(read('justify-self'))
-  if (!d.present) return 'auto'
+  if (!d.present) {return 'auto'}
   const v = norm(d.value)
-  if (v === 'flex-start' || v === 'self-start' || v === 'left') return 'start'
-  if (v === 'flex-end' || v === 'self-end' || v === 'right') return 'end'
+  if (v === 'flex-start' || v === 'self-start' || v === 'left') {return 'start'}
+  if (v === 'flex-end' || v === 'self-end' || v === 'right') {return 'end'}
   return v || 'auto'
 }
 
@@ -235,9 +233,9 @@ function SizingControl(props: Props) {
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!menuOpen) return
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setMenuOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false) }
+    if (!menuOpen) {return}
+    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setMenuOpen(false)} }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setMenuOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
@@ -252,7 +250,7 @@ function SizingControl(props: Props) {
   const pickPreset = (value: string) => { setMenuOpen(false); setSingleCustom(false); setPanelOpen(false); setProp('flex', value, false) }
   const togglePanel = () => {
     // Opening from a preset seeds a sensible custom starting point (grow 1 / shrink 0 / auto).
-    if (!panelOpen && isPreset) setProp('flex', '1 0 auto', false)
+    if (!panelOpen && isPreset) {setProp('flex', '1 0 auto', false)}
     setPanelOpen((value) => !value)
   }
 
@@ -352,7 +350,7 @@ function splitSlash(value: string): [string, string] {
 function buildLine(start: string, end: string): string {
   const s = start.trim() || 'auto'
   const e = end.trim() || 'auto'
-  if (s === 'auto' && e === 'auto') return ''
+  if (s === 'auto' && e === 'auto') {return ''}
   return e === 'auto' ? s : `${s} / ${e}`
 }
 
@@ -381,7 +379,7 @@ function AxisRow({ axis, label, props: sp }: { axis: 'column' | 'row'; label: st
   const clearAxis = () => {
     clearProp([shortProp, startProp, endProp])
     const sib = displayOf(read(siblingProp))
-    if (sib.present && sib.value.trim()) setProp(siblingProp, sib.value.trim(), sib.important)
+    if (sib.present && sib.value.trim()) {setProp(siblingProp, sib.value.trim(), sib.important)}
   }
 
   // Write the grid-column / grid-row SHORTHAND, combining this edit with the other axis end.
@@ -391,11 +389,11 @@ function AxisRow({ axis, label, props: sp }: { axis: 'column' | 'row'; label: st
     const start = (which === 'start' ? value : startVal).trim()
     const end = (which === 'end' ? value : endVal).trim()
     const line = buildLine(start, end)
-    if (live) { if (line) liveSetProp(shortProp, line, important); return }
+    if (live) { if (line) {liveSetProp(shortProp, line, important);} return }
     if (!line) { clearAxis(); return }
     setProp(shortProp, line, important)
     // Drop any legacy longhands so they can't shadow the shorthand we just wrote.
-    if (startD.present || endD.present) clearProp([startProp, endProp])
+    if (startD.present || endD.present) {clearProp([startProp, endProp])}
   }
 
   // The blue, clearable label is the AXIS (Column / Row) — we write the axis shorthand, so

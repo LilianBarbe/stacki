@@ -59,7 +59,7 @@ const stripLoginDash = (name) => (name.startsWith('-') ? name.slice(1) : name);
 // but truncation keeps the head, so collapse it to the basename first. Titles
 // with spaces ("feat: split a/b") are left alone.
 const shortenPathLike = (label) => {
-  if (/\s/.test(label) || !label.includes('/')) return label;
+  if (/\s/.test(label) || !label.includes('/')) {return label;}
   const parts = label.split('/').filter(Boolean);
   return parts[parts.length - 1] || label;
 };
@@ -90,7 +90,7 @@ export function tabLabel(tab, index) {
 export function tabLabels(tabs) {
   const raw = tabs.map(tabLabel);
   const counts = new Map();
-  for (const label of raw) counts.set(label, (counts.get(label) || 0) + 1);
+  for (const label of raw) {counts.set(label, (counts.get(label) || 0) + 1);}
   return raw.map((label, i) => (counts.get(label) > 1 ? `${label} ${i + 1}` : label));
 }
 
@@ -135,7 +135,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
       const next = tabs.filter((t) => t.id !== id);
       setTabs(next);
       // Fall through to whichever tab slid into the closed one's place.
-      if (activeId === id) setActiveId(next[Math.min(index, next.length - 1)]?.id ?? null);
+      if (activeId === id) {setActiveId(next[Math.min(index, next.length - 1)]?.id ?? null);}
     },
     [tabs, activeId]
   );
@@ -145,7 +145,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
   const seeded = useRef(false);
   useEffect(() => {
     return () => {
-      for (const tab of tabsRef.current) window.avb.closeTerminal({ id: tab.id });
+      for (const tab of tabsRef.current) {window.avb.closeTerminal({ id: tab.id });}
       paneRefs.current.clear();
       nextNumber.current = 1;
       seeded.current = false;
@@ -158,7 +158,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
   // alone: React 18's StrictMode remounts effects before the first setState has
   // flushed, so a length check on its own opens a second, redundant shell.
   useEffect(() => {
-    if (!open || seeded.current) return;
+    if (!open || seeded.current) {return;}
     seeded.current = true;
     createTab();
   }, [open, createTab]);
@@ -214,7 +214,7 @@ export default function TerminalDock({ projectPath, open, onClose }) {
   // carries its own ResizeObserver, but a tab switch reveals one that was
   // display:none and so never saw the resize — this covers that.
   useLayoutEffect(() => {
-    if (!open || !activeId) return;
+    if (!open || !activeId) {return;}
     const pane = paneRefs.current.get(activeId);
     // A frame's grace, so the pane has its final size before it measures.
     const raf = requestAnimationFrame(() => {
@@ -225,8 +225,8 @@ export default function TerminalDock({ projectPath, open, onClose }) {
   }, [open, activeId, height]);
 
   const setPaneRef = useCallback((id, ref) => {
-    if (ref) paneRefs.current.set(id, ref);
-    else paneRefs.current.delete(id);
+    if (ref) {paneRefs.current.set(id, ref);}
+    else {paneRefs.current.delete(id);}
   }, []);
 
   const labels = tabLabels(tabs);

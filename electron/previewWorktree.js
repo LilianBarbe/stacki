@@ -77,7 +77,7 @@ function ensureExcluded(projectPath) {
     fs.mkdirSync(infoDir, { recursive: true });
     const file = path.join(infoDir, 'exclude');
     const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-    if (current.split('\n').some((l) => l.trim() === EXCLUDE_LINE)) return true;
+    if (current.split('\n').some((l) => l.trim() === EXCLUDE_LINE)) {return true;}
     const sep = current && !current.endsWith('\n') ? '\n' : '';
     fs.appendFileSync(
       file,
@@ -167,7 +167,7 @@ async function removeWorktree(git, { projectPath }) {
     fs.rmSync(dir, { recursive: true, force: true });
     // Leave `.stacki` itself only if something else put something in it.
     const parent = path.join(projectPath, '.stacki');
-    if (fs.existsSync(parent) && fs.readdirSync(parent).length === 0) fs.rmdirSync(parent);
+    if (fs.existsSync(parent) && fs.readdirSync(parent).length === 0) {fs.rmdirSync(parent);}
   } catch {
     /* nothing to remove */
   }

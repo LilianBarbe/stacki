@@ -20,24 +20,24 @@
 function objectFrom(src) {
   const body = src.trim().slice(1, -1);
   const parts = splitTop(body);
-  if (!parts) return null;
+  if (!parts) {return null;}
   const fields = [];
   for (const [i, part] of parts.entries()) {
     if (!part.trim()) {
-      if (i === parts.length - 1) continue; // a trailing comma
+      if (i === parts.length - 1) {continue;} // a trailing comma
       return null;
     }
     const colon = topColon(part);
-    if (colon === -1) return null; // shorthand `{ value }` names something else
+    if (colon === -1) {return null;} // shorthand `{ value }` names something else
     const rawKey = part.slice(0, colon).trim();
     const key = /^(['"`])(.*)\1$/.test(rawKey) ? rawKey.slice(1, -1) : rawKey;
     const keyQuote = rawKey[0] === '"' || rawKey[0] === "'" ? rawKey[0] : null;
-    if (!/^[A-Za-z_$][\w$]*$/.test(key)) return null;
+    if (!/^[A-Za-z_$][\w$]*$/.test(key)) {return null;}
     const value = itemFrom(part.slice(colon + 1));
     // A field holds a word or a number. An object inside an object is a shape
     // with no depth of fields to show it in, and the popup would have nowhere
     // to put it.
-    if (!value || value.fields) return null;
+    if (!value || value.fields) {return null;}
     fields.push({ key, keyQuote, text: value.text, quote: value.quote });
   }
   return fields.length ? { fields } : null;
@@ -51,12 +51,12 @@ function topColon(part) {
     if (c === '"' || c === "'" || c === '`') {
       const quote = c;
       i++;
-      while (i < part.length && part[i] !== quote) i += part[i] === '\\' ? 2 : 1;
+      while (i < part.length && part[i] !== quote) {i += part[i] === '\\' ? 2 : 1;}
       continue;
     }
-    if (c === '[' || c === '(' || c === '{') depth++;
-    else if (c === ']' || c === ')' || c === '}') depth--;
-    else if (c === ':' && depth === 0) return i;
+    if (c === '[' || c === '(' || c === '{') {depth++;}
+    else if (c === ']' || c === ')' || c === '}') {depth--;}
+    else if (c === ':' && depth === 0) {return i;}
   }
   return -1;
 }
@@ -64,24 +64,24 @@ function topColon(part) {
 /** A quoted string, a number, an object of those, or nothing this can show. */
 function itemFrom(src) {
   const text = src.trim();
-  if (!text) return null;
-  if (text[0] === '{' && text[text.length - 1] === '}') return objectFrom(text);
+  if (!text) {return null;}
+  if (text[0] === '{' && text[text.length - 1] === '}') {return objectFrom(text);}
   const quote = text[0];
   if (quote === '"' || quote === "'" || quote === '`') {
-    if (text.length < 2 || text[text.length - 1] !== quote) return null;
+    if (text.length < 2 || text[text.length - 1] !== quote) {return null;}
     const body = text.slice(1, -1);
     // A template with a hole in it is code — what it says depends on something
     // else, and a row would have to show the hole rather than the value.
-    if (quote === '`' && /\$\{/.test(body)) return null;
+    if (quote === '`' && /\$\{/.test(body)) {return null;}
     // An unescaped quote inside means the literal ended early: two items were
     // read as one, and this is not the shape it looks like.
     for (let i = 0; i < body.length; i++) {
       if (body[i] === '\\') { i++; continue }
-      if (body[i] === quote) return null;
+      if (body[i] === quote) {return null;}
     }
     return { text: body.replace(/\\(['"`\\])/g, '$1').replace(/\\n/g, '\n'), quote };
   }
-  if (/^[-+]?(\d+\.?\d*|\.\d+)$/.test(text)) return { text, quote: null };
+  if (/^[-+]?(\d+\.?\d*|\.\d+)$/.test(text)) {return { text, quote: null };}
   return null;
 }
 
@@ -95,20 +95,20 @@ function splitTop(body) {
     if (c === '"' || c === "'" || c === '`') {
       const quote = c;
       i++;
-      while (i < body.length && body[i] !== quote) i += body[i] === '\\' ? 2 : 1;
-      if (i >= body.length) return null; // ran off the end inside a string
+      while (i < body.length && body[i] !== quote) {i += body[i] === '\\' ? 2 : 1;}
+      if (i >= body.length) {return null;} // ran off the end inside a string
       continue;
     }
-    if (c === '[' || c === '(' || c === '{') depth++;
+    if (c === '[' || c === '(' || c === '{') {depth++;}
     else if (c === ']' || c === ')' || c === '}') {
       depth--;
-      if (depth < 0) return null;
+      if (depth < 0) {return null;}
     } else if (c === ',' && depth === 0) {
       out.push(body.slice(last, i));
       last = i + 1;
     }
   }
-  if (depth !== 0) return null;
+  if (depth !== 0) {return null;}
   out.push(body.slice(last));
   return out;
 }
@@ -126,20 +126,20 @@ function splitTop(body) {
  */
 export function arrayItems(src) {
   const text = String(src ?? '').trim();
-  if (!text.startsWith('[') || !text.endsWith(']')) return null;
+  if (!text.startsWith('[') || !text.endsWith(']')) {return null;}
   const parts = splitTop(text.slice(1, -1));
-  if (!parts) return null;
+  if (!parts) {return null;}
   const items = [];
   for (const [i, part] of parts.entries()) {
     // A trailing comma leaves one empty part at the end, which is punctuation
     // rather than an item. An empty part anywhere else is a hole — `[a, , b]` —
     // and that is not a list of things.
     if (!part.trim()) {
-      if (i === parts.length - 1) continue;
+      if (i === parts.length - 1) {continue;}
       return null;
     }
     const item = itemFrom(part);
-    if (!item) return null;
+    if (!item) {return null;}
     items.push(item);
   }
   return items;
@@ -198,25 +198,25 @@ export function arrayText(items) {
  */
 export function objectFields(src) {
   const text = String(src ?? '').trim();
-  if (!text.startsWith('{') || !text.endsWith('}')) return null;
+  if (!text.startsWith('{') || !text.endsWith('}')) {return null;}
   const parts = splitTop(text.slice(1, -1));
-  if (!parts) return null;
+  if (!parts) {return null;}
   const out = [];
   for (const [i, part] of parts.entries()) {
     if (!part.trim()) {
-      if (i === parts.length - 1) continue; // a trailing comma
+      if (i === parts.length - 1) {continue;} // a trailing comma
       return null;
     }
     const colon = topColon(part);
-    if (colon === -1) return null; // shorthand `{ legend }` names something else
+    if (colon === -1) {return null;} // shorthand `{ legend }` names something else
     const rawKey = part.slice(0, colon).trim();
     const key = /^(['"`])(.*)\1$/.test(rawKey) ? rawKey.slice(1, -1) : rawKey;
     const keyQuote = rawKey[0] === '"' || rawKey[0] === "'" ? rawKey[0] : null;
-    if (!/^[A-Za-z_$][\w$]*$/.test(key)) return null;
+    if (!/^[A-Za-z_$][\w$]*$/.test(key)) {return null;}
     const raw = part.slice(colon + 1).trim();
     if (raw.startsWith('[')) {
       const items = arrayItems(raw);
-      if (!items) return null; // a list this cannot show is one it must not eat
+      if (!items) {return null;} // a list this cannot show is one it must not eat
       out.push({ key, keyQuote, kind: 'list', items });
       continue;
     }
@@ -229,7 +229,7 @@ export function objectFields(src) {
     }
     const value = itemFrom(raw);
     // An object inside an object has no second level of fields to live in.
-    if (!value || value.fields) return null;
+    if (!value || value.fields) {return null;}
     out.push({
       key,
       keyQuote,
@@ -250,7 +250,7 @@ export function objectText(fields) {
     '"';
   const one = (f) => {
     const name = f.keyQuote ? `${f.keyQuote}${f.key}${f.keyQuote}` : f.key;
-    if (f.items) return `${name}: ${arrayText(f.items)}`;
+    if (f.items) {return `${name}: ${arrayText(f.items)}`;}
     return `${name}: ${f.quote === null ? String(f.text) : quoted(f, fallback)}`;
   };
   return `{ ${list.map(one).join(', ')} }`;
@@ -261,11 +261,11 @@ export function objectText(fields) {
 // has, because a row with nothing written on it is a row nobody can aim at.
 const NAMES = ['label', 'name', 'title', 'text', 'value'];
 export function itemLabel(item) {
-  if (!item) return '';
-  if (!item.fields) return String(item.text);
+  if (!item) {return '';}
+  if (!item.fields) {return String(item.text);}
   for (const want of NAMES) {
     const field = item.fields.find((f) => f.key === want && String(f.text).trim());
-    if (field) return String(field.text);
+    if (field) {return String(field.text);}
   }
   return String(item.fields[0]?.text ?? '');
 }
@@ -279,7 +279,7 @@ export function itemLabel(item) {
 export function blankLike(items) {
   const shape = (items || []).find((i) => i.fields);
   const quote = (items || []).find((i) => i.quote)?.quote || '"';
-  if (!shape) return { text: '', quote };
+  if (!shape) {return { text: '', quote };}
   return {
     fields: shape.fields.map((f) => ({ key: f.key, keyQuote: f.keyQuote, text: '', quote: f.quote ?? quote })),
   };
@@ -293,9 +293,9 @@ export function blankLike(items) {
  */
 export function moveItem(items, from, to) {
   const list = [...(items || [])];
-  if (!Number.isInteger(from) || from < 0 || from >= list.length) return list;
+  if (!Number.isInteger(from) || from < 0 || from >= list.length) {return list;}
   const gap = Math.max(0, Math.min(list.length, Math.trunc(to)));
-  if (gap === from || gap === from + 1) return list;
+  if (gap === from || gap === from + 1) {return list;}
   const [moved] = list.splice(from, 1);
   list.splice(gap > from ? gap - 1 : gap, 0, moved);
   return list;

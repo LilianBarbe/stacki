@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // CSS parsing and write-back for embed `<style>` blocks.
 //
 // Strategy: we hold the live postcss Root for each `<style>` region. Reads flow
@@ -22,7 +20,7 @@ function findChildRuleBySelector(container: Root | AtRule, selector: string): Ru
   const key = selectorKey(selector)
   let found: Rule | null = null
   container.each((child) => {
-    if (!found && child.type === 'rule' && selectorKey((child as Rule).selector) === key) found = child as Rule
+    if (!found && child.type === 'rule' && selectorKey((child as Rule).selector) === key) {found = child as Rule}
   })
   return found
 }
@@ -32,7 +30,7 @@ function setDeclOnRule(rule: Rule, prop: string, value: string, important: boole
   let decl: Declaration | null = null
   rule.walkDecls(prop, (found) => { decl = found })
   if (decl) { (decl as Declaration).value = value; (decl as Declaration).important = important }
-  else rule.append({ prop, value, important })
+  else {rule.append({ prop, value, important })}
   // Terminate the last declaration with `;` (postcss omits it unless this is set).
   rule.raws.semicolon = true
 }
@@ -49,7 +47,7 @@ export function extractStyleRegions(code: string): StyleRegion[] {
   while ((match = STYLE_OPEN.exec(code))) {
     const innerStart = match.index + match[0].length
     const closeIdx = lower.indexOf(STYLE_CLOSE, innerStart)
-    if (closeIdx === -1) break
+    if (closeIdx === -1) {break}
     regions.push({
       start: innerStart,
       end: closeIdx,
@@ -76,7 +74,7 @@ export function parseRegion(region: StyleRegion): Root | null {
 
 /** Re-stringify a region's root and splice it back into the full embed code. */
 export function applyRegionToCode(code: string, region: StyleRegion): string {
-  if (!region.root) return code
+  if (!region.root) {return code}
   const css = region.root.toString()
   const next = code.slice(0, region.start) + css + code.slice(region.end)
   // Keep the region offsets/css consistent after the splice so further edits land.
@@ -133,17 +131,17 @@ function splitTopLevelCommas(text: string): string[] {
   let start = 0
   for (let i = 0; i < text.length; i += 1) {
     const c = text[i]
-    if (c === '(') paren += 1
-    else if (c === ')') paren = Math.max(0, paren - 1)
-    else if (c === '[') bracket += 1
-    else if (c === ']') bracket = Math.max(0, bracket - 1)
+    if (c === '(') {paren += 1}
+    else if (c === ')') {paren = Math.max(0, paren - 1)}
+    else if (c === '[') {bracket += 1}
+    else if (c === ']') {bracket = Math.max(0, bracket - 1)}
     else if (c === ',' && paren === 0 && bracket === 0) {
       parts.push(text.slice(start, i).trim())
       start = i + 1
     }
   }
   const last = text.slice(start).trim()
-  if (last) parts.push(last)
+  if (last) {parts.push(last)}
   return parts.filter(Boolean)
 }
 
@@ -152,7 +150,7 @@ function splitTopLevelCommas(text: string): string[] {
  *  `parent .b` and a leading combinator `> .b` → `parent > .b`). */
 function combineNesting(parent: string, sel: string): string {
   const s = sel.trim()
-  if (s.includes('&')) return s.replace(/&/g, parent)
+  if (s.includes('&')) {return s.replace(/&/g, parent)}
   return `${parent} ${s}`
 }
 
@@ -162,7 +160,7 @@ function resolveNestedSelectors(rawSelector: string, parents: string[]): string[
   const nested = splitTopLevelCommas(rawSelector)
   const out: string[] = []
   for (const parent of parents) {
-    for (const sel of nested) out.push(combineNesting(parent, sel))
+    for (const sel of nested) {out.push(combineNesting(parent, sel))}
   }
   return out
 }
@@ -185,7 +183,7 @@ function resolveNestedSelectors(rawSelector: string, parents: string[]): string[
  *  belonging to nested rules, so editing a nesting parent never touches its children. */
 export function directDecls(node: Rule | AtRule): Declaration[] {
   const out: Declaration[] = []
-  node.each((child) => { if (child.type === 'decl') out.push(child as Declaration) })
+  node.each((child) => { if (child.type === 'decl') {out.push(child as Declaration)} })
   return out
 }
 
@@ -195,10 +193,10 @@ export function appendDecl(node: Rule | AtRule, prop: string, value: string, imp
   const decl = postcss.decl({ prop, value, important })
   let firstNested: ChildNode | null = null
   node.each((child) => {
-    if (!firstNested && (child.type === 'rule' || child.type === 'atrule')) firstNested = child as ChildNode
+    if (!firstNested && (child.type === 'rule' || child.type === 'atrule')) {firstNested = child as ChildNode}
   })
-  if (firstNested) node.insertBefore(firstNested, decl)
-  else node.append(decl)
+  if (firstNested) {node.insertBefore(firstNested, decl)}
+  else {node.append(decl)}
   // Terminate the last declaration with `;` (postcss omits it unless this is set).
   node.raws.semicolon = true
   return decl
@@ -210,26 +208,26 @@ function setDeclDirect(node: Rule | AtRule, prop: string, value: string, importa
   const key = prop.trim().toLowerCase()
   const existing = directDecls(node).find((d) => d.prop.trim().toLowerCase() === key)
   if (existing) { existing.value = value; existing.important = important; node.raws.semicolon = true }
-  else appendDecl(node, prop, value, important)
+  else {appendDecl(node, prop, value, important)}
 }
 
 /** Render a chain of SELECTOR ancestors as nested source for display, e.g.
  *  `['.hero', '.title']` → `.hero { .title }`. Queries aren't included (they show in
  *  the context dropdown), so a nested chip reads as the code the user is editing. */
 function renderNestedPath(parts: string[], isRoot = true): string {
-  if (!parts.length) return ''
+  if (!parts.length) {return ''}
   const [head, ...rest] = parts
-  if (head === '@') return rest.length ? `@ ${renderNestedPath(rest, false)}` : '@'
+  if (head === '@') {return rest.length ? `@ ${renderNestedPath(rest, false)}` : '@'}
   const restStr = renderNestedPath(rest, false)
   // Braces when this selector wraps another selector, or when it's the outermost
   // selector with content (e.g. its own decls sit in a nested query → `.hero {@}`).
   // A nested selector whose only content is a query stays inline (`.title @`).
-  if (rest.some((p) => p !== '@') || (isRoot && rest.length)) return `${head} {${restStr}}`
+  if (rest.some((p) => p !== '@') || (isRoot && rest.length)) {return `${head} {${restStr}}`}
   return restStr ? `${head} ${restStr}` : head
 }
 
 export function collectRules(region: StyleRegion, ctx: WalkContext): ParsedRule[] {
-  if (!region.root) return []
+  if (!region.root) {return []}
   const rules: ParsedRule[] = []
   let ruleCounter = 0
 
@@ -304,7 +302,7 @@ export function parseNestedInput(
   input: string,
 ): { selector: string; atContext: string[]; path: NestStep[] } | null {
   const text = input.trim()
-  if (!text) return null
+  if (!text) {return null}
   // The add-selector field holds selectors/queries only (no declarations), so any
   // bare selector/at-rule sitting directly before a `}` needs a block for postcss to
   // parse the nesting — give it an empty one (`.hero { .title }` → `.hero { .title {} }`).
@@ -328,7 +326,7 @@ export function parseNestedInput(
     const next = children.find(
       (c) => c.type === 'rule' || (c.type === 'atrule' && QUERY_ATS.has((c as AtRule).name.toLowerCase())),
     )
-    if (!next) break
+    if (!next) {break}
     if (next.type === 'rule') {
       path.push({ kind: 'selector', selector: (next as Rule).selector.trim() })
       container = next as Rule
@@ -338,7 +336,7 @@ export function parseNestedInput(
       container = at
     }
   }
-  if (!path.length) return null
+  if (!path.length) {return null}
   // Derive the resolved selector + query context from the path.
   let selector = ''
   const atContext: string[] = []
@@ -365,17 +363,17 @@ export function createNestedRule(
   value: string,
   important: boolean,
 ): boolean {
-  if (!region.root || !path.length) return false
+  if (!region.root || !path.length) {return false}
   const cleanProp = prop.trim()
   const cleanValue = value.trim()
-  if (!cleanProp || !cleanValue) return false
+  if (!cleanProp || !cleanValue) {return false}
   const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase()
   let container: Root | Rule | AtRule = region.root
   for (const step of path) {
     if (step.kind === 'selector') {
       let found: Rule | null = null
       container.each((n) => {
-        if (!found && n.type === 'rule' && norm((n as Rule).selector) === norm(step.selector)) found = n as Rule
+        if (!found && n.type === 'rule' && norm((n as Rule).selector) === norm(step.selector)) {found = n as Rule}
       })
       if (!found) {
         found = postcss.rule({ selector: step.selector })
@@ -387,7 +385,7 @@ export function createNestedRule(
       container.each((n) => {
         if (!found && n.type === 'atrule'
           && (n as AtRule).name.toLowerCase() === step.name
-          && norm((n as AtRule).params) === norm(step.params)) found = n as AtRule
+          && norm((n as AtRule).params) === norm(step.params)) {found = n as AtRule}
       })
       if (!found) {
         found = postcss.atRule({ name: step.name, params: step.params })
@@ -424,7 +422,7 @@ export type AtRuleBlock = {
  * selected element without hand-writing the query wrapper.
  */
 export function listAtRuleBlocks(region: StyleRegion): AtRuleBlock[] {
-  if (!region.root) return []
+  if (!region.root) {return []}
   const blocks: AtRuleBlock[] = []
 
   const walk = (container: Root | Rule | AtRule, atContext: string[]) => {
@@ -435,13 +433,13 @@ export function listAtRuleBlocks(region: StyleRegion): AtRuleBlock[] {
         walk(child as Rule, atContext)
         return
       }
-      if (child.type !== 'atrule') return
+      if (child.type !== 'atrule') {return}
       const at = child as AtRule
       const name = at.name.toLowerCase()
       if (name === 'media' || name === 'supports' || name === 'container') {
         const ctx = [...atContext, `@${at.name} ${at.params}`.trim()]
         const selectors: string[] = []
-        at.each((node) => { if (node.type === 'rule') selectors.push((node as Rule).selector.trim()) })
+        at.each((node) => { if (node.type === 'rule') {selectors.push((node as Rule).selector.trim())} })
         blocks.push({ atContext: ctx, node: at, selectors })
         walk(at, ctx)
       } else if (name === 'layer' && at.nodes) {
@@ -461,7 +459,7 @@ export function listAtRuleBlocks(region: StyleRegion): AtRuleBlock[] {
 function appendTopLevel(root: Root, node: ChildNode): void {
   const wasEmpty = !root.nodes || root.nodes.length === 0
   root.append(node)
-  if (wasEmpty) node.raws.before = '\n'
+  if (wasEmpty) {node.raws.before = '\n'}
 }
 
 /** Create `selector { prop: value }` inside an at-rule block. Returns false on empty input. */
@@ -474,12 +472,12 @@ export function createRuleInAtRule(
 ): boolean {
   const cleanProp = prop.trim()
   const cleanValue = value.trim()
-  if (!cleanProp || !cleanValue) return false
+  if (!cleanProp || !cleanValue) {return false}
   // Merge into an existing rule for this selector inside the block, else append a new one.
   const existing = findChildRuleBySelector(atRule, selector)
   const rule = existing ?? postcss.rule({ selector })
   setDeclOnRule(rule, cleanProp, cleanValue, important)
-  if (!existing) atRule.append(rule)
+  if (!existing) {atRule.append(rule)}
   return true
 }
 
@@ -496,12 +494,12 @@ export function createRuleInMedia(
   value: string,
   important: boolean,
 ): boolean {
-  if (!region.root) return false
+  if (!region.root) {return false}
   const norm = (text: string) => text.replace(/\s+/g, '').toLowerCase()
   const want = norm(params)
   let target: AtRule | null = null
   region.root.walkAtRules('media', (atRule) => {
-    if (!target && norm(atRule.params) === want) target = atRule
+    if (!target && norm(atRule.params) === want) {target = atRule}
   })
   if (!target) {
     target = postcss.atRule({ name: 'media', params })
@@ -524,29 +522,29 @@ export function createRuleInQuery(
   value: string,
   important: boolean,
 ): boolean {
-  if (!region.root) return false
+  if (!region.root) {return false}
   const segments = atContextKey.split('›').map((seg) => seg.trim()).filter(Boolean)
   const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase()
   let container: Root | AtRule = region.root
   for (const seg of segments) {
     const m = /^@(\w+)\s*([\s\S]*)$/.exec(seg)
-    if (!m) return false
+    if (!m) {return false}
     const name = m[1].toLowerCase()
     const params = m[2].trim()
     let found: AtRule | null = null
     container.each((n) => {
       if (!found && n.type === 'atrule'
         && (n as AtRule).name.toLowerCase() === name
-        && norm((n as AtRule).params) === norm(params)) found = n as AtRule
+        && norm((n as AtRule).params) === norm(params)) {found = n as AtRule}
     })
     if (!found) {
       found = postcss.atRule({ name, params })
-      if (container === region.root) appendTopLevel(region.root, found)
-      else container.append(found)
+      if (container === region.root) {appendTopLevel(region.root, found)}
+      else {container.append(found)}
     }
     container = found
   }
-  if (container === region.root) return false // no query segment
+  if (container === region.root) {return false} // no query segment
   return createRuleInAtRule(container as AtRule, selector, prop, value, important)
 }
 
@@ -558,16 +556,16 @@ export function createRuleAtRoot(
   value: string,
   important: boolean,
 ): boolean {
-  if (!region.root) return false
+  if (!region.root) {return false}
   const cleanProp = prop.trim()
   const cleanValue = value.trim()
-  if (!cleanProp || !cleanValue) return false
+  if (!cleanProp || !cleanValue) {return false}
   // Merge into an existing top-level rule for this selector, else append a new one — so
   // adding a selector that the embed already has extends that rule instead of duplicating it.
   const existing = findChildRuleBySelector(region.root, selector)
   const rule = existing ?? postcss.rule({ selector })
   setDeclOnRule(rule, cleanProp, cleanValue, important)
-  if (!existing) appendTopLevel(region.root, rule)
+  if (!existing) {appendTopLevel(region.root, rule)}
   return true
 }
 
@@ -579,26 +577,26 @@ export function createRuleAtRoot(
  */
 export function ensureQueryBlock(region: StyleRegion, atContextKey: string): boolean {
   const root = region.root
-  if (!root) return false
+  if (!root) {return false}
   const segments = atContextKey.split('›').map((seg) => seg.trim()).filter(Boolean)
-  if (!segments.length) return false
+  if (!segments.length) {return false}
   const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase()
   let container: Root | AtRule = root
   for (const seg of segments) {
     const m = /^@(\w+)\s*([\s\S]*)$/.exec(seg)
-    if (!m) return false
+    if (!m) {return false}
     const name = m[1].toLowerCase()
     const params = m[2].trim()
     let found: AtRule | null = null
     container.each((n) => {
       if (!found && n.type === 'atrule'
         && (n as AtRule).name.toLowerCase() === name
-        && norm((n as AtRule).params) === norm(params)) found = n as AtRule
+        && norm((n as AtRule).params) === norm(params)) {found = n as AtRule}
     })
     if (!found) {
       found = postcss.atRule({ name, params })
-      if (container === root) appendTopLevel(root, found)
-      else container.append(found)
+      if (container === root) {appendTopLevel(root, found)}
+      else {container.append(found)}
     }
     container = found
   }
@@ -613,19 +611,19 @@ export function ensureQueryBlock(region: StyleRegion, atContextKey: string): boo
  */
 export function ensureNestPath(region: StyleRegion, path: NestStep[]): boolean {
   const root = region.root
-  if (!root || !path.length) return false
+  if (!root || !path.length) {return false}
   const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase()
   let container: Root | Rule | AtRule = root
   for (const step of path) {
     if (step.kind === 'selector') {
       let found: Rule | null = null
       container.each((n) => {
-        if (!found && n.type === 'rule' && norm((n as Rule).selector) === norm(step.selector)) found = n as Rule
+        if (!found && n.type === 'rule' && norm((n as Rule).selector) === norm(step.selector)) {found = n as Rule}
       })
       if (!found) {
         found = postcss.rule({ selector: step.selector })
-        if (container === root) appendTopLevel(root, found)
-        else container.append(found)
+        if (container === root) {appendTopLevel(root, found)}
+        else {container.append(found)}
       }
       container = found
     } else {
@@ -633,12 +631,12 @@ export function ensureNestPath(region: StyleRegion, path: NestStep[]): boolean {
       container.each((n) => {
         if (!found && n.type === 'atrule'
           && (n as AtRule).name.toLowerCase() === step.name
-          && norm((n as AtRule).params) === norm(step.params)) found = n as AtRule
+          && norm((n as AtRule).params) === norm(step.params)) {found = n as AtRule}
       })
       if (!found) {
         found = postcss.atRule({ name: step.name, params: step.params })
-        if (container === root) appendTopLevel(root, found)
-        else container.append(found)
+        if (container === root) {appendTopLevel(root, found)}
+        else {container.append(found)}
       }
       container = found
     }
@@ -702,7 +700,7 @@ export function setDeclarationValue(decl: ParsedDeclaration, value: string, impo
   decl.important = important
   // Terminate the last declaration with `;` (postcss omits it unless this is set).
   const parent = decl.node.parent
-  if (parent) (parent as Rule).raws.semicolon = true
+  if (parent) {(parent as Rule).raws.semicolon = true}
 }
 
 /** Rename a declaration's property. */
@@ -730,12 +728,12 @@ export function removeRule(rule: ParsedRule) {
  */
 export function splitRuleSelectorAt(node: Rule, index: number): Rule | null {
   const selectors = node.selectors
-  if (index < 0 || index >= selectors.length || selectors.length <= 1) return null
+  if (index < 0 || index >= selectors.length || selectors.length <= 1) {return null}
   const clone = node.clone() as Rule
   clone.selector = selectors[index]
   // Ensure the new rule starts on its own line (clone inherits the original's
   // leading whitespace, which may be empty for the first rule → `}.a {`).
-  if (!clone.raws.before?.includes('\n')) clone.raws.before = `\n${clone.raws.before ?? ''}`
+  if (!clone.raws.before?.includes('\n')) {clone.raws.before = `\n${clone.raws.before ?? ''}`}
   node.selectors = selectors.filter((_, i) => i !== index)
   node.parent?.insertAfter(node, clone)
   return clone
@@ -751,12 +749,12 @@ export function removeRuleIfEmpty(rule: ParsedRule): boolean {
   let hasDeclaration = false
   let hasNested = false
   rule.node.each((node) => {
-    if (node.type === 'decl') hasDeclaration = true
-    else if (node.type === 'rule' || node.type === 'atrule') hasNested = true
+    if (node.type === 'decl') {hasDeclaration = true}
+    else if (node.type === 'rule' || node.type === 'atrule') {hasNested = true}
   })
   // Keep the rule if it still holds declarations OR nested rules (a nested-CSS
   // parent whose own last property was just cleared but that still wraps children).
-  if (hasDeclaration || hasNested) return false
+  if (hasDeclaration || hasNested) {return false}
   rule.node.remove()
   return true
 }
@@ -765,7 +763,7 @@ export function removeRuleIfEmpty(rule: ParsedRule): boolean {
 export function addDeclaration(rule: ParsedRule, prop: string, value: string, important: boolean): boolean {
   const cleanProp = prop.trim()
   const cleanValue = value.trim()
-  if (!cleanProp || !cleanValue) return false
+  if (!cleanProp || !cleanValue) {return false}
   appendDecl(rule.node, cleanProp, cleanValue, important)
   return true
 }
@@ -787,7 +785,7 @@ export function replaceRuleCss(rule: ParsedRule, ruleCss: string): { ok: true } 
   try {
     const parsed = postcss.parse(ruleCss)
     const nodes = parsed.nodes.filter((n): n is Rule => n.type === 'rule')
-    if (!nodes.length) return { ok: false, error: 'No CSS rule found in the edited text.' }
+    if (!nodes.length) {return { ok: false, error: 'No CSS rule found in the edited text.' }}
     rule.node.replaceWith(...parsed.nodes)
     return { ok: true }
   } catch (error) {
@@ -826,16 +824,16 @@ export function queryKey(query: string): string {
  *  an at-rule at all — the caller decides what to tell the user. */
 export function splitQuery(query: string): { name: string; params: string } | null {
   const match = /^@([a-zA-Z-]+)\s*([\s\S]*)$/.exec(query.trim())
-  if (!match) return null
+  if (!match) {return null}
   return { name: match[1], params: match[2].trim() }
 }
 
 /** How many at-rules in the region are spelled `query`. */
 export function countAtRuleQuery(region: StyleRegion, query: string): number {
-  if (!region.root) return 0
+  if (!region.root) {return 0}
   const want = queryKey(query)
   let n = 0
-  region.root.walkAtRules((at) => { if (queryKey(atRuleQueryText(at)) === want) n += 1 })
+  region.root.walkAtRules((at) => { if (queryKey(atRuleQueryText(at)) === want) {n += 1} })
   return n
 }
 
@@ -850,13 +848,13 @@ export function countAtRuleQuery(region: StyleRegion, query: string): number {
  * did, and folding them together would reorder somebody's rules to tidy up.
  */
 export function renameAtRuleQuery(region: StyleRegion, from: string, to: string): number {
-  if (!region.root) return 0
+  if (!region.root) {return 0}
   const next = splitQuery(to)
-  if (!next) return 0
+  if (!next) {return 0}
   const want = queryKey(from)
   let n = 0
   region.root.walkAtRules((at) => {
-    if (queryKey(atRuleQueryText(at)) !== want) return
+    if (queryKey(atRuleQueryText(at)) !== want) {return}
     at.name = next.name
     // postcss keeps the raw source of `params` and reuses it while it still
     // matches the parsed value; assigning a new value retires it, so the new

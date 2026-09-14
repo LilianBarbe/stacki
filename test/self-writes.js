@@ -25,7 +25,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const { createSelfWrites } = require('../electron/selfWrites.js');
@@ -36,7 +36,7 @@ const disk = new Map();
 let clock = 1000;
 const writes = createSelfWrites({
   read: (p) => {
-    if (!disk.has(p)) throw new Error('ENOENT');
+    if (!disk.has(p)) {throw new Error('ENOENT');}
     return disk.get(p);
   },
   now: () => clock,

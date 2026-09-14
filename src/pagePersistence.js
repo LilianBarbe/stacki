@@ -5,16 +5,16 @@ export function createPageSaver({ readCurrent, write, markSaved }) {
   const saved = new WeakSet();
   const flush = async () => {
     const path = readCurrent().currentPage?.path;
-    if (!path) return;
+    if (!path) {return;}
     while (true) {
       const { currentPage, pageState } = readCurrent();
-      if (currentPage?.path !== path || !pageState?.dirty) return;
+      if (currentPage?.path !== path || !pageState?.dirty) {return;}
       if (!saved.has(pageState)) {
         await write(path, pageState);
         saved.add(pageState);
       }
       markSaved(pageState);
-      if (readCurrent().pageState === pageState) return;
+      if (readCurrent().pageState === pageState) {return;}
     }
   };
   return () => {
@@ -38,17 +38,17 @@ export function createFileSaver({ delay = 300, onError = () => {} } = {}) {
   const running = new Map();
   const start = (key) => {
     const entry = waiting.get(key);
-    if (!entry) return running.get(key) || Promise.resolve();
+    if (!entry) {return running.get(key) || Promise.resolve();}
     waiting.delete(key);
     clearTimeout(entry.timer);
     const result = (running.get(key) || Promise.resolve()).catch(() => {}).then(entry.write);
     running.set(key, result);
     result.then(
-      () => { if (running.get(key) === result) running.delete(key); },
+      () => { if (running.get(key) === result) {running.delete(key);} },
       (error) => {
         if (running.get(key) === result) {
           running.delete(key);
-          if (!waiting.has(key)) waiting.set(key, { write: entry.write, timer: null });
+          if (!waiting.has(key)) {waiting.set(key, { write: entry.write, timer: null });}
         }
         onError(error);
       }
@@ -62,7 +62,7 @@ export function createFileSaver({ delay = 300, onError = () => {} } = {}) {
     },
     async flush() {
       do {
-        for (const key of waiting.keys()) start(key);
+        for (const key of waiting.keys()) {start(key);}
         await Promise.all(running.values());
       } while (waiting.size);
     },

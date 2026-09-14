@@ -13,16 +13,16 @@ function watchProject({ projectPath, send, isSelfWrite, notePageMayHaveChanged, 
     clearTimeout(timers.get(channel));
     timers.set(channel, setTimeout(() => {
       timers.delete(channel);
-      if (closed) return;
+      if (closed) {return;}
       const payload = channel === 'fs:changed' ? { files: [...files] } : {};
-      if (channel === 'fs:changed') files.clear();
+      if (channel === 'fs:changed') {files.clear();}
       send(channel, payload);
     }, delay));
   };
   const close = () => {
     closed = true;
-    for (const watcher of watchers) watcher.close();
-    for (const timer of timers.values()) clearTimeout(timer);
+    for (const watcher of watchers) {watcher.close();}
+    for (const timer of timers.values()) {clearTimeout(timer);}
     timers.clear();
     files.clear();
   };
@@ -30,17 +30,17 @@ function watchProject({ projectPath, send, isSelfWrite, notePageMayHaveChanged, 
   try {
     const srcDir = path.join(projectPath, 'src');
     watchers.push(watch(srcDir, { recursive: true }, (_event, filename) => {
-      if (closed || !filename) return;
+      if (closed || !filename) {return;}
       const name = filename.toString();
       const changed = path.join(srcDir, name);
       // Comparing self writes can read the file. Do it once per event, before
       // routing it to the panels interested in that kind of file.
-      if (isSelfWrite(changed)) return;
+      if (isSelfWrite(changed)) {return;}
       notePageMayHaveChanged(true);
-      if (/\.json$/i.test(name)) return debounce('cms:changed');
-      if (mediaPattern.test(name)) return debounce('assets:changed');
-      if (/\.css$/i.test(name)) return debounce('css:changed');
-      if (!/\.(astro|md|mdx|html)$/i.test(name)) return;
+      if (/\.json$/i.test(name)) {return debounce('cms:changed');}
+      if (mediaPattern.test(name)) {return debounce('assets:changed');}
+      if (/\.css$/i.test(name)) {return debounce('css:changed');}
+      if (!/\.(astro|md|mdx|html)$/i.test(name)) {return;}
       files.add(changed);
       scheduleThumb(projectPath, 60000);
       debounce('fs:changed', 150);
@@ -49,8 +49,8 @@ function watchProject({ projectPath, send, isSelfWrite, notePageMayHaveChanged, 
     const publicDir = path.join(projectPath, 'public');
     if (fs.existsSync(publicDir)) {
       watchers.push(watch(publicDir, { recursive: true }, (_event, filename) => {
-        if (closed || (filename && String(filename).startsWith('.'))) return;
-        if (filename && isSelfWrite(path.join(publicDir, filename.toString()))) return;
+        if (closed || (filename && String(filename).startsWith('.'))) {return;}
+        if (filename && isSelfWrite(path.join(publicDir, filename.toString()))) {return;}
         debounce('assets:changed');
       }));
     }

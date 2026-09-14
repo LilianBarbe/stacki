@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PointerEvent as ReactPointerEvent } from 'react'
@@ -66,20 +64,20 @@ const bezAt = (s: number, a: number, b: number) => 3 * (1 - s) ** 2 * s * a + 3 
 // read y(s). This is what makes the playback follow the ease — the parameter s is NOT
 // time, so tracing the curve by s alone moves at the wrong (uniform) rate.
 function easeProgress(t: number, x1: number, y1: number, x2: number, y2: number): number {
-  if (t <= 0) return 0
-  if (t >= 1) return 1
+  if (t <= 0) {return 0}
+  if (t >= 1) {return 1}
   let lo = 0, hi = 1, s = t
   for (let i = 0; i < 24; i += 1) {
     const x = bezAt(s, x1, x2)
-    if (Math.abs(x - t) < 1e-4) break
-    if (x < t) lo = s; else hi = s
+    if (Math.abs(x - t) < 1e-4) {break}
+    if (x < t) {lo = s;} else {hi = s}
     s = (lo + hi) / 2
   }
   return bezAt(s, y1, y2)
 }
 // The matched preset's name ("Ease", "Ease In Sine"), else "Custom".
 function presetName(b: Bezier): string {
-  for (const g of PRESETS) for (const item of g.items) if (bezEq(item.b, b)) return g.heading === 'Default' ? item.label : `${g.heading} ${item.label}`
+  for (const g of PRESETS) {for (const item of g.items) {if (bezEq(item.b, b)) {return g.heading === 'Default' ? item.label : `${g.heading} ${item.label}`}}}
   return 'Custom'
 }
 const GearIcon = () => (<svg viewBox="0 0 16 16" width="15" height="15" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.2" /><path d="M8 1.5v1.5M8 13v1.5M2.4 4.6l1.3.75M12.3 10.65l1.3.75M2.4 11.4l1.3-.75M12.3 5.35l1.3-.75" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>)
@@ -112,9 +110,9 @@ function BezierEditor({ value, onChange, playT }: { value: Bezier; onChange: (b:
   const pd = playT != null ? { x: sx(playT), y: sy(easeProgress(playT, value[0], value[1], value[2], value[3])) } : null
 
   const move = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (drag == null) return
+    if (drag == null) {return}
     const rect = areaRef.current?.getBoundingClientRect()
-    if (!rect || rect.width <= 0) return
+    if (!rect || rect.width <= 0) {return}
     const x = clamp((event.clientX - rect.left) / rect.width, 0, 1)
     const y = clamp(1 - (event.clientY - rect.top) / rect.height, -1, 2)
     const next: Bezier = [...value]
@@ -182,17 +180,17 @@ export default function EasingEditor({ value, onClose, onChange, frame }: {
   const [playing, setPlaying] = useState(false)
   const playRaf = useRef<number | null>(null)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
-  useEffect(() => () => { if (playRaf.current != null) cancelAnimationFrame(playRaf.current) }, [])
+  useEffect(() => () => { if (playRaf.current != null) {cancelAnimationFrame(playRaf.current)} }, [])
   const apply = (b: Bezier) => { setDraft(null); setBezier(b); onChange(bezierToEasing(b)) }
   /** Take what was typed, if it is a curve this editor can show. */
   const commitText = () => {
     const text = (draft ?? '').trim()
     setDraft(null)
-    if (!text || !isEasing(text)) return
+    if (!text || !isEasing(text)) {return}
     apply(easingToBezier(text))
   }
   // Preview: the playhead + dot trace the easing. It LOOPS — play → brief hold → restart
@@ -207,19 +205,19 @@ export default function EasingEditor({ value, onClose, onChange, frame }: {
     let start = performance.now()
     const step = (now: number) => {
       const e = now - start
-      if (e < DUR) setPlayT(e / DUR)
-      else if (e < DUR + HOLD) setPlayT(1)
+      if (e < DUR) {setPlayT(e / DUR)}
+      else if (e < DUR + HOLD) {setPlayT(1)}
       else { start = now; setPlayT(0) }
       playRaf.current = requestAnimationFrame(step)
     }
     playRaf.current = requestAnimationFrame(step)
   }
-  const togglePlay = () => { if (playing) stopPlay(); else startPlay() }
+  const togglePlay = () => { if (playing) {stopPlay();} else {startPlay()} }
 
   return createPortal(
     <div
       className={`embed-editor_bg-modal-backdrop embed-editor_ease-backdrop${frame ? ' is-framed' : ''}`}
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) {onClose()} }}
     >
       <div
         className={`embed-editor_ease-modal u-surface-surface${frame ? ' is-framed' : ''}`}

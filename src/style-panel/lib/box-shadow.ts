@@ -16,7 +16,7 @@ function isLength(token: string): boolean {
 /** Parse a `box-shadow` value into an ordered shadow list (`none`/'' → empty). */
 export function parseBoxShadows(value: string): BoxShadow[] {
   const v = value.trim()
-  if (!v || v.toLowerCase() === 'none') return []
+  if (!v || v.toLowerCase() === 'none') {return []}
   return splitTopLevelCommas(v)
     .filter(Boolean)
     .map((part) => {
@@ -25,8 +25,8 @@ export function parseBoxShadows(value: string): BoxShadow[] {
       let inset = false
       for (const token of splitTopLevelSpaces(part)) {
         if (/^inset$/i.test(token)) { inset = true; continue }
-        if (isLength(token)) lengths.push(token)
-        else color = color ? `${color} ${token}` : token
+        if (isLength(token)) {lengths.push(token)}
+        else {color = color ? `${color} ${token}` : token}
       }
       return {
         inset,
@@ -41,7 +41,7 @@ export function parseBoxShadows(value: string): BoxShadow[] {
 
 /** Serialize a shadow list back to a `box-shadow` value ('' when empty). */
 export function serializeBoxShadows(shadows: BoxShadow[]): string {
-  if (!shadows.length) return ''
+  if (!shadows.length) {return ''}
   return shadows
     .map((s) => `${s.inset ? 'inset ' : ''}${s.x || '0px'} ${s.y || '0px'} ${s.blur || '0px'} ${s.spread || '0px'}${s.color ? ` ${s.color}` : ''}`)
     .join(', ')

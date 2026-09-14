@@ -24,7 +24,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
         const name = path.basename(args.path, '.jsx');
         // Keep both preview components real: a mocked pane cannot reveal frame
         // replacement, navigation, or an inspector vanishing beside the frame.
-        if (name === 'PreviewPane' || name === 'CanvasView') return;
+        if (name === 'PreviewPane' || name === 'CanvasView') {return;}
         return { contents: `export const relativeTime = () => ''; export default function Panel(props) { globalThis.__componentPanels[${JSON.stringify(name)}] = props; return null; }`, loader: 'jsx' };
       });
     } }],
@@ -32,7 +32,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true });
   global.window = dom.window;
-  for (const name of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) global[name] = dom.window[name];
+  for (const name of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) {global[name] = dom.window[name];}
   global.getComputedStyle = dom.window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
@@ -59,7 +59,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     resolveImport: async () => ({ path: card.path }),
     readPage: async (file) => heldReads.get(file)?.promise ?? structuredClone(states.get(file)),
     writePage: async ({ pagePath, model }) => {
-      if (writeError) throw writeError;
+      if (writeError) {throw writeError;}
       writes.push({ pagePath, model });
       states.set(pagePath, { editable: true, model: structuredClone(model) });
     },

@@ -19,21 +19,21 @@ import { canContainTag, VOID_TAGS } from './elementSchemas.js';
  */
 export function tagOfComponent(comp, node) {
   const rt = comp?.renderTag;
-  if (!rt) return null;
+  if (!rt) {return null;}
   if (rt.prop && node) {
     const set = node.props?.[rt.prop];
     const v = set && set.type !== 'expr' ? String(set.value || '') : '';
-    if (v) return v.toLowerCase();
+    if (v) {return v.toLowerCase();}
   }
   return rt.tag || null;
 }
 
 const findNode = (nodes, id) => {
   for (const node of nodes) {
-    if (node.id === id) return node;
+    if (node.id === id) {return node;}
     if (Array.isArray(node.children)) {
       const found = findNode(node.children, id);
-      if (found) return found;
+      if (found) {return found;}
     }
   }
   return null;
@@ -42,10 +42,10 @@ const findNode = (nodes, id) => {
 const findParentOf = (nodes, id, parentId = null) => {
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
-    if (n.id === id) return { parentId, index: i };
+    if (n.id === id) {return { parentId, index: i };}
     if (Array.isArray(n.children)) {
       const r = findParentOf(n.children, id, n.id);
-      if (r) return r;
+      if (r) {return r;}
     }
   }
   return null;
@@ -53,19 +53,19 @@ const findParentOf = (nodes, id, parentId = null) => {
 
 /** Whether `n` can hold `childTag` (null when the tag can't be told). */
 export function acceptsChildren(n, childTag, insertables) {
-  if (n.id === 'layout') return true;
+  if (n.id === 'layout') {return true;}
   if (n.kind === 'element') {
     const tag = String(n.name).toLowerCase();
-    if (VOID_TAGS.has(tag)) return false;
+    if (VOID_TAGS.has(tag)) {return false;}
     // A <p> inside an <h1> is invalid HTML the browser would reparent —
     // insert alongside instead of inside.
     return childTag ? canContainTag(tag, childTag) : true;
   }
   // A condition holds nothing itself — its branches do.
-  if (n.kind === 'map' || n.kind === 'chunk-group' || n.kind === 'branch') return true;
+  if (n.kind === 'map' || n.kind === 'chunk-group' || n.kind === 'branch') {return true;}
   if (n.kind === 'component') {
     const comp = (insertables || []).find((c) => c.name === n.name);
-    if (!(comp?.slots || []).includes('default')) return false;
+    if (!(comp?.slots || []).includes('default')) {return false;}
     // …and what it renders as still has to be able to hold the child.
     const tag = tagOfComponent(comp, n);
     return tag && childTag ? canContainTag(tag, childTag) : true;
@@ -97,8 +97,8 @@ export function insertTargetFor(model, selId, item, insertables) {
     let childId = selId;
     for (let depth = 0; depth < 50; depth++) {
       const fp = findParentOf(model.nodes, childId);
-      if (!fp) break;
-      if (fp.parentId === null) return { parentId: null, index: fp.index + 1 };
+      if (!fp) {break;}
+      if (fp.parentId === null) {return { parentId: null, index: fp.index + 1 };}
       const parent = findNode(model.nodes, fp.parentId);
       if (!parent || accepts(parent)) {
         return { parentId: fp.parentId, index: fp.index + 1 };

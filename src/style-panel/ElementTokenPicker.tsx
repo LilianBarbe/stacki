@@ -17,13 +17,13 @@ export default function ElementTokenPicker({
   onChange?: (selectedNames: string[], selector: string) => void
 }) {
   const tokens = useMemo(() => snapshotTokens(snapshot), [snapshot])
-  if (!tokens.length) return null
+  if (!tokens.length) {return null}
 
   const selector = tokens
     .map((token) => {
       const name = token.label ?? ''
-      if (token.kind === 'tag') return name
-      if (token.kind === 'class') return `.${name}`
+      if (token.kind === 'tag') {return name}
+      if (token.kind === 'class') {return `.${name}`}
       const value = snapshot?.attributes[name] ?? ''
       return value ? `[${name}="${value}"]` : `[${name}]`
     })

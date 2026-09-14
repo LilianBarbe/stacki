@@ -1,7 +1,5 @@
-// @ts-nocheck
-// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
-// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
-// gate in scripts/ratchet-check.js keeps the list from growing.
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import SegmentedControl, { type SegmentedOption } from './components/SegmentedControl'
 import DragSlider from './components/DragSlider'
@@ -38,7 +36,7 @@ const MAX_DISTANCE = 2000
 
 const val = (read: Read, prop: string): string => {
   const r = read(prop)
-  if (!r) return ''
+  if (!r) {return ''}
   return (r.source === 'selected' && r.selectedValue ? r.selectedValue.value : r.winner.value).trim()
 }
 
@@ -127,7 +125,7 @@ function DistanceRow({ value, busy, ariaLabel, onLive, onCommit }: {
   const num = pxNumber(value)
   const [draft, setDraft] = useState(value || '0')
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(value || '0') }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value || '0')} }, [value])
   return (
     <div className="embed-editor_size-row">
       <span className="embed-editor_size-label embed-editor_bg-caption">Distance</span>
@@ -138,7 +136,7 @@ function DistanceRow({ value, busy, ariaLabel, onLive, onCommit }: {
           max={MAX_DISTANCE}
           disabled={busy || (value.trim() !== '' && num === null)}
           ariaLabel={ariaLabel}
-          onPreview={(n) => { if (!focused.current) setDraft(`${n}px`) }}
+          onPreview={(n) => { if (!focused.current) {setDraft(`${n}px`)} }}
           onInput={(n) => onLive(`${n}px`)}
           onCommit={(n) => onCommit(n === 0 ? '' : `${n}px`)}
         />
@@ -159,7 +157,7 @@ function DistanceRow({ value, busy, ariaLabel, onLive, onCommit }: {
           onKeyDown={(e) => {
             if (e.key === 'Enter') { commitInPlace(e.currentTarget); return }
             const stepped = handleArrowStep(e)
-            if (!stepped) return
+            if (!stepped) {return}
             e.preventDefault()
             e.currentTarget.value = stepped.text
             e.currentTarget.setSelectionRange(stepped.caret, stepped.caret)
@@ -196,8 +194,8 @@ export default function TransformSettings({ read, busy, setProp, clearProp, self
     const value = serializeOrigin(next)
     // The centre IS the default, so writing `50% 50%` would leave a declaration
     // that says nothing — clear it instead and let the property go back to unset.
-    if (value) setProp(prop, value, false)
-    else clearProp(prop)
+    if (value) {setProp(prop, value, false)}
+    else {clearProp(prop)}
   }
 
   return (
@@ -260,8 +258,8 @@ export default function TransformSettings({ read, busy, setProp, clearProp, self
           value={childDistance}
           busy={busy}
           ariaLabel="Children perspective distance"
-          onLive={(v) => { if (v) setProp('perspective', v, false) }}
-          onCommit={(v) => { if (v) setProp('perspective', v, false); else clearProp('perspective') }}
+          onLive={(v) => { if (v) {setProp('perspective', v, false)} }}
+          onCommit={(v) => { if (v) {setProp('perspective', v, false);} else {clearProp('perspective')} }}
         />
         <OriginRow
           label="Origin"

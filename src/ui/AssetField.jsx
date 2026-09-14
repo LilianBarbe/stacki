@@ -7,9 +7,9 @@ import { assetRelCandidates, assetValueFor, isExternalAsset } from '../assetPath
 const kindLabel = { image: 'Image', video: 'Video', audio: 'Audio', asset: 'Asset' };
 
 const fmtSize = (bytes) => {
-  if (bytes == null) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`;
+  if (bytes == null) {return '';}
+  if (bytes < 1024) {return `${bytes} B`;}
+  if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`;}
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 };
 
@@ -20,7 +20,7 @@ const remoteName = (url) => {
   return path.split('/').filter(Boolean).pop() || path;
 };
 const remoteHost = (url) => {
-  if (/^data:/i.test(url)) return 'data URI';
+  if (/^data:/i.test(url)) {return 'data URI';}
   try {
     return new URL(/^\/\//.test(url) ? `https:${url}` : url).hostname;
   } catch {
@@ -34,7 +34,7 @@ const remoteHost = (url) => {
 function RemoteThumb({ url, onLoad }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [url]);
-  if (failed) return <ElementImageIcon size={18} />;
+  if (failed) {return <ElementImageIcon size={18} />;}
   return (
     <img
       src={url}
@@ -110,7 +110,7 @@ export default function AssetField({
   // path being typed into the URL field is usually half-written, and pulling
   // the field out from under it would be worse than leaving it there.
   useEffect(() => {
-    if (showModeToggle && isExternalAsset(current)) setMode('url');
+    if (showModeToggle && isExternalAsset(current)) {setMode('url');}
   }, [current, showModeToggle]);
 
   // Which project file the value names. A src/ asset reached through an import
@@ -121,7 +121,7 @@ export default function AssetField({
   );
   const byRel = useMemo(() => {
     const map = new Map();
-    for (const e of entries) if (!e.isDir) map.set(e.rel, e);
+    for (const e of entries) {if (!e.isDir) {map.set(e.rel, e);}}
     return map;
   }, [entries]);
   const entry = useMemo(

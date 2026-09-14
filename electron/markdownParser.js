@@ -51,7 +51,7 @@ const ESM_RE = /^(import|export)\s/;
 // because the layout picker needs it — see layoutFromFrontmatter.
 function splitFrontmatter(source) {
   const m = source.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(\r?\n|$)/);
-  if (!m) return { frontmatter: null, body: source, offset: 0 };
+  if (!m) {return { frontmatter: null, body: source, offset: 0 };}
   return { frontmatter: m[1], body: source.slice(m[0].length), offset: m[0].length };
 }
 
@@ -59,9 +59,9 @@ function splitFrontmatter(source) {
 // their layout here rather than by importing it, so the app's layout picker
 // reads and writes this field.
 function layoutFromFrontmatter(frontmatter) {
-  if (!frontmatter) return null;
+  if (!frontmatter) {return null;}
   const m = frontmatter.match(/^[ \t]*layout[ \t]*:[ \t]*(.+?)[ \t]*$/m);
-  if (!m) return null;
+  if (!m) {return null;}
   return m[1].replace(/^['"]|['"]$/g, '') || null;
 }
 
@@ -89,7 +89,7 @@ function parseBlocks(lines, { mdx, imports, esm }) {
   let pendingBlanks = 0;
   const push = (node) => {
     node.id = makeId();
-    if (pendingBlanks) node.mdBlanksBefore = pendingBlanks;
+    if (pendingBlanks) {node.mdBlanksBefore = pendingBlanks;}
     pendingBlanks = 0;
     nodes.push(node);
   };
@@ -106,11 +106,11 @@ function parseBlocks(lines, { mdx, imports, esm }) {
     // has, so the palette can tell which components this page can use.
     if (mdx && ESM_RE.test(line)) {
       const start = i;
-      while (i < lines.length && lines[i].trim()) i++;
+      while (i < lines.length && lines[i].trim()) {i++;}
       const text = lines.slice(start, i).join('\n');
       const im = text.match(/^import\s+(\w+)\s+from\s+['"]([^'"]+)['"]/);
-      if (im) imports.push({ name: im[1], path: im[2] });
-      else esm.push(text);
+      if (im) {imports.push({ name: im[1], path: im[2] });}
+      else {esm.push(text);}
       // Recorded so the block order survives even though the text lives
       // outside the tree.
       push({ kind: 'raw-line', value: text, mdEsm: true });
@@ -125,7 +125,7 @@ function parseBlocks(lines, { mdx, imports, esm }) {
       const start = i;
       // JSX/HTML runs to the first blank line at depth zero, which is how
       // both markdown and MDX delimit an embedded block.
-      while (i < lines.length && lines[i].trim()) i++;
+      while (i < lines.length && lines[i].trim()) {i++;}
       const text = lines.slice(start, i).join('\n');
       const parsed = parseTemplate(text);
       // One node per block, not per element. The canvas numbers markdown
@@ -145,8 +145,8 @@ function parseBlocks(lines, { mdx, imports, esm }) {
         // it would reformat a post the moment anything else on the page is
         // edited. Keeping the source lets serializeBlock emit it verbatim for
         // as long as the node still means the same thing.
-        if (parsed.nodes.length === 1) parsed.nodes[0].mdSource = text;
-        for (const n of parsed.nodes) push(n);
+        if (parsed.nodes.length === 1) {parsed.nodes[0].mdSource = text;}
+        for (const n of parsed.nodes) {push(n);}
       } else {
         push({ kind: 'raw-line', value: text });
       }
@@ -218,12 +218,12 @@ function parseBlocks(lines, { mdx, imports, esm }) {
         const q = lines[i].match(QUOTE_RE);
         if (!q) {
           // A lazy continuation line belongs to the quote's last paragraph.
-          if (!lines[i].trim() || /^\s{0,3}(#|>|```|~~~|[-*+]\s|\d+[.)]\s)/.test(lines[i])) break;
+          if (!lines[i].trim() || /^\s{0,3}(#|>|```|~~~|[-*+]\s|\d+[.)]\s)/.test(lines[i])) {break;}
           inner.push(lines[i]);
           i++;
           continue;
         }
-        if (q[2]) gap = q[2];
+        if (q[2]) {gap = q[2];}
         inner.push(q[3]);
         i++;
       }
@@ -254,9 +254,9 @@ function parseBlocks(lines, { mdx, imports, esm }) {
         const o = lines[i].match(ORDERED_RE);
         const m = ol ? o : b;
         // A different marker or indent starts a different list.
-        if (!m || m[1] !== listIndent) break;
-        if (ol ? m[3] !== marker : m[2] !== marker) break;
-        if (ol) numbers.push(Number(m[2]));
+        if (!m || m[1] !== listIndent) {break;}
+        if (ol ? m[3] !== marker : m[2] !== marker) {break;}
+        if (ol) {numbers.push(Number(m[2]));}
         const gap = ol ? m[4] : m[3];
         const first = ol ? m[5] : m[4];
         const contentIndent = listIndent.length + (ol ? m[2].length + 1 : 1) + gap.length;
@@ -267,16 +267,16 @@ function parseBlocks(lines, { mdx, imports, esm }) {
         while (i < lines.length) {
           if (!lines[i].trim()) {
             let j = i;
-            while (j < lines.length && !lines[j].trim()) j++;
+            while (j < lines.length && !lines[j].trim()) {j++;}
             if (j < lines.length && lines[j].startsWith(' '.repeat(contentIndent))) {
               looseSeen = true;
-              for (let k = i; k < j; k++) inner.push('');
+              for (let k = i; k < j; k++) {inner.push('');}
               i = j;
               continue;
             }
             break;
           }
-          if (!lines[i].startsWith(' '.repeat(contentIndent))) break;
+          if (!lines[i].startsWith(' '.repeat(contentIndent))) {break;}
           inner.push(lines[i].slice(contentIndent));
           i++;
         }
@@ -308,7 +308,7 @@ function parseBlocks(lines, { mdx, imports, esm }) {
     // that, so it stays source.
     if (line.includes('|') && i + 1 < lines.length && /^[\s|:-]+$/.test(lines[i + 1]) && lines[i + 1].includes('-')) {
       const start = i;
-      while (i < lines.length && lines[i].trim()) i++;
+      while (i < lines.length && lines[i].trim()) {i++;}
       push({ kind: 'raw-line', value: lines.slice(start, i).join('\n') });
       continue;
     }
@@ -353,8 +353,8 @@ function parseBlocks(lines, { mdx, imports, esm }) {
     const img = text.match(IMAGE_ONLY_RE);
     if (img) {
       const props = { src: { type: 'string', value: img[2] } };
-      if (img[1]) props.alt = { type: 'string', value: img[1] };
-      if (img[3]) props.title = { type: 'string', value: img[3] };
+      if (img[1]) {props.alt = { type: 'string', value: img[1] };}
+      if (img[3]) {props.title = { type: 'string', value: img[3] };}
       push({ kind: 'element', name: 'img', props, children: null, mdImage: true });
       continue;
     }
@@ -378,10 +378,10 @@ function parseBlocks(lines, { mdx, imports, esm }) {
 
 function serializeBlocks(nodes, out) {
   for (const node of nodes || []) {
-    for (let b = 0; b < (node.mdBlanksBefore || 0); b++) out.push('');
+    for (let b = 0; b < (node.mdBlanksBefore || 0); b++) {out.push('');}
     serializeBlock(node, out);
   }
-  for (let b = 0; b < (nodes?.mdTrailingBlanks || 0); b++) out.push('');
+  for (let b = 0; b < (nodes?.mdTrailingBlanks || 0); b++) {out.push('');}
 }
 
 // A node the app created (from the insert palette, or by pasting) has none of
@@ -444,7 +444,7 @@ function serializeBlock(node, out) {
     const info = node.mdInfo ?? node.props?.lang?.value ?? '';
     out.push(`${indent}${fence}${info}`);
     out.push(...textOf(node).split('\n').filter((l, idx, arr) => !(arr.length === 1 && l === '')));
-    if (!node.mdUnclosed) out.push(`${indent}${fence}`);
+    if (!node.mdUnclosed) {out.push(`${indent}${fence}`);}
     return;
   }
 
@@ -452,7 +452,7 @@ function serializeBlock(node, out) {
     const inner = [];
     serializeBlocks(node.children || [], inner);
     const gap = node.mdGap ?? ' ';
-    for (const l of inner) out.push(l ? `>${gap}${l}` : '>');
+    for (const l of inner) {out.push(l ? `>${gap}${l}` : '>');}
     return;
   }
 
@@ -461,7 +461,7 @@ function serializeBlock(node, out) {
     const marker = node.mdMarker ?? (ol ? '.' : '-');
     const start = Number(node.props?.start?.value ?? 1) || 1;
     (node.children || []).forEach((item, idx) => {
-      for (let b = 0; b < (item.mdBlanksBefore || 0); b++) out.push('');
+      for (let b = 0; b < (item.mdBlanksBefore || 0); b++) {out.push('');}
       const num = ol ? String(node.mdNumbers?.[idx] ?? start + idx) : '';
       const bullet = ol ? `${num}${marker}` : marker;
       const gap = item.mdGap ?? ' ';
@@ -469,10 +469,10 @@ function serializeBlock(node, out) {
       serializeBlocks(item.children || [], inner);
       const pad = ' '.repeat(indent.length + bullet.length + gap.length);
       inner.forEach((l, k) => {
-        if (k === 0) out.push(`${indent}${bullet}${gap}${l}`);
-        else out.push(l ? pad + l : '');
+        if (k === 0) {out.push(`${indent}${bullet}${gap}${l}`);}
+        else {out.push(l ? pad + l : '');}
       });
-      if (!inner.length) out.push(`${indent}${bullet}`);
+      if (!inner.length) {out.push(`${indent}${bullet}`);}
     });
     return;
   }
@@ -509,7 +509,7 @@ function parseMarkdownPage(source, { mdx = false } = {}) {
   // line ending, not a blank line, so it is dropped here and added back on
   // serialize.
   const endsWithNewline = lines.length > 0 && lines[lines.length - 1] === '';
-  if (endsWithNewline) lines.pop();
+  if (endsWithNewline) {lines.pop();}
 
   const nodes = parseBlocks(lines, { mdx, imports, esm });
 
@@ -536,7 +536,7 @@ function serializeMarkdownPage(model) {
   const fm = model.extraFrontmatter ?? '';
   if (model.mdHasFrontmatter || fm.trim()) {
     out.push('---');
-    if (fm !== '') out.push(...fm.split('\n'));
+    if (fm !== '') {out.push(...fm.split('\n'));}
     out.push('---');
   }
   serializeBlocks(model.nodes || [], out);

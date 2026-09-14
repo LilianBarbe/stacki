@@ -48,7 +48,7 @@ function parseAttrs(attrString) {
     /\{\s*\.\.\.((?:[^{}]|\{[^{}]*\})*)\}|([\w@:.-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|\{((?:[^{}]|\{[^{}]*\})*)\}))?/g;
   let m;
   while ((m = re.exec(attrString)) !== null) {
-    if (!m[0].trim()) continue;
+    if (!m[0].trim()) {continue;}
     if (m[1] !== undefined) {
       // Keyed by the spread's own text, so two different spreads on one tag
       // stay separate and the order round-trips.
@@ -75,7 +75,7 @@ function parseAttrs(attrString) {
 // laid out the same way". Editing one attribute reflows the tag onto a line,
 // which is the same bargain struck everywhere else here.
 function attrsAsWritten(node) {
-  if (!node.attrSource) return null;
+  if (!node.attrSource) {return null;}
   const flat = (t) => t.replace(/\s+/g, ' ').trim();
   return flat(node.attrSource) === flat(serializeAttrs(node.props, node.attrOrder))
     ? node.attrSource
@@ -97,15 +97,15 @@ function tagProps(attrs) {
 // What the file had, where it had it, then anything added since.
 function orderedProps(props, order) {
   const entries = Object.entries(props || {});
-  if (!order || !order.length) return entries;
+  if (!order || !order.length) {return entries;}
   const held = new Map(entries);
   const out = [];
   for (const name of order) {
-    if (held.has(name)) out.push([name, held.get(name)]);
+    if (held.has(name)) {out.push([name, held.get(name)]);}
   }
   const known = new Set(order);
   for (const [name, v] of entries) {
-    if (!known.has(name)) out.push([name, v]);
+    if (!known.has(name)) {out.push([name, v]);}
   }
   return out;
 }
@@ -144,7 +144,7 @@ function skipStringOrComment(str, i) {
   if (ch === '`') {
     i++;
     while (i < str.length && str[i] !== ch) {
-      if (str[i] === '\\') i++;
+      if (str[i] === '\\') {i++;}
       i++;
     }
     return i + 1;
@@ -169,7 +169,7 @@ function skipStringOrComment(str, i) {
   }
   if (ch === '/' && str[i + 1] === '/') {
     // `https://…` is not a comment, wherever it is written.
-    if (str[i - 1] === ':') return i;
+    if (str[i - 1] === ':') {return i;}
     const nl = str.indexOf('\n', i + 2);
     return nl === -1 ? str.length : nl; // leave the newline itself unconsumed
   }
@@ -190,10 +190,10 @@ function findMatchingDelimiter(str, start, open, close) {
       continue;
     }
     const ch = str[i];
-    if (ch === open) depth++;
+    if (ch === open) {depth++;}
     else if (ch === close) {
       depth--;
-      if (depth === 0) return i;
+      if (depth === 0) {return i;}
     }
   }
   return -1;
@@ -213,8 +213,8 @@ const normalizeHead = (text) => text.replace(/\s+/g, ' ').trim();
 // can lay them back out under whatever indent the node ends up at.
 function dedentHead(text) {
   const lines = text.split('\n');
-  while (lines.length && !lines[0].trim()) lines.shift();
-  if (lines.length < 2) return normalizeHead(text);
+  while (lines.length && !lines[0].trim()) {lines.shift();}
+  if (lines.length < 2) {return normalizeHead(text);}
   const indents = lines.filter((l) => l.trim()).map((l) => l.match(/^[ \t]*/)[0].length);
   const common = Math.min(...indents);
   return lines.map((l) => (l.trim() ? l.slice(common) : '')).join('\n').trimEnd();
@@ -238,8 +238,8 @@ function topLevelStatements(src) {
       continue;
     }
     const c = src[i];
-    if ('([{'.includes(c)) depth++;
-    else if (')]}'.includes(c)) depth--;
+    if ('([{'.includes(c)) {depth++;}
+    else if (')]}'.includes(c)) {depth--;}
     else if (c === ';' && depth === 0) {
       push(i);
       start = i + 1;
@@ -253,7 +253,7 @@ function topLevelStatements(src) {
       }
     }
   }
-  if (src.slice(start).trim()) push(src.length);
+  if (src.slice(start).trim()) {push(src.length);}
   return out;
 }
 
@@ -264,12 +264,12 @@ function topLevelStatements(src) {
 function afterComments(text) {
   let i = 0;
   for (;;) {
-    while (i < text.length && /\s/.test(text[i])) i++;
-    if (i >= text.length) return text.length;
-    if (!(text[i] === '/' && (text[i + 1] === '*' || text[i + 1] === '/'))) return i;
-    if (text[i + 1] === '*' && text.indexOf('*/', i + 2) === -1) return null;
+    while (i < text.length && /\s/.test(text[i])) {i++;}
+    if (i >= text.length) {return text.length;}
+    if (!(text[i] === '/' && (text[i + 1] === '*' || text[i + 1] === '/'))) {return i;}
+    if (text[i + 1] === '*' && text.indexOf('*/', i + 2) === -1) {return null;}
     const skipped = skipStringOrComment(text, i);
-    if (skipped === i) return i;
+    if (skipped === i) {return i;}
     i = skipped;
   }
 }
@@ -306,15 +306,15 @@ function endsInComment(text) {
 // file, and every node in it has to be able to say which lines are its own.
 function splitBlockLoopBody(block) {
   const statements = topLevelStatements(block);
-  if (!statements.length) return null;
+  if (!statements.length) {return null;}
   const body = [];
   for (let i = 0; i < statements.length; i++) {
     const lead = statements[i].text.length - statements[i].text.trimStart().length;
     const raw = statements[i].text.trim();
     const rawAt = statements[i].at + lead;
-    if (!raw) continue;
+    if (!raw) {continue;}
     const at = afterComments(raw);
-    if (at === null) return null;
+    if (at === null) {return null;}
     const after = raw.slice(at);
     const text = after.trim();
     if (!text) {
@@ -324,7 +324,7 @@ function splitBlockLoopBody(block) {
     }
     if (/^return\b/.test(text)) {
       // The return must be the last thing in the block.
-      if (statements.slice(i + 1).some((rest) => rest.text.trim())) return null;
+      if (statements.slice(i + 1).some((rest) => rest.text.trim())) {return null;}
       let markup = text.slice('return'.length);
       let markupAt =
         rawAt + at + (after.length - after.trimStart().length) + 'return'.length;
@@ -339,11 +339,11 @@ function splitBlockLoopBody(block) {
         markupAt += 1;
         trimLeft();
       }
-      if (!markup.startsWith('<')) return null;
-      if (at) body.push(raw.slice(0, at).trim());
+      if (!markup.startsWith('<')) {return null;}
+      if (at) {body.push(raw.slice(0, at).trim());}
       return { body, markup, at: markupAt };
     }
-    if (!/^(const|let)\s/.test(text)) return null;
+    if (!/^(const|let)\s/.test(text)) {return null;}
     body.push(endsInComment(raw) ? raw : raw.replace(/;*$/, ';'));
   }
   return null; // no return statement — nothing is rendered
@@ -374,17 +374,17 @@ function tryParseConciseMap(inner, base = null) {
   const arrow = inner.match(
     /^([\s\S]*?\.map\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\()/
   );
-  if (!arrow) return null;
+  if (!arrow) {return null;}
   const headRaw = arrow[1];
   const openIdx = arrow[0].length - 1; // the arrow-body '('
   const closeIdx = findMatchingParen(inner, openIdx);
-  if (closeIdx === -1) return null;
+  if (closeIdx === -1) {return null;}
   // After the body must come only the .map() close paren.
-  if (!/^\s*\)\s*$/.test(inner.slice(closeIdx + 1))) return null;
+  if (!/^\s*\)\s*$/.test(inner.slice(closeIdx + 1))) {return null;}
   const body = inner.slice(openIdx + 1, closeIdx);
   // inner starts one char into exprText, and body one char past the arrow '('.
   const parsed = parseTemplate(body, base === null ? null : base + openIdx + 1);
-  if (!parsed.clean) return null;
+  if (!parsed.clean) {return null;}
   return {
     id: makeId(),
     kind: 'map',
@@ -407,18 +407,18 @@ function tryParseBareMap(inner, base = null) {
   const arrow = inner.match(
     /^([\s\S]*?\.map\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*)</
   );
-  if (!arrow) return null;
+  if (!arrow) {return null;}
   const headRaw = arrow[1];
   const mapOpen = headRaw.lastIndexOf('.map(') + '.map'.length;
   const mapClose = findMatchingParen(inner, mapOpen);
-  if (mapClose === -1) return null;
+  if (mapClose === -1) {return null;}
   // After the body must come only the .map() close paren.
-  if (inner.slice(mapClose + 1).trim()) return null;
+  if (inner.slice(mapClose + 1).trim()) {return null;}
   const parsed = parseTemplate(
     inner.slice(headRaw.length, mapClose),
     base === null ? null : base + headRaw.length
   );
-  if (!parsed.clean) return null;
+  if (!parsed.clean) {return null;}
   return {
     id: makeId(),
     kind: 'map',
@@ -435,20 +435,20 @@ function tryParseBlockMap(inner, base = null) {
   const arrow = inner.match(
     /^([\s\S]*?\.map\(\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*)\{/
   );
-  if (!arrow) return null;
+  if (!arrow) {return null;}
   const headRaw = arrow[1];
   const openIdx = arrow[0].length - 1; // the arrow-body '{'
   const closeIdx = findMatchingBrace(inner, openIdx);
-  if (closeIdx === -1) return null;
+  if (closeIdx === -1) {return null;}
   // After the block must come only the .map() close paren.
-  if (!/^\s*\)\s*$/.test(inner.slice(closeIdx + 1))) return null;
+  if (!/^\s*\)\s*$/.test(inner.slice(closeIdx + 1))) {return null;}
   const split = splitBlockLoopBody(inner.slice(openIdx + 1, closeIdx));
-  if (!split) return null;
+  if (!split) {return null;}
   const parsed = parseTemplate(
     split.markup,
     base === null ? null : base + openIdx + 1 + split.at
   );
-  if (!parsed.clean) return null;
+  if (!parsed.clean) {return null;}
   return {
     id: makeId(),
     kind: 'map',
@@ -493,16 +493,16 @@ function topLevelOps(src) {
           j = s;
           continue;
         }
-        if (src[j] === '>') break;
+        if (src[j] === '>') {break;}
         j++;
       }
       i = j;
       continue;
     }
-    if (depth !== 0) continue;
+    if (depth !== 0) {continue;}
     if (ch === '?') {
-      if (src[i + 1] === '?' || src[i + 1] === '.') i++; // ?? and ?. aren't ternaries
-      else out.push({ op: '?', at: i });
+      if (src[i + 1] === '?' || src[i + 1] === '.') {i++;} // ?? and ?. aren't ternaries
+      else {out.push({ op: '?', at: i });}
     } else if (ch === ':') {
       out.push({ op: ':', at: i });
     } else if (ch === '&' && src[i + 1] === '&') {
@@ -529,17 +529,17 @@ function branchNodes(raw, base = null) {
   while (t.startsWith('(') && findMatchingParen(t, 0) === t.length - 1) {
     const inner = t.slice(1, -1);
     const trimmed = inner.trimStart();
-    if (at !== null) at += 1 + (inner.length - trimmed.length);
+    if (at !== null) {at += 1 + (inner.length - trimmed.length);}
     t = trimmed.trimEnd();
   }
   // The ways of writing "render nothing here".
-  if (t === '' || /^(null|undefined|false|''|"")$/.test(t)) return [];
+  if (t === '' || /^(null|undefined|false|''|"")$/.test(t)) {return [];}
   if (t.startsWith('<')) {
     // A failed probe must not claim the page's bail message — the caller
     // falls back to an expression node and the page still parses.
     const saved = lastBail;
     const parsed = parseTemplate(t, at);
-    if (parsed.clean) return parsed.nodes;
+    if (parsed.clean) {return parsed.nodes;}
     lastBail = saved;
     return null;
   }
@@ -576,12 +576,12 @@ function exprBranch(raw, base = null) {
   while (t.startsWith('(') && findMatchingParen(t, 0) === t.length - 1) {
     const inner = t.slice(1, -1);
     const trimmed = inner.trimStart();
-    if (at !== null) at += 1 + (inner.length - trimmed.length);
+    if (at !== null) {at += 1 + (inner.length - trimmed.length);}
     t = trimmed.trimEnd();
   }
   // Markup that failed to parse is not a value — sending it back as an opaque
   // expression would hide a real bail behind a node that looks fine.
-  if (!t || t.startsWith('<')) return null;
+  if (!t || t.startsWith('<')) {return null;}
   const node = { id: makeId(), kind: 'expr', value: `{${t}}` };
   if (at !== null) {
     node.start = at;
@@ -596,15 +596,15 @@ function exprBranch(raw, base = null) {
 function parseCondSource(src, base = null) {
   const raw = String(src);
   const text = raw.trim();
-  if (!text) return null;
+  if (!text) {return null;}
   const from = base === null ? null : base + (raw.length - raw.trimStart().length);
   const ops = topLevelOps(text);
   const ternary = ops.find((o) => o.op === '?');
   if (ternary) {
     const colon = ops.find((o) => o.op === ':' && o.at > ternary.at);
-    if (!colon) return null;
+    if (!colon) {return null;}
     const test = text.slice(0, ternary.at).trim();
-    if (!test) return null;
+    if (!test) {return null;}
     const thenRaw = text.slice(ternary.at + 1, colon.at);
     const elseRaw = text.slice(colon.at + 1);
     let thenKids = branchNodes(thenRaw, from === null ? null : from + ternary.at + 1);
@@ -619,7 +619,7 @@ function parseCondSource(src, base = null) {
     } else if (elseKids && !thenKids && branchIsMarkup(elseKids)) {
       thenKids = exprBranch(thenRaw, from === null ? null : from + ternary.at + 1);
     }
-    if (!thenKids || !elseKids) return null;
+    if (!thenKids || !elseKids) {return null;}
     return {
       id: makeId(),
       kind: 'cond',
@@ -631,11 +631,11 @@ function parseCondSource(src, base = null) {
   // `a && b && (<x/>)`: everything up to the LAST && is the test.
   const ands = ops.filter((o) => o.op === '&&');
   const and = ands[ands.length - 1];
-  if (!and) return null;
+  if (!and) {return null;}
   const test = text.slice(0, and.at).trim();
-  if (!test) return null;
+  if (!test) {return null;}
   const kids = branchNodes(text.slice(and.at + 2), from === null ? null : from + and.at + 2);
-  if (!kids || !kids.length) return null; // `x && null` is not worth a node
+  if (!kids || !kids.length) {return null;} // `x && null` is not worth a node
   return {
     id: makeId(),
     kind: 'cond',
@@ -650,7 +650,7 @@ function parseCondSource(src, base = null) {
 // each side is navigable and editable instead of a wall of code.
 function tryParseMapWithSource(exprText, base = null) {
   const node = tryParseMap(exprText, base);
-  if (node) node.source = exprText;
+  if (node) {node.source = exprText;}
   return node;
 }
 
@@ -659,7 +659,7 @@ function tryParseCond(exprText, base = null) {
   // The text it was written as. A condition that has not been edited is
   // written back exactly, rather than reflowed onto the shape this file would
   // choose — `{x && <p/>}` is not improved by becoming four lines.
-  if (node) node.source = exprText;
+  if (node) {node.source = exprText;}
   return node;
 }
 
@@ -670,7 +670,7 @@ function tryParseCond(exprText, base = null) {
 // parsePage clears it before starting.
 let lastBail = null;
 function bail(nodes, str, at, what) {
-  if (!lastBail) lastBail = { what, near: str.slice(at, at + 60) };
+  if (!lastBail) {lastBail = { what, near: str.slice(at, at + 60) };}
   return { nodes, clean: false };
 }
 
@@ -729,8 +729,8 @@ function parseTemplate(str, base = null) {
     if (!text.trim() && text) {
       // Whitespace only: no node, but remember any blank line inside it.
       const breaks = (text.match(/\n/g) || []).length;
-      if (breaks > 1) pendingBlank = Math.max(pendingBlank, breaks - 1);
-      if (nodes.length) gaps.push(nodes.length);
+      if (breaks > 1) {pendingBlank = Math.max(pendingBlank, breaks - 1);}
+      if (nodes.length) {gaps.push(nodes.length);}
     }
     if (text.trim()) {
       // `source` when the collapsed value isn't the whole truth: a slice that
@@ -739,17 +739,17 @@ function parseTemplate(str, base = null) {
       // and `©` are the same character to a reader and not to a diff, and the
       // file's own spelling is the file's to keep.
       const node = { id: makeId(), kind: 'text', value: textValue(text) };
-      if (text.includes('\n') || /&[#a-zA-Z]/.test(text)) node.source = text;
+      if (text.includes('\n') || /&[#a-zA-Z]/.test(text)) {node.source = text;}
       emit(at(node, pos, textEnd));
     }
-    if (next === -1) break;
+    if (next === -1) {break;}
 
     // {expression} — a recognized .map() becomes a structural loop node and a
     // recognized ternary/&& becomes a condition; anything else is kept
     // verbatim as an opaque node (may contain JSX).
     if (next === br && (lt === -1 || br < lt)) {
       const close = findMatchingBrace(str, br);
-      if (close === -1) return bail(nodes, str, br, 'an unclosed { … } expression');
+      if (close === -1) {return bail(nodes, str, br, 'an unclosed { … } expression');}
       const exprText = str.slice(br, close + 1);
       // `{/* … */}` is a comment that happens to be written the way markup
       // requires inside JSX. It is the same thing as `<!-- … -->` to everyone
@@ -773,7 +773,7 @@ function parseTemplate(str, base = null) {
     // Comment
     if (str.startsWith('<!--', lt)) {
       const end = str.indexOf('-->', lt + 4);
-      if (end === -1) return bail(nodes, str, lt, 'an unclosed <!-- comment');
+      if (end === -1) {return bail(nodes, str, lt, 'an unclosed <!-- comment');}
       emit(at({ id: makeId(), kind: 'comment', value: str.slice(lt + 4, end) }, lt, end + 3));
       pos = end + 3;
       continue;
@@ -782,7 +782,7 @@ function parseTemplate(str, base = null) {
     // Doctype
     if (/^<!doctype/i.test(str.slice(lt))) {
       const end = str.indexOf('>', lt);
-      if (end === -1) return bail(nodes, str, lt, 'an unclosed <!doctype>');
+      if (end === -1) {return bail(nodes, str, lt, 'an unclosed <!doctype>');}
       emit(at({ id: makeId(), kind: 'raw-line', value: str.slice(lt, end + 1) }, lt, end + 1));
       pos = end + 1;
       continue;
@@ -791,7 +791,7 @@ function parseTemplate(str, base = null) {
     const shorthand = str.startsWith('<>', lt);
     TAG_RE.lastIndex = lt;
     const m = shorthand ? ['<>', 'Fragment', '', ''] : TAG_RE.exec(str);
-    if (!m) return bail(nodes, str, lt, 'a stray <');
+    if (!m) {return bail(nodes, str, lt, 'a stray <');}
 
     const [full, name, attrs, selfClose] = m;
     // One level of nested braces in an attribute ({{ a: 1 }}) is supported;
@@ -822,7 +822,7 @@ function parseTemplate(str, base = null) {
     // <style>/<script>: capture inner verbatim, no parsing.
     if (!isComponent && RAW_ELEMENTS.has(name.toLowerCase())) {
       const close = str.indexOf(`</${name}`, afterOpen);
-      if (close === -1) return bail(nodes, str, lt, `an unclosed <${name}> block`);
+      if (close === -1) {return bail(nodes, str, lt, `an unclosed <${name}> block`);}
       const closeEnd = str.indexOf('>', close);
       emit(at({
         id: makeId(),
@@ -839,10 +839,10 @@ function parseTemplate(str, base = null) {
     const closeIdx = shorthand
       ? findMatchingFragmentClose(str, afterOpen)
       : findMatchingClose(str, afterOpen, name);
-    if (closeIdx === -1) return bail(nodes, str, lt, `an unclosed <${shorthand ? '' : name}> tag`);
+    if (closeIdx === -1) {return bail(nodes, str, lt, `an unclosed <${shorthand ? '' : name}> tag`);}
     const inner = str.slice(afterOpen, closeIdx);
     const innerResult = parseTemplate(inner, base === null ? null : base + afterOpen);
-    if (!innerResult.clean) return { nodes, clean: false }; // the inner frame recorded the cause
+    if (!innerResult.clean) {return { nodes, clean: false };} // the inner frame recorded the cause
     // A run written across several lines keeps its raw inner. The tree can't
     // hold it: whitespace-only text between the tags is dropped, so the break
     // before a closing tag exists nowhere else, and the serializer needs it to
@@ -881,7 +881,7 @@ function parseTemplate(str, base = null) {
   // renders as nothing, so it is left out.
   if (gaps.length && isInlineRun(nodes)) {
     for (let i = gaps.length - 1; i >= 0; i--) {
-      if (gaps[i] >= nodes.length) continue;
+      if (gaps[i] >= nodes.length) {continue;}
       nodes.splice(gaps[i], 0, { id: makeId(), kind: 'text', value: ' ' });
     }
   }
@@ -927,7 +927,7 @@ function findMatchingClose(str, from, name) {
     }
     if (full.startsWith('</')) {
       depth--;
-      if (depth === 0) return m.index;
+      if (depth === 0) {return m.index;}
     } else if (selfClose !== '/') {
       depth++;
     }
@@ -942,14 +942,14 @@ function findMatchingFragmentClose(str, from) {
   for (let pos = from; pos < str.length;) {
     if (str[pos] === '{') {
       const end = findMatchingBrace(str, pos);
-      if (end === -1) return -1;
+      if (end === -1) {return -1;}
       pos = end + 1;
     } else if (str.startsWith('<!--', pos)) {
       const end = str.indexOf('-->', pos + 4);
-      if (end === -1) return -1;
+      if (end === -1) {return -1;}
       pos = end + 3;
     } else if (str.startsWith('</>', pos)) {
-      if (--depth === 0) return pos;
+      if (--depth === 0) {return pos;}
       pos += 3;
     } else if (str.startsWith('<>', pos)) {
       depth++;
@@ -965,7 +965,7 @@ function findMatchingFragmentClose(str, from) {
       if (RAW_ELEMENTS.has(tag[1]) && tag[3] !== '/') {
         const close = str.indexOf(`</${tag[1]}`, pos);
         const end = close === -1 ? -1 : str.indexOf('>', close);
-        if (end === -1) return -1;
+        if (end === -1) {return -1;}
         pos = end + 1;
       }
     } else {
@@ -1039,8 +1039,8 @@ function parsePage(source, opts = {}) {
   if (topNodes.length) {
     const lead = (body.match(/^(?:[ \t]*\r?\n)+/) || [''])[0];
     const blanks = (lead.match(/\n/g) || []).length;
-    if (blanks) topNodes[0].blankBefore = blanks;
-    else delete topNodes[0].blankBefore;
+    if (blanks) {topNodes[0].blankBefore = blanks;}
+    else {delete topNodes[0].blankBefore;}
   }
   if (!clean) {
     // Name the construct and point at it. The bail records the text it stopped
@@ -1085,9 +1085,9 @@ function parsePage(source, opts = {}) {
         n.children !== null &&
         /layout/i.test(importsByName[n.name]?.path || '')
     );
-    if (layoutish.length === 1) wrapper = layoutish[0];
+    if (layoutish.length === 1) {wrapper = layoutish[0];}
   }
-  if (wrapper) wrapper.id = 'layout';
+  if (wrapper) {wrapper.id = 'layout';}
 
   // A capitalized tag that isn't imported is a dynamic tag, not a component:
   // `const Tag = tag` then `<Tag>` is how an Astro component renders a
@@ -1097,13 +1097,13 @@ function parsePage(source, opts = {}) {
     for (const n of list) {
       if (n.kind === 'component' && n.name !== 'Fragment') {
         const imp = importsByName[n.name];
-        if (!imp) n.dynamicTag = true;
+        if (!imp) {n.dynamicTag = true;}
         // Astro's own <Image>/<Picture>, identified by where the name came
         // from rather than by the name itself — a project is perfectly
         // entitled to its own component called Image, and several have one.
-        else if (imp.path === 'astro:assets') n.astroAsset = true;
+        else if (imp.path === 'astro:assets') {n.astroAsset = true;}
       }
-      if (Array.isArray(n.children)) markDynamic(n.children);
+      if (Array.isArray(n.children)) {markDynamic(n.children);}
     }
   };
   markDynamic(topNodes);
@@ -1126,7 +1126,7 @@ function parsePage(source, opts = {}) {
 // agreement. The surrounding page writer supplies the last line break.
 function serializeFrontmatter(model, lines, specFor) {
   const text = writeFrontmatter(model, specFor);
-  if (text) lines.push(text.replace(/\r?\n$/, ''));
+  if (text) {lines.push(text.replace(/\r?\n$/, ''));}
 }
 
 function serializePage(model) {
@@ -1140,9 +1140,9 @@ function serializePage(model) {
     lines.push('---', ...fmLines, '---');
   }
 
-  for (const node of model.nodes) serializeNode(node, '', lines);
+  for (const node of model.nodes) {serializeNode(node, '', lines);}
   // Blank lines the file ended on.
-  for (let i = 0; i < (model.trailingBlank || 0); i++) lines.push('');
+  for (let i = 0; i < (model.trailingBlank || 0); i++) {lines.push('');}
   return lines.join('\n') + '\n';
 }
 
@@ -1178,8 +1178,8 @@ function inlineString(nodes) {
     // Same rule as a text node on its own (see the 'text' case in
     // serializeNode): the file keeps its own spelling of a character until
     // somebody edits the words, and then the characters are what there is.
-    if (n.kind === 'text') out += textOut(n);
-    else if (n.kind === 'expr') out += n.value;
+    if (n.kind === 'text') {out += textOut(n);}
+    else if (n.kind === 'expr') {out += n.value;}
     else if (n.children === null) {
       out += n.name === 'br' ? '<br />' : `<${n.name}${serializeAttrs(n.props, n.attrOrder)} />`;
     } else if (n.children.length === 0) {
@@ -1204,7 +1204,7 @@ function inlineString(nodes) {
 // tags and all, without them.
 function tagInlineRun(nodes, path, atRoot = false) {
   return nodes.map((n, i) => {
-    if (n.kind !== 'element') return n;
+    if (n.kind !== 'element') {return n;}
     const childPath = `${path}.${i}`;
     const forwards = Object.keys(n.props || {}).some((key) => key.startsWith('...'));
     const pathProp = atRoot || forwards
@@ -1229,7 +1229,7 @@ function tagInlineRun(nodes, path, atRoot = false) {
 // written on — the same bargain `headSource` strikes for a loop head. A text
 // node with no `source` never had lines to lose, so its value is the original.
 function textAsWritten(node) {
-  if (!node.source) return node.value;
+  if (!node.source) {return node.value;}
   return textValue(node.source) === node.value ? node.source : null;
 }
 
@@ -1255,7 +1255,7 @@ function textOut(node) {
 function reindentRun(source, indent) {
   const lines = source.split('\n');
   const base = lines[lines.length - 1];
-  if (lines.length < 2 || !/^[ \t]*$/.test(base) || base === indent) return source;
+  if (lines.length < 2 || !/^[ \t]*$/.test(base) || base === indent) {return source;}
   let shift;
   if (indent.startsWith(base)) {
     const add = indent.slice(base.length);
@@ -1300,12 +1300,12 @@ function inlineRunUnchanged(node) {
 // the serializer over a copy with the source removed means there is only one
 // description of how these are written, and this cannot drift from it.
 function blockAsWritten(node, indent) {
-  if (!node.source) return null;
+  if (!node.source) {return null;}
   const probe = { ...node, source: undefined, blankBefore: 0, blankAfter: 0 };
   const rebuilt = [];
   serializeNode(probe, '', rebuilt);
   const flat = (t) => t.replace(/[\s(){}]+/g, '').trim();
-  if (flat(rebuilt.join('\n')) !== flat(node.source)) return null;
+  if (flat(rebuilt.join('\n')) !== flat(node.source)) {return null;}
   const src = node.source.split('\n');
   const base = (src[src.length - 1].match(/^[ \t]*/) || [''])[0];
   return src.map((line, i) =>
@@ -1339,7 +1339,7 @@ function serializeCondBody(node, indent, lines) {
       raw.split('\n').forEach((line, i) => lines.push(i === 0 ? at + line : line));
       return;
     }
-    for (const child of kids) serializeNode(child, at, lines);
+    for (const child of kids) {serializeNode(child, at, lines);}
   };
   if (thenKids.length) {
     lines.push(indent + head + '(');
@@ -1359,9 +1359,9 @@ function serializeCondBody(node, indent, lines) {
 function serializeNode(node, indent, lines) {
   // Chunk containers: children live in external .html files (set:html),
   // never in the page — emit the component self-closing, skip the subtree.
-  if (node.kind === 'chunk-group') return; // synthetic, not in page source
+  if (node.kind === 'chunk-group') {return;} // synthetic, not in page source
   // The gap the author left in front of this node.
-  for (let i = 0; i < (node.blankBefore || 0); i++) lines.push('');
+  for (let i = 0; i < (node.blankBefore || 0); i++) {lines.push('');}
   if (node.chunkFile || node.chunkAggregate) {
     lines.push(`${indent}<${node.name}${serializeAttrs(node.props, node.attrOrder)} />`);
     return;
@@ -1387,7 +1387,7 @@ function serializeNode(node, indent, lines) {
       const body = written.replace(/^[ \t]*\r?\n/, '').replace(/\s+$/, '');
       const [first, ...more] = body.split('\n');
       lines.push(indent + first.replace(/^[ \t]+/, ''));
-      for (const line of more) lines.push(line);
+      for (const line of more) {lines.push(line);}
       return;
     }
     case 'expr': {
@@ -1395,13 +1395,13 @@ function serializeNode(node, indent, lines) {
       // (subsequent lines carry their original indentation).
       const exprLines = node.value.split('\n');
       lines.push(indent + exprLines[0]);
-      for (let i = 1; i < exprLines.length; i++) lines.push(exprLines[i]);
+      for (let i = 1; i < exprLines.length; i++) {lines.push(exprLines[i]);}
       return;
     }
     case 'map': {
       const keptMap = blockAsWritten(node, indent);
       if (keptMap) {
-        for (const line of keptMap) lines.push(line);
+        for (const line of keptMap) {lines.push(line);}
         return;
       }
       lines.push(indent + '{');
@@ -1409,7 +1409,7 @@ function serializeNode(node, indent, lines) {
       // declarations, then the markup inside `return ( … )`.
       if (node.body && node.body.length) {
         lines.push(indent + '  ' + blockHead(node.head));
-        for (const line of node.body) lines.push(indent + '    ' + line);
+        for (const line of node.body) {lines.push(indent + '    ' + line);}
         lines.push(indent + '    return (');
         for (const child of node.children || []) {
           serializeNode(child, indent + '      ', lines);
@@ -1440,7 +1440,7 @@ function serializeNode(node, indent, lines) {
       let inner = '';
       if (kept) {
         const headLines = kept.split('\n');
-        for (const line of headLines) lines.push(line ? indent + '  ' + line : '');
+        for (const line of headLines) {lines.push(line ? indent + '  ' + line : '');}
         inner = headLines[headLines.length - 1].match(/^[ \t]*/)[0];
       } else {
         lines.push(indent + '  ' + node.head);
@@ -1455,7 +1455,7 @@ function serializeNode(node, indent, lines) {
     case 'cond': {
       const kept = blockAsWritten(node, indent);
       if (kept) {
-        for (const line of kept) lines.push(line);
+        for (const line of kept) {lines.push(line);}
         return;
       }
       lines.push(indent + '{');
@@ -1466,7 +1466,7 @@ function serializeNode(node, indent, lines) {
     case 'branch':
       // Written by the condition above; standing on its own it is just its
       // contents.
-      for (const child of node.children || []) serializeNode(child, indent, lines);
+      for (const child of node.children || []) {serializeNode(child, indent, lines);}
       return;
     case 'comment':
       lines.push(
@@ -1492,7 +1492,7 @@ function serializeNode(node, indent, lines) {
         return;
       }
       lines.push(open);
-      for (const line of inner.split('\n')) lines.push(line);
+      for (const line of inner.split('\n')) {lines.push(line);}
       lines.push(`${indent}</${node.name}>`);
       return;
     }
@@ -1515,7 +1515,7 @@ function serializeNode(node, indent, lines) {
         // be one too many.
         const tail = kept !== null && /\s$/.test(attrs) ? close.replace(/^ /, '') : close;
         const text = `${indent}<${tagName}${attrs}${tail}`;
-        for (const line of text.split('\n')) lines.push(line);
+        for (const line of text.split('\n')) {lines.push(line);}
       };
       if (node.children === null) {
         openTag(node.tightClose ? '/>' : ' />');
@@ -1540,9 +1540,9 @@ function serializeNode(node, indent, lines) {
         return;
       }
       openTag('>');
-      for (const child of node.children) serializeNode(child, indent + '  ', lines);
-      for (let i = 0; i < (node.blankAfter || 0); i++) lines.push('');
-      for (const line of `${indent}${closeTag}`.split('\n')) lines.push(line);
+      for (const child of node.children) {serializeNode(child, indent + '  ', lines);}
+      for (let i = 0; i < (node.blankAfter || 0); i++) {lines.push('');}
+      for (const line of `${indent}${closeTag}`.split('\n')) {lines.push(line);}
     }
   }
 }
@@ -1651,7 +1651,7 @@ const markerFor = (path, kind, inSlotContent, slotAttr = '') =>
 // they say where a node ENDS, and they carry the nodes an attribute can't
 // (text, a loop, a branch).
 function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot = false) {
-  if (node.kind === 'chunk-group') return; // synthetic, not in page source
+  if (node.kind === 'chunk-group') {return;} // synthetic, not in page source
   // A slotted node can't simply be wrapped: a marker beside it lands in the
   // default slot while the node itself renders in the named one, so the pair
   // ends up around nothing. Its markers travel with it by carrying the same
@@ -1753,12 +1753,12 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
     // A slotted Fragment's own markers, riding inside it (see markWithin).
     // Inside a component, which is what a Fragment is, a plain comment is
     // dropped by the compiler — so they go in the way slot content does.
-    if (markWithin) lines.push(indent + '  ' + markerFor(path, 's', true));
+    if (markWithin) {lines.push(indent + '  ' + markerFor(path, 's', true));}
     node.children.forEach((child, i) =>
       serializeNodeMarked(child, indent + '  ', lines, `${path}.${i}`, node.kind === 'component',
         node.name === 'Fragment' && atRoot)
     );
-    if (markWithin) lines.push(indent + '  ' + markerFor(path, 'e', true));
+    if (markWithin) {lines.push(indent + '  ' + markerFor(path, 'e', true));}
     lines.push(`${indent}</${node.name}>`);
   } else if (node.kind === 'map') {
     // Loop children render once per item, so their marker pairs repeat in
@@ -1785,7 +1785,7 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
     };
     if (node.body && node.body.length) {
       lines.push(indent + '  ' + blockHead(node.head));
-      for (const line of node.body) lines.push(indent + '    ' + line);
+      for (const line of node.body) {lines.push(indent + '    ' + line);}
       lines.push(indent + '    return (');
       loopBody(indent + '      ');
       lines.push(indent + '    );');
@@ -1818,7 +1818,7 @@ function serializeNodeMarked(node, indent, lines, path, inSlot = false, atRoot =
       // left everything in a branch unoutlinable.
       // A root written as a condition — `{render && (<div/>)}` — is still the
       // root: what the branch renders is what the caller placed.
-      if (branch) serializeNodeMarked(branch, inner + '  ', lines, `${path}.${i}`, true, atRoot);
+      if (branch) {serializeNodeMarked(branch, inner + '  ', lines, `${path}.${i}`, true, atRoot);}
       lines.push(inner + '</Fragment>');
     };
     lines.push(indent + '{');
@@ -1880,8 +1880,8 @@ function splitTypeTop(expr, op) {
       continue;
     }
     const c = expr[i];
-    if ('([{<'.includes(c)) depth++;
-    else if (')]}>'.includes(c)) depth--;
+    if ('([{<'.includes(c)) {depth++;}
+    else if (')]}>'.includes(c)) {depth--;}
     else if (c === op && depth === 0) {
       out.push(expr.slice(start, i));
       start = i + 1;
@@ -1908,11 +1908,11 @@ function explodeMembers(block) {
 // prose. Used twice: once for the field itself, and once per union branch,
 // where a prop written in several branches has a different answer in each.
 function statedDefault(doc) {
-  if (!doc) return {};
+  if (!doc) {return {};}
   const stated =
     doc.match(/defaults?\s*(?:to|:)\s*\`([^\`]+)\`/i) ||
     doc.match(/defaults?\s*(?:to|:)\s*([^\`.,;]+)/i);
-  if (!stated) return {};
+  if (!stated) {return {};}
 
   // "Defaults to `webp`, or `svg` for SVG sources" is TWO answers, and which
   // one applies depends on a prop only the component can weigh. Asserting the
@@ -1993,14 +1993,14 @@ function parsePropSchema(source, prelude = '') {
     if (dm[1] === 'interface') {
       // `interface X extends Y { … }` — the braces are the body.
       const open = frontmatter.indexOf('{', after);
-      if (open === -1) continue;
+      if (open === -1) {continue;}
       const close = findMatchingBrace(frontmatter, open);
-      if (close === -1) continue;
+      if (close === -1) {continue;}
       const heritage = frontmatter.slice(after, open).replace(/^\s*extends\s+/, '');
       body = `${heritage} ${frontmatter.slice(open, close + 1)}`;
     } else {
       const eq = frontmatter.indexOf('=', after);
-      if (eq === -1) continue;
+      if (eq === -1) {continue;}
       let i = eq + 1;
       let depth = 0;
       for (; i < frontmatter.length; i++) {
@@ -2010,9 +2010,9 @@ function parsePropSchema(source, prelude = '') {
           continue;
         }
         const c = frontmatter[i];
-        if ('([{'.includes(c)) depth++;
-        else if (')]}'.includes(c)) depth--;
-        else if (c === ';' && depth === 0) break;
+        if ('([{'.includes(c)) {depth++;}
+        else if (')]}'.includes(c)) {depth--;}
+        else if (c === ';' && depth === 0) {break;}
       }
       body = frontmatter.slice(eq + 1, i);
     }
@@ -2022,7 +2022,7 @@ function parsePropSchema(source, prelude = '') {
   // An alias standing in for a union of literals, expanded to those literals.
   const expandAlias = (part, seen = new Set()) => {
     const body = aliases.get(part);
-    if (!body || seen.has(part) || /[{}]/.test(body)) return [part];
+    if (!body || seen.has(part) || /[{}]/.test(body)) {return [part];}
     seen.add(part);
     return splitTypeTop(body, '|').flatMap((p) => expandAlias(p.trim(), seen));
   };
@@ -2041,12 +2041,12 @@ function parsePropSchema(source, prelude = '') {
   // `Base & ({ a } | { b })` yields Base's members plus both branches. A prop
   // in ANY branch is a prop the component can take.
   const memberBlocks = (expr, seen = new Set(), out = []) => {
-    if (!expr || seen.size > 12) return out;
+    if (!expr || seen.size > 12) {return out;}
     let i = 0;
     while (i < expr.length) {
       if (expr[i] === '{') {
         const close = findMatchingBrace(expr, i);
-        if (close === -1) break;
+        if (close === -1) {break;}
         out.push(expr.slice(i + 1, close));
         i = close + 1;
         continue;
@@ -2069,10 +2069,10 @@ function parsePropSchema(source, prelude = '') {
   if (propsDecl) {
     // `interface Props extends HTMLAttributes<"button">` — the extended type
     // is part of the shape too.
-    if (propsDecl[1]) memberBlocks(propsDecl[1], new Set(), blocks);
+    if (propsDecl[1]) {memberBlocks(propsDecl[1], new Set(), blocks);}
     memberBlocks(propsDecl[2], new Set(), blocks);
   }
-  if (asType && aliases.has(asType[1])) memberBlocks(aliases.get(asType[1]), new Set(), blocks);
+  if (asType && aliases.has(asType[1])) {memberBlocks(aliases.get(asType[1]), new Set(), blocks);}
 
   // A discriminated union says which props go together: `variant: "densities"`
   // comes with `densities`, and `widths`/`sizes` belong to the responsive
@@ -2092,7 +2092,7 @@ function parsePropSchema(source, prelude = '') {
   // offers every prop at once, including ones the type has already ruled out.
   const unionTables = [];
   const collectUnions = (expr, seen = new Set()) => {
-    if (!expr) return;
+    if (!expr) {return;}
     for (const part of splitTypeTop(expr, '&')) {
       // The declaration's own semicolon rides along on the last part.
       const inner = part.replace(/;\s*$/, '').replace(/^\(([\s\S]*)\)$/, '$1');
@@ -2129,7 +2129,7 @@ function parsePropSchema(source, prelude = '') {
       // — where it has no type — and a list of rows came out as raw code.
       const text = line.trim().replace(/[;,]\s*$/, '');
       const m = text.match(/^(?:readonly\s+)?([\w$]+)\??\s*:\s*([\s\S]+)$/);
-      if (m) out.set(m[1], m[2].trim());
+      if (m) {out.set(m[1], m[2].trim());}
     }
     // …then whole members, for a type that spans lines:
     //   variant?:
@@ -2145,9 +2145,9 @@ function parsePropSchema(source, prelude = '') {
         .replace(/[{}]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
-      if (!flat.includes('\n') && out.size && !/\|/.test(flat)) continue;
+      if (!flat.includes('\n') && out.size && !/\|/.test(flat)) {continue;}
       const m = flat.match(/^(?:readonly\s+)?([\w$]+)\??\s*:\s*(.+?),?$/);
-      if (m && !out.has(m[1])) out.set(m[1], m[2].trim());
+      if (m && !out.has(m[1])) {out.set(m[1], m[2].trim());}
     }
     return out;
   };
@@ -2161,7 +2161,7 @@ function parsePropSchema(source, prelude = '') {
       if (inBlock) {
         const end = line.indexOf('*/');
         doc.push((end === -1 ? line : line.slice(0, end)).replace(/^\*+\s?/, ''));
-        if (end !== -1) inBlock = false;
+        if (end !== -1) {inBlock = false;}
         continue;
       }
       if (line.startsWith('/*')) {
@@ -2181,7 +2181,7 @@ function parsePropSchema(source, prelude = '') {
       const m = line.match(/^(?:readonly\s+)?([\w$]+)\??\s*:\s*([^;\n]+?)[;,]?\s*$/);
       if (m) {
         const text = doc.join(' ').replace(/\s+/g, ' ').trim();
-        if (text) out.set(m[1], text);
+        if (text) {out.set(m[1], text);}
         doc = [];
       }
     }
@@ -2205,12 +2205,12 @@ function parsePropSchema(source, prelude = '') {
       for (const [name, doc] of docMaps[at]) {
         docs[name] = doc;
         const said = statedDefault(doc);
-        if (said.value !== undefined) defaults[name] = said.value;
-        if (said.when) rules[name] = said.when;
+        if (said.value !== undefined) {defaults[name] = said.value;}
+        if (said.when) {rules[name] = said.when;}
       }
       for (const name of names) {
         const t = m.get(name);
-        if (!t) continue;
+        if (!t) {continue;}
         // A branch PINS a prop when it fixes it to a known set of values —
         // one (`variant: "autofit"`) or several (`variant: "autofit" |
         // "autofill"`), which is still a discriminant, just a wider one.
@@ -2263,19 +2263,19 @@ function parsePropSchema(source, prelude = '') {
     for (const u of unions) {
       for (const b of u.branches) {
         for (const [name, doc] of Object.entries(b.docs || {})) {
-          if (!perName.has(name)) perName.set(name, new Set());
+          if (!perName.has(name)) {perName.set(name, new Set());}
           perName.get(name).add(doc);
         }
       }
     }
     for (const [name, docs] of perName) {
-      if (docs.size < 2) continue;
+      if (docs.size < 2) {continue;}
       const all = [...docs];
       let i = 0;
-      while (i < all[0].length && all.every((d) => d[i] === all[0][i])) i++;
+      while (i < all[0].length && all.every((d) => d[i] === all[0][i])) {i++;}
       const cut = all[0].slice(0, i).lastIndexOf('.');
       const common = cut === -1 ? '' : all[0].slice(0, cut + 1).trim();
-      if (common) sharedDoc.set(name, common);
+      if (common) {sharedDoc.set(name, common);}
     }
   }
 
@@ -2310,7 +2310,7 @@ function parsePropSchema(source, prelude = '') {
         // Closing a block that opened on an earlier line.
         const end = line.indexOf('*/');
         doc.push((end === -1 ? line : line.slice(0, end)).replace(/^\*+\s?/, ''));
-        if (end !== -1) inBlock = false;
+        if (end !== -1) {inBlock = false;}
         continue;
       }
       if (line.startsWith('/*')) {
@@ -2342,8 +2342,8 @@ function parsePropSchema(source, prelude = '') {
         const rest = [];
         while (i + 1 < lines.length) {
           const next = lines[i + 1].trim();
-          if (!next || next.startsWith('/*') || next.startsWith('//')) break;
-          if (entryRe.test(next) || /^(?:readonly\s+)?[\w$]+\??\s*:\s*$/.test(next)) break;
+          if (!next || next.startsWith('/*') || next.startsWith('//')) {break;}
+          if (entryRe.test(next) || /^(?:readonly\s+)?[\w$]+\??\s*:\s*$/.test(next)) {break;}
           rest.push(next);
           i += 1;
         }
@@ -2359,7 +2359,7 @@ function parsePropSchema(source, prelude = '') {
       }
       const name = m[1];
       let typeStr = m[3].trim();
-      if (aliases.has(typeStr)) typeStr = aliases.get(typeStr);
+      if (aliases.has(typeStr)) {typeStr = aliases.get(typeStr);}
       // `never` is how a union branch says "not in this shape" — it describes
       // the branch, not the prop, so it contributes no type and no
       // optionality. It DOES fix the prop's position though: a component that
@@ -2367,9 +2367,9 @@ function parsePropSchema(source, prelude = '') {
       // skipping the line outright would only register href in a later branch
       // and sort it to the bottom.
       if (typeStr === 'never') {
-        if (!rawTypes.has(name)) rawTypes.set(name, { parts: [], optional: false });
+        if (!rawTypes.has(name)) {rawTypes.set(name, { parts: [], optional: false });}
       } else {
-        if (!rawTypes.has(name)) rawTypes.set(name, { parts: [], optional: false });
+        if (!rawTypes.has(name)) {rawTypes.set(name, { parts: [], optional: false });}
         const rec = rawTypes.get(name);
         for (const part of typeStr.split('|').map((x) => x.trim()).filter(Boolean)) {
           // `variant?: PlainVariant | ReversibleVariant` names two aliases
@@ -2377,13 +2377,13 @@ function parsePropSchema(source, prelude = '') {
           // — and an unexpanded name among the literals is a non-literal, so
           // the whole thing stops reading as a fixed set of options.
           for (const piece of expandAlias(part)) {
-            if (piece !== 'never' && !rec.parts.includes(piece)) rec.parts.push(piece);
+            if (piece !== 'never' && !rec.parts.includes(piece)) {rec.parts.push(piece);}
           }
         }
-        if (m[2]) rec.optional = true;
+        if (m[2]) {rec.optional = true;}
       }
       const text = doc.join(' ').replace(/\s+/g, ' ').trim();
-      if (text && !noted.has(name)) noted.set(name, text);
+      if (text && !noted.has(name)) {noted.set(name, text);}
       doc = [];
     }
   }
@@ -2396,12 +2396,12 @@ function parsePropSchema(source, prelude = '') {
   // whose whole point is not having to.
   const shapeOf = (parts) => {
     // A union of two different shapes has no one shape to offer.
-    if (parts.length !== 1) return null;
+    if (parts.length !== 1) {return null;}
     const only = parts[0].trim();
     const arr = only.match(/^([\s\S]*)\[\]$/) || only.match(/^Array<([\s\S]*)>$/);
     const inner = (arr ? arr[1] : only).trim().replace(/^\((.*)\)$/s, '$1').trim();
     const body = inner.startsWith('{') ? inner : aliases.get(inner);
-    if (!body || !body.trim().startsWith('{')) return null;
+    if (!body || !body.trim().startsWith('{')) {return null;}
     // Inside the braces: a member's `;` is only a separator out here, and with
     // the braces still on, a whole one-line type reads as a single member whose
     // type is the rest of the interface.
@@ -2410,7 +2410,7 @@ function parsePropSchema(source, prelude = '') {
       name: memberName,
       type: normalizeType(memberType).type,
     }));
-    if (!members.length) return null;
+    if (!members.length) {return null;}
     return { list: !!arr, members };
   };
 
@@ -2452,7 +2452,7 @@ function parsePropSchema(source, prelude = '') {
       /(\w+)(?:\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|\{[^{}]*\}|\[[^\][]*\]|[^,\n}]+))?/g;
     let m;
     while ((m = entryRe.exec(destructure[1])) !== null) {
-      if (!m[1]) continue;
+      if (!m[1]) {continue;}
       const existing = schema.get(m[1]) || {
         name: m[1],
         type: 'other',
@@ -2463,20 +2463,20 @@ function parsePropSchema(source, prelude = '') {
         let def = m[2].trim();
         if (/^["'`]/.test(def)) {
           existing.default = def.slice(1, -1);
-          if (existing.type === 'other') existing.type = 'string';
+          if (existing.type === 'other') {existing.type = 'string';}
         } else if (/^(true|false)$/.test(def)) {
           existing.default = def === 'true';
-          if (existing.type === 'other') existing.type = 'boolean';
+          if (existing.type === 'other') {existing.type = 'boolean';}
         } else if (/^-?\d+(\.\d+)?$/.test(def)) {
           existing.default = Number(def);
-          if (existing.type === 'other') existing.type = 'number';
+          if (existing.type === 'other') {existing.type = 'number';}
         } else {
           // Not a literal — an identifier or expression (e.g. SITE_TITLE).
           // Flag it so the scanner can try resolving it to a real value.
           existing.default = def;
           existing.defaultExpr = true;
           // An object-literal default marks an attributes-object prop.
-          if (existing.type === 'other' && /^\{/.test(def)) existing.type = 'attrs';
+          if (existing.type === 'other' && /^\{/.test(def)) {existing.type = 'attrs';}
         }
         existing.optional = true;
       }
@@ -2494,10 +2494,10 @@ function parsePropSchema(source, prelude = '') {
     for (const name of u.names) {
       const seen = new Set();
       for (const b of u.branches) {
-        if (b.defaults?.[name] !== undefined) seen.add(b.defaults[name]);
-        if (b.rules?.[name]) seen.add(`rule:${name}`);
+        if (b.defaults?.[name] !== undefined) {seen.add(b.defaults[name]);}
+        if (b.rules?.[name]) {seen.add(`rule:${name}`);}
       }
-      if (seen.size > 1) splitFallback.add(name);
+      if (seen.size > 1) {splitFallback.add(name);}
     }
   }
 
@@ -2512,7 +2512,7 @@ function parsePropSchema(source, prelude = '') {
   // and stays prose — a placeholder that isn't a real value would be a lie
   // about what the component does.
   for (const field of schema.values()) {
-    if (field.default !== undefined) continue;
+    if (field.default !== undefined) {continue;}
 
     // `const x = xProp ?? <literal>` / `const x = props.x ?? <literal>`
     const nullish = frontmatter.match(
@@ -2533,7 +2533,7 @@ function parsePropSchema(source, prelude = '') {
     // "Defaults to `webp`", "Default: 2", "Defaults to `[1, 2]`". The
     // backticked form is tried first and taken whole — a value like `[1, 2]`
     // contains the comma the bare form has to stop at.
-    if (splitFallback.has(field.name)) continue;
+    if (splitFallback.has(field.name)) {continue;}
 
     const said = statedDefault(field.doc);
     if (said.value !== undefined) {
@@ -2563,7 +2563,7 @@ function parsePropSchema(source, prelude = '') {
         .replace(/`/g, '')
         .replace(/\s+/g, ' ')
         .trim();
-      if (text && text.length <= 48) field.hint = text;
+      if (text && text.length <= 48) {field.hint = text;}
     }
   }
 
@@ -2603,16 +2603,16 @@ function slotApiUses(source) {
       if (c === '"' || c === "'" || c === '`') {
         const close = text.indexOf(c, i + 1);
         const quoted = text.slice(i + 1, close === -1 ? text.length : close);
-        if (name === null && /^[\w-]*$/.test(quoted)) name = quoted;
-        if (close === -1) break;
+        if (name === null && /^[\w-]*$/.test(quoted)) {name = quoted;}
+        if (close === -1) {break;}
         i = close;
         continue;
       }
-      if (c === '(' || c === '[' || c === '{') depth++;
+      if (c === '(' || c === '[' || c === '{') {depth++;}
       else if (c === ')' || c === ']' || c === '}') {
         depth--;
-        if (depth === 0) break;
-      } else if (depth === 1 && c === ';') break;
+        if (depth === 0) {break;}
+      } else if (depth === 1 && c === ';') {break;}
     }
     // `const content = await slotContent(...)` — the name that now holds it,
     // which is what the template puts back with `set:html`.
@@ -2638,17 +2638,17 @@ function withoutComments(source) {
   const chars = [...source];
   const blank = (from, to) => {
     for (let i = from; i < to && i < chars.length; i++) {
-      if (chars[i] !== '\n') chars[i] = ' ';
+      if (chars[i] !== '\n') {chars[i] = ' ';}
     }
   };
   const end = fm ? fm[0].length : 0;
   for (let i = 0; i < end; i++) {
     const skipped = skipStringOrComment(source, i);
-    if (skipped === i) continue;
-    if (source[i] === '/') blank(i, skipped);
+    if (skipped === i) {continue;}
+    if (source[i] === '/') {blank(i, skipped);}
     i = skipped - 1;
   }
-  for (const m of source.matchAll(/<!--[\s\S]*?-->/g)) blank(m.index, m.index + m[0].length);
+  for (const m of source.matchAll(/<!--[\s\S]*?-->/g)) {blank(m.index, m.index + m[0].length);}
   return chars.join('');
 }
 
@@ -2666,7 +2666,7 @@ function parseSlots(source) {
     const nameMatch = m[1].match(/\bname\s*=\s*(?:"([^"]*)"|'([^']*)')/);
     found.add(nameMatch ? nameMatch[1] ?? nameMatch[2] : 'default');
   }
-  for (const use of slotApiUses(source)) found.add(use.slot);
+  for (const use of slotApiUses(source)) {found.add(use.slot);}
   const named = [...found].filter((s) => s !== 'default');
   return found.has('default') ? ['default', ...named] : named;
 }
@@ -2690,11 +2690,11 @@ function dynamicTagLiterals(frontmatter, name) {
   const decl = frontmatter.match(
     new RegExp(`\\b(?:const|let|var)\\s+${name}\\s*=\\s*([^;\\n]+)`)
   );
-  if (!decl) return [];
+  if (!decl) {return [];}
   const literals = [...decl[1].matchAll(/["'`]([A-Za-z][\w-]*)["'`]/g)].map((m) => m[1]);
-  if (literals.length) return literals;
+  if (literals.length) {return literals;}
   const ident = decl[1].trim().match(/^([A-Za-z_$][\w$]*)$/);
-  if (!ident) return [];
+  if (!ident) {return [];}
   // `const Tag = tag` — the default sits in the destructure or its own const.
   const viaDefault = frontmatter.match(
     new RegExp(`\\b${ident[1]}\\s*=\\s*["'\`]([A-Za-z][\\w-]*)["'\`]`)
@@ -2716,16 +2716,16 @@ function rootTag(source) {
   let m;
   while ((m = re.exec(body)) !== null) {
     const [, closing, name] = m;
-    if (closing) continue;
+    if (closing) {continue;}
     const lower = name.toLowerCase();
-    if (lower === 'fragment' || lower === 'slot' || lower === 'style' || lower === 'script') continue;
-    if (!/^[A-Z]/.test(name)) return { tag: lower };
+    if (lower === 'fragment' || lower === 'slot' || lower === 'style' || lower === 'script') {continue;}
+    if (!/^[A-Z]/.test(name)) {return { tag: lower };}
     // A capitalised name is either another component — whose own tag this
     // file can't know — or a variable holding one.
     const decl = frontmatter.match(
       new RegExp(`\\b(?:const|let|var)\\s+${name}\\s*=\\s*([^;\\n]+)`)
     );
-    if (!decl) return null;
+    if (!decl) {return null;}
     const expr = decl[1].trim();
     // `const Tag = tag` — the prop decides, so report it along with the
     // default, and an instance that sets the prop overrides the default.
@@ -2740,8 +2740,8 @@ function rootTag(source) {
     // `const Tag = isLink ? "a" : "button"` — it's one of these, and which
     // one depends on values only the page knows.
     const lits = [...expr.matchAll(/["'`]([A-Za-z][\w-]*)["'`]/g)].map((x) => x[1].toLowerCase());
-    if (lits.length === 1) return { tag: lits[0] };
-    if (lits.length > 1) return { options: lits };
+    if (lits.length === 1) {return { tag: lits[0] };}
+    if (lits.length > 1) {return { options: lits };}
     return null;
   }
   return null;
@@ -2776,15 +2776,15 @@ function defaultSlotInline(source) {
     const placeholder = isSlot || (html && heldBy.has(html[1]));
     if (placeholder) {
       const parent = isSlot || tag === 'Fragment' ? stack[stack.length - 1] : tag;
-      if (!parent) return false;
-      if (TEXT_TAGS.has(parent.toLowerCase())) return true;
-      if (!/^[A-Z]/.test(parent)) return false;
+      if (!parent) {return false;}
+      if (TEXT_TAGS.has(parent.toLowerCase())) {return true;}
+      if (!/^[A-Z]/.test(parent)) {return false;}
       const options = dynamicTagLiterals(frontmatter, parent);
       return options.length > 0 && options.every((t) => TEXT_TAGS.has(t.toLowerCase()));
     }
     if (closing) {
       const at = stack.lastIndexOf(tag);
-      if (at !== -1) stack.length = at;
+      if (at !== -1) {stack.length = at;}
     } else if (!selfClosing && !VOID_ELEMENTS.has(tag.toLowerCase())) {
       stack.push(tag);
     }
@@ -2809,7 +2809,7 @@ function parseExtendsTag(source) {
 // overridden by a tag. Returns {} when the doc says nothing about a range.
 const NUMBER_RE = String.raw`-?\d+(?:\.\d+)?`;
 function numberRules(doc) {
-  if (!doc) return {};
+  if (!doc) {return {};}
   const rules = {};
   const tag = (name) => {
     const m = doc.match(new RegExp(`@${name}\\s+(${NUMBER_RE})`, 'i'));
@@ -2818,10 +2818,10 @@ function numberRules(doc) {
   const min = tag('min');
   const max = tag('max');
   const step = tag('step');
-  if (min !== undefined) rules.min = min;
-  if (max !== undefined) rules.max = max;
-  if (step !== undefined) rules.step = step;
-  if (/@(?:int|integer)\b/i.test(doc) && rules.step === undefined) rules.step = 1;
+  if (min !== undefined) {rules.min = min;}
+  if (max !== undefined) {rules.max = max;}
+  if (step !== undefined) {rules.step = step;}
+  if (/@(?:int|integer)\b/i.test(doc) && rules.step === undefined) {rules.step = 1;}
 
   // Prose, for the props that were written before any of that existed. Only
   // phrases that state a bound outright — "Defaults to 12" is not one, and
@@ -2831,30 +2831,30 @@ function numberRules(doc) {
   let prose = doc.replace(/@\w+\s+-?[\d.]+/g, ' ');
   const take = (re, apply) => {
     const m = prose.match(re);
-    if (!m) return;
+    if (!m) {return;}
     apply(...m.slice(1).map(parseFloat));
     prose = prose.replace(m[0], ' ');
   };
   take(new RegExp(`between\\s+(${NUMBER_RE})\\s+and\\s+(${NUMBER_RE})`, 'i'), (a, b) => {
-    if (rules.min === undefined) rules.min = a;
-    if (rules.max === undefined) rules.max = b;
+    if (rules.min === undefined) {rules.min = a;}
+    if (rules.max === undefined) {rules.max = b;}
   });
   // Inclusive bounds first: they contain the words the exclusive ones use.
   take(
     new RegExp(`(?:no more than|not more than|at most|maximum(?: of)?|up to)\\s+(${NUMBER_RE})`, 'i'),
-    (n) => { if (rules.max === undefined) rules.max = n; }
+    (n) => { if (rules.max === undefined) {rules.max = n;} }
   );
   take(
     new RegExp(`(?:no less than|not less than|at least|minimum(?: of)?)\\s+(${NUMBER_RE})`, 'i'),
-    (n) => { if (rules.min === undefined) rules.min = n; }
+    (n) => { if (rules.min === undefined) {rules.min = n;} }
   );
   take(new RegExp(`(?:greater than|more than|above)\\s+(${NUMBER_RE})`, 'i'), (n) => {
-    if (rules.min !== undefined) return;
+    if (rules.min !== undefined) {return;}
     rules.min = n;
     rules.minExclusive = true;
   });
   take(new RegExp(`(?:less than|below|under)\\s+(${NUMBER_RE})`, 'i'), (n) => {
-    if (rules.max !== undefined) return;
+    if (rules.max !== undefined) {return;}
     rules.max = n;
     rules.maxExclusive = true;
   });
@@ -2892,22 +2892,22 @@ function normalizeType(t) {
   // A plain bag of attributes still edits as name/value rows — that reads far
   // better than a JS literal. Only when it can also be an ARRAY does it have
   // to become code, since rows cannot express one.
-  if (/^(HTMLAttributes\b|astroHTML\.|Record\s*<)/.test(t) && !arrayish) return { type: 'attrs' };
-  if (arrayish || /^\{[\s\S]*\}$/.test(t)) return { type: 'code' };
-  if (/^string\b/.test(t)) return { type: 'string' };
-  if (/^number\b/.test(t)) return { type: 'number' };
-  if (/^boolean\b/.test(t)) return { type: 'boolean' };
-  if (/^(['"`]).*\1$/.test(t)) return { type: 'string' };
+  if (/^(HTMLAttributes\b|astroHTML\.|Record\s*<)/.test(t) && !arrayish) {return { type: 'attrs' };}
+  if (arrayish || /^\{[\s\S]*\}$/.test(t)) {return { type: 'code' };}
+  if (/^string\b/.test(t)) {return { type: 'string' };}
+  if (/^number\b/.test(t)) {return { type: 'number' };}
+  if (/^boolean\b/.test(t)) {return { type: 'boolean' };}
+  if (/^(['"`]).*\1$/.test(t)) {return { type: 'string' };}
   // Objects of attributes (HTMLAttributes<"div">, Record<string, …>) edit
   // as name/value rows.
-  if (/^(HTMLAttributes\b|astroHTML\.|Record\s*<)/.test(t)) return { type: 'attrs' };
+  if (/^(HTMLAttributes\b|astroHTML\.|Record\s*<)/.test(t)) {return { type: 'attrs' };}
   return { type: 'other' };
 }
 
 // Serializes a plain node list (used for standalone HTML chunk files).
 function serializeNodes(nodes) {
   const lines = [];
-  for (const node of nodes) serializeNode(node, '', lines);
+  for (const node of nodes) {serializeNode(node, '', lines);}
   return lines.join('\n') + '\n';
 }
 
@@ -2932,7 +2932,7 @@ function resolveChunks(model, pagePath, opts = {}) {
       );
     }
   }
-  if (!rawImports.size) return;
+  if (!rawImports.size) {return;}
 
   // const main = [a, b, c].join("") aggregations in the frontmatter.
   const aggregates = new Map();
@@ -2979,7 +2979,7 @@ function resolveChunks(model, pagePath, opts = {}) {
         if (aggregates.has(ref)) {
           const groups = [];
           for (const ident of aggregates.get(ref)) {
-            if (!rawImports.has(ident)) continue;
+            if (!rawImports.has(ident)) {continue;}
             const file = rawImports.get(ident);
             const children = parseChunkFile(file);
             if (children) {
@@ -2999,7 +2999,7 @@ function resolveChunks(model, pagePath, opts = {}) {
           continue;
         }
       }
-      if (Array.isArray(node.children)) walk(node.children);
+      if (Array.isArray(node.children)) {walk(node.children);}
     }
   };
   walk(model.nodes);
@@ -3017,9 +3017,9 @@ function chunkImportMarks(model) {
       if (node.chunkFile) {
         const group = node.kind === 'chunk-group';
         const ident = group ? node.name : node.props?.['set:html']?.value?.trim();
-        if (ident) marks.set(ident, { path: p, group });
+        if (ident) {marks.set(ident, { path: p, group });}
       }
-      if (Array.isArray(node.children)) walk(node.children, p);
+      if (Array.isArray(node.children)) {walk(node.children, p);}
     });
   };
   walk(model.nodes, '');
@@ -3034,11 +3034,11 @@ function chunkImportMarks(model) {
 // the chunk isn't representable, so the caller can serve it unmarked.
 function markChunkHtml(source, prefix, group) {
   const { nodes, clean } = parseTemplate(source);
-  if (!clean) return null;
+  if (!clean) {return null;}
   const lines = [];
-  if (group) lines.push(`<!--avb-s:${prefix}-->`);
+  if (group) {lines.push(`<!--avb-s:${prefix}-->`);}
   nodes.forEach((node, i) => serializeNodeMarked(node, '', lines, `${prefix}.${i}`));
-  if (group) lines.push(`<!--avb-e:${prefix}-->`);
+  if (group) {lines.push(`<!--avb-e:${prefix}-->`);}
   return lines.join('\n') + '\n';
 }
 
@@ -3050,7 +3050,7 @@ function markChunkHtml(source, prefix, group) {
 function lineOf(source, offset) {
   let line = 1;
   for (let i = 0; i < offset && i < source.length; i++) {
-    if (source[i] === '\n') line++;
+    if (source[i] === '\n') {line++;}
   }
   return line;
 }
@@ -3072,10 +3072,10 @@ function locateSelection(absPath, indexPath) {
     return null;
   }
   const bare = { file: absPath };
-  if (!indexPath) return bare;
+  if (!indexPath) {return bare;}
 
   const parsed = parsePage(source, { locs: true });
-  if (!parsed.editable) return bare;
+  if (!parsed.editable) {return bare;}
   if (indexPath === 'frontmatter') {
     return parsed.model.bodyStart
       ? { file: absPath, startLine: 1, endLine: lineOf(source, parsed.model.bodyStart - 1) }
@@ -3089,9 +3089,9 @@ function locateSelection(absPath, indexPath) {
   for (const part of indexPath.split('.')) {
     // Stepping past a chunk boundary: everything below it is written in the
     // chunk file, while the boundary node itself belongs to the page.
-    if (node?.chunkFile) file = node.chunkFile;
+    if (node?.chunkFile) {file = node.chunkFile;}
     node = Array.isArray(list) ? list[Number(part)] : null;
-    if (!node) return { file };
+    if (!node) {return { file };}
     list = node.children;
   }
   // A branch has no markup of its own. `{render && ( … )}` writes one brace, a
@@ -3105,7 +3105,7 @@ function locateSelection(absPath, indexPath) {
       span = { start: placed[0].start, end: placed[placed.length - 1].end };
     }
   }
-  if (typeof span.start !== 'number') return { file };
+  if (typeof span.start !== 'number') {return { file };}
 
   let text = source;
   if (file !== absPath) {
@@ -3120,8 +3120,8 @@ function locateSelection(absPath, indexPath) {
   // lines the content is actually on.
   let start = span.start;
   let end = Math.min(span.end, text.length);
-  while (start < end && /\s/.test(text[start])) start++;
-  while (end > start && /\s/.test(text[end - 1])) end--;
+  while (start < end && /\s/.test(text[start])) {start++;}
+  while (end > start && /\s/.test(text[end - 1])) {end--;}
   return { file, startLine: lineOf(text, start), endLine: lineOf(text, end - 1) };
 }
 

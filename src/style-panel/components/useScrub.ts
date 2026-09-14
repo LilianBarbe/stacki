@@ -83,11 +83,11 @@ export default function useScrub({ value, disabled = false, onPreview, onInput, 
 
   const frame = useCallback(() => {
     const d = drag.current
-    if (!d) return
+    if (!d) {return}
     d.raf = null
     const steps = Math.round((d.latestX - d.startX) / PX_PER_STEP)
     const text = scrubNumber(d.base, d.run, steps, d.mode)
-    if (text === d.text) return
+    if (text === d.text) {return}
     d.text = text
     onPreviewRef.current?.(text)
     const now = performance.now()
@@ -99,11 +99,11 @@ export default function useScrub({ value, disabled = false, onPreview, onInput, 
 
   const finish = useCallback(() => {
     const d = drag.current
-    if (!d) return
+    if (!d) {return}
     drag.current = null
-    if (d.raf != null) cancelAnimationFrame(d.raf)
+    if (d.raf != null) {cancelAnimationFrame(d.raf)}
     document.body.classList.remove('is-scrubbing')
-    if (!d.moved) return // never crossed the dead zone: it was a click, leave it be
+    if (!d.moved) {return} // never crossed the dead zone: it was a click, leave it be
     // The press that ended a drag must not also register as a click — on a label that
     // would pop the reset menu open the moment you let go.
     const swallow = (event: MouseEvent) => { event.preventDefault(); event.stopPropagation() }
@@ -116,7 +116,7 @@ export default function useScrub({ value, disabled = false, onPreview, onInput, 
   useEffect(() => finish, [finish])
 
   const begin = useCallback((event: ReactPointerEvent<HTMLElement>, base: string, run: NumberRun) => {
-    if (drag.current) return // a second pointer (touch) must not hijack the one in flight
+    if (drag.current) {return} // a second pointer (touch) must not hijack the one in flight
     // Capture so the drag survives leaving the field — and so pointerup still lands here
     // when the pointer is released halfway across the window.
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -136,22 +136,22 @@ export default function useScrub({ value, disabled = false, onPreview, onInput, 
 
   const onPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     const d = drag.current
-    if (!d || event.pointerId !== d.pointerId) return
+    if (!d || event.pointerId !== d.pointerId) {return}
     d.latestX = event.clientX
     d.mode = stepModeOf(event)
     if (!d.moved) {
-      if (Math.abs(event.clientX - d.startX) < DEAD_ZONE) return
+      if (Math.abs(event.clientX - d.startX) < DEAD_ZONE) {return}
       d.moved = true
       // One class on <body> beats a per-drag <style> tag: the cursor has to win over
       // every element the pointer crosses, including the ones it's captured away from.
       document.body.classList.add('is-scrubbing')
     }
-    if (d.raf == null) d.raf = requestAnimationFrame(frame)
+    if (d.raf == null) {d.raf = requestAnimationFrame(frame)}
   }, [frame])
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     const d = drag.current
-    if (!d || event.pointerId !== d.pointerId) return
+    if (!d || event.pointerId !== d.pointerId) {return}
     // Land on where the pointer actually was released, not on the last frame we drew.
     if (d.moved) {
       d.latestX = event.clientX
@@ -178,7 +178,7 @@ export default function useScrub({ value, disabled = false, onPreview, onInput, 
   // Only the hovered field listens for the modifier, so pressing Alt anywhere else in the
   // app costs nothing — with a few dozen fields on screen, always-on listeners wouldn't.
   useEffect(() => {
-    if (!hovering || hoverSurface.current === 'label') return
+    if (!hovering || hoverSurface.current === 'label') {return}
     const sync = (event: KeyboardEvent) => setModifierHeld(event.altKey || event.shiftKey)
     window.addEventListener('keydown', sync)
     window.addEventListener('keyup', sync)
@@ -192,7 +192,7 @@ export default function useScrub({ value, disabled = false, onPreview, onInput, 
   // merge into its own className — every field would otherwise pay for the plumbing.
   useEffect(() => {
     const el = hoverEl.current
-    if (!el || !hovering) return
+    if (!el || !hovering) {return}
     const armed = !disabled && hasScrubTarget(valueRef.current)
       && (hoverSurface.current === 'label' || modifierHeld)
     el.style.cursor = armed ? 'ew-resize' : ''
@@ -200,12 +200,12 @@ export default function useScrub({ value, disabled = false, onPreview, onInput, 
   }, [hovering, modifierHeld, disabled, value])
 
   const onInputPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    if (disabledRef.current || event.button !== 0) return
-    if (!event.altKey && !event.shiftKey) return // a bare drag is still a text selection
+    if (disabledRef.current || event.button !== 0) {return}
+    if (!event.altKey && !event.shiftKey) {return} // a bare drag is still a text selection
     const el = event.currentTarget as HTMLInputElement | HTMLTextAreaElement
-    if (typeof el.value !== 'string') return
+    if (typeof el.value !== 'string') {return}
     const run = findScrubTarget(el.value, caretAtX(el, event.clientX))
-    if (!run) return
+    if (!run) {return}
     // Stops the caret from moving and the selection from starting. It also drops the
     // click, which is fine: a modifier-click on a value field means nothing else.
     event.preventDefault()
@@ -213,9 +213,9 @@ export default function useScrub({ value, disabled = false, onPreview, onInput, 
   }, [begin])
 
   const onLabelPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    if (disabledRef.current || event.button !== 0) return
+    if (disabledRef.current || event.button !== 0) {return}
     const run = findScrubTarget(valueRef.current, 0)
-    if (!run) return
+    if (!run) {return}
     // Deliberately no preventDefault: a press that never turns into a drag has to reach
     // the label as a click and open its reset menu. Text selection is handled instead by
     // the body class, which lands the moment the dead zone is crossed.

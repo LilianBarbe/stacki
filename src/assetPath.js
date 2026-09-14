@@ -21,9 +21,9 @@ export const isExternalAsset = (value) => {
 const normalizeRel = (rel) => {
   const out = [];
   for (const seg of String(rel).split('/')) {
-    if (!seg || seg === '.') continue;
+    if (!seg || seg === '.') {continue;}
     if (seg === '..') {
-      if (!out.length) return null;
+      if (!out.length) {return null;}
       out.pop();
       continue;
     }
@@ -40,14 +40,14 @@ const normalizeRel = (rel) => {
 // ("src/data"); without it a relative value can only be a public/ path.
 export function assetRelCandidates(value, baseDir) {
   const raw = String(value ?? '').trim();
-  if (!raw || isExternalAsset(raw)) return [];
+  if (!raw || isExternalAsset(raw)) {return [];}
   const p = raw.split(/[?#]/)[0].replace(/\\/g, '/');
-  if (!p) return [];
+  if (!p) {return [];}
   // mailto:, tel:, blob: — anything with a scheme names no file here.
-  if (/^[a-z][a-z0-9+.-]*:/i.test(p)) return [];
+  if (/^[a-z][a-z0-9+.-]*:/i.test(p)) {return [];}
 
   const alias = p.match(/^[@~]\/(.+)$/);
-  if (alias) return [normalizeRel(`src/${alias[1]}`)].filter(Boolean);
+  if (alias) {return [normalizeRel(`src/${alias[1]}`)].filter(Boolean);}
 
   if (p.startsWith('/')) {
     // Rooted paths are served out of public/, with one exception: "/src/…" is
@@ -57,14 +57,14 @@ export function assetRelCandidates(value, baseDir) {
     return [normalizeRel(rooted)].filter(Boolean);
   }
 
-  if (/^(public|src)\//.test(p)) return [normalizeRel(p)].filter(Boolean);
+  if (/^(public|src)\//.test(p)) {return [normalizeRel(p)].filter(Boolean);}
 
   // Explicitly relative ("./x.png", "../assets/x.png") is only ever relative
   // to the file — it never means public/.
   const explicit = /^\.\.?\//.test(p);
   const guesses = [];
-  if (baseDir) guesses.push(normalizeRel(`${baseDir}/${p}`));
-  if (!explicit || !baseDir) guesses.push(normalizeRel(`public/${p}`));
+  if (baseDir) {guesses.push(normalizeRel(`${baseDir}/${p}`));}
+  if (!explicit || !baseDir) {guesses.push(normalizeRel(`public/${p}`));}
   return guesses.filter(Boolean);
 }
 
@@ -77,7 +77,7 @@ export function relativeAssetPath(fromDir, toRel) {
   const from = String(fromDir || '').split('/').filter(Boolean);
   const to = String(toRel || '').split('/').filter(Boolean);
   let i = 0;
-  while (i < from.length && i < to.length && from[i] === to[i]) i++;
+  while (i < from.length && i < to.length && from[i] === to[i]) {i++;}
   const up = from.slice(i).map(() => '..');
   const rest = to.slice(i).join('/');
   return up.length ? `${up.join('/')}/${rest}` : `./${rest}`;
@@ -88,7 +88,7 @@ export function relativeAssetPath(fromDir, toRel) {
 // form a bundler can follow back to the original.
 export function assetValueFor(pickedRel, baseDir) {
   const rel = String(pickedRel || '').replace(/^\/+/, '');
-  if (rel.startsWith('public/')) return `/${rel.slice('public/'.length)}`;
-  if (baseDir) return relativeAssetPath(baseDir, rel);
+  if (rel.startsWith('public/')) {return `/${rel.slice('public/'.length)}`;}
+  if (baseDir) {return relativeAssetPath(baseDir, rel);}
   return `/${rel}`;
 }

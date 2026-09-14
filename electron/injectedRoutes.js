@@ -23,7 +23,7 @@ function packageOf(entrypoint) {
   // node_modules/.pnpm/.../node_modules/<package> layout.
   const normalized = '/' + String(entrypoint || '').replace(/\\/g, '/');
   const at = normalized.lastIndexOf('/node_modules/');
-  if (at === -1) return null;
+  if (at === -1) {return null;}
   const m = normalized.slice(at + '/node_modules/'.length).match(/^((?:@[^/]+\/)?[^/]+)/);
   return m ? m[1] : null;
 }
@@ -46,11 +46,11 @@ function readInjectedRoutes(projectPath) {
   } catch {
     return [];
   }
-  if (!Array.isArray(routes)) return [];
+  if (!Array.isArray(routes)) {return [];}
   const injected = [];
   for (const r of routes) {
-    if (!r || typeof r.pattern !== 'string' || r.pattern.startsWith('/__avb')) continue;
-    if (!r.origin || r.origin === 'project' || r.origin === 'internal') continue;
+    if (!r || typeof r.pattern !== 'string' || r.pattern.startsWith('/__avb')) {continue;}
+    if (!r.origin || r.origin === 'project' || r.origin === 'internal') {continue;}
     injected.push({
       route: r.pattern,
       entrypoint: r.entrypoint || null,

@@ -64,7 +64,7 @@ class ChipWidget extends WidgetType {
 const chipFnField = StateField.define({
   create: () => null,
   update(value, tr) {
-    for (const effect of tr.effects) if (effect.is(setChips)) return effect.value || null;
+    for (const effect of tr.effects) {if (effect.is(setChips)) {return effect.value || null;}}
     return value;
   },
 });
@@ -76,7 +76,7 @@ const chipFnField = StateField.define({
 // everywhere else.
 function chipSets(state) {
   const ranges = state.field(chipFnField);
-  if (!ranges) return { deco: Decoration.none, atomic: Decoration.none };
+  if (!ranges) {return { deco: Decoration.none, atomic: Decoration.none };}
   const doc = state.doc.toString();
   const deco = [];
   const atomic = [];
@@ -84,7 +84,7 @@ function chipSets(state) {
     const { from, to, path } = range;
     // A range that no longer fits the document is one the text moved out from
     // under; dropping it is better than throwing.
-    if (!(from >= 0 && to > from && to <= doc.length)) continue;
+    if (!(from >= 0 && to > from && to <= doc.length)) {continue;}
     if (doc.slice(from, to) === path) {
       deco.push(chipMark.range(from, to));
       continue;
@@ -99,7 +99,7 @@ function chipSets(state) {
 const chipField = StateField.define({
   create: (state) => chipSets(state),
   update(value, tr) {
-    if (!tr.docChanged && !tr.effects.some((effect) => effect.is(setChips))) return value;
+    if (!tr.docChanged && !tr.effects.some((effect) => effect.is(setChips))) {return value;}
     return chipSets(tr.state);
   },
   provide: (field) => EditorView.decorations.from(field, (sets) => sets.deco),
@@ -209,11 +209,11 @@ export default function ExprInput({
             override: [
               (ctx) => {
                 const list = completionsRef.current;
-                if (!list?.length) return null;
+                if (!list?.length) {return null;}
                 // After a dot, complete the property rather than the whole path:
                 // `post.` offers `data`, not `post.data`.
                 const before = ctx.matchBefore(/[\w$.]*/);
-                if (!before || (before.from === before.to && !ctx.explicit)) return null;
+                if (!before || (before.from === before.to && !ctx.explicit)) {return null;}
                 const typed = before.text;
                 const dot = typed.lastIndexOf('.');
                 const prefix = dot >= 0 ? typed.slice(0, dot + 1) : '';
@@ -225,7 +225,7 @@ export default function ExprInput({
                     info: c.info || undefined,
                     type: c.type || 'variable',
                   }));
-                if (!options.length) return null;
+                if (!options.length) {return null;}
                 return { from: before.from + prefix.length, options, validFor: /^[\w$]*$/ };
               },
             ],
@@ -243,7 +243,7 @@ export default function ExprInput({
           EditorView.domEventHandlers({
             mousedown: (event, view) => {
               if (!(event.target instanceof Element) || !event.target.closest('.cm-chip, .expr-chip'))
-                return false;
+                {return false;}
               // The chip is a control, not text: pressing it opens the picker
               // rather than putting the caret in the middle of a name.
               event.preventDefault();
@@ -265,13 +265,13 @@ export default function ExprInput({
             },
           }),
           EditorView.updateListener.of((u) => {
-            if (u.docChanged) onChangeRef.current?.(u.state.doc.toString());
+            if (u.docChanged) {onChangeRef.current?.(u.state.doc.toString());}
           }),
         ],
       }),
     });
     viewRef.current = view;
-    if (autoFocus) view.focus();
+    if (autoFocus) {view.focus();}
     return () => {
       view.destroy();
       viewRef.current = null;
@@ -283,12 +283,12 @@ export default function ExprInput({
   // nobody has clicked into yet — the same place BindInput puts it. Returns
   // the whole value, since the caller is usually about to commit it.
   useEffect(() => {
-    if (!apiRef) return undefined;
+    if (!apiRef) {return undefined;}
     apiRef.current = {
       /** Swap one range for other text — repointing a chip. */
       replaceRange(from, to, text) {
         const view = viewRef.current;
-        if (!view) return null;
+        if (!view) {return null;}
         view.dispatch({
           changes: { from, to, insert: text },
           selection: { anchor: from + text.length },
@@ -297,7 +297,7 @@ export default function ExprInput({
       },
       insert(text) {
         const view = viewRef.current;
-        if (!view) return null;
+        if (!view) {return null;}
         const end = view.state.doc.length;
         const { from, to } = touchedRef.current ? view.state.selection.main : { from: end, to: end };
         view.dispatch({
@@ -323,7 +323,7 @@ export default function ExprInput({
   // Apply outside edits (undo, file reload, the Code field below).
   useEffect(() => {
     const view = viewRef.current;
-    if (!view || syncValue == null) return;
+    if (!view || syncValue == null) {return;}
     const cur = view.state.doc.toString();
     if (syncValue !== cur) {
       view.dispatch({ changes: { from: 0, to: cur.length, insert: syncValue } });

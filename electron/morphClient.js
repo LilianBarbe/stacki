@@ -27,7 +27,7 @@
 // guessing from tag names does.
 function stripTemplateMarkers(root) {
   const gone = root.querySelectorAll('template[data-avb-s],template[data-avb-e]');
-  for (let i = 0; i < gone.length; i++) gone[i].remove();
+  for (let i = 0; i < gone.length; i++) {gone[i].remove();}
 }
 
 const isAnchor = (n) => n && n.nodeType === 8 && /^avb-[se]:/.test(n.data);
@@ -40,12 +40,12 @@ function stripAnchors(root) {
   const gone = [];
   const walk = (p) => {
     for (let n = p.firstChild; n; n = n.nextSibling) {
-      if (isAnchor(n)) gone.push(n);
-      else if (n.nodeType === 1) walk(n);
+      if (isAnchor(n)) {gone.push(n);}
+      else if (n.nodeType === 1) {walk(n);}
     }
   };
   walk(root);
-  for (const n of gone) n.remove();
+  for (const n of gone) {n.remove();}
 }
 
 // Markers are comments: invisible to layout, to selectors and to animation, so
@@ -77,11 +77,11 @@ function syncAnchors(liveRoot, serverRoot) {
         live.insertBefore(document.createComment(sv.data), l);
         continue;
       }
-      if (blank(sv)) continue;
+      if (blank(sv)) {continue;}
       let t = l;
-      while (t && (blank(t) || !sameKind(t, sv))) t = t.nextSibling;
-      if (!t) continue;
-      if (t.nodeType === 1) walk(t, sv);
+      while (t && (blank(t) || !sameKind(t, sv))) {t = t.nextSibling;}
+      if (!t) {continue;}
+      if (t.nodeType === 1) {walk(t, sv);}
       l = t.nextSibling;
     }
   };
@@ -131,7 +131,7 @@ const keyOf = (n) => (n && n.nodeType === 1 ? n.getAttribute('id') || null : nul
 // changing a variant threw the canvas back to the top. It is an attribute, and
 // it is patched like one.
 function keyFor(n) {
-  if (n.nodeType === 1) return 'e:' + n.tagName + '#' + (keyOf(n) || '');
+  if (n.nodeType === 1) {return 'e:' + n.tagName + '#' + (keyOf(n) || '');}
   return n.nodeType === 8 ? 'c' : 't';
 }
 
@@ -153,12 +153,12 @@ function diffChildren(a, b) {
   const ops = [];
   let i = 0;
   let j = 0;
-  while (i < n && j < m && a[i] === b[j]) ops.push([0, i++, j++]);
+  while (i < n && j < m && a[i] === b[j]) {ops.push([0, i++, j++]);}
 
   const start = i;
   const dp = [];
   if (i < n && j < m) {
-    for (let row = 0; row <= n - start; row++) dp.push(new Int32Array(m - start + 1));
+    for (let row = 0; row <= n - start; row++) {dp.push(new Int32Array(m - start + 1));}
     for (let row = n - start - 1; row >= 0; row--) {
       for (let col = m - start - 1; col >= 0; col--) {
         dp[row][col] = a[row + start] === b[col + start]
@@ -169,11 +169,11 @@ function diffChildren(a, b) {
   }
   while (i < n && j < m) {
     if (a[i] === b[j]) { ops.push([0, i++, j++]); continue; }      // keep
-    if (dp[i - start + 1][j - start] >= dp[i - start][j - start + 1]) ops.push([-1, i++, -1]); // removed
-    else ops.push([1, -1, j++]);                                    // inserted
+    if (dp[i - start + 1][j - start] >= dp[i - start][j - start + 1]) {ops.push([-1, i++, -1]);} // removed
+    else {ops.push([1, -1, j++]);}                                    // inserted
   }
-  while (i < n) ops.push([-1, i++, -1]);
-  while (j < m) ops.push([1, -1, j++]);
+  while (i < n) {ops.push([-1, i++, -1]);}
+  while (j < m) {ops.push([1, -1, j++]);}
   return ops;
 }
 
@@ -211,8 +211,8 @@ const classesOf = (n) => (n.getAttribute('class') || '').split(/\s+/).filter(Boo
 // vacuous and would match anything, including a node the client inserted.
 function keepsClassesOf(live, serverNode) {
   const want = classesOf(serverNode);
-  if (!want.length) return live.classList.length === 0;
-  for (const c of want) if (!live.classList.contains(c)) return false;
+  if (!want.length) {return live.classList.length === 0;}
+  for (const c of want) {if (!live.classList.contains(c)) {return false;}}
   return true;
 }
 
@@ -220,24 +220,24 @@ function findLive(from, serverNode) {
   let loose = null;
   const key = keyOf(serverNode);
   for (let n = from; n; n = n.nextSibling) {
-    if (isAnchor(n)) continue;
+    if (isAnchor(n)) {continue;}
     if (serverNode.nodeType !== 1) {
-      if (n.nodeType === serverNode.nodeType) return n;
+      if (n.nodeType === serverNode.nodeType) {return n;}
       continue;
     }
-    if (n.nodeType !== 1) continue;
-    if (n.tagName !== serverNode.tagName) continue;
+    if (n.nodeType !== 1) {continue;}
+    if (n.tagName !== serverNode.tagName) {continue;}
     // An explicit id cannot fall back to a different same-tag element. If
     // client code removed it, reloading is safer than editing its neighbour.
     if (key !== null) {
-      if (keyOf(n) === key) return n;
+      if (keyOf(n) === key) {return n;}
       continue;
     }
-    if (keepsClassesOf(n, serverNode)) return n;
+    if (keepsClassesOf(n, serverNode)) {return n;}
     // Same tag, weaker evidence. Kept in case nothing better turns up: the
     // diff has already decided this node persists, so the only question left
     // is which one it is, and a same-tag sibling beats giving up and reloading.
-    if (!loose) loose = n;
+    if (!loose) {loose = n;}
   }
   return loose;
 }
@@ -247,8 +247,8 @@ function findLive(from, serverNode) {
 function patchClass(live, prev, next) {
   const before = (prev.getAttribute('class') || '').split(/\s+/).filter(Boolean);
   const after = (next.getAttribute('class') || '').split(/\s+/).filter(Boolean);
-  for (const c of before) if (after.indexOf(c) === -1) live.classList.remove(c);
-  for (const c of after) if (before.indexOf(c) === -1) live.classList.add(c);
+  for (const c of before) {if (after.indexOf(c) === -1) {live.classList.remove(c);}}
+  for (const c of after) {if (before.indexOf(c) === -1) {live.classList.add(c);}}
 }
 
 // Only where the two renderings disagree. An attribute the client set that the
@@ -257,16 +257,16 @@ function patchAttrs(live, prev, next) {
   const want = next.attributes;
   for (let i = 0; i < want.length; i++) {
     const a = want[i];
-    if (prev.getAttribute(a.name) === a.value) continue;
-    if (a.name === 'class') patchClass(live, prev, next);
-    else live.setAttribute(a.name, a.value);
+    if (prev.getAttribute(a.name) === a.value) {continue;}
+    if (a.name === 'class') {patchClass(live, prev, next);}
+    else {live.setAttribute(a.name, a.value);}
   }
   const had = prev.attributes;
   for (let i = had.length - 1; i >= 0; i--) {
     const a = had[i];
-    if (next.hasAttribute(a.name)) continue;
-    if (a.name === 'class') patchClass(live, prev, next);
-    else live.removeAttribute(a.name);
+    if (next.hasAttribute(a.name)) {continue;}
+    if (a.name === 'class') {patchClass(live, prev, next);}
+    else {live.removeAttribute(a.name);}
   }
 }
 
@@ -274,24 +274,24 @@ function patchNode(live, prev, next) {
   if (live.nodeType === 3 || live.nodeType === 8) {
     // Only when the server changed it, and only if the live copy still says
     // what the server last said — client code that rewrote this text keeps it.
-    if (prev.data !== next.data && live.data === prev.data) live.data = next.data;
+    if (prev.data !== next.data && live.data === prev.data) {live.data = next.data;}
     return;
   }
-  if (live.nodeType !== 1 || pinned(live)) return;
+  if (live.nodeType !== 1 || pinned(live)) {return;}
   patchAttrs(live, prev, next);
   patchChildren(live, prev, next);
 }
 
 function patchChildren(liveParent, prevParent, nextParent) {
   const before = [];
-  for (let n = prevParent.firstChild; n; n = n.nextSibling) before.push(n);
+  for (let n = prevParent.firstChild; n; n = n.nextSibling) {before.push(n);}
   const after = [];
-  for (let n = nextParent.firstChild; n; n = n.nextSibling) after.push(n);
+  for (let n = nextParent.firstChild; n; n = n.nextSibling) {after.push(n);}
 
   let live = liveParent.firstChild;
   const locate = (serverNode) => {
     const target = findLive(live, serverNode);
-    if (!target) throw Ambiguous(describe(serverNode));
+    if (!target) {throw Ambiguous(describe(serverNode));}
     return target;
   };
 
@@ -302,7 +302,7 @@ function patchChildren(liveParent, prevParent, nextParent) {
       live = target.nextSibling;
     } else if (kind === -1) {
       const target = locate(before[i]);
-      if (live === target) live = target.nextSibling;
+      if (live === target) {live = target.nextSibling;}
       target.remove();
     } else {
       liveParent.insertBefore(document.importNode(after[j], true), live);
@@ -350,7 +350,7 @@ function scriptsOf(doc) {
   for (let i = 0; i < list.length; i++) {
     const s = list[i];
     const src = s.getAttribute('src') || '';
-    if (isStyleModule(src)) continue;
+    if (isStyleModule(src)) {continue;}
     const attrs = Array.from(s.attributes, (a) => [a.name, a.value]);
     attrs.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
     out.push({
@@ -388,7 +388,7 @@ function addedScripts(prevDoc, nextDoc) {
     } else {
       // Already-run scripts must keep their order and count. Neither a
       // reorder nor another execution of an existing script can be patched.
-      if (had.has(script.signature) || !script.src) return null;
+      if (had.has(script.signature) || !script.src) {return null;}
       added.push(script);
     }
   }
@@ -400,19 +400,19 @@ function addedScripts(prevDoc, nextDoc) {
 const loadedScripts = new Set();
 function noteScripts(doc) {
   for (const { src } of scriptsOf(doc)) {
-    if (src) loadedScripts.add(src);
+    if (src) {loadedScripts.add(src);}
   }
 }
 function runScripts(added) {
   for (const { src, attrs } of added) {
-    if (!src || loadedScripts.has(src)) continue;
+    if (!src || loadedScripts.has(src)) {continue;}
     loadedScripts.add(src);
     const el = document.createElement('script');
     // Preserve loading semantics such as integrity, crossorigin and nonce.
     // Dynamic classic scripts default to async; source scripts without that
     // attribute must instead execute in insertion order.
     el.async = false;
-    for (const [name, value] of attrs) el.setAttribute(name, value);
+    for (const [name, value] of attrs) {el.setAttribute(name, value);}
     document.head.appendChild(el);
   }
 }
@@ -432,14 +432,14 @@ function noteStyles(doc) {
   const list = doc.getElementsByTagName('script');
   for (let i = 0; i < list.length; i++) {
     const src = list[i].getAttribute('src');
-    if (isStyleModule(src)) loadedStyles.add(src);
+    if (isStyleModule(src)) {loadedStyles.add(src);}
   }
 }
 function loadStyles(doc) {
   const list = doc.getElementsByTagName('script');
   for (let i = 0; i < list.length; i++) {
     const src = list[i].getAttribute('src');
-    if (!isStyleModule(src) || loadedStyles.has(src)) continue;
+    if (!isStyleModule(src) || loadedStyles.has(src)) {continue;}
     loadedStyles.add(src);
     const el = document.createElement('script');
     el.type = 'module';
@@ -451,7 +451,7 @@ function loadStyles(doc) {
 function fetchDoc() {
   return fetch(location.href, { cache: 'no-store' })
     .then((r) => {
-      if (!r.ok) throw new Error('dev server answered ' + r.status);
+      if (!r.ok) {throw new Error('dev server answered ' + r.status);}
       return r.text();
     })
     .then((html) => {
@@ -481,7 +481,7 @@ async function update() {
   busy = true;
   try {
     await ready;
-    if (!prevDoc) throw new Error('no baseline rendering to compare against');
+    if (!prevDoc) {throw new Error('no baseline rendering to compare against');}
     const next = await fetchDoc();
     const added = addedScripts(prevDoc, next.clean);
     if (added === null) {
@@ -522,7 +522,7 @@ async function update() {
 // The app watches the file system itself, for its own reasons, so it knows
 // about every change either way — and it can say so straight to this frame.
 // Patching twice for one edit costs a fetch and a diff that finds nothing.
-if (import.meta.hot) import.meta.hot.on('avb:page-changed', update);
+if (import.meta.hot) {import.meta.hot.on('avb:page-changed', update);}
 window.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'avb:patch-now') update();
+  if (e.data && e.data.type === 'avb:patch-now') {update();}
 });

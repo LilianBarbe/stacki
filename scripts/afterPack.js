@@ -11,7 +11,7 @@ const fs = require('node:fs');
 const { fixNodePtyPermissions } = require('./fix-node-pty-permissions');
 
 exports.default = async function afterPack(context) {
-  if (context.electronPlatformName === 'win32') return;
+  if (context.electronPlatformName === 'win32') {return;}
 
   const appName = context.packager.appInfo.productFilename;
   // node-pty is asarUnpack'd, so it lives beside app.asar as real files.

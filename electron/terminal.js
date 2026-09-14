@@ -54,12 +54,12 @@ function buildShellEnv() {
   delete env.INIT_CWD;
   delete env.VITE_DEV_SERVER_URL;
   for (const key of Object.keys(env)) {
-    if (key.startsWith('npm_')) delete env[key];
+    if (key.startsWith('npm_')) {delete env[key];}
   }
   env.TERM_PROGRAM = 'stacki';
   env.COLORTERM = 'truecolor';
 
-  if (isWin) return env;
+  if (isWin) {return env;}
 
   const home = process.env.HOME || '';
   const extraPaths = [
@@ -83,7 +83,7 @@ function buildShellEnv() {
   const seen = new Set();
   env.PATH = [...extraPaths, ...(env.PATH || '').split(':')]
     .filter((p) => {
-      if (!p || seen.has(p)) return false;
+      if (!p || seen.has(p)) {return false;}
       seen.add(p);
       return true;
     })
@@ -127,7 +127,7 @@ function pruneOldClipboardImages() {
   for (const name of names) {
     const full = path.join(CLIPBOARD_DIR, name);
     try {
-      if (now - fs.statSync(full).mtimeMs > CLIPBOARD_TTL_MS) fs.unlinkSync(full);
+      if (now - fs.statSync(full).mtimeMs > CLIPBOARD_TTL_MS) {fs.unlinkSync(full);}
     } catch {
       /* vanished or locked */
     }
@@ -157,7 +157,7 @@ async function spawnWithRetry(shell, args, options) {
       return { proc: pty.spawn(shell, args, options) };
     } catch (err) {
       lastErr = err;
-      if (!RETRIABLE_SPAWN_CODES.has(err?.code) || attempt === SPAWN_RETRIES) break;
+      if (!RETRIABLE_SPAWN_CODES.has(err?.code) || attempt === SPAWN_RETRIES) {break;}
       await sleep(SPAWN_RETRY_DELAY_MS);
     }
   }
@@ -214,21 +214,21 @@ function pollProcessNames(send) {
     } catch {
       continue; // exited between the map read and the fd lookup
     }
-    if (!name || lastProcessName.get(id) === name) continue;
+    if (!name || lastProcessName.get(id) === name) {continue;}
     lastProcessName.set(id, name);
     send('terminal:process', { id, name });
   }
 }
 
 function startPolling(send) {
-  if (pollTimer) return;
+  if (pollTimer) {return;}
   pollTimer = setInterval(() => pollProcessNames(send), PROCESS_POLL_MS);
   // Never hold the event loop open on quit — this poll is decoration.
   pollTimer.unref?.();
 }
 
 function stopPolling() {
-  if (!pollTimer) return;
+  if (!pollTimer) {return;}
   clearInterval(pollTimer);
   pollTimer = null;
 }
@@ -312,7 +312,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
     const FALLBACK_MS = 4000;
 
     const launch = () => {
-      if (launched) return;
+      if (launched) {return;}
       launched = true;
       clearTimeout(quietTimer);
       clearTimeout(fallbackTimer);
@@ -323,7 +323,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
       }
     };
     // Hard ceiling: an animated prompt may never fall quiet, so try anyway.
-    if (command) fallbackTimer = setTimeout(launch, FALLBACK_MS);
+    if (command) {fallbackTimer = setTimeout(launch, FALLBACK_MS);}
 
     proc.onData((data) => {
       send('terminal:data', { id, data });
@@ -341,7 +341,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
         }
       }
 
-      if (launched) return;
+      if (launched) {return;}
       clearTimeout(quietTimer);
       quietTimer = setTimeout(launch, QUIET_MS);
     });
@@ -353,7 +353,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
       // asynchronously, so this can fire *after* a replacement has registered
       // under the same id — clearing unconditionally would orphan the live one
       // and every input/resize/close would silently no-op against it.
-      if (terminals.get(id)?.proc !== proc) return;
+      if (terminals.get(id)?.proc !== proc) {return;}
       terminals.delete(id);
       flowState.delete(id);
       lastProcessName.delete(id);
@@ -367,7 +367,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
   // that need no reply, so they shouldn't pay for a round trip.
   ipcMain.on('terminal:input', (_e, { id, data } = {}) => {
     const entry = terminals.get(id);
-    if (!entry) return;
+    if (!entry) {return;}
     try {
       entry.proc.write(data);
     } catch {
@@ -379,11 +379,11 @@ function registerTerminalHandlers({ send, projectRoot }) {
   // watermark paused once it has drained.
   ipcMain.on('terminal:ack', (_e, { id, count } = {}) => {
     const flow = flowState.get(id);
-    if (!flow) return;
+    if (!flow) {return;}
     flow.unacked = Math.max(0, flow.unacked - (count || 0));
-    if (!flow.paused || flow.unacked > FLOW_LOW_WATERMARK) return;
+    if (!flow.paused || flow.unacked > FLOW_LOW_WATERMARK) {return;}
     const entry = terminals.get(id);
-    if (!entry) return;
+    if (!entry) {return;}
     try {
       entry.proc.resume();
       flow.paused = false;
@@ -394,7 +394,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
 
   ipcMain.handle('terminal:resize', (_e, { id, cols, rows } = {}) => {
     const entry = terminals.get(id);
-    if (!entry) return { ok: false };
+    if (!entry) {return { ok: false };}
     try {
       entry.proc.resize(cols, rows);
     } catch {
@@ -408,7 +408,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
     terminals.delete(id);
     flowState.delete(id);
     lastProcessName.delete(id);
-    if (!entry) return { ok: false };
+    if (!entry) {return { ok: false };}
     try {
       entry.proc.kill();
     } catch {
@@ -422,7 +422,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
   ipcMain.handle('terminal:clipboardImage', (_e, { bytes, mime } = {}) => {
     try {
       const buf = Buffer.from(bytes || []);
-      if (buf.length === 0) return { ok: false, error: 'empty image' };
+      if (buf.length === 0) {return { ok: false, error: 'empty image' };}
       pruneOldClipboardImages();
       fs.mkdirSync(CLIPBOARD_DIR, { recursive: true });
       const ext = IMAGE_MIME_EXT[mime] || 'png';

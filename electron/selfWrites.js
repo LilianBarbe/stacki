@@ -39,7 +39,7 @@ function createSelfWrites({ read, now = () => Date.now(), windowMs = DEFAULT_WIN
     /** Is an event for `path` this app hearing itself? */
     isEcho(abs) {
       const mine = seen.get(abs);
-      if (!mine) return false;
+      if (!mine) {return false;}
       if (typeof mine.text === 'string') {
         try {
           return read(abs) === mine.text;

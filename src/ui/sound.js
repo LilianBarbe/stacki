@@ -71,9 +71,9 @@ export function setSoundEnabled(on) {
 // Built on the first note, which is inside a pointer event — the gesture a
 // browser requires before it will let anything make sound.
 function bench() {
-  if (ctx) return ctx;
+  if (ctx) {return ctx;}
   const Ctor = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
-  if (!Ctor) return null;
+  if (!Ctor) {return null;}
   ctx = new Ctor();
   const master = ctx.createGain();
   master.gain.value = 0.06; // quiet enough to sit under a conversation
@@ -84,9 +84,9 @@ function bench() {
 
 function note(hz, tone) {
   const audio = bench();
-  if (!audio) return;
+  if (!audio) {return;}
   // A tab that has been away can come back suspended.
-  if (audio.state === 'suspended') void audio.resume();
+  if (audio.state === 'suspended') {void audio.resume();}
   const at = audio.currentTime;
   const osc = audio.createOscillator();
   const mute = audio.createBiquadFilter();
@@ -129,14 +129,14 @@ function note(hz, tone) {
  * worth a sound.
  */
 export function dragNote(fraction, verticalFraction) {
-  if (!enabled) return;
+  if (!enabled) {return;}
   const f = Number(fraction);
-  if (!Number.isFinite(f)) return;
+  if (!Number.isFinite(f)) {return;}
   const step = Math.max(0, Math.min(LAST, Math.round(f * LAST)));
   const level = biteLevel(verticalFraction);
   const key = `${step}:${level}`;
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  if (key === lastKey || now - lastAt < FLOOR_MS) return;
+  if (key === lastKey || now - lastAt < FLOOR_MS) {return;}
   lastKey = key;
   lastAt = now;
   note(ROOT_HZ * Math.pow(2, SEMITONES[step] / 12), toneFor(level));
@@ -153,7 +153,7 @@ export function noteHzFor(fraction) {
 // sounded before there was an up and a down.
 function biteLevel(verticalFraction) {
   const y = Number(verticalFraction);
-  if (!Number.isFinite(y)) return (BITE_LEVELS - 1) / 2;
+  if (!Number.isFinite(y)) {return (BITE_LEVELS - 1) / 2;}
   const up = 1 - Math.max(0, Math.min(1, y));
   return Math.round(up * (BITE_LEVELS - 1));
 }
@@ -188,12 +188,12 @@ const HOVER = { cutoff: 1200, gain: 0.5, attack: 0.003, decay: 0.075 };
  * the pointer moving within it — is silent.
  */
 export function hoverNote(index, count) {
-  if (!enabled) return;
+  if (!enabled) {return;}
   const rows = Math.max(1, Math.floor(Number(count)) || 1);
   const row = Math.max(0, Math.min(rows - 1, Math.floor(Number(index)) || 0));
   const key = `row:${row}/${rows}`;
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  if (key === lastKey || now - lastAt < FLOOR_MS) return;
+  if (key === lastKey || now - lastAt < FLOOR_MS) {return;}
   lastKey = key;
   lastAt = now;
   // Down the list is down the scale: the top row is the top of it.
@@ -217,7 +217,7 @@ const TAP = { hz: 174, cutoff: 900, gain: 0.5, attack: 0.001, decay: 0.055 };
 
 /** A button was pressed. */
 export function clickNote() {
-  if (!enabled) return;
+  if (!enabled) {return;}
   note(TAP.hz, TAP);
 }
 

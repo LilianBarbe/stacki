@@ -16,14 +16,14 @@ function* entries(nodes) {
 }
 
 function findEntry(nodes, id) {
-  for (const entry of entries(nodes)) if (entry.node.id === id) return entry;
+  for (const entry of entries(nodes)) {if (entry.node.id === id) {return entry;}}
   return null;
 }
 
 function trailFor(entry, field) {
-  if (!entry) return null;
+  if (!entry) {return null;}
   const trail = [];
-  for (let current = entry; current; current = current.parent) trail.push(current[field]);
+  for (let current = entry; current; current = current.parent) {trail.push(current[field]);}
   return trail.reverse();
 }
 
@@ -46,7 +46,7 @@ export function nodeAtPath(nodes, trail) {
   let node = null;
   for (const i of trail) {
     node = list?.[i];
-    if (!node) return null;
+    if (!node) {return null;}
     list = node.children;
   }
   return node;
@@ -61,7 +61,7 @@ export function createTreeIndex(nodes) {
     byId.set(entry.node.id, entry);
     byPath.set(entry.path, entry.node);
     const id = entry.node.props?.id;
-    if (id?.type === 'string' && id.value) sectionIds.push(id.value);
+    if (id?.type === 'string' && id.value) {sectionIds.push(id.value);}
   }
   return {
     byId,

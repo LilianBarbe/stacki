@@ -156,7 +156,7 @@ void main(){
 
 function compileShader(gl, type, source) {
   const shader = gl.createShader(type)
-  if (!shader) return null
+  if (!shader) {return null}
 
   gl.shaderSource(shader, source)
   gl.compileShader(shader)
@@ -205,7 +205,7 @@ export default function WelcomeBackground() {
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
+    if (!canvas) {return}
 
     const gl = canvas.getContext('webgl', { antialias: false, alpha: false })
     if (!(gl instanceof WebGLRenderingContext)) {
@@ -221,9 +221,9 @@ export default function WelcomeBackground() {
     const fieldLocation = program ? gl.getUniformLocation(program, 'u_field') : null
 
     if (!program || !buffer || !fieldTexture || positionLocation < 0 || !timeLocation || !resolutionLocation || !fieldLocation) {
-      if (buffer) gl.deleteBuffer(buffer)
-      if (fieldTexture) gl.deleteTexture(fieldTexture)
-      if (program) gl.deleteProgram(program)
+      if (buffer) {gl.deleteBuffer(buffer)}
+      if (fieldTexture) {gl.deleteTexture(fieldTexture)}
+      if (program) {gl.deleteProgram(program)}
       return
     }
 
@@ -305,7 +305,7 @@ export default function WelcomeBackground() {
             const dx = (gridX - centerX) * aspect
             const dy = gridY - centerY
             const distanceSquared = dx * dx + dy * dy
-            if (distanceSquared >= radiusSquared) continue
+            if (distanceSquared >= radiusSquared) {continue}
 
             const weight = Math.exp(-distanceSquared / (radiusSquared * 0.4)) * intensity
             const index = gridY * FIELD_SIZE + gridX

@@ -26,7 +26,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
@@ -77,8 +77,8 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     let found = null;
     for (const el of window.document.querySelectorAll('[data-box]')) {
       const b = el.getBoundingClientRect();
-      if (x < b.left || x > b.right || y < b.top || y > b.bottom) continue;
-      if (!found || found.contains(el)) found = el;
+      if (x < b.left || x > b.right || y < b.top || y > b.bottom) {continue;}
+      if (!found || found.contains(el)) {found = el;}
     }
     return found;
   };

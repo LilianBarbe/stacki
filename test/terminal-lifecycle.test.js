@@ -65,7 +65,7 @@ test('terminals load on demand, retain scrollback while hidden, and ignore dispo
     assert.equal(global.__terminalTest.loads, 1);
     assert.equal(global.__terminalTest.terminals.length, 1);
     assert.ok(started.id);
-    for (const listener of dataListeners) listener({ id: started.id, data: 'saved scrollback' });
+    for (const listener of dataListeners) {listener({ id: started.id, data: 'saved scrollback' });}
     assert.equal(sizes.length, 1, 'first fit sizes the native terminal');
     window.dispatchEvent(new dom.window.Event('resize'));
     window.dispatchEvent(new dom.window.Event('resize'));

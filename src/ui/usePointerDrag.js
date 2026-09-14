@@ -9,32 +9,32 @@ export function usePointerDrag() {
     stopRef.current?.();
     const pointerId = event.pointerId;
     const previousCursor = document.body.style.cursor;
-    if (cursor) document.body.style.cursor = cursor;
+    if (cursor) {document.body.style.cursor = cursor;}
     let frame = null;
     let latest = null;
     const matches = (e) => e.pointerId == null || pointerId == null || e.pointerId === pointerId;
     const apply = () => {
       frame = null;
-      if (!latest) return;
+      if (!latest) {return;}
       const next = latest;
       latest = null;
       onMove(next);
     };
     const move = (e) => {
-      if (!matches(e)) return;
+      if (!matches(e)) {return;}
       latest = e;
-      if (frame === null) frame = requestAnimationFrame(apply);
+      if (frame === null) {frame = requestAnimationFrame(apply);}
     };
     const stop = (e) => {
-      if (e && !matches(e)) return;
-      if (frame !== null) cancelAnimationFrame(frame);
-      if (e?.type === 'pointerup') latest = e;
+      if (e && !matches(e)) {return;}
+      if (frame !== null) {cancelAnimationFrame(frame);}
+      if (e?.type === 'pointerup') {latest = e;}
       apply();
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', stop);
       window.removeEventListener('pointercancel', stop);
       window.removeEventListener('blur', stop);
-      if (cursor) document.body.style.cursor = previousCursor;
+      if (cursor) {document.body.style.cursor = previousCursor;}
       stopRef.current = null;
       onEnd?.(e);
     };
