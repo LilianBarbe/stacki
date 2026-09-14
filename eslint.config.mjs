@@ -32,6 +32,7 @@ export default [
       'electron/selfWrites.js',
       'electron/windowBounds.js',
       'electron/assetRefs.js',
+      'electron/frontmatter.js',
     ],
   },
   {
