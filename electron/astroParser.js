@@ -91,6 +91,9 @@ function attrsAsWritten(node) {
 function tagProps(attrs) {
   const props = parseAttrs(attrs);
   const attrOrder = Object.keys(props);
+  // props is always present — even empty — because writers mutate node.props
+  // in place (e.g. fragment tests and panel edits). attrOrder only exists
+  // when there is something to order.
   return attrOrder.length ? { props, attrOrder } : { props };
 }
 
@@ -1068,14 +1071,17 @@ function parsePage(source, opts = {}) {
   // Layout detection: a single top-level component wrapping the whole page,
   // or — when siblings live outside it — exactly one top-level component
   // whose import path mentions "layout". The wrapper keeps its place in the
-  // tree; it's just tagged with the well-known id 'layout'.
+  // tree; it's just tagged with the well-known id 'layout'. A lone top-level
+  // component the page never imported is content (a component used as a tag,
+  // e.g. a snippet page), not a layout: only an import makes it a layout.
   const significant = topNodes.filter((n) => n.kind !== 'comment');
   let wrapper = null;
   if (
     significant.length === 1 &&
     significant[0].kind === 'component' &&
     significant[0].name !== 'Fragment' &&
-    significant[0].children !== null
+    significant[0].children !== null &&
+    !!importsByName[significant[0].name]
   ) {
     wrapper = significant[0];
   } else if (significant.length > 1) {
