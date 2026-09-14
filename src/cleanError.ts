@@ -5,12 +5,16 @@
 // into a full page reload — which drops the open project and lands you back on
 // the dashboard mid-edit.
 
-export function cleanError(err) {
-  const msg = err?.message || String(err);
-  return stripAnsi(msg.replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, ''));
+import { toRecord } from '../shared/dist/record.js';
+
+export function cleanError(err: unknown): string {
+  const record = toRecord(err);
+  const message = record?.['message'];
+  const text = typeof message === 'string' && message ? message : String(err);
+  return stripAnsi(text.replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, ''));
 }
 
-export function stripAnsi(s) {
+export function stripAnsi(s: unknown): string {
   return String(s)
     .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
     .replace(/\x1b/g, '')

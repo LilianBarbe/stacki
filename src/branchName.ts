@@ -26,7 +26,7 @@ const FORBIDDEN = /[\x00-\x1f\x7f ~^:?*[\\]/g;
  * Spaces become `-` rather than vanishing: a space is what somebody means as a
  * separator, and dropping it silently joins two words into one.
  */
-export function sanitizeBranchName(text) {
+export function sanitizeBranchName(text: unknown): string {
   return String(text ?? '')
     .replace(/\s+/g, '-')
     .replace(FORBIDDEN, '')
@@ -43,7 +43,7 @@ export function sanitizeBranchName(text) {
  *
  * `existing` is the branches the project already has.
  */
-export function branchNameError(name, existing = []) {
+export function branchNameError(name: unknown, existing: readonly string[] = []): string | null {
   const n = String(name ?? '').trim();
   if (!n) {return null;}
   if (n === '@') {return '“@” is git’s own name for the current branch.';}
@@ -61,7 +61,7 @@ export function branchNameError(name, existing = []) {
 }
 
 /** Whether this name can be created as it stands. */
-export function isValidBranchName(name, existing = []) {
+export function isValidBranchName(name: unknown, existing: readonly string[] = []): boolean {
   const n = String(name ?? '').trim();
   return !!n && !branchNameError(n, existing);
 }

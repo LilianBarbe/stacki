@@ -114,7 +114,9 @@ export function createTreeIndex(nodes: readonly PageNode[]): TreeIndex {
     entry.path = entry.parent ? `${entry.parent.path}.${entry.index}` : String(entry.index);
     byId.set(entry.node.id, entry);
     byPath.set(entry.path, entry.node);
-    if (entry.node.kind === 'component' || entry.node.kind === 'element' || entry.node.kind === 'raw') {
+    // Presence, not kind: the tree query layer reads props from any node
+    // that carries them, kind-tagged or not.
+    if ('props' in entry.node) {
       const id = entry.node.props?.['id'];
       if (id?.type === 'string' && id.value) {
         sectionIds.push(id.value);
