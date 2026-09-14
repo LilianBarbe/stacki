@@ -130,7 +130,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   const watcher = fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8');
   check(
     'a change the app did not make is marked as coming from outside',
-    /if \(isSelfWrite\(changed\)\) return;\s*notePageMayHaveChanged\(true\);/.test(watcher),
+    /if \(isSelfWrite\(changed\)\) \{return;\}\s*notePageMayHaveChanged\(true\);/.test(watcher),
     'the app cannot tell an outside edit from its own'
   );
   check(
@@ -147,7 +147,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
   check(
     'the app tells the canvas about an outside edit',
-    /if \(d\?\.external\) tellCanvas\(\{ type: 'avb:patch-now' \}\);/.test(app),
+    /if \(d\?\.external\) \{tellCanvas\(\{ type: 'avb:patch-now' \}\);\}/.test(app),
     'nothing reaches the canvas when the socket is quiet'
   );
   const morph = fs.readFileSync(path.join(__dirname, '..', 'electron', 'morphClient.js'), 'utf8');

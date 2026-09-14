@@ -159,7 +159,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   );
   check(
     'a step within a copy keeps it',
-    /if \(sameCopy\(previous, selPath\)\) return;/.test(pane),
+    /if \(sameCopy\(previous, selPath\)\) \{return;\}/.test(pane),
     'every selection outside the canvas is back to meaning the first copy'
   );
   check(

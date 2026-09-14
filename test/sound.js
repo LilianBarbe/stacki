@@ -504,7 +504,7 @@ function fakeAudio() {
     path.join(__dirname, '..', 'src', 'style-panel', 'components', 'ColorPicker.tsx'),
     'utf8'
   );
-  check('the colour drag plays the note', /if \(live\) dragNote\(fx, tall \? fy : undefined\)/.test(picker));
+  check('the colour drag plays the note', /if \(live\) \{dragNote\(fx, tall \? fy : undefined\)/.test(picker));
   check('and releasing ends the run', /endDragNotes\(\)/.test(picker));
   // The square is a surface to drag around in; the bars are a few pixels high,
   // where a fraction of the height is noise rather than intent.

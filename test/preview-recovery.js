@@ -265,7 +265,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     );
     check(
       'and not for the app’s own writes, which say it themselves',
-      /if \(isSelfWrite\(changed\)\) return;\s*notePageMayHaveChanged\(true\);/.test(handler),
+      /if \(isSelfWrite\(changed\)\) \{return;\}\s*notePageMayHaveChanged\(true\);/.test(handler),
       handler.slice(0, 400)
     );
     check(

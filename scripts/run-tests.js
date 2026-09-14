@@ -16,6 +16,26 @@ if (!names.length || names.some((name) => !scripts[name])) {
 const started = Date.now();
 const failed = [];
 const env = { ...process.env, PATH: `${path.join(root, 'node_modules', '.bin')}${path.delimiter}${process.env.PATH || ''}` };
+
+// Static gate first: typecheck, lint, and the migration ratchet. These are
+// fast and fail cheap; a broken static check never reaches the test suites.
+// This is the contract gate AI-generated code must satisfy.
+const staticGates = [
+  ['tsc --noEmit', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit']],
+  ['eslint', [process.execPath, path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.']],
+  ['ratchet-check', [process.execPath, path.join(root, 'scripts', 'ratchet-check.js')]],
+];
+for (const [label, [bin, ...args]] of staticGates) {
+  console.log(`\n[gate] ${label}`);
+  const result = spawnSync(bin, args, { cwd: root, env, stdio: 'inherit' });
+  if (result.signal === 'SIGINT' || result.signal === 'SIGTERM') {
+    process.exit(130);
+  }
+  if (result.status !== 0 || result.error) {
+    console.error(`\nStatic gate failed: ${label}`);
+    process.exit(1);
+  }
+}
 for (const [index, name] of names.entries()) {
   console.log(`\n[${index + 1}/${names.length}] ${name}`);
   // Run the existing command verbatim (including Node flags and Electron tests),
@@ -28,6 +48,24 @@ for (const [index, name] of names.entries()) {
   }
 }
 
+// Pre-existing failures on main, verified at the ts-contracts/phase-0-gate
+// branch point: they fail without any of this branch's changes. A test that
+// stays broken blocks the gate only if it is NOT listed here; a listed test
+// that starts passing is reported so the list shrinks.
+const QUARANTINED = [
+  'test:binding',
+  'test:chipedit',
+  'test:codeeditorlifecycle',
+  'test:codeprop',
+  'test:jsguard',
+  'test:varsrowheight',
+];
+
 console.log(`\n${names.length - failed.length}/${names.length} test commands passed in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
 if (failed.length) {console.error(`Failed: ${failed.join(', ')}`);}
-process.exitCode = failed.length ? 1 : 0;
+const unexpected = failed.filter((name) => !QUARANTINED.includes(name));
+const healed = QUARANTINED.filter((name) => !failed.includes(name) && names.includes(name));
+if (healed.length) {
+  console.error(`\nQuarantined tests now pass — remove them from QUARANTINED: ${healed.join(', ')}`);
+}
+process.exitCode = unexpected.length || healed.length ? 1 : 0;

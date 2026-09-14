@@ -376,15 +376,15 @@ const check = (what, condition, detail) => {
   );
   check(
     'a list is something the control can write, so `{}` is a toggle and not the only way',
-    /if \(field\.type === 'code'\) return arrayItems\(src\) === null;/.test(panel),
+    /if \(field\.type === 'code'\) \{return arrayItems\(src\) === null;\}/.test(panel),
     'an array would always open as an expression'
   );
   check(
     'and the way back keeps the value',
-    /if \(field\.type === 'code' && arrayItems\(src\)\) return \{ type: 'expr', value: src \};/.test(panel),
+    /if \(field\.type === 'code' && arrayItems\(src\)\) \{return \{ type: 'expr', value: src \};\}/.test(panel),
     'coming back from the code editor would drop the prop'
   );
-  check('the toggle calls it a list', /field\.type === 'code'\) return 'list'/.test(panel));
+  check('the toggle calls it a list', /field\.type === 'code'\) \{return 'list'/.test(panel));
 
   // Alone in the box, the button's own top rule would double the box's edge.
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');

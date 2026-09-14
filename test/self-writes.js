@@ -99,7 +99,7 @@ const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 
 check(
   'the watcher asks about every kind of file it hears about',
   /watchProject\(\{[\s\S]*?isSelfWrite/.test(main) &&
-    /if \(isSelfWrite\(changed\)\) return;/.test(fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8')),
+    /if \(isSelfWrite\(changed\)\) \{return;\}/.test(fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8')),
   'the watcher must receive the self-write guard before routing events'
 );
 check(

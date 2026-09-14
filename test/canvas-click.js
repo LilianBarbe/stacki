@@ -104,7 +104,7 @@ const check = (what, condition, detail) => {
   const preload = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
   check(
     'one run is enough to narrow to the instance',
-    /if \(runs\.length\) focusCache = runs\[focusOcc\]/.test(preload),
+    /if \(runs\.length\) \{focusCache = runs\[focusOcc\]/.test(preload),
     'focusRoots still requires more than one run'
   );
   check('and none still narrows to nothing', /if \(focusPath\) \{/.test(preload));
@@ -112,7 +112,7 @@ const check = (what, condition, detail) => {
   check(
     'and closing is the only thing that closes',
     (app.match(/kind === 'close'/g) || []).length === 1 &&
-      /if \(kind === 'nothing'\) return;/.test(app)
+      /if \(kind === 'nothing'\) \{return;\}/.test(app)
   );
 
   if (failures.length) {

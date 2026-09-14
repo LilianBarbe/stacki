@@ -247,7 +247,7 @@ const marked = (body, frontmatter = 'import Split from "./Split.astro";\nimport 
     );
     check(
       'and a template still is too, for a page served before this update',
-      /n\.tagName === 'TEMPLATE'\) return n\.getAttribute\(`data-avb-\$\{kind\}`\)/.test(preload),
+      /n\.tagName === 'TEMPLATE'\) \{return n\.getAttribute\(`data-avb-\$\{kind\}`\)/.test(preload),
       'a running dev server would go blank on update'
     );
   }
