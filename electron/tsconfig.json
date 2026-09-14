@@ -1,0 +1,25 @@
+{
+  "//": "Converted electron sources emit their .js side-by-side, in place: the require sites — tests, main.js, electron-builder — keep working untouched, and the emitted file is gitignored. When every electron file has converted, the whole process moves to a dist layout in one step. Strict flags mirror the root; verbatimModuleSyntax is off only here because the emit target is CommonJS.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2022"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "verbatimModuleSyntax": false,
+
+    "outDir": ".",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "files": ["htmlText.ts"]
+}

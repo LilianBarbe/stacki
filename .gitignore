@@ -12,3 +12,4 @@ shared/dist/
 *.pem
 *.key
 *.mobileprovision
+electron/htmlText.js

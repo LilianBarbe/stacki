@@ -13,7 +13,7 @@
 // The named entities that turn up in hand-written markup. Not the full HTML
 // table — that is 2231 names, nearly all of them for characters nobody types —
 // but everything an author reaches for, plus the five that are structural.
-const NAMED = {
+const NAMED: Record<string, string> = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
   nbsp: ' ', copy: '©', reg: '®', trade: '™', deg: '°',
   hellip: '…', mdash: '—', ndash: '–', minus: '−', shy: '­',
@@ -36,23 +36,33 @@ const ENTITY = /&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi;
 /** The characters an entity stands for. Anything unrecognised is left alone —
  *  a name this doesn't know is still valid HTML, and rewriting it as itself is
  *  better than mangling it. */
-function decodeEntities(text) {
-  return String(text ?? '').replace(ENTITY, (whole, body) => {
-    if (body[0] === '#') {
+function decodeEntities(text: unknown): string {
+  return String(text ?? '').replace(ENTITY, (whole: string, body: string): string => {
+    if (body.charAt(0) === '#') {
+      const second = body.charAt(1);
       const code =
-        body[1] === 'x' || body[1] === 'X'
+        second === 'x' || second === 'X'
           ? parseInt(body.slice(2), 16)
           : parseInt(body.slice(1), 10);
-      if (!Number.isFinite(code) || code < 1 || code > 0x10ffff) {return whole;}
+      if (!Number.isFinite(code) || code < 1 || code > 0x10ffff) {
+        return whole;
+      }
       try {
         return String.fromCodePoint(code);
       } catch {
         return whole;
       }
     }
-    if (Object.hasOwn(NAMED, body)) {return NAMED[body];}
+    // Own properties only: NAMED['constructor'] would otherwise resolve the
+    // inherited Object.prototype member and hand back a function.
+    if (Object.hasOwn(NAMED, body)) {
+      return NAMED[body] ?? whole;
+    }
     const lower = body.toLowerCase();
-    return Object.hasOwn(NAMED, lower) ? NAMED[lower] : whole;
+    if (Object.hasOwn(NAMED, lower)) {
+      return NAMED[lower] ?? whole;
+    }
+    return whole;
   });
 }
 
@@ -63,10 +73,23 @@ function decodeEntities(text) {
  * `&copy;` in a file that says `©` everywhere else would be the editor imposing
  * its own habits.
  */
-function encodeText(text) {
-  return String(text ?? '').replace(/[&<>    ‌‍­]/g, (c) =>
-    c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : `&#${c.codePointAt(0)};`
-  );
+function encodeText(text: unknown): string {
+  return String(text ?? '').replace(/[&<>    ‌‍­]/g, (c: string): string => {
+    if (c === '&') {
+      return '&amp;';
+    }
+    if (c === '<') {
+      return '&lt;';
+    }
+    if (c === '>') {
+      return '&gt;';
+    }
+    const code = c.codePointAt(0);
+    if (code === undefined) {
+      return c;
+    }
+    return `&#${code};`;
+  });
 }
 
-module.exports = { decodeEntities, encodeText };
+export { decodeEntities, encodeText };

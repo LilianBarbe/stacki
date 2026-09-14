@@ -23,6 +23,7 @@ const env = { ...process.env, PATH: `${path.join(root, 'node_modules', '.bin')}$
 const staticGates = [
   // Contracts build first: the root typecheck resolves shared/dist/*.d.ts.
   ['build:contracts', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('shared', 'tsconfig.json')]],
+  ['build:electron', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('electron', 'tsconfig.json')]],
   ['tsc --noEmit', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit']],
   ['eslint', [process.execPath, path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.']],
   ['ratchet-check', [process.execPath, path.join(root, 'scripts', 'ratchet-check.js')]],
