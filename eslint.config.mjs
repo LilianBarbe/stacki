@@ -22,6 +22,7 @@ export default [
       'dist/**',
       'release/**',
       'coverage/**',
+      'shared/dist/**',
       'test/.stacki-test/**',
       '**/generated/**',
     ],

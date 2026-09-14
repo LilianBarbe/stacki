@@ -18,7 +18,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { parsePageResult, assertTreeInvariants } from '../../shared/page-node.ts';
+import { parsePageResult, assertTreeInvariants } from '../../shared/dist/page-node.js';
 
 const require = createRequire(import.meta.url);
 // CJS module boundary; every value it returns is validated by the contract parsers.

@@ -7,8 +7,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePropSchema } from '../../shared/prop-schema.ts';
-import { LIMITS } from '../../shared/limits.ts';
+import { parsePropSchema } from '../../shared/dist/prop-schema.js';
+import { LIMITS } from '../../shared/dist/limits.js';
 
 const goodSchema = new Map<string, unknown>([
   ['title', { name: 'title', type: 'string', optional: false, default: 'Home', doc: 'Page title.' }],

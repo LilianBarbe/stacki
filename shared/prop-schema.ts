@@ -3,7 +3,7 @@
 // builds typed fields from this; a malformed schema shows up as wrong
 // controls, so the boundary validates every field.
 
-import { LIMITS } from './limits.ts';
+import { LIMITS } from './limits';
 
 export interface PropField {
   readonly name: string;

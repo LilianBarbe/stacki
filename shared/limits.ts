@@ -26,6 +26,10 @@ export const LIMITS = {
   propOptionsMax: 256,
   /** Import declarations in one frontmatter block. */
   importsMax: 256,
+  /** Cap on rescan chain-follows and save drains: both loops converge because
+   * each pass needs a strictly newer request; a live cap hit means a bug. */
+  rescanChainMax: 256,
+  saveDrainMax: 256,
   /** Length of one IPC payload string field. */
   ipcFieldCharsMax: 10_000_000,
 } as const satisfies Record<string, number>;

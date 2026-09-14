@@ -7,8 +7,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseScanResult } from '../../shared/scan.ts';
-import { LIMITS } from '../../shared/limits.ts';
+import { parseScanResult } from '../../shared/dist/scan.js';
+import { LIMITS } from '../../shared/dist/limits.js';
 
 const goodScan = {
   pages: [{ path: '/p/src/pages/index.astro', name: 'index.astro', route: '/' }],

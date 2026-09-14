@@ -4,9 +4,9 @@
 // emits and rejects everything else — the boundary is where malformed data
 // dies, and inward code never re-validates.
 
-import type { NodeId } from './brand.ts';
-import { toNodeId } from './brand.ts';
-import { LIMITS } from './limits.ts';
+import type { NodeId } from './brand';
+import { toNodeId } from './brand';
+import { LIMITS } from './limits';
 
 export type Attr =
   | { readonly type: 'string'; readonly value: string }
@@ -497,6 +497,14 @@ export function parsePageResult(input: unknown): ParsePageResult {
     };
   }
   fail('result.editable', 'expected boolean');
+}
+
+/** Parse the page:read envelope: the parse result plus the source text. */
+export function parsePageReadResult(input: unknown): ParsePageResult & { readonly source: string } {
+  const result = parsePageResult(input);
+  const record = asRecord(input, 'pageRead');
+  const source = asString(record['source'], 'pageRead.source', LIMITS.ipcFieldCharsMax);
+  return { ...result, source };
 }
 
 /** Invariants beyond the type: ids unique, self-closing only on paired kinds,
