@@ -17,6 +17,7 @@
     "verbatimModuleSyntax": true,
 
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "checkJs": false,
     "skipLibCheck": true,
@@ -24,5 +25,5 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "electron/**/*", "scripts/**/*", "test/**/*", "vite.config.mjs"]
+  "include": ["src/**/*", "electron/**/*", "scripts/**/*", "test/**/*", "shared/**/*", "vite.config.mjs"]
 }

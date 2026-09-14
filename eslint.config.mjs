@@ -98,6 +98,15 @@ export default [
     },
   },
   {
+    // shared/ is the validated-constructor layer (AGENTS.md §2): assertions
+    // are permitted here immediately after validation. Everywhere else the
+    // rule stands at error.
+    files: ['shared/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/consistent-type-assertions': 'off',
+    },
+  },
+  {
     // Legacy zone — same 44 files as the tsc @ts-nocheck ratchet. These rules
     // land as errors the moment each file converts; the zone block then shrinks.
     files: ['src/style-panel/**/*.{ts,tsx}'],
