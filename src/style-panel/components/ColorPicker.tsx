@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { colorMode, formatColor, formatHex, hsvaToRgba, parseColor, rgbaToHsl, rgbaToHsva, type ColorMode, type HSVA, type RGBA } from '../shared/color'

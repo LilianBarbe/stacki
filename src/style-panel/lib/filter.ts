@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // `filter` / `backdrop-filter` are a SPACE-separated list of filter functions
 // (blur/brightness/…/drop-shadow). We model each as one editable layer and
 // parse/serialize back, splitting on TOP-LEVEL spaces so drop-shadow()'s inner

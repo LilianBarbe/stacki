@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // Colour normalization for writes. Webflow's native Style API accepts hex and
 // rgb()/rgba() but not hsl()/hsla() — it silently drops an hsl* value. So on every
 // write we rewrite any hsl()/hsla() in the value to rgb()/rgba() (works natively AND

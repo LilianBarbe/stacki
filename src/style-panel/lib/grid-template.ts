@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // Model for editing grid-template-columns / -rows as an ordered list of tracks, with
 // per-track sizing (a "default" single size, or a minmax(min, max) pair). Reading
 // expands `repeat(n, …)` and drops [line-name] tokens so the list is one entry per

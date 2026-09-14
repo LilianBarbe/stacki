@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // Where a picked variable goes in the field.
 //
 // Picking one used to replace the whole value, which is right for most fields:

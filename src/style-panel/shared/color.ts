@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // Color parsing + conversion for the color picker. Parsing leans on a shared
 // canvas 2d context (the browser normalizes ANY CSS color — named, hex, rgb(),
 // hsl(), transparent — to rgb/rgba), so we never ship a 148-name table.

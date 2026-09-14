@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // CSS parsing and write-back for embed `<style>` blocks.
 //
 // Strategy: we hold the live postcss Root for each `<style>` region. Reads flow

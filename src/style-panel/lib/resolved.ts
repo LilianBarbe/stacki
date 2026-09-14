@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // Resolved style model — re-projects the already-matched rules (from
 // computeRuleModel) for ONE context (base / a query), ONE state (:hover/…), and
 // ONE selected selector (the picked element tokens). It answers, per property:

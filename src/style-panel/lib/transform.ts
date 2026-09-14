@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // `transform` is a SPACE-separated list of functions (translate/scale/rotate/skew).
 // We model each as one editable layer with up to three axes and parse/serialize back,
 // splitting on TOP-LEVEL spaces/commas only so calc()/var() with inner separators

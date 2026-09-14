@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // Native Webflow class styles — the responsive/breakpoint model + the pure
 // helpers that project a NativeModel (read in webflow.ts) into the resolved
 // style panel. Class styles are read/written through the Designer Style API

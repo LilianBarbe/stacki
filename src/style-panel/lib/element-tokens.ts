@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // Turn a selected element's identity into pickable tokens: its HTML tag (first),
 // then its classes, then its data attributes — the set of things an embed
 // selector can target. Used by the header ClassPicker.

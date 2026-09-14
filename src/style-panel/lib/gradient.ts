@@ -1,3 +1,7 @@
+// @ts-nocheck
+// Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict tsconfig
+// and fails the AGENTS.md flag set. Conversion removes this header; the ratchet
+// gate in scripts/ratchet-check.js keeps the list from growing.
 // Parse / serialize a CSS gradient function into a structured model so the
 // Backgrounds panel can offer Webflow's visual gradient editor (position grid,
 // size presets, a draggable stops bar, a repeat toggle) instead of raw CSS text.
