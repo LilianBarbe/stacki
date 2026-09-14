@@ -10,6 +10,8 @@ import { setSoundEnabled } from './ui/sound.js';
 import { createPreviewWatch } from './previewRecovery.js';
 import { tellCanvas } from './canvasQuery.js';
 import { renameAttr } from './attrOrder.js';
+import { scanProject } from './bridge';
+import { LIMITS } from '../shared/dist/limits.js';
 import PreviewPane from './panels/PreviewPane.jsx';
 import GitChip from './panels/GitChip.jsx';
 import HistoryPanel, { relativeTime } from './panels/HistoryPanel.jsx';
@@ -601,9 +603,18 @@ export default function App() {
 
   const scanRequestRef = useRef(null);
   const rescan = useCallback(async (projectPath) => {
-    let request = { projectPath, promise: window.avb.scanProject(projectPath), applied: false };
+    // The bridge parses the payload against the scan contract before any of
+    // this code sees it.
+    let request = { projectPath, promise: scanProject(projectPath), applied: false };
     scanRequestRef.current = request;
+    let chain = 0;
     while (true) {
+      chain += 1;
+      // Each continue requires a strictly newer request for the same project;
+      // a live cap hit means the chain stopped converging — a bug, not load.
+      if (chain > LIMITS.rescanChainMax) {
+        throw new Error(`rescan chain exceeded ${LIMITS.rescanChainMax} hops for ${projectPath}`);
+      }
       let result;
       let failure;
       try {

@@ -1,12 +1,21 @@
 // Serialize writes and drain edits made while a write is pending. A successful
 // write acknowledges its exact state object, never a newer edit or another file.
+import { LIMITS } from '../shared/dist/limits.js';
+
 export function createPageSaver({ readCurrent, write, markSaved }) {
   let pending = Promise.resolve();
   const saved = new WeakSet();
   const flush = async () => {
     const path = readCurrent().currentPage?.path;
     if (!path) {return;}
+    let drain = 0;
     while (true) {
+      drain += 1;
+      // Each pass past this point needs a strictly newer dirty state; hitting
+      // the cap means edits arrive faster than writes can ever drain — a bug.
+      if (drain > LIMITS.saveDrainMax) {
+        throw new Error(`save drain exceeded ${LIMITS.saveDrainMax} passes for ${path}`);
+      }
       const { currentPage, pageState } = readCurrent();
       if (currentPage?.path !== path || !pageState?.dirty) {return;}
       if (!saved.has(pageState)) {

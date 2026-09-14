@@ -18,6 +18,9 @@ const path = require('path');
 const { decodeEntities, encodeText } = require('./htmlText');
 
 const { readFrontmatter, writeFrontmatter } = require('./frontmatter');
+// The contract layer's compiled output: the producer-side half of the tree
+// invariant pair (the renderer boundary re-parses what crosses IPC).
+const { assertTreeInvariants } = require('../shared/dist/page-node.js');
 const VOID_ELEMENTS = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
   'link', 'meta', 'param', 'source', 'track', 'wbr',
@@ -1113,6 +1116,10 @@ function parsePage(source, opts = {}) {
     }
   };
   markDynamic(topNodes);
+
+  // Producer-side invariant check (paired with parsePageResult at the IPC
+  // boundary): a tree that violates this never leaves the parser.
+  assertTreeInvariants(topNodes);
 
   return {
     editable: true,
