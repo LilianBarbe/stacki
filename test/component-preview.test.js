@@ -42,7 +42,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   global.__componentPanels = {};
   global.IS_REACT_ACT_ENVIRONMENT = true;
   const page = { name: 'index.astro', path: '/project/src/pages/index.astro', route: '/' };
-  const card = { name: 'Card', path: '/project/src/components/Card.astro' };
+  const card = { name: 'Card', path: '/project/src/components/Card.astro', folder: '' };
   const states = new Map([
     [page.path, parsePage("---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>")],
     [card.path, parsePage('<section class="card"><p>Card content</p></section>')],
@@ -52,7 +52,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   let writeError = null;
   const bridge = new Proxy({
     pendingProject: async () => null,
-    scanProject: async () => ({ pages: [page], components: [card], layouts: [] }),
+    scanProject: async () => ({ pages: [page], components: [card], layouts: [], pageFolders: [] }),
     hasNodeModules: async () => true,
     startDevServer: async () => ({ url: 'http://localhost:4321' }),
     listProjectClasses: async () => [],

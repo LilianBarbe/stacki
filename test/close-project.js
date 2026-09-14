@@ -90,7 +90,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
       pendingProject: async () => null,
       scanProject: async (p) => {
         opened.push(p);
-        return { pages: [], layouts: [], components: [] };
+        return { pages: [], layouts: [], components: [], pageFolders: [] };
       },
       listProjectClasses: async () => [],
       startDevServer: async () => ({ url: 'http://localhost:4321' }),

@@ -35,7 +35,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   global.__panels = {};
   global.IS_REACT_ACT_ENVIRONMENT = true;
   const pages = ['index', 'second', 'third'].map((name) => ({ name: `${name}.astro`, path: `/project/src/pages/${name}.astro`, route: name === 'index' ? '/' : `/${name}` }));
-  const scan = { pages, components: [{ name: 'Card', path: '/project/src/components/Card.astro' }], layouts: [] };
+  const scan = { pages, components: [{ name: 'Card', path: '/project/src/components/Card.astro', folder: '' }], layouts: [], pageFolders: [] };
   const reads = [];
   const scans = [];
   let deferScans = false;
@@ -141,7 +141,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   await act(async () => { earlierScanEvent = onFsChanged({ files: [pages[1].path] }); await tick(); });
   await act(async () => { laterScanEvent = onFsChanged({ files: ['/project/src/components/New.astro'] }); await tick(); });
   assert.equal(scans.length, 2);
-  const latestScan = { ...scan, layouts: [{ name: 'NewLayout', path: '/project/src/layouts/NewLayout.astro' }] };
+  const latestScan = { ...scan, layouts: [{ name: 'NewLayout', path: '/project/src/layouts/NewLayout.astro', folder: 'layouts' }] };
   await act(async () => { scans[1].resolve(latestScan); await tick(); });
   assert.equal(reads[9].path, pages[1].path, 'the unrelated later event keeps the earlier page change');
   await act(async () => { reads[9].resolve(pageState('after-newest-scan')); await laterScanEvent; await tick(); });
