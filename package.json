@@ -136,6 +136,7 @@
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac:unsigned": "npm run build && electron-builder --mac -c.mac.forceCodeSigning=false -c.mac.notarize=false -c.mac.identity=null",
     "test": "node scripts/run-tests.js",
+    "test:contracts": "node --test 'test/contracts/*.test.ts'",
     "test:docdefaults": "node test/doc-defaults.js",
     "test:querycache": "node test/query-cache.js",
     "test:codeeditorlifecycle": "node test/code-editor-lifecycle.js",
