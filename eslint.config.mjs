@@ -31,6 +31,7 @@ export default [
       'electron/serialQueue.js',
       'electron/selfWrites.js',
       'electron/windowBounds.js',
+      'electron/assetRefs.js',
     ],
   },
   {
