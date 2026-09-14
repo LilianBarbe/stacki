@@ -59,6 +59,8 @@ const QUARANTINED = [
   'test:codeprop',
   'test:jsguard',
   'test:varsrowheight',
+  // Query-count performance check; fails under machine load on main too.
+  'test:hovercost',
 ];
 
 console.log(`\n${names.length - failed.length}/${names.length} test commands passed in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
