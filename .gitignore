@@ -1,6 +1,7 @@
 node_modules/
 dist/
 release/
+shared/dist/
 .DS_Store
 
 # Signing material and credentials — never commit these

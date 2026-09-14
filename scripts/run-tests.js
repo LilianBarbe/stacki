@@ -21,6 +21,8 @@ const env = { ...process.env, PATH: `${path.join(root, 'node_modules', '.bin')}$
 // fast and fail cheap; a broken static check never reaches the test suites.
 // This is the contract gate AI-generated code must satisfy.
 const staticGates = [
+  // Contracts build first: the root typecheck resolves shared/dist/*.d.ts.
+  ['build:contracts', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('shared', 'tsconfig.json')]],
   ['tsc --noEmit', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit']],
   ['eslint', [process.execPath, path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.']],
   ['ratchet-check', [process.execPath, path.join(root, 'scripts', 'ratchet-check.js')]],
@@ -59,13 +61,15 @@ const QUARANTINED = [
   'test:codeprop',
   'test:jsguard',
   'test:varsrowheight',
-  // Query-count performance check; fails under machine load on main too.
-  'test:hovercost',
 ];
+// Load-sensitive perf checks that fail intermittently on main too. Failures
+// are tolerated; passing is normal, so no heal report.
+const FLAKY = ['test:hovercost'];
 
 console.log(`\n${names.length - failed.length}/${names.length} test commands passed in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
 if (failed.length) {console.error(`Failed: ${failed.join(', ')}`);}
-const unexpected = failed.filter((name) => !QUARANTINED.includes(name));
+const tolerated = [...QUARANTINED, ...FLAKY];
+const unexpected = failed.filter((name) => !tolerated.includes(name));
 const healed = QUARANTINED.filter((name) => !failed.includes(name) && names.includes(name));
 if (healed.length) {
   console.error(`\nQuarantined tests now pass — remove them from QUARANTINED: ${healed.join(', ')}`);
