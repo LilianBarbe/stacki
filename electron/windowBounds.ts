@@ -13,6 +13,27 @@
 const MIN_WIDTH = 1024;
 const MIN_HEIGHT = 640;
 
+/** The display's work area — the screen minus whatever the OS keeps for
+ * itself. Every field is optional because the caller reads it from Electron's
+ * `display.workArea` and may hand us nothing at all. */
+interface WorkArea {
+  readonly x?: number;
+  readonly y?: number;
+  readonly width?: number;
+  readonly height?: number;
+}
+
+interface WindowBounds {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly minWidth: number;
+  readonly minHeight: number;
+}
+
+const rounded = (value: number | undefined): number => (value === undefined ? NaN : Math.round(value));
+
 /**
  * The bounds to open at on a display, given that display's work area — the
  * screen minus whatever the OS keeps for itself.
@@ -21,13 +42,13 @@ const MIN_HEIGHT = 640;
  * width below which they stop being usable, and a window that starts too small
  * to use is worse than one that hangs over an edge.
  */
-function openingBounds(workArea) {
-  const area = workArea || {};
-  const width = Math.max(MIN_WIDTH, Math.round(area.width) || MIN_WIDTH);
-  const height = Math.max(MIN_HEIGHT, Math.round(area.height) || MIN_HEIGHT);
+function openingBounds(workArea?: WorkArea): WindowBounds {
+  const area: WorkArea = workArea ?? {};
+  const width = Math.max(MIN_WIDTH, rounded(area.width) || MIN_WIDTH);
+  const height = Math.max(MIN_HEIGHT, rounded(area.height) || MIN_HEIGHT);
   return {
-    x: Math.round(area.x) || 0,
-    y: Math.round(area.y) || 0,
+    x: rounded(area.x) || 0,
+    y: rounded(area.y) || 0,
     width,
     height,
     minWidth: MIN_WIDTH,
@@ -35,4 +56,5 @@ function openingBounds(workArea) {
   };
 }
 
-module.exports = { openingBounds, MIN_WIDTH, MIN_HEIGHT };
+export { openingBounds, MIN_WIDTH, MIN_HEIGHT };
+export type { WorkArea, WindowBounds };

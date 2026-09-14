@@ -25,6 +25,12 @@ export default [
       'shared/dist/**',
       'test/.stacki-test/**',
       '**/generated/**',
+      // tsc-emit artifacts (side-by-side with their .ts sources; keep in sync
+      // with the files list in electron/tsconfig.json).
+      'electron/htmlText.js',
+      'electron/serialQueue.js',
+      'electron/selfWrites.js',
+      'electron/windowBounds.js',
     ],
   },
   {

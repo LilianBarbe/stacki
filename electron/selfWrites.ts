@@ -24,22 +24,41 @@
 
 const DEFAULT_WINDOW_MS = 1000;
 
-/**
- * @param read  (path) => string   the file's current text; throws if it is gone
- * @param now   () => number
- * @param windowMs how long a write with no text to compare still counts as ours
- */
-function createSelfWrites({ read, now = () => Date.now(), windowMs = DEFAULT_WINDOW_MS } = {}) {
-  const seen = new Map();
+interface SelfWritesOptions {
+  /** The file's current text; throws if it is gone. Required: a noted write
+   * with text can only be answered by reading the file back. */
+  readonly read: (path: string) => string;
+  readonly now?: () => number;
+  /** How long a write with no text to compare still counts as ours. */
+  readonly windowMs?: number;
+}
+
+interface SeenWrite {
+  readonly text: string | null;
+  readonly at: number;
+}
+
+interface SelfWrites {
+  /** The app wrote `path`. Pass the text it wrote whenever there is one. */
+  note(abs: string, text?: string | null): void;
+  /** Is an event for `path` this app hearing itself? */
+  isEcho(abs: string): boolean;
+  clear(): void;
+  /** For tests and for anyone who wants to know what we last put there. */
+  lastWrite(abs: string): SeenWrite | null;
+}
+
+function createSelfWrites({ read, now = () => Date.now(), windowMs = DEFAULT_WINDOW_MS }: SelfWritesOptions): SelfWrites {
+  const seen = new Map<string, SeenWrite>();
   return {
-    /** The app wrote `path`. Pass the text it wrote whenever there is one. */
-    note(abs, text = null) {
+    note(abs: string, text: string | null = null): void {
       seen.set(abs, { text: typeof text === 'string' ? text : null, at: now() });
     },
-    /** Is an event for `path` this app hearing itself? */
-    isEcho(abs) {
+    isEcho(abs: string): boolean {
       const mine = seen.get(abs);
-      if (!mine) {return false;}
+      if (!mine) {
+        return false;
+      }
       if (typeof mine.text === 'string') {
         try {
           return read(abs) === mine.text;
@@ -49,14 +68,14 @@ function createSelfWrites({ read, now = () => Date.now(), windowMs = DEFAULT_WIN
       }
       return now() - mine.at < windowMs;
     },
-    clear() {
+    clear(): void {
       seen.clear();
     },
-    /** For tests and for anyone who wants to know what we last put there. */
-    lastWrite(abs) {
+    lastWrite(abs: string): SeenWrite | null {
       return seen.get(abs) || null;
     },
   };
 }
 
-module.exports = { createSelfWrites, DEFAULT_WINDOW_MS };
+export { createSelfWrites, DEFAULT_WINDOW_MS };
+export type { SelfWrites, SelfWritesOptions, SeenWrite };
