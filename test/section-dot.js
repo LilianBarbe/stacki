@@ -103,7 +103,17 @@ const check = (what, condition, detail) => {
   const select = async (id) => {
     setHost({ projectPath: '/p', nodes: NODES, selectedId: id, files: [SHEET], astroFiles: [], renderedClasses: [], pathOf: () => '0.1' });
     root.render(React.createElement(EmbedEditor));
-    await wait(400);
+    // Poll for the panel to go quiet: a fixed sleep here was load-sensitive —
+    // 400ms passed when written and fails on the same machine a session later.
+    // Quiescence (two identical snapshots with the dot rendered) is the
+    // condition the checks actually need, for the orange case as much as blue.
+    let previous = '';
+    for (let tries = 0; tries < 100; tries++) {
+      await wait(50);
+      const html = panel.innerHTML;
+      if (html === previous && html.includes('section-dot')) {return;}
+      previous = html;
+    }
   };
 
   // The section by its title, and whether its header carries the dot.
