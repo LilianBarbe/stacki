@@ -14,20 +14,21 @@
 
 // Longest common subsequence over lines, as a map from index in `a` to index in
 // `b` for the lines they share.
-function align(a, b) {
+function align(a: readonly string[], b: readonly string[]): Map<number, number> {
   const n = a.length;
   const m = b.length;
   // Small files; the quadratic table is a few hundred kilobytes at worst.
   const table = new Int32Array((n + 1) * (m + 1));
+  const cell = (i: number, j: number): number => table[i * (m + 1) + j] ?? 0;
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
       table[i * (m + 1) + j] =
         a[i] === b[j]
-          ? table[(i + 1) * (m + 1) + j + 1] + 1
-          : Math.max(table[(i + 1) * (m + 1) + j], table[i * (m + 1) + j + 1]);
+          ? cell(i + 1, j + 1) + 1
+          : Math.max(cell(i + 1, j), cell(i, j + 1));
     }
   }
-  const map = new Map();
+  const map = new Map<number, number>();
   let i = 0;
   let j = 0;
   while (i < n && j < m) {
@@ -35,22 +36,33 @@ function align(a, b) {
       map.set(i, j);
       i++;
       j++;
-    } else if (table[(i + 1) * (m + 1) + j] >= table[i * (m + 1) + j + 1]) {i++;}
-    else {j++;}
+    } else if (cell(i + 1, j) >= cell(i, j + 1)) {
+      i++;
+    } else {
+      j++;
+    }
   }
   return map;
 }
 
+interface Hunk {
+  readonly start: number;
+  readonly end: number;
+  readonly lines: readonly string[];
+}
+
 // The runs of lines that differ, as { start, end, lines } against `a`.
-function hunks(a, b) {
+function hunks(a: readonly string[], b: readonly string[]): Hunk[] {
   const map = align(a, b);
-  const out = [];
-  let open = null;
+  const out: Hunk[] = [];
+  let open: { start: number; from: number } | null = null;
   let prevB = -1;
   for (let i = 0; i <= a.length; i++) {
     const j = i < a.length ? map.get(i) : b.length;
     if (j === undefined) {
-      if (!open) {open = { start: i, from: prevB + 1 };}
+      if (!open) {
+        open = { start: i, from: prevB + 1 };
+      }
       continue;
     }
     if (open || j > prevB + 1) {
@@ -71,24 +83,32 @@ function hunks(a, b) {
  * edit cannot be placed, which is the same file the serializer would have
  * written anyway.
  */
-function transplant(original, before, after) {
-  if (before === after) {return original;}
+function transplant(original: string, before: string, after: string): string {
+  if (before === after) {
+    return original;
+  }
   const O = original.split('\n');
   const A = before.split('\n');
   const B = after.split('\n');
   const toOriginal = align(A, O);
   const changes = hunks(A, B);
-  if (!changes.length) {return original;}
+  if (!changes.length) {
+    return original;
+  }
 
   const out = O.slice();
   for (const hunk of changes.reverse()) {
     // The usual case: the lines being replaced are lines the serializer wrote
     // the same way the original has them, so they can be found in the original
     // and swapped on their own.
-    const mapped = [];
-    for (let i = hunk.start; i < hunk.end; i++) {mapped.push(toOriginal.get(i));}
-    if (mapped.length && mapped.every((at) => at !== undefined)) {
-      out.splice(mapped[0], mapped[mapped.length - 1] - mapped[0] + 1, ...hunk.lines);
+    const mapped: (number | undefined)[] = [];
+    for (let i = hunk.start; i < hunk.end; i++) {
+      mapped.push(toOriginal.get(i));
+    }
+    const first = mapped[0];
+    const last = mapped[mapped.length - 1];
+    if (first !== undefined && last !== undefined && mapped.every((at) => at !== undefined)) {
+      out.splice(first, last - first + 1, ...hunk.lines);
       continue;
     }
 
@@ -97,13 +117,21 @@ function transplant(original, before, after) {
     // to anchor against. It is taken along: the region it belongs to can only
     // be replaced whole, so the diff grows by those lines and stops there.
     let start = hunk.start;
-    while (start > 0 && !toOriginal.has(start - 1)) {start--;}
+    while (start > 0 && !toOriginal.has(start - 1)) {
+      start--;
+    }
     let end = hunk.end;
-    while (end < A.length && !toOriginal.has(end)) {end++;}
+    while (end < A.length && !toOriginal.has(end)) {
+      end++;
+    }
 
-    const from = start === 0 ? 0 : toOriginal.get(start - 1) + 1;
-    const to = end === A.length ? O.length : toOriginal.get(end);
-    if (to < from) {return after;}
+    // Both sides of the region are mapped by construction (the loops above stop
+    // at a mapped line or at an edge); the fallbacks are unreachable.
+    const from = start === 0 ? 0 : (toOriginal.get(start - 1) ?? 0) + 1;
+    const to = end === A.length ? O.length : toOriginal.get(end) ?? O.length;
+    if (to < from) {
+      return after;
+    }
 
     const lines = [...A.slice(start, hunk.start), ...hunk.lines, ...A.slice(hunk.end, end)];
     out.splice(from, to - from, ...lines);
@@ -111,4 +139,4 @@ function transplant(original, before, after) {
   return out.join('\n');
 }
 
-module.exports = { transplant };
+export { transplant };

@@ -15,27 +15,38 @@
 //     text `draft: true` has to come back out quoted, or the file no longer
 //     parses.
 
-const YAML = require('yaml');
-const { transplant } = require('./transplant');
+import * as YAML from 'yaml';
+
+import { toRecord, toArray } from '../../shared/dist/record.js';
+import { transplant } from './transplant.js';
 
 const PARSE_OPTIONS = { keepSourceTokens: true };
 // Long strings are not re-wrapped and flow lists keep their spacing, which is
 // what most files already look like.
 const STRINGIFY_OPTIONS = { lineWidth: 0, flowCollectionPadding: false };
 
-const parseData = (text) => YAML.parse(text) ?? null;
+const parseData = (text: string): unknown => YAML.parse(text) ?? null;
 
-const parseDocument = (text) => YAML.parseDocument(text, PARSE_OPTIONS);
+const parseDocument = (text: string): YAML.Document => YAML.parseDocument(text, PARSE_OPTIONS);
 
-const isPrimitive = (v) => v === null || ['string', 'number', 'boolean'].includes(typeof v);
+const isPrimitive = (v: unknown): v is string | number | boolean | null =>
+  v === null || ['string', 'number', 'boolean'].includes(typeof v);
 
 const DELETE = Symbol('delete');
+
+export interface Edit {
+  readonly path: readonly (string | number)[];
+  readonly value: unknown;
+  readonly rename?: string;
+}
 
 /**
  * Applies { path, value } edits to YAML source text. `DELETE` removes the key.
  */
-function applyEdits(text, edits) {
-  if (!edits.length) {return text;}
+function applyEdits(text: string, edits: readonly Edit[]): string {
+  if (!edits.length) {
+    return text;
+  }
   const doc = parseDocument(text);
   // What the serializer makes of this file before anything is changed. When it
   // differs from the file on disk — a folded scalar it writes flat, a quote it
@@ -47,12 +58,20 @@ function applyEdits(text, edits) {
     // its place among the others.
     if (rename !== undefined) {
       const parent = path.length > 1 ? doc.getIn(path.slice(0, -1), true) : doc.contents;
-      const pair = parent?.items?.find((item) => item?.key?.value === path[path.length - 1]);
-      if (pair?.key) {pair.key.value = rename;}
+      const items = toArray(toRecord(parent)?.['items']);
+      const pair = items
+        ?.map((item) => toRecord(item))
+        .find((item) => toRecord(item?.['key'])?.['value'] === path[path.length - 1]);
+      const pairKey = toRecord(pair?.['key']);
+      if (pairKey) {
+        pairKey['value'] = rename;
+      }
       continue;
     }
     if (!path.length) {
-      if (value === DELETE) {continue;}
+      if (value === DELETE) {
+        continue;
+      }
       const next = parseDocument(YAML.stringify(value, STRINGIFY_OPTIONS));
       doc.contents = next.contents;
       continue;
@@ -62,10 +81,12 @@ function applyEdits(text, edits) {
       continue;
     }
     const node = doc.getIn(path, true);
+    const nodeRecord = toRecord(node);
+    const nodeValue = nodeRecord?.['value'];
     // Writing into the node that is already there keeps its style — the block
     // scalar, the quoting, the comment sitting beside it.
-    if (node && node.value !== undefined && isPrimitive(value) && typeof node.value === typeof value) {
-      node.value = value;
+    if (nodeRecord && nodeValue !== undefined && isPrimitive(value) && typeof nodeValue === typeof value) {
+      nodeRecord['value'] = value;
       continue;
     }
     doc.setIn(path, value);
@@ -80,7 +101,7 @@ function applyEdits(text, edits) {
  * trip cleanly would pick up unrelated changes on its first save — better to
  * know that before writing than to explain the diff afterwards.
  */
-function roundTrips(text) {
+function roundTrips(text: string): boolean {
   try {
     return parseDocument(text).toString(STRINGIFY_OPTIONS) === text;
   } catch {
@@ -88,4 +109,4 @@ function roundTrips(text) {
   }
 }
 
-module.exports = { parseData, parseDocument, applyEdits, roundTrips, DELETE, YAML };
+export { parseData, parseDocument, applyEdits, roundTrips, DELETE, YAML };

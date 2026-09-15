@@ -37,6 +37,11 @@ export default [
       'electron/devProbe.js',
       'electron/injectedRoutes.js',
       'electron/projectWatcher.js',
+      'electron/formats/transplant.js',
+      'electron/formats/ndjson.js',
+      'electron/formats/csv.js',
+      'electron/formats/yaml.js',
+      'electron/formats/frontmatter.js',
     ],
   },
   {
