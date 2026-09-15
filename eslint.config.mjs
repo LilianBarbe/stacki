@@ -45,6 +45,7 @@ export default [
       'electron/previewWorktree.js',
       'electron/scaffold.js',
       'electron/contentRefs.js',
+      'electron/contentEntries.js',
       'electron/thumbs.js',
       'electron/gitBranches.js',
       'electron/gitHistory.js',

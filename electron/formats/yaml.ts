@@ -36,7 +36,7 @@ const DELETE = Symbol('delete');
 
 export interface Edit {
   readonly path: readonly (string | number)[];
-  readonly value: unknown;
+  readonly value?: unknown;
   readonly rename?: string;
 }
 

@@ -3,7 +3,7 @@ import path from 'path';
 
 import { toRecord, toArray } from '../shared/dist/record.js';
 import { listEntries, writeEntry } from './contentEntries.js';
-import type { ListedEntry } from './contentEntries.js';
+import type { Entry as ListedEntry } from './contentEntries.js';
 
 // Renaming an entry, and everything that points at it.
 //

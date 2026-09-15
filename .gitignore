@@ -40,3 +40,4 @@ electron/formats/toml.js
 electron/thumbs.js
 electron/gitBranches.js
 electron/gitHistory.js
+electron/contentEntries.js

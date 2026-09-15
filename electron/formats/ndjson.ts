@@ -39,7 +39,7 @@ const DELETE = Symbol('delete');
 
 export interface Edit {
   readonly path: readonly (string | number)[];
-  readonly value: unknown;
+  readonly value?: unknown;
 }
 
 const setIn = (target: unknown, path: readonly (string | number)[], value: unknown): unknown => {
