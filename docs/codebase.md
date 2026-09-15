@@ -30,15 +30,15 @@ lets you edit its pages visually:
   preview; "New Project…" scaffolds a minimal Astro starter.
 
 The product constraint that shapes everything below: Stacki edits files that
-are *also* edited by hand and by AI assistants in real editors. The source of
+are _also_ edited by hand and by AI assistants in real editors. The source of
 truth is always the `.astro` file on disk — never the app's internal model.
 
 ## The core problem: round-trip editing with preserved source
 
 Parsing `.astro` into a tree and rendering it is easy. The hard part, and the
 thing the architecture is organized around, is the **round trip**: text →
-structured model → user edits → text, *preserving everything the user did not
-touch* — comments, formatting, attribute order, hand-written expressions,
+structured model → user edits → text, _preserving everything the user did not
+touch_ — comments, formatting, attribute order, hand-written expressions,
 frontmatter code, and markup constructs the visual model does not understand.
 
 Stacki solves this the way editors with faithful round trips always do: a
@@ -49,7 +49,7 @@ everything else**. Concretely:
   `PageNode` tree. Nodes carry their **source ranges** (`.at` offsets), and
   anything not modeled (attributes in unusual order, raw `<script>`, unknown
   constructs) is kept verbatim and re-emitted on write.
-- Frontmatter (`electron/frontmatter.ts`) is *not* treated as a code blob:
+- Frontmatter (`electron/frontmatter.ts`) is _not_ treated as a code blob:
   imports become editable records whose **slots** retain the exact source,
   whitespace, and position between them. Edits to the declarations field are
   mapped back to import positions by a line-based diff (`moveOffsets`) that
@@ -99,7 +99,7 @@ Four cooperating processes, each with one job:
   (Structure, Props, Style, Pages, Assets, CMS, Git history, terminal…);
   `src/style-panel/` is the CSS editing surface (mostly TypeScript);
   `src/ui/` holds shared widgets.
-- **Astro dev server**: the *user's project's own* dev server. Stacki renders
+- **Astro dev server**: the _user's project's own_ dev server. Stacki renders
   the canvas by embedding it, so the preview is always exactly what Astro
   produces — no re-implementation of Astro semantics. A small injected client
   script (`electron/morphClient.js` and friends) maps DOM ↔ source nodes for
@@ -211,25 +211,32 @@ green at every commit.
   ESLint flat config enforcing the ruleset (no `any`, no unchecked
   assertions, exhaustive switches, ≤70-line functions), a **`@ts-nocheck`
   ratchet** (`scripts/ratchet-check.js`, baseline 44 legacy files — the count
-  may only go down), and ~4,800 mechanical `curly` fixes. Six pre-existing
-  broken suites are quarantined with `moduleId` so the gate starts green and
-  heals visibly.
+  may only go down), and ~4,800 mechanical `curly` fixes. One pre-existing
+  broken suite remains quarantined (`varsrowheight`); five healed out of the
+  list during Phase 3. The gate starts green and heals visibly.
 - **Phase 1 (done)** — the `shared/` contract layer above, with contract
   tests (round-trip, negative space, invariant violations). Found and fixed a
   real bug: a lone top-level component was not treated as a layout.
 - **Phase 2 (done)** — `shared/` compiles to `shared/dist` (CJS + `.d.ts`;
   the only runtime artifact); the renderer's `src/bridge.ts` validates at the
-  boundary; packaging unpacks `shared/dist` for the dev server.
+  boundary; packaging unpacks `shared/dist` for the dev server. A first live
+  end-to-end open (a real project, on a user's Windows machine) then exposed a
+  wrong wire shape — the scan payload's component schema was contracted as a
+  `Map` while the wire has always carried an array of fields; fixed in
+  b94457c together with `renderTag`'s object shape and the dropped `hasRest`.
 - **Phase 3 (in progress)** — mechanical conversion, leaf → hotspot.
   Electron modules convert in place with side-by-side tsc emit
-  (`electron/tsconfig.json`) so `require` sites never move; renderer modules
-  convert directly (Vite resolves `.js` → `.ts`). Done so far:
-  `htmlText`, `serialQueue`, `selfWrites`, `windowBounds`, `assetRefs`,
-  `frontmatter` (electron); `editorTree`, `pagePersistence`, `cleanError`,
-  `branchName` (src). Remaining: `astroParser.js` (the flagship), the other
-  electron libs, main/preload, the panels, and the four hotspots last
-  (`App.jsx` 4.6k lines, `PropsPanel.jsx` 3.8k, `parsePropSchema`,
-  `ClipPath.tsx` 8.8k).
+  (`electron/tsconfig.json`, plus per-module projects for `morphClient` and
+  `preload`, which need DOM libs) so `require` sites never move; renderer
+  modules convert directly (Vite resolves `.js` → `.ts`). Done so far: 30
+  electron modules — all except `astroParser.js` (the flagship, next) and
+  `main.js` (last, with the `shared/ipc.ts` channel inventory) — and 8 src
+  modules (`editorTree`, `pagePersistence`, `cleanError`, `branchName`,
+  `loopBindings`, `bindings`, `arrayValue`, `dataSuggest`). Remaining: the
+  two electron files above, ~30 src leaf libs, the panels, and the four
+  hotspots last (`App.jsx` 4.6k lines, `PropsPanel.jsx` 3.8k,
+  `parsePropSchema`, `ClipPath.tsx` 8.8k). Live status:
+  `docs/migration-tracker.md`.
 - **Phase 4 (planned)** — `docs/contracts.md` for invariants types can't
   express; an AGENTS.md "contracts" section; CI/pre-push hook.
 
@@ -274,19 +281,19 @@ batching/queueing write path (already the right shape).
 
 ## Directory map
 
-| Path | What lives there |
-|---|---|
-| `electron/` | Main process: IPC registry, parsers, git, watcher, terminal, packaging helpers |
-| `electron/content/` | Astro content-collection introspection + stubs injected into the dev server |
-| `electron/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter) |
-| `src/` | Renderer: `App.jsx` shell, tree/persistence/binding logic, `bridge.ts` |
-| `src/panels/` | Side panels (Structure, Props, Style, Pages, Assets, CMS, History, Git, terminal) |
-| `src/style-panel/` | CSS editing surface (TypeScript); `clip-path/`, `lib/`, shared controls |
-| `src/ui/` | Shared renderer widgets |
-| `shared/` | Contract layer: types, parsers, limits, IPC contract → compiled to `shared/dist` |
-| `scripts/` | Dev/CI tooling (test runner, ratchet, packaging hooks) |
-| `test/` | 124 suites: round-trip, canvas-stub, contract, packaging |
-| `docs/` | This file, the migration plan |
+| Path                | What lives there                                                                  |
+| ------------------- | --------------------------------------------------------------------------------- |
+| `electron/`         | Main process: IPC registry, parsers, git, watcher, terminal, packaging helpers    |
+| `electron/content/` | Astro content-collection introspection + stubs injected into the dev server       |
+| `electron/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter)               |
+| `src/`              | Renderer: `App.jsx` shell, tree/persistence/binding logic, `bridge.ts`            |
+| `src/panels/`       | Side panels (Structure, Props, Style, Pages, Assets, CMS, History, Git, terminal) |
+| `src/style-panel/`  | CSS editing surface (TypeScript); `clip-path/`, `lib/`, shared controls           |
+| `src/ui/`           | Shared renderer widgets                                                           |
+| `shared/`           | Contract layer: types, parsers, limits, IPC contract → compiled to `shared/dist`  |
+| `scripts/`          | Dev/CI tooling (test runner, ratchet, packaging hooks)                            |
+| `test/`             | 124 suites: round-trip, canvas-stub, contract, packaging                          |
+| `docs/`             | This file, the migration plan                                                     |
 
 ## Standing rules
 

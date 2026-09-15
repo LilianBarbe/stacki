@@ -35,17 +35,17 @@ already carries it).
 
 Modules, each exporting types + a hand-rolled parser (AGENTS.md §2) + bounds:
 
-| Module | Contents |
-|---|---|
-| `brand.ts` | `Brand`, `FilePath`, `ProjectPath`, `NodeId` — lookalike primitives made distinct |
-| `limits.ts` | `LIMITS`: max file bytes, max tree nodes, max attrs, max IPC payload, schema depth |
-| `result.ts` | `Result<T, E>`, `ok`, `err`, `AppError` — the expected-failure channel |
-| `page-node.ts` | `PageNode` discriminated union + `parsePageNode` + tree invariants |
-| `prop-schema.ts` | `PropSchema`, `PropField`, `PropShape` + `parsePropSchema` |
-| `scan.ts` | `ScanResult`, `ScanEntry`, page/layout/component kinds |
-| `page-state.ts` | `PageState`, dirty/saved state machine |
-| `content.ts` | CMS collection/entry/field models (from `electron/content*`) |
-| `ipc.ts` | the channel map: method name → payload type → result type; `AvbBridge` |
+| Module           | Contents                                                                           |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| `brand.ts`       | `Brand`, `FilePath`, `ProjectPath`, `NodeId` — lookalike primitives made distinct  |
+| `limits.ts`      | `LIMITS`: max file bytes, max tree nodes, max attrs, max IPC payload, schema depth |
+| `result.ts`      | `Result<T, E>`, `ok`, `err`, `AppError` — the expected-failure channel             |
+| `page-node.ts`   | `PageNode` discriminated union + `parsePageNode` + tree invariants                 |
+| `prop-schema.ts` | `PropSchema`, `PropField`, `PropShape` + `parsePropSchema`                         |
+| `scan.ts`        | `ScanResult`, `ScanEntry`, page/layout/component kinds                             |
+| `page-state.ts`  | `PageState`, dirty/saved state machine                                             |
+| `content.ts`     | CMS collection/entry/field models (from `electron/content*`)                       |
+| `ipc.ts`         | the channel map: method name → payload type → result type; `AvbBridge`             |
 
 ### PageNode — the flagship model
 
@@ -53,17 +53,30 @@ Derived from `electron/astroParser.js` (kinds: component, element, text,
 comment, raw, branch) and consumed by `src/editorTree.js`:
 
 ```ts
-type Attr = { readonly type: 'string' | 'expr' | 'bare' | 'spread'; readonly value: string };
+type Attr = {
+  readonly type: "string" | "expr" | "bare" | "spread";
+  readonly value: string;
+};
 
-type PairedBase = { readonly id: NodeId; readonly name: string; readonly attrs: readonly Attr[] };
+type PairedBase = {
+  readonly id: NodeId;
+  readonly name: string;
+  readonly attrs: readonly Attr[];
+};
 
 // Children exist ONLY on kinds that can have them; null = self-closing.
 type PageNode =
-  | (PairedBase & { readonly kind: 'component' | 'element'; readonly children: readonly PageNode[] | null })
-  | (PairedBase & { readonly kind: 'branch'; readonly children: readonly PageNode[] })
-  | { readonly kind: 'text'; readonly id: NodeId; readonly value: string }
-  | { readonly kind: 'comment'; readonly id: NodeId; readonly value: string }
-  | { readonly kind: 'raw'; readonly id: NodeId; readonly value: string };
+  | (PairedBase & {
+      readonly kind: "component" | "element";
+      readonly children: readonly PageNode[] | null;
+    })
+  | (PairedBase & {
+      readonly kind: "branch";
+      readonly children: readonly PageNode[];
+    })
+  | { readonly kind: "text"; readonly id: NodeId; readonly value: string }
+  | { readonly kind: "comment"; readonly id: NodeId; readonly value: string }
+  | { readonly kind: "raw"; readonly id: NodeId; readonly value: string };
 ```
 
 Invariants the type encodes (previously conventions enforced nowhere):
@@ -87,15 +100,21 @@ connects them:
 
 ```ts
 export interface IpcContract {
-  readonly 'project:scan': { payload: { projectPath: ProjectPath }; result: ScanResult };
-  readonly 'src:readText': { payload: { path: FilePath }; result: Result<string, AppError> };
+  readonly "project:scan": {
+    payload: { projectPath: ProjectPath };
+    result: ScanResult;
+  };
+  readonly "src:readText": {
+    payload: { path: FilePath };
+    result: Result<string, AppError>;
+  };
   // …one entry per channel, both processes
 }
 
 export type AvbBridge = {
   readonly [K in keyof IpcContract]: (
-    payload: IpcContract[K]['payload'],
-  ) => Promise<IpcContract[K]['result']>;
+    payload: IpcContract[K]["payload"],
+  ) => Promise<IpcContract[K]["result"]>;
 };
 ```
 
@@ -196,9 +215,14 @@ owed first: the diff-mapping plan's projection concept is `shared/page-node.ts`
 - **Electron CJS vs renderer ESM** — `shared/` compiles to CJS for the main
   process; Vite consumes the TS directly. No dual-package hazard because
   `shared/` has no runtime deps.
-- **Map over IPC** — `parsePropSchema` returns a `Map`, which structured-clone
-  preserves, but the contract type will say `ReadonlyMap` on both sides so the
-  assumption is written down and checked.
+- **Map over IPC** — `ipcMain.handle` results are serialized across the
+  process boundary, and serialization collapses a `Map` to a plain object:
+  the assumption that structured clone preserves it was written down here and
+  then **disproved in the field** (the renderer contract rejected every real
+  scan payload until b94457c). The scan wire shape is an array of `PropField`;
+  the prop-schema `Map` builder is for in-process consumers only. When a wire
+  shape and its contract disagree, a live end-to-end run is the only test that
+  catches it — every suite stubs the bridge.
 - **Test harness churn** — do not migrate the ~120 test scripts in this
   project; the gate only adds typecheck. Standardizing on `node:test` is a
   separate, later decision.
