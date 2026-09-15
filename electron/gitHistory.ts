@@ -27,6 +27,10 @@
 // "Home" needs the project's routing, which lives in main.js — so that
 // translation happens at the IPC edge, and this module stays about git.
 
+import { toRecord } from '../shared/dist/record.js';
+import { gitErrorDetail } from './git.js';
+import type { Git } from './git.js';
+
 // Field and record separators: git will happily put anything in a subject
 // line, including newlines and tabs, so the format is delimited by bytes a
 // commit message cannot contain.
@@ -55,10 +59,27 @@ const LOG_FORMAT = RS + ['%H', '%h', '%an', '%ae', '%aI', '%s', '%P', '%D'].join
 const DIFF_FLAGS = ['--diff-merges=first-parent', '-M'];
 
 /** True when the failure is "this repository has no commits yet". */
-const isEmptyRepo = (err) =>
-  /does not have any commits yet|bad default revision|unknown revision/i.test(
-    String(err.stderr || err.message || '')
-  );
+const isEmptyRepo = (err: unknown): boolean =>
+  /does not have any commits yet|bad default revision|unknown revision/i.test(gitErrorDetail(err));
+
+export interface FileChange {
+  readonly status: string;
+  readonly path: string;
+  readonly from?: string;
+}
+
+export interface CommitInfo {
+  readonly files: FileChange[] | undefined;
+  readonly hash: string | undefined;
+  readonly shortHash: string | undefined;
+  readonly author: string | undefined;
+  readonly email: string | undefined;
+  readonly when: string | undefined; // ISO 8601 with offset; the panel decides how to say it
+  readonly subject: string | undefined;
+  readonly parents: readonly string[];
+  readonly refs: readonly string[];
+  readonly isMerge: boolean;
+}
 
 /**
  * Commits, newest first.
@@ -66,24 +87,39 @@ const isEmptyRepo = (err) =>
  * `limit`/`skip` page it — the panel scrolls rather than loading a history
  * that can be tens of thousands of commits long.
  */
-async function log(git, { projectPath, ref, limit = 50, skip = 0, withFiles = false }) {
+async function log(
+  git: Git,
+  { projectPath, ref, limit = 50, skip = 0, withFiles = false }: {
+    readonly projectPath: string;
+    readonly ref?: string;
+    readonly limit?: number;
+    readonly skip?: number;
+    readonly withFiles?: boolean;
+  },
+): Promise<{ commits: CommitInfo[]; atEnd: boolean }> {
   const args = ['log', `--format=${LOG_FORMAT}`, `-n${limit}`, `--skip=${skip}`];
   // One call for the whole page, files included. The alternative — a `git
   // show` per commit to find out what it touched — is fifty processes to draw
   // one screen, and the panel needs the files to say "you changed Home"
   // rather than just the subject line.
-  if (withFiles) {args.push('--name-status', ...DIFF_FLAGS);}
-  if (ref) {args.push(ref);}
-  let stdout;
+  if (withFiles) {
+    args.push('--name-status', ...DIFF_FLAGS);
+  }
+  if (ref) {
+    args.push(ref);
+  }
+  let stdout: string;
   try {
     ({ stdout } = await git(projectPath, args));
   } catch (err) {
     // A project that has just been initialised has a branch and no commits.
     // That is an empty history, not a broken one.
-    if (isEmptyRepo(err)) {return { commits: [], atEnd: true };}
+    if (isEmptyRepo(err)) {
+      return { commits: [], atEnd: true };
+    }
     throw err;
   }
-  const commits = stdout
+  const commits: CommitInfo[] = stdout
     .split(RS)
     .filter((rec) => rec.trim())
     .map((rec) => {
@@ -93,28 +129,32 @@ async function log(git, { projectPath, ref, limit = 50, skip = 0, withFiles = fa
       const head = nl === -1 ? rec : rec.slice(0, nl);
       const rest = nl === -1 ? '' : rec.slice(nl + 1);
       const [hash, shortHash, author, email, when, subject, parents, refs] = head.split(US);
+      const parentList = parents ? parents.split(' ').filter(Boolean) : [];
       return {
         files: withFiles ? parseNameStatus(rest) : undefined,
         hash,
         shortHash,
         author,
         email,
-        when, // ISO 8601 with offset; the panel decides how to say it
+        when,
         subject,
-        parents: parents ? parents.split(' ').filter(Boolean) : [],
+        parents: parentList,
         // "HEAD -> main, origin/main, tag: v1" — what to badge the row with.
         refs: refs ? refs.split(', ').filter(Boolean) : [],
-        isMerge: (parents ? parents.split(' ').filter(Boolean) : []).length > 1,
+        isMerge: parentList.length > 1,
       };
     });
-  // Asked for one more than we need? No — `atEnd` is inferred from a short
-  // page, which costs nothing and is right except when the history length is
-  // an exact multiple of the page size (one extra empty fetch).
+  // `atEnd` is inferred from a short page, which costs nothing and is right
+  // except when the history length is an exact multiple of the page size (one
+  // extra empty fetch).
   return { commits, atEnd: commits.length < limit };
 }
 
 /** What one commit changed: `{status, path, from}` per file. */
-async function commitFiles(git, { projectPath, ref }) {
+async function commitFiles(
+  git: Git,
+  { projectPath, ref }: { readonly projectPath: string; readonly ref: string },
+): Promise<FileChange[]> {
   const { stdout } = await git(projectPath, [
     'show',
     '--name-status',
@@ -125,21 +165,36 @@ async function commitFiles(git, { projectPath, ref }) {
   return parseNameStatus(stdout);
 }
 
-function parseNameStatus(stdout) {
-  const files = [];
+function parseNameStatus(stdout: string): FileChange[] {
+  const files: FileChange[] = [];
   for (const line of stdout.split('\n')) {
-    if (!line.trim()) {continue;}
+    if (!line.trim()) {
+      continue;
+    }
     const parts = line.split('\t');
     const code = parts[0];
+    if (code === undefined) {
+      continue;
+    }
     // A rename or copy is "R100\told\tnew" — a similarity score on the code
     // and two paths. Everything else is one code and one path.
-    if (/^[RC]/.test(code) && parts.length >= 3) {
-      files.push({ status: code[0], path: parts[2], from: parts[1] });
-    } else if (parts.length >= 2) {
-      files.push({ status: code[0], path: parts[1] });
+    const from = parts[1];
+    const to = parts[2];
+    if (/^[RC]/.test(code) && parts.length >= 3 && from !== undefined && to !== undefined) {
+      files.push({ status: code.charAt(0), path: to, from });
+    } else if (parts.length >= 2 && from !== undefined) {
+      files.push({ status: code.charAt(0), path: from });
     }
   }
   return files;
+}
+
+export interface StatusFile {
+  readonly path: string;
+  readonly from: string | undefined; // always present; undefined unless a staged rename
+  readonly status: string;
+  readonly staged: boolean;
+  readonly untracked: boolean;
 }
 
 /**
@@ -148,17 +203,19 @@ function parseNameStatus(stdout) {
  * chip; this is the one that has to be complete, because a file missing from
  * it is a file that silently cannot be committed.
  */
-async function status(git, { projectPath }) {
+async function status(git: Git, { projectPath }: { readonly projectPath: string }): Promise<StatusFile[]> {
   const { stdout } = await git(projectPath, ['status', '--porcelain']);
-  const files = [];
+  const files: StatusFile[] = [];
   for (const line of stdout.split('\n')) {
-    if (!line.trim()) {continue;}
+    if (!line.trim()) {
+      continue;
+    }
     // Porcelain v1 is "XY path": two status columns, a space, then the path.
     // Not trimmed before slicing — the first column is a space for changes
     // that are only in the working tree, and trimming loses that distinction.
     const code = line.slice(0, 2);
     let p = line.slice(3);
-    let from;
+    let from: string | undefined;
     // "R  old -> new" — staged renames carry both names.
     const arrow = p.lastIndexOf(' -> ');
     if (arrow !== -1) {
@@ -170,8 +227,8 @@ async function status(git, { projectPath }) {
       from,
       // The letter to show. `??` is git's "untracked", which to anyone who did
       // not choose that spelling is simply a new file.
-      status: code === '??' ? 'A' : code.trim()[0] || 'M',
-      staged: code[0] !== ' ' && code !== '??',
+      status: code === '??' ? 'A' : code.trim().charAt(0) || 'M',
+      staged: code.charAt(0) !== ' ' && code !== '??',
       untracked: code === '??',
     });
   }
@@ -182,7 +239,13 @@ async function status(git, { projectPath }) {
 // quotes are undone here — a path that needed the full C-style unescaping is
 // rare enough that showing it slightly wrong beats getting the common case
 // wrong by hand-rolling an unescaper.
-const unquote = (s) => (s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : s);
+const unquote = (s: string): string => (s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : s);
+
+export interface ProjectFile {
+  readonly path: string;
+  readonly status: string | null;
+  readonly staged: boolean;
+}
 
 /**
  * Every file in the project, with what has happened to each.
@@ -197,7 +260,7 @@ const unquote = (s) => (s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : 
  * Status comes from the same porcelain the file picker reads, so a file cannot
  * appear as changed in one place and clean in another.
  */
-async function allFiles(git, { projectPath }) {
+async function allFiles(git: Git, { projectPath }: { readonly projectPath: string }): Promise<ProjectFile[]> {
   const { stdout } = await git(projectPath, [
     'ls-files',
     '--cached',
@@ -210,13 +273,17 @@ async function allFiles(git, { projectPath }) {
       stdout
         .split('\n')
         .map((l) => unquote(l.trim()))
-        .filter(Boolean)
+        .filter(Boolean),
     ),
   ];
   // A deleted file is gone from the working tree, so ls-files still lists it
   // from the index — but a file deleted and staged is not listed at all, and
   // it is exactly the one somebody may want to find and put back.
-  for (const [p, f] of changed) {if (!paths.includes(p)) {paths.push(p);}}
+  for (const [p] of changed) {
+    if (!paths.includes(p)) {
+      paths.push(p);
+    }
+  }
   return paths.sort().map((p) => {
     const c = changed.get(p);
     return { path: p, status: c ? c.status : null, staged: c ? c.staged : false };
@@ -224,7 +291,10 @@ async function allFiles(git, { projectPath }) {
 }
 
 /** A file's contents as they were at `ref`, or null when it wasn't there. */
-async function fileAt(git, { projectPath, ref, path: filePath }) {
+async function fileAt(
+  git: Git,
+  { projectPath, ref, path: filePath }: { readonly projectPath: string; readonly ref: string; readonly path: string },
+): Promise<string | null> {
   try {
     const { stdout } = await git(projectPath, ['show', `${ref}:${filePath}`]);
     return stdout;
@@ -232,13 +302,24 @@ async function fileAt(git, { projectPath, ref, path: filePath }) {
     // Not an error worth raising: a file that did not exist yet is a normal
     // answer to "what did this look like then", and the caller wants to say
     // "this page didn't exist yet" rather than show a failure.
-    if (/does not exist|exists on disk, but not in/i.test(String(err.stderr || ''))) {return null;}
+    const stderr = toRecord(err)?.['stderr'];
+    if (/does not exist|exists on disk, but not in/i.test(typeof stderr === 'string' ? stderr : '')) {
+      return null;
+    }
     throw err;
   }
 }
 
+export interface WorktreeInfo {
+  readonly path: string;
+  readonly head: string | null;
+  readonly branch: string | null;
+  readonly detached: boolean;
+  readonly bare: boolean;
+}
+
 /** Every worktree of this repository, the main one first. */
-async function worktrees(git, { projectPath }) {
+async function worktrees(git: Git, { projectPath }: { readonly projectPath: string }): Promise<WorktreeInfo[]> {
   const { stdout } = await git(projectPath, ['worktree', 'list', '--porcelain']);
   // Blank-line-separated records of "key value" lines. `detached` and `bare`
   // are bare keys with no value.
@@ -247,20 +328,32 @@ async function worktrees(git, { projectPath }) {
     .map((rec) => rec.trim())
     .filter(Boolean)
     .map((rec) => {
-      const out = { path: null, head: null, branch: null, detached: false, bare: false };
+      const out: { path: string | null; head: string | null; branch: string | null; detached: boolean; bare: boolean } = {
+        path: null,
+        head: null,
+        branch: null,
+        detached: false,
+        bare: false,
+      };
       for (const line of rec.split('\n')) {
         const sp = line.indexOf(' ');
         const key = sp === -1 ? line : line.slice(0, sp);
         const value = sp === -1 ? '' : line.slice(sp + 1);
-        if (key === 'worktree') {out.path = value;}
-        else if (key === 'HEAD') {out.head = value;}
-        else if (key === 'branch') {out.branch = value.replace(/^refs\/heads\//, '');}
-        else if (key === 'detached') {out.detached = true;}
-        else if (key === 'bare') {out.bare = true;}
+        if (key === 'worktree') {
+          out.path = value;
+        } else if (key === 'HEAD') {
+          out.head = value;
+        } else if (key === 'branch') {
+          out.branch = value.replace(/^refs\/heads\//, '');
+        } else if (key === 'detached') {
+          out.detached = true;
+        } else if (key === 'bare') {
+          out.bare = true;
+        }
       }
       return out;
     })
-    .filter((w) => w.path);
+    .filter((w): w is WorktreeInfo => w.path !== null);
 }
 
 // --- Saying what a file is -------------------------------------------------
@@ -273,10 +366,20 @@ async function worktrees(git, { projectPath }) {
 // convention (src/pages, src/components, src/layouts) rather than something
 // this has to go to disk to learn, which is what keeps it testable.
 
-const TITLE = (seg) =>
+const TITLE = (seg: string): string =>
   seg
     .replace(/-/g, ' ')
     .replace(/^./, (c) => c.toUpperCase());
+
+export type FileKind =
+  | 'page' | 'component' | 'layout' | 'content' | 'asset'
+  | 'style' | 'config' | 'script' | 'doc' | 'file';
+
+export interface FileDescription {
+  readonly path: string;
+  readonly kind: FileKind;
+  readonly label: string;
+}
 
 /**
  * `{ path, kind, label }` for one repo-relative path.
@@ -285,27 +388,44 @@ const TITLE = (seg) =>
  * nothing about keeps its own name rather than being forced into a category —
  * a wrong label is worse than a plain one.
  */
-function describeFile(relPath) {
+function describeFile(relPath: unknown): FileDescription {
   const p = String(relPath || '').replace(/\\/g, '/');
   const base = p.split('/').pop() || p;
 
   const page = p.match(/^src\/pages\/(.+)\.(astro|mdx?)$/i);
-  if (page) {
-    let route = page[1];
-    if (route === 'index') {return { path: p, kind: 'page', label: 'Home' };}
+  const pageRoute = page?.[1];
+  if (pageRoute !== undefined) {
+    let route = pageRoute;
+    if (route === 'index') {
+      return { path: p, kind: 'page', label: 'Home' };
+    }
     // "about/index" is the same page as "about" — the folder is the route.
-    if (route.endsWith('/index')) {route = route.slice(0, -'/index'.length);}
+    if (route.endsWith('/index')) {
+      route = route.slice(0, -'/index'.length);
+    }
     return { path: p, kind: 'page', label: route.split('/').map(TITLE).join(' / ') };
   }
   const comp = p.match(/^src\/components\/(.+)\.(astro|jsx?|tsx?|vue|svelte)$/i);
-  if (comp) {return { path: p, kind: 'component', label: comp[1].split('/').pop() };}
+  const compName = comp?.[1];
+  if (compName !== undefined) {
+    return { path: p, kind: 'component', label: compName.split('/').pop() ?? compName };
+  }
 
   const layout = p.match(/^src\/layouts\/(.+)\.(astro|jsx?|tsx?)$/i);
-  if (layout) {return { path: p, kind: 'layout', label: layout[1].split('/').pop() };}
+  const layoutName = layout?.[1];
+  if (layoutName !== undefined) {
+    return { path: p, kind: 'layout', label: layoutName.split('/').pop() ?? layoutName };
+  }
 
-  if (/^src\/content\//i.test(p)) {return { path: p, kind: 'content', label: base };}
-  if (/^public\//i.test(p)) {return { path: p, kind: 'asset', label: base };}
-  if (/\.(css|scss|sass|less)$/i.test(p)) {return { path: p, kind: 'style', label: base };}
+  if (/^src\/content\//i.test(p)) {
+    return { path: p, kind: 'content', label: base };
+  }
+  if (/^public\//i.test(p)) {
+    return { path: p, kind: 'asset', label: base };
+  }
+  if (/\.(css|scss|sass|less)$/i.test(p)) {
+    return { path: p, kind: 'style', label: base };
+  }
   if (/\.(png|jpe?g|gif|svg|webp|avif|ico|woff2?|ttf|otf)$/i.test(p)) {
     return { path: p, kind: 'asset', label: base };
   }
@@ -316,18 +436,24 @@ function describeFile(relPath) {
   // Script and prose get named rather than falling into the catch-all. Both
   // are things people change on purpose and go looking for by type — a
   // stylesheet is offered as a stylesheet, and a script should be too.
-  if (/\.(m|c)?[jt]sx?$/i.test(p)) {return { path: p, kind: 'script', label: base };}
-  if (/\.mdx?$/i.test(p)) {return { path: p, kind: 'doc', label: base };}
+  if (/\.(m|c)?[jt]sx?$/i.test(p)) {
+    return { path: p, kind: 'script', label: base };
+  }
+  if (/\.mdx?$/i.test(p)) {
+    return { path: p, kind: 'doc', label: base };
+  }
   // Anything genuinely unrecognised keeps its own path. Guessing a category
   // for it would be worse than saying where it is.
   return { path: p, kind: 'file', label: p };
 }
 
 /** Every file in a list, described. Renames keep where they came from. */
-const describeFiles = (files) =>
-  (files || []).map((f) => ({ ...f, ...describeFile(f.path), from: f.from }));
+const describeFiles = <T extends { readonly path: string; readonly from?: string }>(
+  files: readonly T[] | null | undefined,
+): (T & FileDescription & { readonly from: string | undefined })[] =>
+  (files ?? []).map((f) => ({ ...f, ...describeFile(f.path), from: f.from }));
 
-module.exports = {
+export {
   allFiles,
   log,
   commitFiles,
