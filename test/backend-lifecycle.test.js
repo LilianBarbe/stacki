@@ -259,10 +259,10 @@ test('closing a project cancels active and queued starts without poisoning the n
 function loadThumbs(BrowserWindow) {
   const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'thumbs.js'), 'utf8');
   const mod = { exports: {} };
-  vm.runInNewContext('(function(require, module) {' + source + '\n})', {
+  vm.runInNewContext('(function(require, module, exports) {' + source + '\n})', {
     setTimeout: (callback, ms) => setTimeout(callback, Math.min(ms, 5)),
     clearTimeout,
-  })((name) => name === 'electron' ? { BrowserWindow } : require(name), mod);
+  })((name) => name === 'electron' ? { BrowserWindow } : require(name), mod, mod.exports);
   return mod.exports;
 }
 
