@@ -1,7 +1,12 @@
 // The prop schema parsePropSchema infers from a component's frontmatter and
-// sends to the renderer as a Map (structured clone preserves it). The panel
-// builds typed fields from this; a malformed schema shows up as wrong
-// controls, so the boundary validates every field.
+// lets the renderer build typed fields from it. Two shapes exist because the
+// two in-process consumers disagree about what a schema is: the published
+// scan payload carries it as an ARRAY of fields (main.js assembles it, the
+// props panel reads it), while the symbol-read edit path that the PropsPanel
+// conversion will use keeps a Map keyed by field name. IPC serializes arrays
+// intact and turns Maps into plain objects, so the Map is only ever built
+// in-process — never sent over the wire. A malformed schema shows up as
+// wrong controls, so every boundary validates every field.
 
 import { LIMITS } from './limits';
 
@@ -31,7 +36,7 @@ function fail(where: string, what: string): never {
   throw new Error(`PropSchema.${where}: ${what}`);
 }
 
-function parseField(input: unknown, where: string): PropField {
+export function parseField(input: unknown, where: string): PropField {
   if (typeof input !== 'object' || input === null) {
     fail(where, 'expected object');
   }

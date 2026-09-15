@@ -3,14 +3,18 @@
 // renderer can never confuse a page route with a component folder.
 
 import { LIMITS } from './limits';
-import type { PropSchema } from './prop-schema';
-import { parsePropSchema } from './prop-schema';
+import { parseField, type PropField } from './prop-schema';
 
 export interface ScanPage {
   readonly path: string;
   /** POSIX path relative to src/pages — the route's file identity. */
   readonly name: string;
   readonly route: string;
+}
+
+export interface RenderTag {
+  readonly tag?: string;
+  readonly prop?: string;
 }
 
 export interface ScanComponent {
@@ -20,11 +24,12 @@ export interface ScanComponent {
   readonly isLayout?: boolean;
   readonly instances?: number;
   // safeSchema output — absent when the component's source could not be read.
-  readonly schema?: PropSchema;
+  readonly schema?: readonly PropField[];
   readonly extendsTag?: string | null;
   readonly slots?: readonly string[];
   readonly slotText?: boolean;
-  readonly renderTag?: string | null;
+  readonly renderTag?: RenderTag | null;
+  readonly hasRest?: boolean;
 }
 
 export interface ScanResult {
@@ -37,6 +42,19 @@ export interface ScanResult {
 
 function fail(where: string, what: string): never {
   throw new Error(`ScanResult.${where}: ${what}`);
+}
+
+/** The scan payload carries each component's schema as an ARRAY of fields —
+ * the shape main.js assembles and the props panel reads. Validate every field
+ * with the same parser the Map shape uses, so both stay in agreement. */
+function parseSchemaArray(input: unknown, where: string): readonly PropField[] {
+  if (!Array.isArray(input)) {
+    fail(where, 'expected array of fields');
+  }
+  if (input.length > LIMITS.propSchemaFieldsMax) {
+    fail(where, `exceeds ${LIMITS.propSchemaFieldsMax} fields`);
+  }
+  return input.map((field, index) => parseField(field, `${where}[${index}]`)) as readonly PropField[];
 }
 
 function asString(value: unknown, where: string): string {
@@ -95,15 +113,32 @@ function parseComponent(input: unknown, where: string): ScanComponent {
     out['instances'] = record['instances'];
   }
   if (record['schema'] !== undefined) {
-    out['schema'] = parsePropSchema(record['schema']);
+    out['schema'] = parseSchemaArray(record['schema'], `${where}.schema`);
   }
-  for (const field of ['extendsTag', 'renderTag'] as const) {
-    if (record[field] !== undefined) {
-      const value = record[field];
-      if (value !== null && typeof value !== 'string') {
-        fail(where, `${field}: expected string or null`);
+  if (record['extendsTag'] !== undefined) {
+    const value = record['extendsTag'];
+    if (value !== null && typeof value !== 'string') {
+      fail(where, 'extendsTag: expected string or null');
+    }
+    out['extendsTag'] = value;
+  }
+  if (record['renderTag'] !== undefined) {
+    const value = record['renderTag'];
+    if (value === null) {
+      out['renderTag'] = null;
+    } else if (typeof value !== 'object' || Array.isArray(value)) {
+      fail(where, 'renderTag: expected object or null');
+    } else {
+      const record2 = value as Record<string, unknown>;
+      const tag = record2['tag'];
+      if (tag !== undefined && typeof tag !== 'string') {
+        fail(where, 'renderTag.tag: expected string');
       }
-      out[field] = value;
+      const prop = record2['prop'];
+      if (prop !== undefined && typeof prop !== 'string') {
+        fail(where, 'renderTag.prop: expected string');
+      }
+      out['renderTag'] = { tag, prop };
     }
   }
   if (record['slots'] !== undefined) {
@@ -118,6 +153,12 @@ function parseComponent(input: unknown, where: string): ScanComponent {
       fail(where, 'slotText: expected boolean');
     }
     out['slotText'] = record['slotText'];
+  }
+  if (record['hasRest'] !== undefined) {
+    if (typeof record['hasRest'] !== 'boolean') {
+      fail(where, 'hasRest: expected boolean');
+    }
+    out['hasRest'] = record['hasRest'];
   }
   return out as unknown as ScanComponent;
 }

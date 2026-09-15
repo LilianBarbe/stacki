@@ -20,11 +20,12 @@ const goodScan = {
       folder: 'layouts',
       isLayout: true,
       instances: 3,
-      schema: new Map([['title', { name: 'title', type: 'string', optional: false }]]),
+      schema: [{ name: 'title', type: 'string', optional: false }],
       extendsTag: 'div',
       slots: ['default'],
       slotText: false,
-      renderTag: 'html',
+      renderTag: { tag: 'html' },
+      hasRest: true,
     },
   ],
   components: [{ path: '/p/src/components/Hero.astro', name: 'Hero', folder: '', instances: 2 }],
@@ -34,7 +35,9 @@ const goodScan = {
 test('a full scan passes intact', () => {
   const parsed = parseScanResult(structuredClone(goodScan));
   assert.equal(parsed.pages[0]?.route, '/');
-  assert.equal(parsed.layouts[0]?.schema?.get('title')?.type, 'string');
+  assert.equal(parsed.layouts[0]?.schema?.[0]?.type, 'string');
+  assert.equal(parsed.layouts[0]?.renderTag?.tag, 'html');
+  assert.equal(parsed.layouts[0]?.hasRest, true);
   assert.equal(parsed.trailingSlash, 'ignore');
 });
 
@@ -59,7 +62,15 @@ test('negative space: wrong entry shapes fail with pinned messages', () => {
   );
   assert.throws(
     () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', schema: {} }] }),
-    /expected Map/,
+    /schema: expected array of fields/,
+  );
+  assert.throws(
+    () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', schema: [{ type: 'string' }] }] }),
+    /name: expected non-empty string/,
+  );
+  assert.throws(
+    () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', hasRest: 'yes' }] }),
+    /hasRest: expected boolean/,
   );
 });
 

@@ -58,14 +58,7 @@ for (const [index, name] of names.entries()) {
 // branch point: they fail without any of this branch's changes. A test that
 // stays broken blocks the gate only if it is NOT listed here; a listed test
 // that starts passing is reported so the list shrinks.
-const QUARANTINED = [
-  'test:binding',
-  'test:chipedit',
-  'test:codeeditorlifecycle',
-  'test:codeprop',
-  'test:jsguard',
-  'test:varsrowheight',
-];
+const QUARANTINED = ['test:varsrowheight'];
 // Load-sensitive checks that fail intermittently on main too. Failures
 // are tolerated; passing is normal, so no heal report.
 const FLAKY = ['test:hovercost', 'test:popoverdropdown'];
