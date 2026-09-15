@@ -53,6 +53,7 @@ export default [
       'electron/contentConfig.js',
       'electron/terminal.js',
       'electron/markdownParser.js',
+      'electron/cssVars.js',
       'electron/formats/transplant.js',
       'electron/formats/ndjson.js',
       'electron/formats/csv.js',

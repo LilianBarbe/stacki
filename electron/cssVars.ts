@@ -1,6 +1,7 @@
-const fs = require('fs');
-const path = require('path');
-const postcss = require('postcss');
+import fs from 'fs';
+import path from 'path';
+import postcss from 'postcss';
+import type { Declaration, Rule as PostcssRule } from 'postcss';
 
 // Reading a project's CSS custom properties as something an editor can show.
 //
@@ -29,58 +30,98 @@ const postcss = require('postcss');
 const MAX_BYTES = 1024 * 1024;
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.astro', '.stacki']);
 
-const toPosix = (p) => p.split(path.sep).join('/');
+const toPosix = (p: string): string => p.split(path.sep).join('/');
 
 // --- reading ---------------------------------------------------------------
 
-function findStylesheets(projectPath) {
+function findStylesheets(projectPath: string): string[] {
   const roots = ['src', 'public', 'styles'].map((d) => path.join(projectPath, d));
-  const found = [];
-  const walk = (dir, depth) => {
-    if (depth > 8) {return;}
-    let entries;
+  const found: string[] = [];
+  const walk = (dir: string, depth: number): void => {
+    if (depth > 8) {
+      return;
+    }
+    let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const entry of entries) {
-      if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) {continue;}
+      if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) {
+        continue;
+      }
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {walk(full, depth + 1);}
-      else if (/\.css$/i.test(entry.name)) {found.push(full);}
+      if (entry.isDirectory()) {
+        walk(full, depth + 1);
+      } else if (/\.css$/i.test(entry.name)) {
+        found.push(full);
+      }
     }
   };
-  for (const root of roots) {walk(root, 0);}
+  for (const root of roots) {
+    walk(root, 0);
+  }
   return [...new Set(found)].sort();
 }
 
+interface VarEntry {
+  readonly kind: 'var';
+  readonly name: string;
+  readonly value: string;
+  readonly important: boolean;
+  readonly valueStart: number;
+  readonly valueEnd: number;
+  readonly line: number;
+}
+interface CommentEntry {
+  readonly kind: 'comment';
+  readonly text: string;
+  readonly textStart: number;
+  readonly textEnd: number;
+}
+type Entry = VarEntry | CommentEntry;
+
+interface Rule {
+  selector: string;
+  selectors: readonly string[];
+  context: readonly string[];
+  line: number;
+  entries: Entry[];
+}
+
+/** The indentation in front of `text`, absent when nothing matches (never). */
+const leading = (s: string): number => s.match(/^\s*/)?.[0]?.length ?? 0;
+
 // Every custom property declared in one file, with where its value sits in the
 // text so it can be written back without reformatting anything around it.
-function readDeclarations(text) {
+function readDeclarations(text: string): Rule[] {
   const root = postcss.parse(text);
-  const rules = [];
+  const rules: Rule[] = [];
 
-  const contextOf = (node) => {
-    const parts = [];
+  const contextOf = (node: Declaration | PostcssRule): string[] => {
+    const parts: string[] = [];
     let parent = node.parent;
     while (parent && parent.type !== 'root') {
-      if (parent.type === 'atrule') {parts.unshift(`@${parent.name} ${parent.params}`.trim());}
-      else if (parent.type === 'rule') {parts.unshift(parent.selector);}
+      if (parent.type === 'atrule') {
+        parts.unshift(`@${parent.name} ${parent.params}`.trim());
+      } else if (parent.type === 'rule') {
+        parts.unshift(parent.selector);
+      }
       parent = parent.parent;
     }
     return parts;
   };
 
-  root.walkRules((rule) => {
-    const entries = [];
+  root.walkRules((rule: PostcssRule) => {
+    const entries: Entry[] = [];
     for (const node of rule.nodes || []) {
       if (node.type === 'comment') {
         // Where the words are, inside the `/*` and the spacing postcss keeps in
         // raws: a heading in a single-rule file IS this comment, so renaming it
         // means writing here.
         const open = node.source?.start?.offset ?? 0;
-        const textStart = open + 2 + (node.raws?.left?.length ?? 0);
+        const textStart = open + 2 + (node.raws?.['left']?.length ?? 0);
         entries.push({
           kind: 'comment',
           text: node.text.trim(),
@@ -89,15 +130,16 @@ function readDeclarations(text) {
         });
         continue;
       }
-      if (node.type !== 'decl' || !node.prop.startsWith('--')) {continue;}
+      if (node.type !== 'decl' || !node.prop.startsWith('--')) {
+        continue;
+      }
       // PostCSS offsets end just after the declaration. Including another
       // character can pull the next declaration into a compact CSS value.
       const start = node.source?.start?.offset ?? 0;
       const end = node.source?.end?.offset ?? start;
       const declText = text.slice(start, end);
       const rawValue = node.raws.value?.raw ?? node.value;
-      const leading = rawValue.match(/^\s*/)[0].length;
-      const valueStart = start + node.prop.length + (node.raws.between ?? ':').length + leading;
+      const valueStart = start + node.prop.length + (node.raws.between ?? ':').length + leading(rawValue);
       // Trailing `;` and whitespace are not part of the value.
       // PostCSS keeps whitespace in an empty custom property's node.value.
       // That whitespace was already skipped above, so using its length again
@@ -113,10 +155,12 @@ function readDeclarations(text) {
         line: node.source?.start?.line ?? 0,
       });
     }
-    if (!entries.some((e) => e.kind === 'var')) {return;}
+    if (!entries.some((e) => e.kind === 'var')) {
+      return;
+    }
     rules.push({
       selector: rule.selector,
-      selectors: rule.selectors,
+      selectors: rule.selectors ?? [],
       context: contextOf(rule),
       line: rule.source?.start?.line ?? 0,
       entries,
@@ -128,7 +172,7 @@ function readDeclarations(text) {
 
 // --- naming ----------------------------------------------------------------
 
-const titleize = (text) =>
+const titleize = (text: unknown): string =>
   String(text)
     .replace(/[-_]+/g, ' ')
     .trim()
@@ -137,25 +181,33 @@ const titleize = (text) =>
 // What to call a rule. A selector list usually leads with the generic one
 // (`:root, .theme-light, …`) and the name people use for it is the specific
 // one, so the first plain class wins over `:root`, `*` and anything nested.
-function labelForRule(rule) {
-  const candidates = rule.selectors || [rule.selector];
+function labelForRule(rule: Rule): string {
+  const candidates = rule.selectors.length ? rule.selectors : [rule.selector];
   const simpleClass = candidates.find((s) => /^\.[a-z0-9_-]+$/i.test(s.trim()));
   const chosen = simpleClass || candidates[0] || rule.selector;
   const cleaned = String(chosen).trim();
-  if (cleaned === ':root') {return ':root';}
-  if (/^\.[a-z0-9_-]+$/i.test(cleaned)) {return titleize(cleaned.slice(1));}
+  if (cleaned === ':root') {
+    return ':root';
+  }
+  if (/^\.[a-z0-9_-]+$/i.test(cleaned)) {
+    return titleize(cleaned.slice(1));
+  }
   return cleaned;
 }
 
 // The stem shared by a set of labels, for naming a group of modes: "Theme
 // light" + "Theme dark" + "Theme brand" → "Theme".
-function commonStem(labels) {
-  if (!labels.length) {return '';}
+function commonStem(labels: readonly string[]): string {
+  if (!labels.length) {
+    return '';
+  }
   const words = labels.map((l) => l.split(/\s+/));
-  const stem = [];
-  for (let i = 0; i < words[0].length; i++) {
-    const word = words[0][i];
-    if (!words.every((w) => w[i] === word)) {break;}
+  const stem: string[] = [];
+  for (let i = 0; i < (words[0]?.length ?? 0); i++) {
+    const word = words[0]?.[i];
+    if (!word || !words.every((w) => w[i] === word)) {
+      break;
+    }
     stem.push(word);
   }
   return stem.join(' ');
@@ -163,9 +215,9 @@ function commonStem(labels) {
 
 // --- grouping --------------------------------------------------------------
 
-const namesOf = (rule) => rule.entries.filter((e) => e.kind === 'var').map((e) => e.name);
+const namesOf = (rule: Rule): string[] => rule.entries.filter((e) => e.kind === 'var').map((e) => e.name);
 
-const overlap = (a, b) => {
+const overlap = (a: readonly string[], b: readonly string[]): number => {
   const setB = new Set(b);
   const shared = a.filter((name) => setB.has(name)).length;
   return shared / Math.max(a.length, b.length);
@@ -176,20 +228,26 @@ const overlap = (a, b) => {
 // columns of a single table rather than as three tables nobody can compare.
 const MERGE_THRESHOLD = 0.6;
 
-function groupRules(rules) {
-  const groups = [];
-  const taken = new Set();
+function groupRules(rules: readonly Rule[]): Rule[][] {
+  const groups: Rule[][] = [];
+  const taken = new Set<number>();
 
   rules.forEach((rule, index) => {
-    if (taken.has(index)) {return;}
+    if (taken.has(index)) {
+      return;
+    }
     const names = namesOf(rule);
-    const members = [rule];
+    const members: Rule[] = [rule];
     taken.add(index);
 
     for (let other = index + 1; other < rules.length; other++) {
-      if (taken.has(other)) {continue;}
+      if (taken.has(other)) {
+        continue;
+      }
       const candidate = rules[other];
-      if (candidate.context.join('|') !== rule.context.join('|')) {continue;}
+      if (!candidate || candidate.context.join('|') !== rule.context.join('|')) {
+        continue;
+      }
       const otherNames = namesOf(candidate);
       const same = overlap(names, otherNames);
       // One shared name is only a mode when it is the whole of both rules —
@@ -211,14 +269,34 @@ function groupRules(rules) {
 // --- families (the columns inside one rule) --------------------------------
 
 // Every way a name can be cut into a prefix and a suffix at a dash.
-function splits(name) {
+function splits(name: string): { prefix: string; suffix: string }[] {
   const body = name.replace(/^--/, '');
   const parts = body.split('-');
-  const out = [];
+  const out: { prefix: string; suffix: string }[] = [];
   for (let at = 1; at < parts.length; at++) {
     out.push({ prefix: parts.slice(0, at).join('-'), suffix: parts.slice(at).join('-') });
   }
   return out;
+}
+
+interface Family {
+  prefixes: string[];
+  rows: string[];
+  self: boolean;
+}
+
+// The suffixes most of these prefixes declare. "Most" rather than "all",
+// because one variant carrying an extra property is normal and should not cost
+// everyone else the table.
+function rowsFor(prefixes: readonly string[], bySuffix: Map<string, Set<string>>, used: Set<string>): string[] {
+  const rows: string[] = [];
+  for (const [suffix, owners] of bySuffix) {
+    const shared = prefixes.filter((p) => owners.has(p) && !used.has(`--${p}-${suffix}`));
+    if (shared.length >= Math.max(2, Math.ceil(prefixes.length * 0.5))) {
+      rows.push(suffix);
+    }
+  }
+  return rows;
 }
 
 /**
@@ -230,31 +308,22 @@ function splits(name) {
  * becomes a row. A name that is only the prefix (`--h1`) is the family's own
  * value, and is the first row.
  */
-// The suffixes most of these prefixes declare. "Most" rather than "all",
-// because one variant carrying an extra property is normal and should not cost
-// everyone else the table.
-function rowsFor(prefixes, bySuffix, used) {
-  const rows = [];
-  for (const [suffix, owners] of bySuffix) {
-    const shared = prefixes.filter((p) => owners.has(p) && !used.has(`--${p}-${suffix}`));
-    if (shared.length >= Math.max(2, Math.ceil(prefixes.length * 0.5))) {rows.push(suffix);}
-  }
-  return rows;
-}
-
-function findFamilies(names) {
-  const bySuffix = new Map(); // suffix -> Set(prefix)
+function findFamilies(names: readonly string[]): { families: Family[]; used: Set<string> } {
+  const bySuffix = new Map<string, Set<string>>(); // suffix -> Set(prefix)
   for (const name of names) {
     for (const { prefix, suffix } of splits(name)) {
-      if (!bySuffix.has(suffix)) {bySuffix.set(suffix, new Set());}
-      bySuffix.get(suffix).add(prefix);
+      const owners = bySuffix.get(suffix);
+      if (owners) {
+        owners.add(prefix);
+      } else {
+        bySuffix.set(suffix, new Set([prefix]));
+      }
     }
   }
 
   const nameSet = new Set(names);
-  const families = [];
-  const used = new Set();
-
+  const families: Family[] = [];
+  const used = new Set<string>();
 
   for (;;) {
     // Every suffix is a candidate seed: the prefixes that share it might be a
@@ -263,10 +332,12 @@ function findFamilies(names) {
     // of fourteen `*-margin`/`*-trim` prefixes that would eat two rows out of
     // the real one. The family that accounts for the most declarations wins,
     // which is the deep one: seven headings by thirteen properties.
-    let best = null;
+    let best: { score: number; prefixes: string[]; rows: string[] } | null = null;
     for (const [suffix, prefixes] of bySuffix) {
       const seed = [...prefixes].filter((p) => !used.has(`--${p}-${suffix}`));
-      if (seed.length < 2) {continue;}
+      if (seed.length < 2) {
+        continue;
+      }
       const rows = rowsFor(seed, bySuffix, used);
       // A prefix that is also a variable of its own — `--gap-1` beside
       // `--gap-1-min` — is a row too: the family's own value. Without counting
@@ -274,26 +345,34 @@ function findFamilies(names) {
       // a list.
       const self = seed.some((p) => nameSet.has(`--${p}`) && !used.has(`--${p}`));
       const height = rows.length + (self ? 1 : 0);
-      if (height < 2) {continue;}
+      if (height < 2) {
+        continue;
+      }
       const score = seed.length * height;
-      if (!best || score > best.score) {best = { score, prefixes: seed, rows };}
+      if (!best || score > best.score) {
+        best = { score, prefixes: seed, rows };
+      }
     }
-    if (!best) {break;}
+    if (!best) {
+      break;
+    }
 
     const prefixes = best.prefixes;
     const rows = best.rows;
 
     // Source order is what the author chose, so rows and columns follow the
     // order the names appeared in rather than anything alphabetical.
-    const order = new Map();
+    const order = new Map<string, number>();
     names.forEach((name, index) => {
       for (const { prefix, suffix } of splits(name)) {
-        if (prefixes.includes(prefix) && !order.has(suffix)) {order.set(suffix, index);}
+        if (prefixes.includes(prefix) && !order.has(suffix)) {
+          order.set(suffix, index);
+        }
       }
     });
     rows.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
 
-    const columnOrder = new Map();
+    const columnOrder = new Map<string, number>();
     names.forEach((name, index) => {
       const body = name.replace(/^--/, '');
       for (const prefix of prefixes) {
@@ -304,18 +383,24 @@ function findFamilies(names) {
     });
     const columns = [...prefixes].sort((a, b) => (columnOrder.get(a) ?? 0) - (columnOrder.get(b) ?? 0));
 
-    const family = { prefixes: columns, rows: [], self: false };
+    const family: Family = { prefixes: columns, rows: [], self: false };
     // `--h1` itself, if it exists: the value the family is named for.
     if (columns.some((p) => nameSet.has(`--${p}`))) {
       family.self = true;
-      for (const p of columns) {used.add(`--${p}`);}
+      for (const p of columns) {
+        used.add(`--${p}`);
+      }
     }
     for (const suffix of rows) {
       family.rows.push(suffix);
-      for (const p of columns) {used.add(`--${p}-${suffix}`);}
+      for (const p of columns) {
+        used.add(`--${p}-${suffix}`);
+      }
     }
     families.push(family);
-    if (families.length > 24) {break;} // a stylesheet, not a database
+    if (families.length > 24) {
+      break; // a stylesheet, not a database
+    }
   }
 
   return { families, used };
@@ -330,45 +415,56 @@ function findFamilies(names) {
 //
 // The longest shared start wins, so `--button-2-*` is its own thing rather than
 // six more rows of `--button-*`.
-function prefixSections(names) {
+function prefixSections(names: readonly string[]): { loose: string[]; sections: Map<string, string[]> } {
   const nameSet = new Set(names);
-  const counts = new Map();
+  const counts = new Map<string, number>();
   for (const name of names) {
     const body = name.replace(/^--/, '');
     const parts = body.split('-');
     for (let at = 1; at < parts.length; at++) {
       const prefix = parts.slice(0, at).join('-');
-      if (nameSet.has(`--${prefix}`)) {continue;}
+      if (nameSet.has(`--${prefix}`)) {
+        continue;
+      }
       counts.set(prefix, (counts.get(prefix) || 0) + 1);
     }
   }
 
-  const qualifies = (prefix) => (counts.get(prefix) || 0) >= 2;
-  const assigned = new Map(); // prefix -> [names]
-  const loose = [];
+  const qualifies = (prefix: string): boolean => (counts.get(prefix) || 0) >= 2;
+  const assigned = new Map<string, string[]>(); // prefix -> [names]
+  const loose: string[] = [];
   for (const name of names) {
     const body = name.replace(/^--/, '');
     const parts = body.split('-');
-    let chosen = null;
+    let chosen: string | null = null;
     for (let at = 1; at < parts.length; at++) {
       const prefix = parts.slice(0, at).join('-');
-      if (qualifies(prefix)) {chosen = prefix;}
+      if (qualifies(prefix)) {
+        chosen = prefix;
+      }
     }
     if (!chosen) {
       loose.push(name);
       continue;
     }
-    if (!assigned.has(chosen)) {assigned.set(chosen, []);}
-    assigned.get(chosen).push(name);
+    const group = assigned.get(chosen);
+    if (group) {
+      group.push(name);
+    } else {
+      assigned.set(chosen, [name]);
+    }
   }
 
   // A section of one is not a section — those names go back in the main list,
   // in the place they were declared.
-  const sections = new Map();
-  const orphans = new Set();
+  const sections = new Map<string, string[]>();
+  const orphans = new Set<string>();
   for (const [prefix, group] of assigned) {
-    if (group.length >= 2) {sections.set(prefix, group);}
-    else {group.forEach((n) => orphans.add(n));}
+    if (group.length >= 2) {
+      sections.set(prefix, group);
+    } else {
+      group.forEach((n) => orphans.add(n));
+    }
   }
   const mainList = names.filter((n) => loose.includes(n) || orphans.has(n));
   return { loose: mainList, sections };
@@ -383,49 +479,98 @@ function prefixSections(names) {
 // what it lands on, and no editor can preview that honestly.
 
 const NAMED_COLORS = new Set([
-  'transparent', 'currentcolor', 'black', 'white', 'red', 'green', 'blue', 'yellow', 'orange',
-  'purple', 'pink', 'gray', 'grey', 'brown', 'cyan', 'magenta', 'lime', 'navy', 'teal', 'olive',
-  'maroon', 'silver', 'gold', 'beige', 'ivory', 'coral', 'salmon', 'khaki', 'indigo', 'violet',
+  'transparent',
+  'currentcolor',
+  'black',
+  'white',
+  'red',
+  'green',
+  'blue',
+  'yellow',
+  'orange',
+  'purple',
+  'pink',
+  'gray',
+  'grey',
+  'brown',
+  'cyan',
+  'magenta',
+  'lime',
+  'navy',
+  'teal',
+  'olive',
+  'maroon',
+  'silver',
+  'gold',
+  'beige',
+  'ivory',
+  'coral',
+  'salmon',
+  'khaki',
+  'indigo',
+  'violet',
 ]);
 
 const COLOR_FN = /^(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i;
 
-function resolveValue(value, map, depth = 0) {
-  if (depth > 8) {return value;}
-  const next = String(value).replace(/var\(\s*(--[\w-]+)\s*(?:,([^()]*(?:\([^()]*\)[^()]*)*))?\)/g,
-    (whole, name, fallback) => {
+function resolveValue(value: unknown, map: Map<string, string>, depth = 0): string {
+  if (depth > 8) {
+    return String(value);
+  }
+  const next = String(value).replace(
+    /var\(\s*(--[\w-]+)\s*(?:,([^()]*(?:\([^()]*\)[^()]*)*))?\)/g,
+    (whole: string, name: string, fallback: string | undefined) => {
       const found = map.get(name);
-      if (found !== undefined) {return found;}
+      if (found !== undefined) {
+        return found;
+      }
       return fallback !== undefined ? fallback.trim() : whole;
-    });
+    },
+  );
   return next === String(value) ? next : resolveValue(next, map, depth + 1);
 }
 
-function colorOf(resolved) {
+function colorOf(resolved: unknown): string | null {
   const value = String(resolved).trim();
-  if (!value) {return null;}
-  if (/^#[0-9a-f]{3,8}$/i.test(value)) {return value;}
-  if (COLOR_FN.test(value)) {return value;}
-  if (NAMED_COLORS.has(value.toLowerCase())) {return value;}
+  if (!value) {
+    return null;
+  }
+  if (/^#[0-9a-f]{3,8}$/i.test(value)) {
+    return value;
+  }
+  if (COLOR_FN.test(value)) {
+    return value;
+  }
+  if (NAMED_COLORS.has(value.toLowerCase())) {
+    return value;
+  }
   return null;
 }
 
 // True for values that name a colour but cannot be drawn as one — the swatch
 // shows a checkerboard rather than pretending.
-const isUncomputableColor = (resolved) => /(^|\s|\()color-mix\(/i.test(String(resolved));
+const isUncomputableColor = (resolved: unknown): boolean => /(^|\s|\()color-mix\(/i.test(String(resolved));
 
 // What kind of thing a variable holds, which is what picks its glyph — the same
 // four the style panel's variable picker uses, so a colour is a droplet in both
 // places and a bare number is a number in both.
 const FONT_WORDS = /(serif|sans-serif|monospace|cursive|system-ui|uppercase|lowercase|capitalize|balance|pretty|italic|normal|inherit)/i;
 
-function kindOf(value, resolved) {
+function kindOf(value: unknown, resolved: unknown): string {
   const text = String(resolved ?? value).trim();
-  if (!text) {return 'size';}
-  if (colorOf(text) || isUncomputableColor(text)) {return 'color';}
+  if (!text) {
+    return 'size';
+  }
+  if (colorOf(text) || isUncomputableColor(text)) {
+    return 'color';
+  }
   // Unitless: a line height, a weight, a column count, a fluid-scale bound.
-  if (/^-?\d*\.?\d+$/.test(text)) {return 'number';}
-  if (/^-?\d*\.?\d+([a-z%]+)$/i.test(text) || /^(calc|clamp|min|max)\(/i.test(text)) {return 'size';}
+  if (/^-?\d*\.?\d+$/.test(text)) {
+    return 'number';
+  }
+  if (/^-?\d*\.?\d+([a-z%]+)$/i.test(text) || /^(calc|clamp|min|max)\(/i.test(text)) {
+    return 'size';
+  }
   if (/[a-z]/i.test(text) && (FONT_WORDS.test(text) || text.includes(',') || /^[a-z-]+$/i.test(text))) {
     return 'font';
   }
@@ -434,7 +579,64 @@ function kindOf(value, resolved) {
 
 // --- the model -------------------------------------------------------------
 
-function buildGroup(members, file) {
+interface Column {
+  readonly id: string;
+  readonly label: string;
+  readonly selector: string;
+  readonly context: readonly string[];
+  readonly line: number;
+}
+
+interface Cell {
+  readonly name: string;
+  readonly value: string;
+  readonly file: string;
+  readonly selector: string;
+  readonly valueStart: number;
+  readonly valueEnd: number;
+  readonly line: number;
+  readonly column: string;
+}
+
+interface Row {
+  readonly label: string;
+  readonly name?: string;
+  // Reassigned centrally in readVariables once cells are described.
+  cells: (Cell | null)[];
+}
+
+interface Block {
+  readonly kind: 'rows' | 'matrix';
+  readonly title: string | null;
+  readonly titleStart?: number;
+  readonly titleEnd?: number;
+  readonly rows: Row[];
+  readonly columns?: Column[];
+}
+
+interface Group {
+  readonly kind: 'modes' | 'single';
+  readonly label: string;
+  readonly columns: Column[];
+  readonly blocks: Block[];
+}
+
+interface FileModel {
+  readonly rel: string;
+  readonly name: string;
+  readonly groups: Group[];
+  readonly error?: string;
+  readonly count?: number;
+  declarations?: Rule[];
+}
+
+// A variable entry with the rule it came from attached, so a move can look the
+// declaration up by selector after the model has travelled to the renderer.
+interface TaggedVar extends VarEntry {
+  readonly selector: string;
+}
+
+function buildGroup(members: readonly Rule[], file: string): Group {
   const columns = members.map((rule, index) => ({
     id: `${index}`,
     label: labelForRule(rule),
@@ -442,16 +644,22 @@ function buildGroup(members, file) {
     context: rule.context,
     line: rule.line,
   }));
-  const byName = members.map((rule) => {
-    const map = new Map();
-    for (const entry of rule.entries) {if (entry.kind === 'var') {map.set(entry.name, { ...entry, selector: rule.selector });}}
+  const byName = members.map((rule): Map<string, TaggedVar> => {
+    const map = new Map<string, TaggedVar>();
+    for (const entry of rule.entries) {
+      if (entry.kind === 'var') {
+        map.set(entry.name, { ...entry, selector: rule.selector });
+      }
+    }
     return map;
   });
 
-  const cellsFor = (name) =>
+  const cellsFor = (name: string): (Cell | null)[] =>
     byName.map((map, index) => {
       const entry = map.get(name);
-      if (!entry) {return null;}
+      if (!entry) {
+        return null;
+      }
       return {
         name,
         value: entry.value,
@@ -461,21 +669,31 @@ function buildGroup(members, file) {
         valueStart: entry.valueStart,
         valueEnd: entry.valueEnd,
         line: entry.line,
-        column: columns[index].id,
+        column: columns[index]?.id ?? '',
       };
     });
 
-  const blocks = [];
+  const blocks: Block[] = [];
   const multi = members.length > 1;
 
   if (multi) {
     // The columns are the modes, so the names are the rows. Sub-sections come
     // from shared prefixes.
-    const names = [];
-    for (const map of byName) {for (const name of map.keys()) {if (!names.includes(name)) {names.push(name);}}}
+    const names: string[] = [];
+    for (const map of byName) {
+      for (const name of map.keys()) {
+        if (!names.includes(name)) {
+          names.push(name);
+        }
+      }
+    }
     const { loose, sections } = prefixSections(names);
     if (loose.length) {
-      blocks.push({ kind: 'rows', title: null, rows: loose.map((n) => ({ label: shortLabel(n), name: n, cells: cellsFor(n) })) });
+      blocks.push({
+        kind: 'rows',
+        title: null,
+        rows: loose.map((n) => ({ label: shortLabel(n), name: n, cells: cellsFor(n) })),
+      });
     }
     for (const [prefix, group] of sections) {
       blocks.push({
@@ -484,33 +702,44 @@ function buildGroup(members, file) {
         rows: group.map((n) => ({ label: shortLabel(n, prefix), name: n, cells: cellsFor(n) })),
       });
     }
-    return { kind: 'modes', label: commonStem(columns.map((c) => c.label)) || columns[0].label, columns, blocks };
+    const firstLabel = columns[0]?.label ?? '';
+    return { kind: 'modes', label: commonStem(columns.map((c) => c.label)) || firstLabel, columns, blocks };
   }
 
   // One rule: comments are headings, and the names inside each heading may form
   // tables of their own.
   const rule = members[0];
-  const sections = [];
-  let current = { title: null, names: [] };
+  if (!rule) {
+    return { kind: 'single', label: '', columns, blocks };
+  }
+  const sections: ({ title: string | null; titleStart?: number; titleEnd?: number; names: string[] })[] = [];
+  let current: { title: string | null; titleStart?: number; titleEnd?: number; names: string[] } = {
+    title: null,
+    names: [],
+  };
   for (const entry of rule.entries) {
     if (entry.kind === 'comment') {
       // A heading with nothing under it is kept. It used to be dropped, which
       // was tidy right up until the panel grew a way to MAKE one: a new group
       // starts empty, and a group you cannot see is one you cannot fill.
       // (Untitled runs with no names are still nothing at all.)
-      if (current.names.length || current.title != null) {sections.push(current);}
+      if (current.names.length || current.title != null) {
+        sections.push(current);
+      }
       current = { title: entry.text, titleStart: entry.textStart, titleEnd: entry.textEnd, names: [] };
       continue;
     }
     current.names.push(entry.name);
   }
-  if (current.names.length || current.title != null) {sections.push(current);}
+  if (current.names.length || current.title != null) {
+    sections.push(current);
+  }
 
   for (const section of sections) {
     const { families, used } = findFamilies(section.names);
-    const claimed = new Set();
+    const claimed = new Set<string>();
     for (const family of families) {
-      const rows = [];
+      const rows: Row[] = [];
       if (family.self) {
         rows.push({
           label: 'value',
@@ -523,15 +752,24 @@ function buildGroup(members, file) {
           cells: family.prefixes.map((p) => cellFor(byName[0], `--${p}-${suffix}`, file, '0')),
         });
       }
-      if (family.self) {for (const p of family.prefixes) {claimed.add(`--${p}`);}}
-      for (const suffix of family.rows) {for (const p of family.prefixes) {claimed.add(`--${p}-${suffix}`);}}
+      if (family.self) {
+        for (const p of family.prefixes) {
+          claimed.add(`--${p}`);
+        }
+      }
+      for (const suffix of family.rows) {
+        for (const p of family.prefixes) {
+          claimed.add(`--${p}-${suffix}`);
+        }
+      }
       blocks.push({
         kind: 'matrix',
         title: section.title,
-        titleStart: section.titleStart,
-        titleEnd: section.titleEnd,
-        columns: family.prefixes.map((p) => ({ id: p, label: p })),
+        columns: family.prefixes.map((p): Column => ({ id: p, label: p, selector: rule.selector, context: rule.context, line: rule.line })),
         rows: rows.filter((r) => r.cells.some(Boolean)),
+        // The inner sections of a one-rule file carry their comment's span so
+        // the heading can be renamed in place; a comment-less section has none.
+        ...(section.titleStart !== undefined ? { titleStart: section.titleStart, titleEnd: section.titleEnd } : {}),
       });
     }
     const leftovers = section.names.filter((n) => !claimed.has(n) && !used.has(n));
@@ -539,8 +777,8 @@ function buildGroup(members, file) {
       blocks.push({
         kind: 'rows',
         title: families.length ? null : section.title,
-        ...(families.length ? {} : { titleStart: section.titleStart, titleEnd: section.titleEnd }),
         rows: leftovers.map((n) => ({ label: shortLabel(n), name: n, cells: [cellFor(byName[0], n, file, '0')] })),
+        ...(families.length ? {} : { titleStart: section.titleStart, titleEnd: section.titleEnd }),
       });
     }
   }
@@ -548,9 +786,11 @@ function buildGroup(members, file) {
   return { kind: 'single', label: labelForRule(rule), columns, blocks };
 }
 
-function cellFor(map, name, file, column) {
-  const entry = map.get(name);
-  if (!entry) {return null;}
+function cellFor(map: Map<string, TaggedVar> | undefined, name: string, file: string, column: string): Cell | null {
+  const entry = map?.get(name);
+  if (!entry) {
+    return null;
+  }
   return {
     name,
     value: entry.value,
@@ -563,17 +803,27 @@ function cellFor(map, name, file, column) {
   };
 }
 
+interface DescribedCell extends Cell {
+  readonly ref: string | null;
+  readonly resolved: string | null;
+  readonly color: string | null;
+  readonly unknownColor: boolean;
+  readonly kind: string;
+}
+
 // A cell's value said three ways: what the file holds, what it comes out as,
 // and what colour to draw beside it (if any).
-function describeCell(cell, map) {
-  if (!cell) {return null;}
+function describeCell(cell: Cell | null, map: Map<string, string>): DescribedCell | null {
+  if (!cell) {
+    return null;
+  }
   const single = String(cell.value).trim().match(/^var\(\s*(--[\w-]+)\s*(?:,[^)]*)?\)$/);
   const resolved = resolveValue(cell.value, map);
   return {
     ...cell,
     // A value that is nothing but another variable is shown as that variable's
     // name — which is what the author wrote, and what they would search for.
-    ref: single ? single[1] : null,
+    ref: single ? single[1] ?? null : null,
     resolved: resolved === cell.value ? null : resolved,
     color: colorOf(resolved),
     unknownColor: isUncomputableColor(resolved),
@@ -581,7 +831,7 @@ function describeCell(cell, map) {
   };
 }
 
-const shortLabel = (name, prefix) => {
+const shortLabel = (name: string, prefix?: string | null): string => {
   const body = name.replace(/^--/, '');
   return prefix && body.startsWith(`${prefix}-`) ? body.slice(prefix.length + 1) : body;
 };
@@ -591,25 +841,29 @@ const shortLabel = (name, prefix) => {
  * tables. Files with none are left out — a variables panel is a place to find
  * variables, not a file browser.
  */
-function readVariables(projectPath) {
-  const files = [];
+function readVariables(projectPath: string): { files: FileModel[]; values: Record<string, string> } {
+  const files: FileModel[] = [];
   for (const abs of findStylesheets(projectPath)) {
-    let text;
+    let text: string;
     try {
-      if (fs.statSync(abs).size > MAX_BYTES) {continue;}
+      if (fs.statSync(abs).size > MAX_BYTES) {
+        continue;
+      }
       text = fs.readFileSync(abs, 'utf8');
     } catch {
       continue;
     }
     const rel = toPosix(path.relative(projectPath, abs));
-    let rules;
+    let rules: Rule[];
     try {
       rules = readDeclarations(text);
     } catch (err) {
-      files.push({ rel, name: path.basename(abs), error: `Could not parse — ${err.message}`, groups: [] });
+      files.push({ rel, name: path.basename(abs), error: `Could not parse — ${err instanceof Error ? err.message : String(err)}`, groups: [] });
       continue;
     }
-    if (!rules.length) {continue;}
+    if (!rules.length) {
+      continue;
+    }
     const groups = groupRules(rules).map((members) => buildGroup(members, rel));
     files.push({
       rel,
@@ -621,10 +875,14 @@ function readVariables(projectPath) {
   }
   // Values reference each other across files as freely as within one, so the
   // map every value is resolved against is the project's, not the file's.
-  const map = new Map();
+  const map = new Map<string, string>();
   for (const file of files) {
     for (const rule of file.declarations || []) {
-      for (const entry of rule.entries) {if (entry.kind === 'var') {map.set(entry.name, entry.value);}}
+      for (const entry of rule.entries) {
+        if (entry.kind === 'var') {
+          map.set(entry.name, entry.value);
+        }
+      }
     }
   }
   const values = Object.fromEntries(map);
@@ -632,11 +890,21 @@ function readVariables(projectPath) {
     delete file.declarations;
     for (const group of file.groups) {
       for (const block of group.blocks) {
-        for (const row of block.rows) {row.cells = row.cells.map((cell) => describeCell(cell, map));}
+        for (const row of block.rows) {
+          row.cells = row.cells.map((cell) => describeCell(cell, map));
+        }
       }
     }
   }
   return { files, values };
+}
+
+interface SetValuePayload {
+  readonly file: string;
+  readonly valueStart: number;
+  readonly valueEnd: number;
+  readonly expect?: string;
+  readonly value: string;
 }
 
 /**
@@ -644,7 +912,7 @@ function readVariables(projectPath) {
  * the value that was read, or the file has changed underneath the panel and the
  * offsets no longer mean anything.
  */
-function setVariable(projectPath, { file, valueStart, valueEnd, expect, value }) {
+function setVariable(projectPath: string, { file, valueStart, valueEnd, expect, value }: SetValuePayload): { ok: boolean; stale?: boolean; error?: string } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   const current = text.slice(valueStart, valueEnd);
@@ -656,6 +924,14 @@ function setVariable(projectPath, { file, valueStart, valueEnd, expect, value })
   return { ok: true };
 }
 
+interface SectionRangePayload {
+  readonly file: string;
+  readonly start: number;
+  readonly end: number;
+  readonly expect?: string;
+  readonly title?: string;
+}
+
 /**
  * Renames a heading that is a comment.
  *
@@ -664,13 +940,17 @@ function setVariable(projectPath, { file, valueStart, valueEnd, expect, value })
  * writing them. Like a value, it is written back only if the file still says
  * what the panel read.
  */
-function setSectionTitle(projectPath, { file, start, end, expect, title }) {
+function setSectionTitle(projectPath: string, { file, start, end, expect, title }: SectionRangePayload): { ok: boolean; stale?: boolean; error?: string } {
   const next = String(title ?? '').trim();
-  if (!next) {return { ok: false, error: 'A heading needs a name.' };}
+  if (!next) {
+    return { ok: false, error: 'A heading needs a name.' };
+  }
   // The words live inside a comment, and `*/` would end it early — the rest of
   // the rule would become the comment's text and the variables under it would
   // stop existing.
-  if (next.includes('*/')) {return { ok: false, error: 'A heading cannot contain "*/".' };}
+  if (next.includes('*/')) {
+    return { ok: false, error: 'A heading cannot contain "*/".' };
+  }
 
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
@@ -694,7 +974,7 @@ function setSectionTitle(projectPath, { file, start, end, expect, title }) {
  * one to itself — a heading removed by cutting the words alone would leave an
  * empty comment behind.
  */
-function removeSection(projectPath, { file, start, end, expect }) {
+function removeSection(projectPath: string, { file, start, end, expect }: SectionRangePayload): { ok: boolean; stale?: boolean; error?: string } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   if (expect !== undefined && text.slice(start, end) !== expect) {
@@ -702,7 +982,9 @@ function removeSection(projectPath, { file, start, end, expect }) {
   }
   const open = text.lastIndexOf('/*', start);
   const close = text.indexOf('*/', end);
-  if (open === -1 || close === -1) {return { ok: false, error: 'That heading is no longer a comment.' };}
+  if (open === -1 || close === -1) {
+    return { ok: false, error: 'That heading is no longer a comment.' };
+  }
   let from = open;
   let to = close + 2;
   // A line of its own goes with it; a comment sharing a line with something
@@ -719,6 +1001,15 @@ function removeSection(projectPath, { file, start, end, expect }) {
   return { ok: true };
 }
 
+interface MoveHeadingPayload {
+  readonly file: string;
+  readonly selector: string;
+  readonly start: number;
+  readonly end: number;
+  readonly expect?: string;
+  readonly before?: string;
+}
+
 /**
  * Moves a heading, and only the heading.
  *
@@ -731,7 +1022,7 @@ function removeSection(projectPath, { file, start, end, expect }) {
  * `before` is the declaration it should sit above; null puts it after the last
  * one, where it heads whatever is added next.
  */
-function moveHeading(projectPath, { file, selector, start, end, expect, before }) {
+function moveHeading(projectPath: string, { file, selector, start, end, expect, before }: MoveHeadingPayload): { ok: boolean; stale?: boolean; error?: string } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   if (expect !== undefined && text.slice(start, end) !== expect) {
@@ -739,7 +1030,9 @@ function moveHeading(projectPath, { file, selector, start, end, expect, before }
   }
   const open = text.lastIndexOf('/*', start);
   const close = text.indexOf('*/', end);
-  if (open === -1 || close === -1) {return { ok: false, error: 'That heading is no longer a comment.' };}
+  if (open === -1 || close === -1) {
+    return { ok: false, error: 'That heading is no longer a comment.' };
+  }
 
   const comment = text.slice(open, close + 2);
   let from = open;
@@ -753,31 +1046,47 @@ function moveHeading(projectPath, { file, selector, start, end, expect, before }
   const cut = text.slice(0, from) + text.slice(to);
 
   const root = postcss.parse(cut);
-  let rule = null;
+  const matches: PostcssRule[] = [];
   root.walkRules((candidate) => {
-    if (!rule && candidate.selector === selector) {rule = candidate;}
+    if (candidate.selector === selector) {
+      matches.push(candidate);
+    }
   });
-  if (!rule) {return { ok: false, error: `${selector} is no longer in ${file}.` };}
+  const rule = matches[0];
+  if (!rule) {
+    return { ok: false, error: `${selector} is no longer in ${file}.` };
+  }
 
   const decls = (rule.nodes || []).filter((n) => n.type === 'decl');
-  const anchorDecl = before ? decls.find((d) => d.prop === before) : null;
-  let at;
+  const anchorDecl = before ? decls.find((d) => d.prop === before) : undefined;
+  let at: number;
   if (anchorDecl) {
-    at = cut.lastIndexOf('\n', anchorDecl.source.start.offset - 1) + 1;
+    const offset = anchorDecl.source?.start?.offset ?? 0;
+    at = cut.lastIndexOf('\n', offset - 1) + 1;
   } else {
     // After everything: the line following the last declaration, or just inside
     // the brace when the rule has none left.
     const last = decls[decls.length - 1];
     if (last) {
-      const nl = cut.indexOf('\n', last.source.end.offset);
+      const offset = last.source?.end?.offset ?? 0;
+      const nl = cut.indexOf('\n', offset);
       at = nl === -1 ? cut.length : nl + 1;
     } else {
-      at = cut.indexOf('{', rule.source.start.offset) + 2;
+      const openOffset = rule.source?.start?.offset ?? 0;
+      at = cut.indexOf('{', openOffset) + 2;
     }
   }
-  const indent = cut.slice(cut.lastIndexOf('\n', at - 1) + 1, at).match(/^\s*/)[0] || '  ';
+  const indent = cut.slice(cut.lastIndexOf('\n', at - 1) + 1, at).match(/^\s*/)?.[0] || '  ';
   fs.writeFileSync(abs, `${cut.slice(0, at)}${indent}${comment}\n${cut.slice(at)}`, 'utf8');
   return { ok: true };
+}
+
+interface AddSectionPayload {
+  readonly file: string;
+  readonly selector: string;
+  readonly title?: string;
+  readonly before?: string;
+  readonly at?: number;
 }
 
 /**
@@ -791,33 +1100,76 @@ function moveHeading(projectPath, { file, selector, start, end, expect, before }
  * `before` puts it above a named declaration. Either way it takes the
  * indentation of the line it lands on.
  */
-function addSection(projectPath, { file, selector, title, before, at }) {
+function addSection(projectPath: string, { file, selector, title, before, at }: AddSectionPayload): { ok: boolean; error?: string; stale?: boolean; title?: string } {
   const next = String(title ?? '').trim();
-  if (!next) {return { ok: false, error: 'A heading needs a name.' };}
-  if (next.includes('*/')) {return { ok: false, error: 'A heading cannot contain "*/".' };}
+  if (!next) {
+    return { ok: false, error: 'A heading needs a name.' };
+  }
+  if (next.includes('*/')) {
+    return { ok: false, error: 'A heading cannot contain "*/".' };
+  }
 
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
 
   let offset = at;
   if (typeof offset !== 'number') {
+    const matches: PostcssRule[] = [];
     const root = postcss.parse(text);
-    let rule = null;
     root.walkRules((candidate) => {
-      if (!rule && candidate.selector === selector) {rule = candidate;}
+      if (candidate.selector === selector) {
+        matches.push(candidate);
+      }
     });
-    if (!rule) {return { ok: false, error: `${selector} is no longer in ${file}.` };}
+    const rule = matches[0];
+    if (!rule) {
+      return { ok: false, error: `${selector} is no longer in ${file}.` };
+    }
     const decls = (rule.nodes || []).filter((n) => n.type === 'decl');
-    const anchorDecl = (before && decls.find((d) => d.prop === before)) || decls[decls.length - 1];
-    if (!anchorDecl) {return { ok: false, error: `${selector} has nothing to head.` };}
-    offset = anchorDecl.source.start.offset;
+    const anchorDecl = (before && decls.find((d) => d.prop === before)) || decls[decls.length - 1] || undefined;
+    if (!anchorDecl) {
+      return { ok: false, error: `${selector} has nothing to head.` };
+    }
+    offset = anchorDecl.source?.start?.offset ?? 0;
   }
-  if (offset < 0 || offset > text.length) {return { ok: false, error: 'That place is no longer in the file.' };}
+  const sane = offset > text.length ? text.length : offset < 0 ? 0 : offset;
+  if (sane < 0 || sane > text.length) {
+    return { ok: false, error: 'That place is no longer in the file.' };
+  }
 
-  const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
-  const indent = text.slice(lineStart, offset).match(/^\s*/)[0];
+  const lineStart = text.lastIndexOf('\n', sane - 1) + 1;
+  const indent = text.slice(lineStart, sane).match(/^\s*/)?.[0] ?? '';
   fs.writeFileSync(abs, `${text.slice(0, lineStart)}${indent}/* ${next} */\n${text.slice(lineStart)}`, 'utf8');
   return { ok: true, title: next };
+}
+
+interface MoveVariablePayload {
+  readonly file: string;
+  readonly selector: string;
+  readonly name: string;
+  readonly target?: string;
+  readonly at?: number;
+}
+
+// A declaration owns its whole line: the indentation in front of it and the
+// newline after it. Taking less leaves a blank line behind and lands the moved
+// line inside another one.
+interface SourcedNode {
+  readonly source?: {
+    readonly start?: { readonly offset?: number };
+    readonly end?: { readonly offset?: number };
+  };
+}
+
+function lineSpan(text: string, node: SourcedNode): { from: number; to: number } {
+  const start = node.source?.start?.offset ?? 0;
+  // postcss ends a declaration on its last character, which for a line that
+  // ends in a newline IS that newline — so the search for the end of the line
+  // starts there, not after it, or the span swallows the line below.
+  const end = node.source?.end?.offset ?? start;
+  const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+  const nextLine = text.indexOf('\n', end);
+  return { from: lineStart, to: nextLine === -1 ? text.length : nextLine + 1 };
 }
 
 /**
@@ -828,57 +1180,65 @@ function addSection(projectPath, { file, selector, title, before, at }) {
  *
  * `target` is the name to land in front of; null means the end of the rule.
  */
-function moveVariable(projectPath, { file, selector, name, target, at: landAt }) {
+function moveVariable(projectPath: string, { file, selector, name, target, at: landAt }: MoveVariablePayload): { ok: boolean; error?: string; changed?: boolean } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   const root = postcss.parse(text);
 
-  let rule = null;
+  const matches: PostcssRule[] = [];
   root.walkRules((candidate) => {
-    if (!rule && candidate.selector === selector) {rule = candidate;}
+    if (candidate.selector === selector) {
+      matches.push(candidate);
+    }
   });
-  if (!rule) {return { ok: false, error: `${selector} is no longer in ${file}.` };}
+  const rule = matches[0];
+  if (!rule) {
+    return { ok: false, error: `${selector} is no longer in ${file}.` };
+  }
 
-  const declOf = (prop) => (rule.nodes || []).find((n) => n.type === 'decl' && n.prop === prop);
+  const declOf = (prop: string): Declaration | undefined =>
+    (rule.nodes || []).find((n): n is Declaration => n.type === 'decl' && n.prop === prop);
   const moved = declOf(name);
-  if (!moved) {return { ok: false, error: `${name} is no longer declared there.` };}
-  const before = target ? declOf(target) : null;
-  if (target && !before) {return { ok: false, error: `${target} is no longer declared there.` };}
+  if (!moved) {
+    return { ok: false, error: `${name} is no longer declared there.` };
+  }
+  const before = target ? declOf(target) : undefined;
+  if (target && !before) {
+    return { ok: false, error: `${target} is no longer declared there.` };
+  }
 
-  // A declaration owns its whole line: the indentation in front of it and the
-  // newline after it. Taking less leaves a blank line behind and lands the
-  // moved line inside another one.
-  const lineSpan = (node) => {
-    const start = node.source.start.offset;
-    // postcss ends a declaration on its last character, which for a line that
-    // ends in a newline IS that newline — so the search for the end of the line
-    // starts there, not after it, or the span swallows the line below.
-    const end = node.source.end.offset;
-    const lineStart = text.lastIndexOf('\n', start - 1) + 1;
-    const nextLine = text.indexOf('\n', end);
-    return { from: lineStart, to: nextLine === -1 ? text.length : nextLine + 1 };
-  };
-
-  const span = lineSpan(moved);
+  const span = lineSpan(text, moved);
   const line = text.slice(span.from, span.to);
   // Landing in front of a declaration is not enough on its own: a group ends at
   // a COMMENT, and "in front of the next declaration" steps over that comment
   // and into the next group. So a drop at the end of a group says where it
   // means, as an offset — the start of the line the variable should land above,
   // comment or not.
-  const at = typeof landAt === 'number'
-    ? text.lastIndexOf('\n', Math.max(0, Math.min(landAt, text.length)) - 1) + 1
-    : before
-      ? lineSpan(before).from
-      : lineSpan((rule.nodes || []).filter((n) => n.type === 'decl').pop()).to;
+  const allDecls = (rule.nodes || []).filter((n) => n.type === 'decl');
+  const lastDecl = allDecls[allDecls.length - 1] ?? moved;
+  const at =
+    typeof landAt === 'number'
+      ? text.lastIndexOf('\n', Math.max(0, Math.min(landAt, text.length)) - 1) + 1
+      : before
+        ? lineSpan(text, before).from
+        : lineSpan(text, lastDecl).to;
 
   // Cut first, then insert at a position corrected for the cut.
   const withoutLine = text.slice(0, span.from) + text.slice(span.to);
   const insertAt = at > span.from ? at - (span.to - span.from) : at;
   const next = withoutLine.slice(0, insertAt) + line + withoutLine.slice(insertAt);
-  if (next === text) {return { ok: true, changed: false };}
+  if (next === text) {
+    return { ok: true, changed: false };
+  }
   fs.writeFileSync(abs, next, 'utf8');
   return { ok: true, changed: true };
+}
+
+interface MoveSectionPayload {
+  readonly file: string;
+  readonly selector: string;
+  readonly names: readonly string[];
+  readonly target?: string;
 }
 
 /**
@@ -888,70 +1248,95 @@ function moveVariable(projectPath, { file, selector, name, target, at: landAt })
  * that are not always next to each other (a family's names interleave), so they
  * are cut out and re-inserted together, in the order they were in.
  */
-function moveSection(projectPath, { file, selector, names, target }) {
+function moveSection(projectPath: string, { file, selector, names, target }: MoveSectionPayload): { ok: boolean; error?: string; changed?: boolean } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   const root = postcss.parse(text);
 
-  let rule = null;
+  const matches: PostcssRule[] = [];
   root.walkRules((candidate) => {
-    if (!rule && candidate.selector === selector) {rule = candidate;}
+    if (candidate.selector === selector) {
+      matches.push(candidate);
+    }
   });
-  if (!rule) {return { ok: false, error: `${selector} is no longer in ${file}.` };}
+  const rule = matches[0];
+  if (!rule) {
+    return { ok: false, error: `${selector} is no longer in ${file}.` };
+  }
 
   const nodes = rule.nodes || [];
-  const declOf = (prop) => nodes.find((n) => n.type === 'decl' && n.prop === prop);
-  const lineSpan = (node) => {
-    const start = node.source.start.offset;
-    const end = node.source.end.offset;
-    const lineStart = text.lastIndexOf('\n', start - 1) + 1;
-    const nextLine = text.indexOf('\n', end);
-    return { from: lineStart, to: nextLine === -1 ? text.length : nextLine + 1 };
-  };
+  const declOf = (prop: string): Declaration | undefined =>
+    nodes.find((n): n is Declaration => n.type === 'decl' && n.prop === prop);
 
-  const decls = names.map(declOf).filter(Boolean);
-  if (!decls.length) {return { ok: false, error: 'Those variables are no longer declared there.' };}
+  const decls = names.map(declOf).filter((d): d is Declaration => d !== undefined);
+  const firstDecl = decls[0];
+  if (!firstDecl) {
+    return { ok: false, error: 'Those variables are no longer declared there.' };
+  }
 
-  const spans = decls.map(lineSpan);
+  const spans = decls.map((d) => lineSpan(text, d));
+  const firstSpan = spans[0];
+  if (!firstSpan) {
+    return { ok: false, error: 'Those variables are no longer declared there.' };
+  }
   // The comment above the first one is the group's name — it goes too.
-  const firstAt = nodes.indexOf(decls[0]);
-  const heading = firstAt > 0 && nodes[firstAt - 1].type === 'comment' ? nodes[firstAt - 1] : null;
-  if (heading) {spans.unshift(lineSpan(heading));}
+  const firstAt = nodes.indexOf(firstDecl);
+  const heading = firstAt > 0 && nodes[firstAt - 1]?.type === 'comment' ? nodes[firstAt - 1] : null;
+  if (heading?.type === 'comment') {
+    spans.unshift(lineSpan(text, heading));
+  }
 
   spans.sort((a, b) => a.from - b.from);
   // The blank line under a group belongs to it — leaving it behind closes the
   // gap where the group was and glues the group to whatever it lands on.
-  const last = spans[spans.length - 1];
+  const last = spans[spans.length - 1] ?? firstSpan;
   const blank = text.slice(last.to).match(/^[ \t]*\r?\n/);
-  if (blank) {last.to += blank[0].length;}
+  if (blank) {
+    last.to += blank[0]?.length ?? 0;
+  }
   let block = spans.map((s) => text.slice(s.from, s.to)).join('');
 
-  const landing = target ? declOf(target) : null;
-  if (target && !landing) {return { ok: false, error: `${target} is no longer declared there.` };}
+  const landing = target ? declOf(target) : undefined;
+  if (target && !landing) {
+    return { ok: false, error: `${target} is no longer declared there.` };
+  }
   // In front of the target group's own heading, if it has one.
   const landingAt = landing ? nodes.indexOf(landing) : -1;
-  const landingHeading =
-    landingAt > 0 && nodes[landingAt - 1].type === 'comment' ? nodes[landingAt - 1] : null;
+  const landingHeading = landingAt > 0 ? nodes[landingAt - 1] : null;
+  const lastDecl = decls[decls.length - 1] ?? firstDecl;
   const at = landing
-    ? lineSpan(landingHeading || landing).from
-    : lineSpan(nodes.filter((n) => n.type === 'decl').pop()).to;
+    ? lineSpan(text, landingHeading?.type === 'comment' ? landingHeading : landing).from
+    : lineSpan(text, lastDecl).to;
   // At the end of the rule there is nothing to separate from below, so the
   // group keeps its gap above instead of leaving one before the closing brace.
-  if (!landing) {block = block.replace(/(?:[ \t]*\r?\n)+$/, '\n').replace(/^/, '\n');}
-  // Landing in front of another group, it needs a gap under it — the group it
-  // came from may not have had one to bring along.
-  else if (!/\n[ \t]*\r?\n$/.test(block)) {block += '\n';}
+  if (!landing) {
+    block = block.replace(/(?:[ \t]*\r?\n)+$/, '\n').replace(/^/, '\n');
+  } else if (!/\n[ \t]*\r?\n$/.test(block)) {
+    block += '\n';
+  }
 
   // Cut from the bottom up so the offsets above stay valid, then insert at the
   // target corrected for everything removed before it.
   let out = text;
-  for (const span of [...spans].reverse()) {out = out.slice(0, span.from) + out.slice(span.to);}
+  for (const span of [...spans].reverse()) {
+    out = out.slice(0, span.from) + out.slice(span.to);
+  }
   const removedBefore = spans.reduce((sum, s) => (s.to <= at ? sum + (s.to - s.from) : sum), 0);
   const insertAt = at - removedBefore;
   const next = out.slice(0, insertAt) + block + out.slice(insertAt);
-  if (next === text) {return { ok: true, changed: false };}
+  if (next === text) {
+    return { ok: true, changed: false };
+  }
   fs.writeFileSync(abs, next, 'utf8');
   return { ok: true, changed: true };
+}
+
+interface AddVariablePayload {
+  readonly file: string;
+  readonly selector: string;
+  readonly name: string;
+  readonly value?: string;
+  readonly after?: string;
 }
 
 /**
@@ -960,43 +1345,48 @@ function moveSection(projectPath, { file, selector, names, target }) {
  * at the bottom of its own group rather than at the bottom of the rule, which
  * for a file like this would be two hundred lines away from what it belongs to.
  */
-function addVariable(projectPath, { file, selector, name, value = 'unset', after }) {
+function addVariable(projectPath: string, { file, selector, name, value = 'unset', after }: AddVariablePayload): { ok: boolean; error?: string; name?: string } {
   const abs = path.resolve(projectPath, file);
   const text = fs.readFileSync(abs, 'utf8');
   const root = postcss.parse(text);
 
-  let rule = null;
+  const matches: PostcssRule[] = [];
   root.walkRules((candidate) => {
-    if (!rule && candidate.selector === selector) {rule = candidate;}
+    if (candidate.selector === selector) {
+      matches.push(candidate);
+    }
   });
-  if (!rule) {return { ok: false, error: `${selector} is no longer in ${file}.` };}
+  const rule = matches[0];
+  if (!rule) {
+    return { ok: false, error: `${selector} is no longer in ${file}.` };
+  }
 
   const decls = (rule.nodes || []).filter((n) => n.type === 'decl');
   if (decls.some((d) => d.prop === name)) {
     return { ok: false, error: `${name} is already declared in ${selector}.` };
   }
 
-  const previous = (after && decls.find((d) => d.prop === after)) || decls[decls.length - 1] || null;
-  const indentOf = (node) => {
-    const start = node.source.start.offset;
+  const previous = (after && decls.find((d) => d.prop === after)) || decls[decls.length - 1] || undefined;
+  const indentOf = (node: Declaration): string => {
+    const start = node.source?.start?.offset ?? 0;
     return text.slice(text.lastIndexOf('\n', start - 1) + 1, start);
   };
   const line = `${previous ? indentOf(previous) : '  '}${name}: ${value};\n`;
 
-  let at;
+  let at: number;
   if (previous) {
-    const end = previous.source.end.offset;
+    const end = previous.source?.end?.offset ?? 0;
     const nextLine = text.indexOf('\n', end);
     at = nextLine === -1 ? text.length : nextLine + 1;
   } else {
     // An empty rule: just inside the brace.
-    at = text.indexOf('{', rule.source.start.offset) + 2;
+    const openOffset = rule.source?.start?.offset ?? 0;
+    at = text.indexOf('{', openOffset) + 2;
   }
 
   fs.writeFileSync(abs, text.slice(0, at) + line + text.slice(at), 'utf8');
   return { ok: true, name };
 }
-
 
 // --- renaming ----------------------------------------------------------------
 //
@@ -1031,11 +1421,13 @@ const RENAME_EXTS = /\.(css|s[ac]ss|less|pcss|postcss|astro|html|htm|md|mdx|mdoc
  * resolving somewhere the panel cannot see, which is the failure that has no
  * symptom until someone looks at the page.
  */
-function findRenameTargets(projectPath) {
-  const found = [];
-  const walk = (dir, depth) => {
-    if (depth > 10) {return;}
-    let entries;
+function findRenameTargets(projectPath: string): string[] {
+  const found: string[] = [];
+  const walk = (dir: string, depth: number): void => {
+    if (depth > 10) {
+      return;
+    }
+    let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
@@ -1046,7 +1438,9 @@ function findRenameTargets(projectPath) {
       // root can still be a config that names a variable (`.postcssrc`), so the
       // skip is for directories only.
       if (entry.isDirectory()) {
-        if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) {continue;}
+        if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) {
+          continue;
+        }
         walk(path.join(dir, entry.name), depth + 1);
       } else if (RENAME_EXTS.test(entry.name)) {
         found.push(path.join(dir, entry.name));
@@ -1064,6 +1458,11 @@ const NAME_RE = /^--[^\s:;{}()'"\\,]+$/;
 // either side is part of a longer name rather than a boundary.
 const EDGE = '[-\\w\\u00a0-\\uffff]';
 
+interface Rename {
+  readonly from: string;
+  readonly to: string;
+}
+
 /**
  * Renames custom properties across the project — declarations and references
  * alike, in one pass.
@@ -1073,34 +1472,50 @@ const EDGE = '[-\\w\\u00a0-\\uffff]';
  * a rename that would land on a name already in use, or that is not a name at
  * all, takes the whole batch down rather than leaving a group half renamed.
  */
-function renameVariables(projectPath, { renames, markWrite }) {
+function renameVariables(
+  projectPath: string,
+  { renames, markWrite }: { readonly renames?: readonly Rename[]; readonly markWrite?: (abs: string) => void },
+): { ok: boolean; files?: number; occurrences?: number; error?: string } {
   const list = (renames || []).filter((r) => r && r.from !== r.to);
-  if (!list.length) {return { ok: true, files: 0, occurrences: 0 };}
+  if (!list.length) {
+    return { ok: true, files: 0, occurrences: 0 };
+  }
 
-  const froms = new Set();
-  const tos = new Set();
+  const froms = new Set<string>();
+  const tos = new Set<string>();
   for (const { from, to } of list) {
-    if (!NAME_RE.test(String(from || ''))) {return { ok: false, error: `${from} is not a variable name.` };}
+    if (!NAME_RE.test(String(from || ''))) {
+      return { ok: false, error: `${from} is not a variable name.` };
+    }
     if (!NAME_RE.test(String(to || ''))) {
       return { ok: false, error: `"${String(to || '').replace(/^--/, '')}" cannot be a variable name.` };
     }
-    if (froms.has(from)) {return { ok: false, error: `${from} is renamed twice in one go.` };}
-    if (tos.has(to)) {return { ok: false, error: `Two variables would both be called ${to}.` };}
+    if (froms.has(from)) {
+      return { ok: false, error: `${from} is renamed twice in one go.` };
+    }
+    if (tos.has(to)) {
+      return { ok: false, error: `Two variables would both be called ${to}.` };
+    }
     froms.add(from);
     tos.add(to);
   }
 
   // Taken names, minus the ones this batch is freeing up: renaming a group means
   // every member moves at once, and a swap within it is legitimate.
-  const declared = new Set();
+  const declared = new Set<string>();
   for (const abs of findStylesheets(projectPath)) {
-    let text;
+    let text: string;
     try {
       text = fs.readFileSync(abs, 'utf8');
     } catch {
       continue;
     }
-    for (const m of text.matchAll(/(^|[;{}\s])(--[^\s:;{}()'"\\,]+)\s*:/g)) {declared.add(m[2]);}
+    for (const m of text.matchAll(/(^|[;{}\s])(--[^\s:;{}()'"\\,]+)\s*:/g)) {
+      const name = m[2];
+      if (name) {
+        declared.add(name);
+      }
+    }
   }
   for (const to of tos) {
     if (declared.has(to) && !froms.has(to)) {
@@ -1117,22 +1532,26 @@ function renameVariables(projectPath, { renames, markWrite }) {
     .join('|');
   const re = new RegExp(`(?<!${EDGE})(${alternation})(?!${EDGE})`, 'g');
 
-  const writes = [];
+  const writes: [string, string][] = [];
   let occurrences = 0;
   for (const abs of findRenameTargets(projectPath)) {
-    let text;
+    let text: string;
     try {
-      if (fs.statSync(abs).size > MAX_BYTES) {continue;}
+      if (fs.statSync(abs).size > MAX_BYTES) {
+        continue;
+      }
       text = fs.readFileSync(abs, 'utf8');
     } catch {
       continue;
     }
     let hits = 0;
-    const next = text.replace(re, (match) => {
+    const next = text.replace(re, (match: string): string => {
       hits += 1;
       return by.get(match) ?? match;
     });
-    if (!hits) {continue;}
+    if (!hits) {
+      continue;
+    }
     occurrences += hits;
     writes.push([abs, next]);
   }
@@ -1148,7 +1567,7 @@ function renameVariables(projectPath, { renames, markWrite }) {
   return { ok: true, files: writes.length, occurrences };
 }
 
-module.exports = {
+export {
   readVariables,
   renameVariables,
   setSectionTitle,
