@@ -29,3 +29,5 @@ electron/formats/yaml.js
 electron/formats/frontmatter.js
 electron/componentFile.js
 electron/gitSnapshot.js
+electron/starter.js
+electron/cmsRefs.js

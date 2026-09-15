@@ -39,6 +39,8 @@ export default [
       'electron/projectWatcher.js',
       'electron/componentFile.js',
       'electron/gitSnapshot.js',
+      'electron/starter.js',
+      'electron/cmsRefs.js',
       'electron/formats/transplant.js',
       'electron/formats/ndjson.js',
       'electron/formats/csv.js',

@@ -1,6 +1,8 @@
-const fs = require('fs');
-const path = require('path');
-const { spawn } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { spawn } from 'child_process';
+
+import { toRecord } from '../shared/dist/record.js';
 
 // Starting a site from a starter.
 //
@@ -16,7 +18,12 @@ const { spawn } = require('child_process');
 
 const isWin = process.platform === 'win32';
 
-const STARTERS = {
+interface Starter {
+  readonly label: string;
+  readonly create: string;
+}
+
+const STARTERS: Record<string, Starter> = {
   lumos: {
     label: 'Lumos',
     // Pinned to `@latest` rather than a version: the scaffolder is downloaded
@@ -29,11 +36,13 @@ const STARTERS = {
 // out of a directory that already exists.
 const NAME_RE = /^[A-Za-z0-9._-]+$/;
 
-const run = (cmd, args, cwd, onLog) =>
+type OnLog = (text: string) => void;
+
+const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): Promise<string> =>
   new Promise((resolve, reject) => {
     let proc;
     try {
-      proc = spawn(cmd, args, {
+      proc = spawn(cmd, [...args], {
         cwd,
         // npm is a .cmd shim on Windows, which needs a shell to be found.
         shell: isWin && /^npm/.test(cmd),
@@ -46,11 +55,11 @@ const run = (cmd, args, cwd, onLog) =>
         },
       });
     } catch (err) {
-      reject(new Error(`Could not run ${cmd}: ${err.message}`));
+      reject(new Error(`Could not run ${cmd}: ${err instanceof Error ? err.message : String(err)}`));
       return;
     }
     let tail = '';
-    const onOut = (d) => {
+    const onOut = (d: { toString(): string }): void => {
       // Progress spinners are drawn with cursor moves and line clears; strip
       // them so the log pane reads as the plain text it renders.
       const text = d
@@ -62,45 +71,60 @@ const run = (cmd, args, cwd, onLog) =>
     };
     proc.stdout.on('data', onOut);
     proc.stderr.on('data', onOut);
-    proc.on('error', (err) =>
+    proc.on('error', (err: Error) => {
+      const code = toRecord(err)?.['code'];
       reject(
         new Error(
-          err.code === 'ENOENT'
+          code === 'ENOENT'
             ? path.basename(cmd).startsWith('npm')
               ? 'npm could not be found. Install Node.js (which includes npm) and try again.'
               : `${cmd} could not be found. Install it and try again.`
-            : `Could not run ${cmd}: ${err.message}`
-        )
-      )
-    );
-    proc.on('exit', (code) =>
-      code === 0 ? resolve(tail) : reject(new Error(`${cmd} ${args[0]} exited with code ${code}.\n\n${tail}`))
+            : `Could not run ${cmd}: ${err.message}`,
+        ),
+      );
+    });
+    proc.on('exit', (code: number | null) =>
+      code === 0
+        ? resolve(tail)
+        : reject(new Error(`${cmd} ${args[0] ?? ''} exited with code ${code}.\n\n${tail}`)),
     );
   });
+
+interface CreateStarterOptions {
+  readonly starter?: string;
+  readonly parentPath?: string;
+  readonly name?: string;
+  /** The npm command to run, so a test can hand it one that needs no network. */
+  readonly npm?: string;
+  readonly onLog?: OnLog;
+}
 
 /**
  * Runs a starter's scaffolder in `parentPath` to make `parentPath/name`, then
  * gives the site a history of its own. Installing what it needs is the
  * caller's — this is the part that has to be right before anything is
  * installed into it.
- *
- * `npm` is the command to run, so a test can hand it one that does not need the
- * network.
  */
-async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog } = {}) {
+async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog }: CreateStarterOptions = {}): Promise<{ ok: boolean; projectPath: string }> {
   const template = STARTERS[starter];
-  if (!template) {throw new Error(`${starter} is not a starter this app knows.`);}
+  if (!template) {
+    throw new Error(`${starter} is not a starter this app knows.`);
+  }
   if (!parentPath || !fs.existsSync(parentPath)) {
     throw new Error('Choose where the site should go first.');
   }
 
   const folder = String(name || '').trim();
-  if (!folder) {throw new Error('Give the site a name.');}
+  if (!folder) {
+    throw new Error('Give the site a name.');
+  }
   if (!NAME_RE.test(folder)) {
     throw new Error('Use letters, numbers, dashes, dots or underscores for the folder name.');
   }
   const dir = path.join(parentPath, folder);
-  if (fs.existsSync(dir)) {throw new Error(`${folder} already exists in that folder.`);}
+  if (fs.existsSync(dir)) {
+    throw new Error(`${folder} already exists in that folder.`);
+  }
 
   // `--no-install`: the app installs afterwards, where a failure is an error
   // the wizard can show rather than a line in a log that scrolled past.
@@ -117,9 +141,12 @@ async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog }
   // than one it hopes for.
   try {
     const file = path.join(dir, 'package.json');
-    const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
-    pkg.name = folder.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
-    fs.writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+    const raw: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const pkg = toRecord(raw);
+    if (pkg) {
+      pkg['name'] = folder.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+      fs.writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+    }
   } catch {
     /* an unusual package.json is not worth failing the site over */
   }
@@ -134,11 +161,11 @@ async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog }
       await run('git', ['commit', '-m', `Start ${folder} from ${template.label}`], dir);
     } catch (err) {
       // A site with no git still runs; say so rather than throwing it away.
-      onLog?.(`\n(could not start a git history: ${err.message})\n`);
+      onLog?.(`\n(could not start a git history: ${err instanceof Error ? err.message : String(err)})\n`);
     }
   }
 
   return { ok: true, projectPath: dir };
 }
 
-module.exports = { createStarter, STARTERS };
+export { createStarter, STARTERS };
