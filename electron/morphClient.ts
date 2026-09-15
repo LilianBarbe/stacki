@@ -16,6 +16,21 @@
 // it survives untouched. Three trees, and the live one is only ever written
 // where the other two disagree.
 
+// This module is served to the browser as source text (main.js reads it and
+// hands it to the dev plugin), so it is emitted as plain ESM by its own
+// tsconfig, never as CommonJS. The exports at the bottom are the module
+// marker the compiler needs (import.meta is only legal in a module) and a
+// no-op to the page.
+
+declare global {
+  // Vite's import.meta.hot; only .on is used here, so only .on is declared.
+  interface ImportMeta {
+    readonly hot?: {
+      readonly on: (event: string, handler: () => void) => void;
+    };
+  }
+}
+
 // A <template> marker is an element, and the page removes those from itself on
 // load, so they are taken out of the fetched copies too — otherwise they are
 // nodes on one side with nothing to match on the other.
@@ -25,34 +40,56 @@
 // sit in the live document as well as in both fetched ones. Matching walks
 // from one to the next, so it can never drift onto the wrong element the way
 // guessing from tag names does.
-function stripTemplateMarkers(root) {
+function stripTemplateMarkers(root: ParentNode): void {
   const gone = root.querySelectorAll('template[data-avb-s],template[data-avb-e]');
-  for (let i = 0; i < gone.length; i++) {gone[i].remove();}
+  for (let i = 0; i < gone.length; i++) {
+    const node = gone[i];
+    if (node) {
+      node.remove();
+    }
+  }
 }
 
-const isAnchor = (n) => n && n.nodeType === 8 && /^avb-[se]:/.test(n.data);
+const isAnchor = (n: Node | null | undefined): boolean => {
+  const comment = n !== undefined && n !== null && asComment(n) ? n : null;
+  return comment !== null && /^avb-[se]:/.test(comment.data);
+};
+
+const asElement = (n: Node): n is Element => n.nodeType === 1;
+const asText = (n: Node): n is Text => n.nodeType === 3;
+const asComment = (n: Node): n is Comment => n.nodeType === 8;
+const asDocument = (n: Node): n is Document => n.nodeType === 9;
+
+// test/morph.js lifts the patching half out of this file by slicing from the
+// `const isAnchor =` line, so the type guards live below that marker, before
+// their first use. That keeps the lifted source self-contained.
 
 // Markers take no part in the comparison. Their path is an index, so removing
 // one node renumbers every marker after it, and a diff that reads them as
 // content sees the whole rest of the page change. They are stripped from both
 // fetched copies, skipped over in the live page, and put back afterwards.
-function stripAnchors(root) {
-  const gone = [];
-  const walk = (p) => {
+function stripAnchors(root: ParentNode): void {
+  const gone: Comment[] = [];
+  const walk = (p: ParentNode): void => {
     for (let n = p.firstChild; n; n = n.nextSibling) {
-      if (isAnchor(n)) {gone.push(n);}
-      else if (n.nodeType === 1) {walk(n);}
+      if (asComment(n) && isAnchor(n)) {
+        gone.push(n);
+      } else if (asElement(n)) {
+        walk(n);
+      }
     }
   };
   walk(root);
-  for (const n of gone) {n.remove();}
+  for (const n of gone) {
+    n.remove();
+  }
 }
 
 // Markers are comments: invisible to layout, to selectors and to animation, so
 // they can be taken out and put back without the page noticing. Done in one
 // pass after the content is settled, from a copy of the new rendering that
 // still has them, so the editor's paths point at what is on the page now.
-function syncAnchors(liveRoot, serverRoot) {
+function syncAnchors(liveRoot: ParentNode, serverRoot: ParentNode): void {
   stripAnchors(liveRoot);
 
   // Whitespace is not content, and is never matched.
@@ -66,22 +103,38 @@ function syncAnchors(liveRoot, serverRoot) {
   // a closing marker after the very element it was supposed to close, and a
   // region that swallowed its next sibling whole. On the docs footer that made
   // a clicked line report the comment above it.
-  const blank = (n) => n.nodeType === 3 && !n.data.trim();
-  const sameKind = (a, b) =>
-    a.nodeType === b.nodeType && (b.nodeType !== 1 || a.tagName === b.tagName);
+  const blank = (n: Node): boolean => (asText(n) ? n.data.trim() === '' : false);
+  const sameKind = (a: Node, b: Node): boolean => {
+    if (a.nodeType !== b.nodeType) {
+      return false;
+    }
+    if (b.nodeType !== 1) {
+      return true;
+    }
+    return asElement(a) && asElement(b) && a.tagName === b.tagName;
+  };
 
-  const walk = (live, server) => {
+  const walk = (live: ParentNode, server: ParentNode): void => {
     let l = live.firstChild;
     for (let sv = server.firstChild; sv; sv = sv.nextSibling) {
-      if (isAnchor(sv)) {
-        live.insertBefore(document.createComment(sv.data), l);
+      const marker = asComment(sv) && isAnchor(sv) ? sv : null;
+      if (marker) {
+        live.insertBefore(document.createComment(marker.data), l);
         continue;
       }
-      if (blank(sv)) {continue;}
+      if (blank(sv)) {
+        continue;
+      }
       let t = l;
-      while (t && (blank(t) || !sameKind(t, sv))) {t = t.nextSibling;}
-      if (!t) {continue;}
-      if (t.nodeType === 1) {walk(t, sv);}
+      while (t && (blank(t) || !sameKind(t, sv))) {
+        t = t.nextSibling;
+      }
+      if (!t) {
+        continue;
+      }
+      if (asElement(t) && asElement(sv)) {
+        walk(t, sv);
+      }
       l = t.nextSibling;
     }
   };
@@ -103,12 +156,17 @@ function syncAnchors(liveRoot, serverRoot) {
 //
 // <template> is opaque for the same kind of reason: its markup lives in a
 // separate fragment rather than in childNodes.
-const pinned = (n) =>
-  n.nodeType === 1 &&
-  (n.tagName === 'NOSCRIPT' ||
+const pinned = (n: Node): boolean => {
+  if (!asElement(n)) {
+    return false;
+  }
+  return (
+    n.tagName === 'NOSCRIPT' ||
     n.tagName === 'TEMPLATE' ||
     (n.tagName === 'SCRIPT' && !!n.getAttribute('src')) ||
-    (n.tagName === 'STYLE' && n.hasAttribute('data-vite-dev-id')));
+    (n.tagName === 'STYLE' && n.hasAttribute('data-vite-dev-id'))
+  );
+};
 
 // An id, and deliberately nothing else. `data-avb-p` looks like a better key —
 // it is the editor's own node path — but the canvas stamps it onto live
@@ -116,7 +174,12 @@ const pinned = (n) =>
 // attribute. Reading it here compared a stamped path against an id, decided
 // every element was a different element, and fell back to reloading the page
 // on every keystroke: the exact thing this was written to stop.
-const keyOf = (n) => (n && n.nodeType === 1 ? n.getAttribute('id') || null : null);
+const keyOf = (n: Node | null | undefined): string | null => {
+  if (n !== undefined && n !== null && asElement(n)) {
+    return n.getAttribute('id') || null;
+  }
+  return null;
+};
 
 // What makes two nodes the same kind of thing for the purpose of lining up two
 // lists: a tag, and an id if it has one. Every text node is interchangeable
@@ -130,9 +193,11 @@ const keyOf = (n) => (n && n.nodeType === 1 ? n.getAttribute('id') || null : nul
 // its place — and a wrapper takes the whole page down with it, which is why
 // changing a variant threw the canvas back to the top. It is an attribute, and
 // it is patched like one.
-function keyFor(n) {
-  if (n.nodeType === 1) {return 'e:' + n.tagName + '#' + (keyOf(n) || '');}
-  return n.nodeType === 8 ? 'c' : 't';
+function keyFor(n: Node): string {
+  if (asElement(n)) {
+    return 'e:' + n.tagName + '#' + (keyOf(n) || '');
+  }
+  return asComment(n) ? 'c' : 't';
 }
 
 // Longest common subsequence over the two child lists.
@@ -147,33 +212,52 @@ function keyFor(n) {
 // or attributes, leaving every child key in place; those lists, along with
 // appends and removals at the end, take linear time and memory. The remaining
 // matrix keeps the existing tie-breaking for repeated text and element keys.
-function diffChildren(a, b) {
+type DiffOp = readonly [kind: number, i: number, j: number];
+
+function diffChildren(a: readonly string[], b: readonly string[]): DiffOp[] {
   const n = a.length;
   const m = b.length;
-  const ops = [];
+  const ops: DiffOp[] = [];
   let i = 0;
   let j = 0;
-  while (i < n && j < m && a[i] === b[j]) {ops.push([0, i++, j++]);}
+  while (i < n && j < m && a[i] === b[j]) {
+    ops.push([0, i++, j++]);
+  }
 
   const start = i;
-  const dp = [];
+  const dp: Int32Array[] = [];
   if (i < n && j < m) {
-    for (let row = 0; row <= n - start; row++) {dp.push(new Int32Array(m - start + 1));}
+    for (let row = 0; row <= n - start; row++) {
+      dp.push(new Int32Array(m - start + 1));
+    }
     for (let row = n - start - 1; row >= 0; row--) {
+      const cur = dp[row];
+      const next = dp[row + 1];
+      if (!cur || !next) {
+        continue;
+      }
       for (let col = m - start - 1; col >= 0; col--) {
-        dp[row][col] = a[row + start] === b[col + start]
-          ? dp[row + 1][col + 1] + 1
-          : Math.max(dp[row + 1][col], dp[row][col + 1]);
+        cur[col] = a[row + start] === b[col + start] ? (next[col + 1] ?? 0) + 1 : Math.max(next[col] ?? 0, cur[col + 1] ?? 0);
       }
     }
   }
   while (i < n && j < m) {
-    if (a[i] === b[j]) { ops.push([0, i++, j++]); continue; }      // keep
-    if (dp[i - start + 1][j - start] >= dp[i - start][j - start + 1]) {ops.push([-1, i++, -1]);} // removed
-    else {ops.push([1, -1, j++]);}                                    // inserted
+    if (a[i] === b[j]) {
+      ops.push([0, i++, j++]);
+      continue; // keep
+    }
+    if ((dp[i - start + 1]?.[j - start] ?? 0) >= (dp[i - start]?.[j - start + 1] ?? 0)) {
+      ops.push([-1, i++, -1]); // removed
+    } else {
+      ops.push([1, -1, j++]); // inserted
+    }
   }
-  while (i < n) {ops.push([-1, i++, -1]);}
-  while (j < m) {ops.push([1, -1, j++]);}
+  while (i < n) {
+    ops.push([-1, i++, -1]);
+  }
+  while (j < m) {
+    ops.push([1, -1, j++]);
+  }
   return ops;
 }
 
@@ -181,7 +265,7 @@ function diffChildren(a, b) {
 // happens when client code has rearranged something this cannot reason about.
 // The caller turns it into the reload it replaced: losing the running state is
 // a disappointment, patching the wrong element is a bug.
-function Ambiguous(what) {
+function Ambiguous(what: string): Error {
   return new Error('cannot line up ' + what + ' with the live page');
 }
 
@@ -204,114 +288,206 @@ function Ambiguous(what) {
 // contradicted wins, and scanning past one for a "better" match is exactly the
 // mistake. A same-tag node is still remembered as a last resort, for the case
 // where client code took one of the server's own classes away.
-const classesOf = (n) => (n.getAttribute('class') || '').split(/\s+/).filter(Boolean);
+const classesOf = (n: Element): string[] => (n.getAttribute('class') || '').split(/\s+/).filter(Boolean);
 
 // Every class the server put on the node is still on the live one. A node the
 // server gave no class to has to have none either — otherwise the test is
 // vacuous and would match anything, including a node the client inserted.
-function keepsClassesOf(live, serverNode) {
+function keepsClassesOf(live: Element, serverNode: Element): boolean {
   const want = classesOf(serverNode);
-  if (!want.length) {return live.classList.length === 0;}
-  for (const c of want) {if (!live.classList.contains(c)) {return false;}}
+  if (!want.length) {
+    return live.classList.length === 0;
+  }
+  for (const c of want) {
+    if (!live.classList.contains(c)) {
+      return false;
+    }
+  }
   return true;
 }
 
-function findLive(from, serverNode) {
-  let loose = null;
+function findLive(from: Node | null, serverNode: Node): Node | null {
+  let loose: Element | null = null;
+  if (!asElement(serverNode)) {
+    for (let n = from; n; n = n.nextSibling) {
+      if (isAnchor(n)) {
+        continue;
+      }
+      if (n.nodeType === serverNode.nodeType) {
+        return n;
+      }
+    }
+    return null;
+  }
   const key = keyOf(serverNode);
   for (let n = from; n; n = n.nextSibling) {
-    if (isAnchor(n)) {continue;}
-    if (serverNode.nodeType !== 1) {
-      if (n.nodeType === serverNode.nodeType) {return n;}
+    if (isAnchor(n)) {
       continue;
     }
-    if (n.nodeType !== 1) {continue;}
-    if (n.tagName !== serverNode.tagName) {continue;}
+    if (!asElement(n)) {
+      continue;
+    }
+    if (n.tagName !== serverNode.tagName) {
+      continue;
+    }
     // An explicit id cannot fall back to a different same-tag element. If
     // client code removed it, reloading is safer than editing its neighbour.
     if (key !== null) {
-      if (keyOf(n) === key) {return n;}
+      if (keyOf(n) === key) {
+        return n;
+      }
       continue;
     }
-    if (keepsClassesOf(n, serverNode)) {return n;}
+    if (keepsClassesOf(n, serverNode)) {
+      return n;
+    }
     // Same tag, weaker evidence. Kept in case nothing better turns up: the
     // diff has already decided this node persists, so the only question left
     // is which one it is, and a same-tag sibling beats giving up and reloading.
-    if (!loose) {loose = n;}
+    if (!loose) {
+      loose = n;
+    }
   }
   return loose;
 }
 
 // Class is merged rather than assigned: a class the server added or dropped is
 // applied, and one the client added — `is-open`, `in-view` — is left in place.
-function patchClass(live, prev, next) {
+function patchClass(live: Element, prev: Element, next: Element): void {
   const before = (prev.getAttribute('class') || '').split(/\s+/).filter(Boolean);
   const after = (next.getAttribute('class') || '').split(/\s+/).filter(Boolean);
-  for (const c of before) {if (after.indexOf(c) === -1) {live.classList.remove(c);}}
-  for (const c of after) {if (before.indexOf(c) === -1) {live.classList.add(c);}}
+  for (const c of before) {
+    if (after.indexOf(c) === -1) {
+      live.classList.remove(c);
+    }
+  }
+  for (const c of after) {
+    if (before.indexOf(c) === -1) {
+      live.classList.add(c);
+    }
+  }
 }
 
 // Only where the two renderings disagree. An attribute the client set that the
 // server never mentions is never seen here, so it stays.
-function patchAttrs(live, prev, next) {
+function patchAttrs(live: Element, prev: Element, next: Element): void {
   const want = next.attributes;
   for (let i = 0; i < want.length; i++) {
     const a = want[i];
-    if (prev.getAttribute(a.name) === a.value) {continue;}
-    if (a.name === 'class') {patchClass(live, prev, next);}
-    else {live.setAttribute(a.name, a.value);}
+    if (!a) {
+      continue;
+    }
+    if (prev.getAttribute(a.name) === a.value) {
+      continue;
+    }
+    if (a.name === 'class') {
+      patchClass(live, prev, next);
+    } else {
+      live.setAttribute(a.name, a.value);
+    }
   }
   const had = prev.attributes;
   for (let i = had.length - 1; i >= 0; i--) {
     const a = had[i];
-    if (next.hasAttribute(a.name)) {continue;}
-    if (a.name === 'class') {patchClass(live, prev, next);}
-    else {live.removeAttribute(a.name);}
+    if (!a) {
+      continue;
+    }
+    if (next.hasAttribute(a.name)) {
+      continue;
+    }
+    if (a.name === 'class') {
+      patchClass(live, prev, next);
+    } else {
+      live.removeAttribute(a.name);
+    }
   }
 }
 
-function patchNode(live, prev, next) {
+function patchNode(live: Node, prev: Node, next: Node): void {
   if (live.nodeType === 3 || live.nodeType === 8) {
     // Only when the server changed it, and only if the live copy still says
     // what the server last said — client code that rewrote this text keeps it.
-    if (prev.data !== next.data && live.data === prev.data) {live.data = next.data;}
+    const liveText = asText(live) ? live : asComment(live) ? live : null;
+    const prevData = (asText(prev) ? prev : asComment(prev) ? prev : null)?.data;
+    const nextData = (asText(next) ? next : asComment(next) ? next : null)?.data;
+    if (liveText && prevData !== undefined && nextData !== undefined && prevData !== nextData && liveText.data === prevData) {
+      liveText.data = nextData;
+    }
     return;
   }
-  if (live.nodeType !== 1 || pinned(live)) {return;}
+  if (!asElement(live) || pinned(live)) {
+    return;
+  }
+  if (!asElement(prev) || !asElement(next)) {
+    // The diff only pairs nodes of equal kind, so reach is impossible; the
+    // guard keeps the types truthful rather than encoding a lie about it.
+    return;
+  }
   patchAttrs(live, prev, next);
   patchChildren(live, prev, next);
 }
 
-function patchChildren(liveParent, prevParent, nextParent) {
-  const before = [];
-  for (let n = prevParent.firstChild; n; n = n.nextSibling) {before.push(n);}
-  const after = [];
-  for (let n = nextParent.firstChild; n; n = n.nextSibling) {after.push(n);}
+function patchChildren(liveParent: Element, prevParent: Element, nextParent: Element): void {
+  const before: Node[] = [];
+  for (let n = prevParent.firstChild; n; n = n.nextSibling) {
+    before.push(n);
+  }
+  const after: Node[] = [];
+  for (let n = nextParent.firstChild; n; n = n.nextSibling) {
+    after.push(n);
+  }
 
-  let live = liveParent.firstChild;
-  const locate = (serverNode) => {
+  let live: Node | null = liveParent.firstChild;
+  const locate = (serverNode: Node): Node => {
     const target = findLive(live, serverNode);
-    if (!target) {throw Ambiguous(describe(serverNode));}
+    if (!target) {
+      throw Ambiguous(describe(serverNode));
+    }
     return target;
   };
 
   for (const [kind, i, j] of diffChildren(before.map(keyFor), after.map(keyFor))) {
     if (kind === 0) {
-      const target = locate(before[i]);
-      patchNode(target, before[i], after[j]);
+      const prevNode = before[i];
+      const nextNode = after[j];
+      // The diff only emits keep ops for valid indexes; a gap is a bug, and
+      // the reload the catch performs is the right failure then too.
+      if (prevNode === undefined || nextNode === undefined) {
+        throw Ambiguous('index gap in diff');
+      }
+      const target = locate(prevNode);
+      patchNode(target, prevNode, nextNode);
       live = target.nextSibling;
     } else if (kind === -1) {
-      const target = locate(before[i]);
-      if (live === target) {live = target.nextSibling;}
-      target.remove();
+      const prevNode = before[i];
+      if (prevNode === undefined) {
+        throw Ambiguous('index gap in diff');
+      }
+      const target = locate(prevNode);
+      if (live === target) {
+        live = target.nextSibling;
+      }
+      // remove() lives on the leaf kinds, not on Node itself.
+      const removal = asElement(target) ? target : asText(target) ? target : asComment(target) ? target : null;
+      removal?.remove();
     } else {
-      liveParent.insertBefore(document.importNode(after[j], true), live);
+      const nextNode = after[j];
+      if (nextNode !== undefined) {
+        liveParent.insertBefore(document.importNode(nextNode, true), live);
+      }
     }
   }
 }
 
-const describe = (n) =>
-  n.nodeType === 1 ? '<' + n.tagName.toLowerCase() + '>' : n.nodeType === 8 ? 'marker ' + n.data : 'text';
+const describe = (n: Node): string => {
+  if (asElement(n)) {
+    return '<' + n.tagName.toLowerCase() + '>';
+  }
+  if (asComment(n)) {
+    return 'marker ' + n.data;
+  }
+  return 'text';
+};
 
 // A component's <style> is delivered as a MODULE in dev — one
 // `<script type="module" src="…?astro&type=style…">` per styled component that
@@ -324,13 +500,22 @@ const describe = (n) =>
 // file exists to avoid, on the one edit most likely to be made over and over.
 // Style modules are held apart from real scripts and patched like anything
 // else.
-function isStyleModule(src) {
+function isStyleModule(src: string | null): boolean {
   return /[?&]astro&type=style|\.(css|s[ac]ss|less|pcss|styl)(\?|$)/.test(src || '');
+}
+
+interface ScriptInfo {
+  readonly src: string;
+  readonly type: string;
+  readonly attrs: readonly [name: string, value: string][];
+  readonly signature: string;
 }
 
 // A script that CHANGED, or one that is GONE, cannot be patched in: rewriting
 // one does not run it, and nothing can un-run one. Both are wrong, so the page
-// reloads.
+// reloads. (Kept below the erased interface: comments attached to a type
+// declaration are dropped at emit, and test/morph.js slices this file by this
+// comment.)
 //
 // A script that only APPEARED is a different matter, and it is the common one.
 // Switching a variant is how a component starts rendering something it wasn't:
@@ -344,15 +529,20 @@ function isStyleModule(src) {
 // So a new module is loaded rather than reloaded around — the same thing
 // loadStyles does for a stylesheet, for the same reason: an element made here
 // runs, a cloned one does not.
-function scriptsOf(doc) {
-  const out = [];
+function scriptsOf(doc: Document): ScriptInfo[] {
+  const out: ScriptInfo[] = [];
   const list = doc.getElementsByTagName('script');
   for (let i = 0; i < list.length; i++) {
     const s = list[i];
+    if (!s) {
+      continue;
+    }
     const src = s.getAttribute('src') || '';
-    if (isStyleModule(src)) {continue;}
-    const attrs = Array.from(s.attributes, (a) => [a.name, a.value]);
-    attrs.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+    if (isStyleModule(src)) {
+      continue;
+    }
+    let attrs: [string, string][] = Array.from(s.attributes, (a) => [a.name, a.value]);
+    attrs = attrs.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     out.push({
       src,
       type: s.getAttribute('type') || '',
@@ -364,7 +554,7 @@ function scriptsOf(doc) {
 }
 
 // Structured signatures cannot collide with separators in URLs or source.
-function scriptSignature(doc) {
+function scriptSignature(doc: Document): string {
   return JSON.stringify(scriptsOf(doc).map((s) => s.signature));
 }
 
@@ -376,11 +566,11 @@ function scriptSignature(doc) {
  * where it sits, and this cannot put it there: the copy the patch inserted is
  * inert and replacing it is a different job. So an inline arrival still reloads.
  */
-function addedScripts(prevDoc, nextDoc) {
+function addedScripts(prevDoc: Document, nextDoc: Document): ScriptInfo[] | null {
   const before = scriptsOf(prevDoc);
   const after = scriptsOf(nextDoc);
   const had = new Set(before.map((s) => s.signature));
-  const added = [];
+  const added: ScriptInfo[] = [];
   let i = 0;
   for (const script of after) {
     if (script.signature === before[i]?.signature) {
@@ -388,7 +578,9 @@ function addedScripts(prevDoc, nextDoc) {
     } else {
       // Already-run scripts must keep their order and count. Neither a
       // reorder nor another execution of an existing script can be patched.
-      if (had.has(script.signature) || !script.src) {return null;}
+      if (had.has(script.signature) || !script.src) {
+        return null;
+      }
       added.push(script);
     }
   }
@@ -397,22 +589,28 @@ function addedScripts(prevDoc, nextDoc) {
 
 // The modules a rendering asks for that this page has never run. Made here, not
 // cloned, so they run.
-const loadedScripts = new Set();
-function noteScripts(doc) {
+const loadedScripts = new Set<string>();
+function noteScripts(doc: Document): void {
   for (const { src } of scriptsOf(doc)) {
-    if (src) {loadedScripts.add(src);}
+    if (src) {
+      loadedScripts.add(src);
+    }
   }
 }
-function runScripts(added) {
+function runScripts(added: readonly ScriptInfo[]): void {
   for (const { src, attrs } of added) {
-    if (!src || loadedScripts.has(src)) {continue;}
+    if (!src || loadedScripts.has(src)) {
+      continue;
+    }
     loadedScripts.add(src);
     const el = document.createElement('script');
     // Preserve loading semantics such as integrity, crossorigin and nonce.
     // Dynamic classic scripts default to async; source scripts without that
     // attribute must instead execute in insertion order.
     el.async = false;
-    for (const [name, value] of attrs) {el.setAttribute(name, value);}
+    for (const [name, value] of attrs) {
+      el.setAttribute(name, value);
+    }
     document.head.appendChild(el);
   }
 }
@@ -427,19 +625,31 @@ function runScripts(added) {
 // A stylesheet whose component is no longer rendered is left loaded. Its rules
 // match nothing now, and it is already in hand for the moment the variant is
 // switched back.
-const loadedStyles = new Set();
-function noteStyles(doc) {
+const loadedStyles = new Set<string>();
+function noteStyles(doc: Document): void {
   const list = doc.getElementsByTagName('script');
   for (let i = 0; i < list.length; i++) {
-    const src = list[i].getAttribute('src');
-    if (isStyleModule(src)) {loadedStyles.add(src);}
+    const s = list[i];
+    if (!s) {
+      continue;
+    }
+    const src = s.getAttribute('src') ?? null;
+    if (src !== null && isStyleModule(src)) {
+      loadedStyles.add(src);
+    }
   }
 }
-function loadStyles(doc) {
+function loadStyles(doc: Document): void {
   const list = doc.getElementsByTagName('script');
   for (let i = 0; i < list.length; i++) {
-    const src = list[i].getAttribute('src');
-    if (!isStyleModule(src) || loadedStyles.has(src)) {continue;}
+    const s = list[i];
+    if (!s) {
+      continue;
+    }
+    const src = s.getAttribute('src') ?? null;
+    if (src === null || !isStyleModule(src) || loadedStyles.has(src)) {
+      continue;
+    }
     loadedStyles.add(src);
     const el = document.createElement('script');
     el.type = 'module';
@@ -448,16 +658,29 @@ function loadStyles(doc) {
   }
 }
 
-function fetchDoc() {
+interface FetchedDoc {
+  readonly withAnchors: Document;
+  readonly clean: Document;
+}
+
+function fetchDoc(): Promise<FetchedDoc> {
   return fetch(location.href, { cache: 'no-store' })
     .then((r) => {
-      if (!r.ok) {throw new Error('dev server answered ' + r.status);}
+      if (!r.ok) {
+        throw new Error('dev server answered ' + r.status);
+      }
       return r.text();
     })
     .then((html) => {
       const withAnchors = new DOMParser().parseFromString(html, 'text/html');
       stripTemplateMarkers(withAnchors);
-      const clean = withAnchors.cloneNode(true);
+      const clone = withAnchors.cloneNode(true);
+      // A cloned document is a Document; the guard is the types' only honest
+      // way to say nodeType 9 without an assertion.
+      if (!asDocument(clone)) {
+        throw new Error('cloned rendering is not a document');
+      }
+      const clean = clone;
       stripAnchors(clean);
       return { withAnchors, clean };
     });
@@ -467,28 +690,45 @@ function fetchDoc() {
 // alter it. The live DOM is not a substitute: a script that appends during
 // parse has already run by the time this module does, and mistaking its work
 // for server output would delete it on the first patch.
-let prevDoc = null;
+let prevDoc: Document | null = null;
 const ready = fetchDoc().then(
-  (d) => { prevDoc = d.clean; noteStyles(d.clean); noteScripts(d.clean); },
-  () => { prevDoc = null; }
+  (d) => {
+    prevDoc = d.clean;
+    noteStyles(d.clean);
+    noteScripts(d.clean);
+  },
+  () => {
+    prevDoc = null;
+  },
 );
 
 let busy = false;
 let again = false;
 
-async function update() {
-  if (busy) { again = true; return; }
+async function update(): Promise<void> {
+  if (busy) {
+    again = true;
+    return;
+  }
   busy = true;
   try {
     await ready;
-    if (!prevDoc) {throw new Error('no baseline rendering to compare against');}
+    if (!prevDoc) {
+      throw new Error('no baseline rendering to compare against');
+    }
     const next = await fetchDoc();
     const added = addedScripts(prevDoc, next.clean);
     if (added === null) {
       location.reload();
       return;
     }
-    patchAttrs(document.documentElement, prevDoc.documentElement, next.clean.documentElement);
+    const liveRoot = document.documentElement;
+    const prevRoot = prevDoc.documentElement;
+    const nextRoot = next.clean.documentElement;
+    if (!liveRoot || !prevRoot || !nextRoot) {
+      throw new Error('missing <html> in one of the renderings');
+    }
+    patchAttrs(liveRoot, prevRoot, nextRoot);
     patchChildren(document.head, prevDoc.head, next.clean.head);
     patchChildren(document.body, prevDoc.body, next.clean.body);
     prevDoc = next.clean;
@@ -496,18 +736,29 @@ async function update() {
     // time anything measures it — and running by the time anything clicks it.
     loadStyles(next.clean);
     runScripts(added);
-    syncAnchors(document.body, next.withAnchors.body);
+    const liveBody = document.body;
+    const serverBody = next.withAnchors.body;
+    if (!liveBody || !serverBody) {
+      throw new Error('missing <body> in one of the renderings');
+    }
+    syncAnchors(liveBody, serverBody);
     document.dispatchEvent(new CustomEvent('avb:morphed'));
   } catch (err) {
     // Whatever went wrong, the page must still end up showing what the file
     // says. Falling back to the reload this replaced is always safe.
-    console.warn('[stacki] could not patch the page, reloading:', err);
+    // The original called console.warn, which no browser implements — the
+    // throw it caused skipped the reload line below, which is the whole point
+    // of the catch. Log and reload.
+    console.error('[stacki] could not patch the page, reloading:', err);
     location.reload();
     return;
   } finally {
     busy = false;
   }
-  if (again) { again = false; update(); }
+  if (again) {
+    again = false;
+    update();
+  }
 }
 
 // Two ways the news arrives, because one of them is not reliable enough on its
@@ -522,7 +773,17 @@ async function update() {
 // The app watches the file system itself, for its own reasons, so it knows
 // about every change either way — and it can say so straight to this frame.
 // Patching twice for one edit costs a fetch and a diff that finds nothing.
-if (import.meta.hot) {import.meta.hot.on('avb:page-changed', update);}
-window.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'avb:patch-now') {update();}
+if (import.meta.hot) {
+  import.meta.hot.on('avb:page-changed', update);
+}
+window.addEventListener('message', (e: MessageEvent) => {
+  const data: unknown = e.data;
+  if (typeof data === 'object' && data !== null && 'type' in data && data['type'] === 'avb:patch-now') {
+    update();
+  }
 });
+
+// update is the module's entry; scriptSignature is not referenced internally
+// but is part of the tested surface — test/morph.js slices it out of this
+// source, so deleting it would delete coverage of the script-diff decision.
+export { update, scriptSignature };

@@ -1,0 +1,25 @@
+{
+  "//": "morphClient is served to the preview page as raw browser ESM source text (main.js reads the file and hands it to the dev plugin), so it compiles separately from the CJS suite: ESM output and the DOM library. The emitted morphClient.js replaces the hand-written one, gitignored like the other artifacts. delete key: this file goes away when the whole electron tree moves to a dist layout.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "lib": ["ES2022", "DOM"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "verbatimModuleSyntax": false,
+
+    "outDir": ".",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "files": ["morphClient.ts"]
+}

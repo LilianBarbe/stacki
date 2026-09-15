@@ -44,3 +44,4 @@ electron/contentEntries.js
 electron/conflicts.js
 electron/contentConfig.js
 electron/terminal.js
+electron/morphClient.js

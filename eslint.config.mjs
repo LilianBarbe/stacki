@@ -91,14 +91,6 @@ export default [
     },
   },
   {
-    // morphClient runs as an ESM bundle in the preview frame, not as CJS main.
-    files: ['electron/morphClient.js'],
-    languageOptions: { ecmaVersion: 'latest', sourceType: 'module' },
-    rules: {
-      curly: ['error', 'all'],
-    },
-  },
-  {
     files: ['**/*.{ts,tsx}'],
     linterOptions: { reportUnusedDisableDirectives: 'warn' },
     languageOptions: {
