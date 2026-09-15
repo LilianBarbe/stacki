@@ -92,7 +92,13 @@ function parse(text: string): JsonNode {
           return fail('Expected a key');
         }
         const keySpan = string();
-        const key: string = JSON.parse(text.slice(keySpan.start, keySpan.end));
+        // The span is a quoted string, so this parses to one; the guard is
+        // unreachable but keeps the boundary honest.
+        const parsedKey: unknown = JSON.parse(text.slice(keySpan.start, keySpan.end));
+        if (typeof parsedKey !== 'string') {
+          return fail('Expected a key');
+        }
+        const key = parsedKey;
         skip();
         if (text.charAt(i) !== ':') {
           return fail('Expected ":"');
