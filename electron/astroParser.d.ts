@@ -13,3 +13,20 @@ export interface SerializePageModel {
 
 export function serializeNodes(nodes: readonly unknown[]): string;
 export function serializePage(model: SerializePageModel): string;
+
+/** A node the parser handed back, as markdownParser needs it. */
+export interface SerializeNode {
+  kind: string;
+  value?: string;
+  inner?: string;
+  // Set by markdownParser on the single node of a JSX block, so the block's
+  // source can be re-emitted verbatim; the astro parser knows nothing of it.
+  mdSource?: string;
+}
+
+export interface ParsedTemplate {
+  clean?: boolean;
+  nodes: readonly SerializeNode[];
+}
+
+export function parseTemplate(source: string): ParsedTemplate;
