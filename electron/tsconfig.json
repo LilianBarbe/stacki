@@ -21,5 +21,5 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "files": ["htmlText.ts", "serialQueue.ts", "selfWrites.ts", "windowBounds.ts", "assetRefs.ts", "frontmatter.ts", "jsCollections.ts", "devProbe.ts", "injectedRoutes.ts", "projectWatcher.ts", "componentFile.ts", "gitSnapshot.ts", "starter.ts", "cmsRefs.ts", "componentUsage.ts", "previewWorktree.ts", "scaffold.ts", "contentRefs.ts", "formats/transplant.ts", "formats/ndjson.ts", "formats/csv.ts", "formats/yaml.ts", "formats/frontmatter.ts", "formats/json.ts", "formats/toml.ts"]
+  "files": ["htmlText.ts", "serialQueue.ts", "selfWrites.ts", "windowBounds.ts", "assetRefs.ts", "frontmatter.ts", "jsCollections.ts", "devProbe.ts", "injectedRoutes.ts", "projectWatcher.ts", "componentFile.ts", "gitSnapshot.ts", "starter.ts", "cmsRefs.ts", "componentUsage.ts", "previewWorktree.ts", "scaffold.ts", "contentRefs.ts", "thumbs.ts", "formats/transplant.ts", "formats/ndjson.ts", "formats/csv.ts", "formats/yaml.ts", "formats/frontmatter.ts", "formats/json.ts", "formats/toml.ts"]
 }

@@ -1,7 +1,9 @@
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const { BrowserWindow } = require('electron');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { BrowserWindow } from 'electron';
+
+import { toRecord } from '../shared/dist/record.js';
 
 // The picture of a project on the start screen.
 //
@@ -17,7 +19,7 @@ const { BrowserWindow } = require('electron');
 // matches what the site is designed for, with no editor chrome in the frame
 // because there is no editor in the window.
 
-const VIEWPORT = { width: 1440, height: 900 };
+const VIEWPORT = { width: 1440, height: 900 } as const;
 const THUMB_WIDTH = 720;
 // Long enough for fonts, hero video posters and entrance animations to land —
 // a hero whose headline animates in letter by letter is halfway through it at a
@@ -26,23 +28,24 @@ const THUMB_WIDTH = 720;
 const SETTLE_MS = 1800;
 const LOAD_TIMEOUT = 15000;
 
-const thumbsDir = (userDataPath) => path.join(userDataPath, 'thumbs');
-const keyFor = (projectPath) => crypto.createHash('sha1').update(projectPath).digest('hex').slice(0, 16);
-const thumbPathFor = (userDataPath, projectPath) =>
+const thumbsDir = (userDataPath: string): string => path.join(userDataPath, 'thumbs');
+const keyFor = (projectPath: string): string =>
+  crypto.createHash('sha1').update(projectPath).digest('hex').slice(0, 16);
+const thumbPathFor = (userDataPath: string, projectPath: string): string =>
   path.join(thumbsDir(userDataPath), `${keyFor(projectPath)}.png`);
-const metaPathFor = (userDataPath, projectPath) =>
+const metaPathFor = (userDataPath: string, projectPath: string): string =>
   path.join(thumbsDir(userDataPath), `${keyFor(projectPath)}.json`);
 
 // What the site is made of, as one number that changes when any of it does.
 // Only the directories a page can be built from — a thumbnail does not go stale
 // because node_modules changed, and walking it would cost more than the
 // screenshot.
-const SOURCE_DIRS = ['src', 'public'];
+const SOURCE_DIRS = ['src', 'public'] as const;
 const SKIP = new Set(['node_modules', 'dist', '.git', '.astro', '.stacki', '.vercel', '.netlify']);
 
-function fingerprint(projectPath) {
+function fingerprint(projectPath: string): string {
   const hash = crypto.createHash('sha1');
-  const include = (full) => {
+  const include = (full: string): void => {
     try {
       const stat = fs.statSync(full);
       // Count + newest timestamp misses changes to every older file whenever
@@ -53,28 +56,42 @@ function fingerprint(projectPath) {
       /* raced with a write */
     }
   };
-  const walk = (dir, depth) => {
-    if (depth > 8) {return;}
-    let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  const walk = (dir: string, depth: number): void => {
+    if (depth > 8) {
+      return;
+    }
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
-      if (entry.name.startsWith('.') || SKIP.has(entry.name)) {continue;}
+      if (entry.name.startsWith('.') || SKIP.has(entry.name)) {
+        continue;
+      }
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {walk(full, depth + 1);}
-      else {include(full);}
+      if (entry.isDirectory()) {
+        walk(full, depth + 1);
+      } else {
+        include(full);
+      }
     }
   };
-  for (const dir of SOURCE_DIRS) {walk(path.join(projectPath, dir), 0);}
+  for (const dir of SOURCE_DIRS) {
+    walk(path.join(projectPath, dir), 0);
+  }
   for (const name of ['astro.config.mjs', 'astro.config.ts', 'astro.config.js', 'astro.config.mts', 'astro.config.cjs', 'package.json']) {
     include(path.join(projectPath, name));
   }
   return hash.digest('hex');
 }
 
-function readMeta(userDataPath, projectPath) {
+function readMeta(userDataPath: string, projectPath: string): Record<string, unknown> | null {
   try {
-    return JSON.parse(fs.readFileSync(metaPathFor(userDataPath, projectPath), 'utf8'));
+    const raw: unknown = JSON.parse(fs.readFileSync(metaPathFor(userDataPath, projectPath), 'utf8'));
+    return toRecord(raw) ?? null;
   } catch {
     return null;
   }
@@ -84,13 +101,15 @@ function readMeta(userDataPath, projectPath) {
  * True when the site has changed since its picture was taken — including
  * changes made with the app closed, which is most of them.
  */
-function isStale(userDataPath, projectPath) {
+function isStale(userDataPath: string, projectPath: string): boolean {
   const meta = readMeta(userDataPath, projectPath);
-  if (!meta || !fs.existsSync(thumbPathFor(userDataPath, projectPath))) {return true;}
-  return meta.fingerprint !== fingerprint(projectPath);
+  if (!meta || !fs.existsSync(thumbPathFor(userDataPath, projectPath))) {
+    return true;
+  }
+  return meta['fingerprint'] !== fingerprint(projectPath);
 }
 
-function readThumb(userDataPath, projectPath) {
+function readThumb(userDataPath: string, projectPath: string): string | null {
   try {
     const data = fs.readFileSync(thumbPathFor(userDataPath, projectPath));
     return 'data:image/png;base64,' + data.toString('base64');
@@ -99,7 +118,7 @@ function readThumb(userDataPath, projectPath) {
   }
 }
 
-function forget(userDataPath, projectPath) {
+function forget(userDataPath: string, projectPath: string): void {
   try {
     fs.rmSync(thumbPathFor(userDataPath, projectPath), { force: true });
     fs.rmSync(metaPathFor(userDataPath, projectPath), { force: true });
@@ -111,48 +130,56 @@ function forget(userDataPath, projectPath) {
 // The window the page is rendered in. No preload, no node, nothing of the app:
 // this is a browser showing a website, and it should behave like one — the page
 // is the real page, not the marked-up one the canvas edits.
-function makeWindow() {
+function makeWindow(): BrowserWindow {
+  // The untyped original carried paintWhenInitiallyHidden inside
+  // webPreferences; Electron reads that option from the window options, so
+  // this placement is inert. Preserved exactly — changing when the page paints
+  // is a behavior change, and thumbnails work as written.
+  const webPreferences = {
+    paintWhenInitiallyHidden: true,
+    offscreen: false,
+    sandbox: true,
+    contextIsolation: true,
+    nodeIntegration: false,
+    nodeIntegrationInSubFrames: false,
+    backgroundThrottling: false,
+    images: true,
+  };
   return new BrowserWindow({
     show: false,
     width: VIEWPORT.width,
     height: VIEWPORT.height,
     useContentSize: true,
     backgroundColor: '#ffffff',
-    webPreferences: {
-      // Hidden windows still paint with this, which is what capturePage needs.
-      paintWhenInitiallyHidden: true,
-      offscreen: false,
-      sandbox: true,
-      contextIsolation: true,
-      nodeIntegration: false,
-      nodeIntegrationInSubFrames: false,
-      backgroundThrottling: false,
-      images: true,
-    },
+    webPreferences,
   });
 }
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function within(promise, ms, message) {
-  let timer;
+async function within<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       promise,
-      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), ms);
+      }),
     ]);
   } finally {
     clearTimeout(timer);
   }
 }
 
+type CaptureResult = { readonly ok: true } | { readonly ok: false; readonly error: string };
+
 /**
  * Renders `url` and stores the top of the page as this project's thumbnail.
- * Returns { ok } or { ok: false, error } — a thumbnail is never worth throwing
- * over, so every failure comes back as a value and the old picture stays.
+ * A thumbnail is never worth throwing over, so every failure comes back as a
+ * value and the old picture stays.
  */
-async function capture(userDataPath, projectPath, url) {
-  let win = null;
+async function capture(userDataPath: string, projectPath: string, url: string): Promise<CaptureResult> {
+  let win: BrowserWindow | null = null;
   try {
     win = makeWindow();
     const capturedFingerprint = fingerprint(projectPath);
@@ -166,14 +193,18 @@ async function capture(userDataPath, projectPath, url) {
     // URL, a restored scroll position or a script's own scrollTo would
     // otherwise photograph the middle of the page — which is the bug this
     // replaces.
-    await within(win.webContents.executeJavaScript(
+    await within(
+      win.webContents.executeJavaScript(
         `(async () => {
            try { await document.fonts.ready; } catch {}
            window.scrollTo(0, 0);
            return document.title || '';
          })()`,
-        true
-      ), 3000, 'fonts did not settle').catch(() => '');
+        true,
+      ),
+      3000,
+      'fonts did not settle',
+    ).catch(() => '');
     await wait(SETTLE_MS);
 
     // Back to the top, and stay there until it has been painted. Two things
@@ -182,14 +213,18 @@ async function capture(userDataPath, projectPath, url) {
     // scroll that has been applied has not necessarily been drawn — the
     // compositor paints on the next frame, and capturePage photographs
     // whatever is on screen now.
-    await within(win.webContents.executeJavaScript(
+    await within(
+      win.webContents.executeJavaScript(
         `new Promise((done) => {
            document.documentElement.style.scrollBehavior = 'auto';
            window.scrollTo(0, 0);
            requestAnimationFrame(() => requestAnimationFrame(() => done(true)));
          })`,
-        true
-      ), 3000, 'the page did not repaint').catch(() => {});
+        true,
+      ),
+      3000,
+      'the page did not repaint',
+    ).catch(() => {});
     await wait(150);
 
     const image = await win.webContents.capturePage({
@@ -198,27 +233,32 @@ async function capture(userDataPath, projectPath, url) {
       width: VIEWPORT.width,
       height: VIEWPORT.height,
     });
-    if (image.isEmpty()) {return { ok: false, error: 'the capture came back empty' };}
+    if (image.isEmpty()) {
+      return { ok: false, error: 'the capture came back empty' };
+    }
 
     fs.mkdirSync(thumbsDir(userDataPath), { recursive: true });
     fs.writeFileSync(thumbPathFor(userDataPath, projectPath), image.resize({ width: THUMB_WIDTH }).toPNG());
     fs.writeFileSync(
       metaPathFor(userDataPath, projectPath),
-      JSON.stringify({ fingerprint: capturedFingerprint, capturedAt: Date.now(), url }, null, 2)
+      JSON.stringify({ fingerprint: capturedFingerprint, capturedAt: Date.now(), url }, null, 2),
     );
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: String(err?.message || err) };
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: message || String(err) };
   } finally {
     try {
-      if (win && !win.isDestroyed()) {win.destroy();}
+      if (win && !win.isDestroyed()) {
+        win.destroy();
+      }
     } catch {
       /* already gone */
     }
   }
 }
 
-module.exports = {
+export {
   capture,
   fingerprint,
   isStale,
