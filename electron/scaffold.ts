@@ -2,10 +2,10 @@
 // immediately: a base layout, a handful of components with typed props,
 // and an index page.
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
-const FILES = {
+const FILES: Record<string, (name: string) => string> = {
   'package.json': (name) =>
     JSON.stringify(
       {
@@ -159,7 +159,7 @@ import Footer from '../components/Footer.astro';
 `,
 };
 
-function scaffoldProject(dir, name) {
+function scaffoldProject(dir: string, name?: string): string {
   const safeName = (name || path.basename(dir))
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
@@ -173,4 +173,4 @@ function scaffoldProject(dir, name) {
   return dir;
 }
 
-module.exports = { scaffoldProject };
+export { scaffoldProject };

@@ -33,3 +33,5 @@ electron/starter.js
 electron/cmsRefs.js
 electron/componentUsage.js
 electron/previewWorktree.js
+electron/scaffold.js
+electron/contentRefs.js

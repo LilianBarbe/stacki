@@ -43,6 +43,8 @@ export default [
       'electron/cmsRefs.js',
       'electron/componentUsage.js',
       'electron/previewWorktree.js',
+      'electron/scaffold.js',
+      'electron/contentRefs.js',
       'electron/formats/transplant.js',
       'electron/formats/ndjson.js',
       'electron/formats/csv.js',
