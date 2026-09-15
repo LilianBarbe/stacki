@@ -51,6 +51,7 @@ export default [
       'electron/formats/yaml.js',
       'electron/formats/frontmatter.js',
       'electron/formats/json.js',
+      'electron/formats/toml.js',
     ],
   },
   {
