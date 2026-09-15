@@ -33,6 +33,7 @@ export default [
       'electron/windowBounds.js',
       'electron/assetRefs.js',
       'electron/frontmatter.js',
+      'electron/jsCollections.js',
     ],
   },
   {

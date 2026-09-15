@@ -18,3 +18,4 @@ electron/selfWrites.js
 electron/windowBounds.js
 electron/assetRefs.js
 electron/frontmatter.js
+electron/jsCollections.js
