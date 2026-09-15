@@ -37,6 +37,8 @@ export default [
       'electron/devProbe.js',
       'electron/injectedRoutes.js',
       'electron/projectWatcher.js',
+      'electron/componentFile.js',
+      'electron/gitSnapshot.js',
       'electron/formats/transplant.js',
       'electron/formats/ndjson.js',
       'electron/formats/csv.js',

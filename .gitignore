@@ -27,3 +27,5 @@ electron/formats/ndjson.js
 electron/formats/csv.js
 electron/formats/yaml.js
 electron/formats/frontmatter.js
+electron/componentFile.js
+electron/gitSnapshot.js

@@ -13,6 +13,12 @@
 // the work is recoverable even though the tree no longer shows it. Neither
 // rewrites history — going back is itself something you can come back from.
 
+interface GitResult {
+  readonly stdout: string;
+}
+
+type Git = (projectPath: string, args: readonly string[]) => Promise<GitResult>;
+
 /**
  * Save a version.
  *
@@ -20,9 +26,12 @@
  * and still does by default — picking is the opt-in. Given a list, only those
  * files are saved and everything else stays changed on disk exactly as it was.
  */
-async function commit(git, { projectPath, message, paths }) {
+async function commit(
+  git: Git,
+  { projectPath, message, paths }: { readonly projectPath: string; readonly message?: string; readonly paths?: readonly unknown[] },
+): Promise<{ ok: true; files: number | null }> {
   const subject = message || 'Update from Stacki';
-  const chosen = Array.isArray(paths) ? paths.filter(Boolean) : null;
+  const chosen = Array.isArray(paths) ? paths.filter(Boolean).map(String) : null;
   if (chosen && !chosen.length) {
     throw new Error('Nothing was picked to save — choose at least one file.');
   }
@@ -56,7 +65,10 @@ async function commit(git, { projectPath, message, paths }) {
  * at that commit is a question this cannot answer by writing something, so it
  * says so instead.
  */
-async function restoreFile(git, { projectPath, ref, path: filePath }) {
+async function restoreFile(
+  git: Git,
+  { projectPath, ref, path: filePath }: { readonly projectPath: string; readonly ref: string; readonly path: string },
+): Promise<{ ok: boolean; missing?: boolean; message?: string }> {
   try {
     await git(projectPath, ['cat-file', '-e', `${ref}:${filePath}`]);
   } catch {
@@ -83,13 +95,16 @@ async function restoreFile(git, { projectPath, ref, path: filePath }) {
  * first whenever there is anything to lose. Without that, restoring over
  * uncommitted work would destroy it with no way back.
  */
-async function restoreProject(git, { projectPath, ref, park }) {
+async function restoreProject(
+  git: Git,
+  { projectPath, ref, park }: { readonly projectPath: string; readonly ref: string; readonly park?: () => Promise<boolean> },
+): Promise<{ ok: boolean; parked: boolean }> {
   const dirty = (await git(projectPath, ['status', '--porcelain'])).stdout.trim().length > 0;
   let parked = false;
   if (dirty) {
     if (!park) {
       throw new Error(
-        'There are unsaved changes here. Save them first — going back would write over them.'
+        'There are unsaved changes here. Save them first — going back would write over them.',
       );
     }
     parked = await park();
@@ -111,4 +126,4 @@ async function restoreProject(git, { projectPath, ref, park }) {
   return { ok: true, parked };
 }
 
-module.exports = { commit, restoreFile, restoreProject };
+export { commit, restoreFile, restoreProject };

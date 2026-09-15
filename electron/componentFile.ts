@@ -12,23 +12,45 @@
 // import that came along can't simply be copied — a relative path is relative
 // to the file it was written in, and the new file is somewhere else.
 
-const fs = require('fs');
-const path = require('path');
-const { serializePage, serializeNodes } = require('./astroParser');
+import fs from 'fs';
+import path from 'path';
 
-const toPosix = (p) => p.split(path.sep).join('/');
+import { serializePage, serializeNodes } from './astroParser.js';
+
+const toPosix = (p: string): string => p.split(path.sep).join('/');
 
 // A component's name is a filename, an import and a tag all at once — and the
 // capital is load-bearing: Astro reads a lowercase tag as an HTML element, so
 // `<card />` renders a literal <card> and the component never appears.
 const VALID_NAME = /^[A-Z][A-Za-z0-9]*$/;
 
+interface ComponentImport {
+  readonly name?: string;
+  readonly path?: string;
+}
+
+interface ComponentFileArgs {
+  readonly projectPath: string;
+  readonly pagePath: string;
+  readonly name: string;
+  readonly nodes: readonly unknown[];
+  readonly imports?: readonly ComponentImport[];
+  readonly props?: readonly unknown[];
+}
+
 /**
  * The file to write for a new component, as `{ path, rel, text }`. Throws when
  * the name can't be used — nothing is written here; the caller does that, so
  * every write to the project stays in one place.
  */
-function componentFile({ projectPath, pagePath, name, nodes, imports = [], props = [] }) {
+function componentFile({
+  projectPath,
+  pagePath,
+  name,
+  nodes,
+  imports = [],
+  props = [],
+}: ComponentFileArgs): { path: string; rel: string; text: string } {
   if (!VALID_NAME.test(String(name || ''))) {
     throw new Error('A component name has to be a word starting with a capital letter.');
   }
@@ -53,7 +75,7 @@ function componentFile({ projectPath, pagePath, name, nodes, imports = [], props
   const markup = serializeNodes(nodes);
   const used = imports.filter(
     (imp) =>
-      imp?.name && new RegExp(`(^|[^A-Za-z0-9_$])${imp.name}([^A-Za-z0-9_$]|$)`).test(markup)
+      imp?.name && new RegExp(`(^|[^A-Za-z0-9_$])${imp.name}([^A-Za-z0-9_$]|$)`).test(markup),
   );
 
   // `@/components/Button.astro` and bare package names mean the same thing from
@@ -62,7 +84,9 @@ function componentFile({ projectPath, pagePath, name, nodes, imports = [], props
   const pageDir = path.dirname(pagePath);
   const moved = used.map((imp) => {
     const spec = String(imp.path || '');
-    if (!spec.startsWith('.')) {return { ...imp };}
+    if (!spec.startsWith('.')) {
+      return { ...imp };
+    }
     const rel = toPosix(path.relative(componentsDir, path.resolve(pageDir, spec)));
     return { ...imp, path: rel.startsWith('.') ? rel : './' + rel };
   });
@@ -85,4 +109,4 @@ function componentFile({ projectPath, pagePath, name, nodes, imports = [], props
   return { path: target, rel: toPosix(path.relative(projectPath, target)), text };
 }
 
-module.exports = { componentFile };
+export { componentFile };
