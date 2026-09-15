@@ -54,14 +54,14 @@ bridge); rescan/save drain caps; `assertTreeInvariants`; packaging asarUnpack;
 | `contentEntries` (retired its seed d.ts) | ✅ |
 | `conflicts` (CommonRun/DiffRun union; retired seed d.ts) | ✅ |
 | `contentConfig` (Service interface, child-process typing) | ✅ |
+| `terminal` (first ipcMain registrar; node-pty seed contract) | ✅ |
+| `morphClient` (browser ESM, own tsconfig + DOM lib; fixed console.warn reload bug) | ✅ |
+| `markdownParser` (byte-exact round trips incl. CRLF; seed gains parseTemplate) | ✅ |
 
 Remaining electron leaves (by lines):
 
 | File | Lines | Notes |
 |---|---|---|
-| `terminal.js` | 455 | Medium leaf |
-| `morphClient.js` | 528 | Medium leaf |
-| `markdownParser.js` | 552 | Medium leaf |
 | `cssVars.js` | 1,167 | Large leaf |
 | `preload.js` | 2,026 | ~80 `window.avb` methods; sandboxed preload must stay CJS; Phase 2 typed `AvbBridge` applies |
 | `astroParser.js` | 3,158 | **Flagship.** Own focused session; delete `astroParser.d.ts` on landing; then tighten `PageModel.frontmatterLayout.slots` from `unknown` to `ImportSlot[]` |
