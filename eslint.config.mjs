@@ -34,6 +34,9 @@ export default [
       'electron/assetRefs.js',
       'electron/frontmatter.js',
       'electron/jsCollections.js',
+      'electron/devProbe.js',
+      'electron/injectedRoutes.js',
+      'electron/projectWatcher.js',
     ],
   },
   {

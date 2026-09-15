@@ -8,6 +8,14 @@
 // on recognising the error screen's markup or parsing the server's log — both of
 // which change with every version of Astro and Vite.
 
+interface ProbeResponse {
+  readonly ok: boolean;
+  readonly status: number;
+  arrayBuffer(): Promise<unknown>;
+}
+
+type FetchLike = (url: string, init: { redirect: 'follow' }) => Promise<ProbeResponse>;
+
 /**
  * Ask the dev server for a URL and report only the verdict.
  *
@@ -16,19 +24,24 @@
  * on. The body is drained and dropped — it can be a megabyte of stack trace,
  * and none of it is wanted.
  */
-async function probeUrl(url, fetchImpl = fetch) {
-  if (!url || typeof url !== 'string') {return { ok: false, status: 0 }}
+async function probeUrl(
+  url: unknown,
+  fetchImpl: FetchLike = fetch,
+): Promise<{ ok: boolean; status: number }> {
+  if (!url || typeof url !== 'string') {
+    return { ok: false, status: 0 };
+  }
   try {
-    const res = await fetchImpl(url, { redirect: 'follow' })
+    const res = await fetchImpl(url, { redirect: 'follow' });
     try {
-      await res.arrayBuffer()
+      await res.arrayBuffer();
     } catch {
       /* nothing to drain */
     }
-    return { ok: res.ok, status: res.status }
+    return { ok: res.ok, status: res.status };
   } catch {
-    return { ok: false, status: 0 }
+    return { ok: false, status: 0 };
   }
 }
 
-module.exports = { probeUrl }
+export { probeUrl };

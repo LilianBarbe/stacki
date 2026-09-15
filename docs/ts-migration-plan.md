@@ -186,6 +186,11 @@ owed first: the diff-mapping plan's projection concept is `shared/page-node.ts`
 
 ## Risks and mitigations
 
+- **Undeclared tooling is fragile** (learned the hard way): typescript,
+  eslint, and the @types packages spent weeks as transitive-only installs,
+  until a package-manager run outside the repo's control pruned them
+  mid-session. They are declared in `devDependencies` now; treat any future
+  "works but isn't declared" tool the same day it enters the gate.
 - **The 4 giant files** — converting + splitting at once doubles the diff.
   Phase 3 order forbids it; each hotspot is its own commit sequence.
 - **Electron CJS vs renderer ESM** — `shared/` compiles to CJS for the main

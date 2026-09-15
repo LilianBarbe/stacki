@@ -14,18 +14,29 @@
 // is undone by the next install and renaming or deleting is not the editor's
 // business — so these never join the page list the editor writes through.
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+
+import { toRecord, toArray } from '../shared/dist/record.js';
 
 /** The package an entrypoint belongs to, when it is inside one. */
-function packageOf(entrypoint) {
+function packageOf(entrypoint: unknown): string | null {
   // Resolve the innermost package, including Windows paths and pnpm's
   // node_modules/.pnpm/.../node_modules/<package> layout.
   const normalized = '/' + String(entrypoint || '').replace(/\\/g, '/');
   const at = normalized.lastIndexOf('/node_modules/');
-  if (at === -1) {return null;}
+  if (at === -1) {
+    return null;
+  }
   const m = normalized.slice(at + '/node_modules/'.length).match(/^((?:@[^/]+\/)?[^/]+)/);
-  return m ? m[1] : null;
+  return m?.[1] ?? null;
+}
+
+export interface InjectedRoute {
+  readonly route: string;
+  readonly entrypoint: string | null;
+  readonly from: string | null;
+  readonly params: readonly unknown[];
 }
 
 /**
@@ -37,28 +48,42 @@ function packageOf(entrypoint) {
  * no server has run yet, or this Astro is too old to report them, and either
  * way the app carries on with the pages it can see.
  */
-function readInjectedRoutes(projectPath) {
-  let routes;
+function readInjectedRoutes(projectPath: string): InjectedRoute[] {
+  let raw: unknown;
   try {
-    routes = JSON.parse(
-      fs.readFileSync(path.join(projectPath, 'node_modules', '.avb', 'routes.json'), 'utf8')
+    raw = JSON.parse(
+      fs.readFileSync(path.join(projectPath, 'node_modules', '.avb', 'routes.json'), 'utf8'),
     );
   } catch {
     return [];
   }
-  if (!Array.isArray(routes)) {return [];}
-  const injected = [];
+  const routes = toArray(raw);
+  if (!routes) {
+    return [];
+  }
+  const injected: InjectedRoute[] = [];
   for (const r of routes) {
-    if (!r || typeof r.pattern !== 'string' || r.pattern.startsWith('/__avb')) {continue;}
-    if (!r.origin || r.origin === 'project' || r.origin === 'internal') {continue;}
+    const record = toRecord(r);
+    const pattern = record?.['pattern'];
+    if (typeof pattern !== 'string' || pattern.startsWith('/__avb')) {
+      continue;
+    }
+    const origin = record?.['origin'];
+    if (!origin || origin === 'project' || origin === 'internal') {
+      continue;
+    }
+    const entrypoint = record?.['entrypoint'];
+    const params = record?.['params'];
     injected.push({
-      route: r.pattern,
-      entrypoint: r.entrypoint || null,
-      from: packageOf(r.entrypoint),
-      params: Array.isArray(r.params) ? r.params : [],
+      route: pattern,
+      // Astro writes a string here or omits it; anything else is not a route
+      // entrypoint this editor can open, so the boundary drops it to null.
+      entrypoint: typeof entrypoint === 'string' ? entrypoint : null,
+      from: packageOf(entrypoint),
+      params: toArray(params) ?? [],
     });
   }
   return injected;
 }
 
-module.exports = { readInjectedRoutes, packageOf };
+export { readInjectedRoutes, packageOf };
