@@ -41,3 +41,4 @@ electron/thumbs.js
 electron/gitBranches.js
 electron/gitHistory.js
 electron/contentEntries.js
+electron/conflicts.js

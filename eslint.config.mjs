@@ -49,6 +49,7 @@ export default [
       'electron/thumbs.js',
       'electron/gitBranches.js',
       'electron/gitHistory.js',
+      'electron/conflicts.js',
       'electron/formats/transplant.js',
       'electron/formats/ndjson.js',
       'electron/formats/csv.js',
