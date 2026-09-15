@@ -58,6 +58,7 @@ bridge); rescan/save drain caps; `assertTreeInvariants`; packaging asarUnpack;
 | `morphClient` (browser ESM, own tsconfig + DOM lib; fixed console.warn reload bug) | ✅ |
 | `markdownParser` (byte-exact round trips incl. CRLF; seed gains parseTemplate) | ✅ |
 | `cssVars` (postcss 8 types; array-collect rule lookups) | ✅ |
+| `preload` (own tsconfig, DOM lib; predicate-narrowed CSSOM; parsed message payloads; Canvas logic + full window.avb bridge) | ✅ |
 
 Remaining electron leaves (by lines):
 
