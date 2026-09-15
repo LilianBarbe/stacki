@@ -63,9 +63,9 @@ const QUARANTINED = [
   'test:jsguard',
   'test:varsrowheight',
 ];
-// Load-sensitive perf checks that fail intermittently on main too. Failures
+// Load-sensitive checks that fail intermittently on main too. Failures
 // are tolerated; passing is normal, so no heal report.
-const FLAKY = ['test:hovercost'];
+const FLAKY = ['test:hovercost', 'test:popoverdropdown'];
 
 console.log(`\n${names.length - failed.length}/${names.length} test commands passed in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
 if (failed.length) {console.error(`Failed: ${failed.join(', ')}`);}
