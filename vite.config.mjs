@@ -14,7 +14,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     commonjsOptions: {
-      include: [/node_modules/, /electron[\\/]frontmatter\.js$/],
+      include: [/node_modules/, /electron[\\/]frontmatter\.js$/, /shared[\\/]dist/],
     },
   },
 });
