@@ -61,7 +61,7 @@ const preload = fs.readFileSync(path.join(root, 'electron', 'preload.js'), 'utf8
 const exposed = new Set();
 const bridgeStart = preload.indexOf('contextBridge.exposeInMainWorld');
 const bridgeText = preload.slice(bridgeStart);
-for (const m of bridgeText.matchAll(/^\s{2}([A-Za-z_$][\w$]*)\s*:/gm)) {exposed.add(m[1]);}
+for (const m of bridgeText.matchAll(/^\s+([A-Za-z_$][\w$]*)\s*:/gm)) {exposed.add(m[1]);}
 
 // --- what the main process handles ------------------------------------------
 const main = fs.readFileSync(path.join(root, 'electron', 'main.js'), 'utf8');
@@ -84,7 +84,7 @@ for (const text of mainSide) {
 // The channel each exposed method invokes, so a method that is exposed but has
 // no handler is caught too — that fails at runtime with "no handler registered".
 const channels = new Map();
-for (const m of bridgeText.matchAll(/^\s{2}([A-Za-z_$][\w$]*)\s*:\s*invoke\(\s*['"]([^'"]+)['"]/gm)) {
+for (const m of bridgeText.matchAll(/^\s+([A-Za-z_$][\w$]*)\s*:\s*invoke\(\s*['"]([^'"]+)['"]/gm)) {
   channels.set(m[1], m[2]);
 }
 

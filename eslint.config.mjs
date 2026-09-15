@@ -54,6 +54,8 @@ export default [
       'electron/terminal.js',
       'electron/markdownParser.js',
       'electron/cssVars.js',
+      'electron/preload.js',
+      'electron/morphClient.js',
       'electron/formats/transplant.js',
       'electron/formats/ndjson.js',
       'electron/formats/csv.js',

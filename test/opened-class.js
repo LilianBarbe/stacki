@@ -268,7 +268,7 @@ const frame = (url) => {
   );
   // The one raw read left is the filter's own; anything else is a way for these
   // classes to reach the app.
-  const raw = source.split('\n').filter((l) => /\[\.\.\.\w+\.classList\]/.test(l));
+  const raw = source.split('\n').filter((l) => /Array\.from\(\w+\.classList\)/.test(l));
   check(
     'and every reported class list is filtered through it',
     raw.length === 1 && /ownClasses/.test(raw[0]),

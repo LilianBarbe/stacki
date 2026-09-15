@@ -25,6 +25,7 @@ const staticGates = [
   ['build:contracts', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('shared', 'tsconfig.json')]],
   ['build:electron', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('electron', 'tsconfig.json')]],
   ['build:morph', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('electron', 'tsconfig.morph.json')]],
+  ['build:preload', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('electron', 'tsconfig.preload.json')]],
   ['tsc --noEmit', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit']],
   ['eslint', [process.execPath, path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.']],
   ['ratchet-check', [process.execPath, path.join(root, 'scripts', 'ratchet-check.js')]],

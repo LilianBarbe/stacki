@@ -104,7 +104,7 @@ const check = (what, condition, detail) => {
   const preload = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
   check(
     'one run is enough to narrow to the instance',
-    /if \(runs\.length\) \{focusCache = runs\[focusOcc\]/.test(preload),
+    /if \(runs\.length\) \{[\s\S]*?focusCache = runs\[focusOcc\]/.test(preload),
     'focusRoots still requires more than one run'
   );
   check('and none still narrows to nothing', /if \(focusPath\) \{/.test(preload));

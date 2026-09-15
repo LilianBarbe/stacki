@@ -34,8 +34,10 @@ function loadGapBandsFor(window) {
   const src = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
   const start = src.indexOf('  const gapBandsFor = (el, cs) => {');
   if (start === -1) {throw new Error('gapBandsFor not found in preload.js — has it been renamed?');}
-  const end = src.indexOf('\n  };', start);
-  const body = src.slice(start, end + '\n  };'.length);
+  // The file is now the tsc emit of preload.ts, which indents every level
+  // with four spaces — the function's own closing brace sits at that depth.
+  const end = src.indexOf('\n    };', start);
+  const body = src.slice(start, end + '\n    };'.length);
    
   return new Function('window', `${body}\nreturn gapBandsFor;`)(window);
 }

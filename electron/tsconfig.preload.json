@@ -1,0 +1,25 @@
+{
+  "//": "preload runs in the renderer (the app window AND the preview/canvas frames), so it compiles separately from the main-process suite: it needs the DOM library and the electron renderer types. It must stay CommonJS — an Electron sandboxed preload is loaded as CJS — so it shares the in-place emit the other artifacts use. The emitted preload.js replaces the hand-written one, gitignored like the others. delete key: this file goes away with the rest of the per-target configs when the electron tree moves to a dist layout.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2022", "DOM"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "verbatimModuleSyntax": false,
+
+    "outDir": ".",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "files": ["preload.ts", "preload-process.d.ts"]
+}

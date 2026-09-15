@@ -52,7 +52,7 @@ function contentHarness(t) {
   };
   const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'contentConfig.js'), 'utf8');
   const mod = { exports: {} };
-  const fn = vm.runInNewContext('(function(require, module, __dirname) {' + source + '\n})', {
+  const fn = vm.runInNewContext('(function(require, module, __dirname, exports) {' + source + '\n})', {
     process,
     setTimeout: (callback, delay) => {
       const timer = { callback, delay, unref() {} };
@@ -61,7 +61,7 @@ function contentHarness(t) {
     },
     clearTimeout: (timer) => timers.delete(timer),
   });
-  fn((name) => mocks[name] || require(name), mod, path.join(__dirname, '..', 'electron'));
+  fn((name) => mocks[name] || require(name), mod, path.join(__dirname, '..', 'electron'), mod.exports);
   t.after(() => {
     mod.exports.stopAllServices();
     assert.equal(timers.size, 0, 'stopping releases every timeout');

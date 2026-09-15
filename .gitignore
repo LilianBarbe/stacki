@@ -47,3 +47,4 @@ electron/terminal.js
 electron/morphClient.js
 electron/markdownParser.js
 electron/cssVars.js
+electron/preload.js
