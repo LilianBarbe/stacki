@@ -50,6 +50,7 @@ export default [
       'electron/formats/csv.js',
       'electron/formats/yaml.js',
       'electron/formats/frontmatter.js',
+      'electron/formats/json.js',
     ],
   },
   {

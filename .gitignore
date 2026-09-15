@@ -35,3 +35,4 @@ electron/componentUsage.js
 electron/previewWorktree.js
 electron/scaffold.js
 electron/contentRefs.js
+electron/formats/json.js
