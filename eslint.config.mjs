@@ -51,6 +51,7 @@ export default [
       'electron/gitHistory.js',
       'electron/conflicts.js',
       'electron/contentConfig.js',
+      'electron/terminal.js',
       'electron/formats/transplant.js',
       'electron/formats/ndjson.js',
       'electron/formats/csv.js',

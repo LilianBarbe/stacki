@@ -1,3 +1,12 @@
+import { ipcMain } from 'electron';
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
+import { Buffer } from 'node:buffer';
+import { spawn, type PseudoTerminal, type SpawnOptions } from 'node-pty';
+
+import { toRecord } from '../shared/dist/record.js';
+
 // Embedded terminal — a real login shell in the open project, hosted by
 // node-pty and rendered by xterm in the bottom dock.
 //
@@ -12,16 +21,12 @@
 // (kept — see below) minus the projects-base path model, which Stacki replaces
 // with the open-project check the asset protocol already uses.
 
-const { ipcMain } = require('electron');
-const path = require('node:path');
-const os = require('node:os');
-const fs = require('node:fs');
-const pty = require('node-pty');
-
 const isWin = process.platform === 'win32';
 
+type TerminalHandle = { readonly proc: PseudoTerminal; readonly cwd: string };
+
 // terminalId -> { proc, cwd }
-const terminals = new Map();
+const terminals = new Map<string, TerminalHandle>();
 
 // ---------------------------------------------------------------------------
 // Shell environment
@@ -39,7 +44,7 @@ const terminals = new Map();
 // probes a shell to fix *this process's* PATH before spawning `astro`/`git`
 // directly. Here the shell we spawn does its own sourcing; we only need to
 // hand it a plausible starting point and get Electron's fingerprints off it.
-function buildShellEnv() {
+function buildShellEnv(): Record<string, string | undefined> {
   const env = { ...process.env };
 
   // Strip Electron/npm-leaked vars so the shell looks like a fresh
@@ -48,20 +53,24 @@ function buildShellEnv() {
   // default — which masks globally installed CLIs. TERM_PROGRAM gates some
   // user .zshrc/.bashrc branches; set a stable marker so conditional config
   // still runs.
-  delete env.ELECTRON_RUN_AS_NODE;
-  delete env.NODE_OPTIONS;
-  delete env.NODE_PATH;
-  delete env.INIT_CWD;
-  delete env.VITE_DEV_SERVER_URL;
+  delete env['ELECTRON_RUN_AS_NODE'];
+  delete env['NODE_OPTIONS'];
+  delete env['NODE_PATH'];
+  delete env['INIT_CWD'];
+  delete env['VITE_DEV_SERVER_URL'];
   for (const key of Object.keys(env)) {
-    if (key.startsWith('npm_')) {delete env[key];}
+    if (key.startsWith('npm_')) {
+      delete env[key];
+    }
   }
-  env.TERM_PROGRAM = 'stacki';
-  env.COLORTERM = 'truecolor';
+  env['TERM_PROGRAM'] = 'stacki';
+  env['COLORTERM'] = 'truecolor';
 
-  if (isWin) {return env;}
+  if (isWin) {
+    return env;
+  }
 
-  const home = process.env.HOME || '';
+  const home = process.env['HOME'] || '';
   const extraPaths = [
     '/opt/homebrew/bin',
     '/opt/homebrew/sbin',
@@ -80,10 +89,12 @@ function buildShellEnv() {
     home && path.join(home, 'bin'),
   ].filter(Boolean);
 
-  const seen = new Set();
-  env.PATH = [...extraPaths, ...(env.PATH || '').split(':')]
+  const seen = new Set<string>();
+  env['PATH'] = [...extraPaths, ...(env['PATH'] || '').split(':')]
     .filter((p) => {
-      if (!p || seen.has(p)) {return false;}
+      if (!p || seen.has(p)) {
+        return false;
+      }
       seen.add(p);
       return true;
     })
@@ -104,7 +115,7 @@ function buildShellEnv() {
 const CLIPBOARD_DIR = path.join(os.tmpdir(), 'stacki-clipboard');
 const CLIPBOARD_TTL_MS = 60 * 60 * 1000; // prune pasted images older than an hour
 
-const IMAGE_MIME_EXT = {
+const IMAGE_MIME_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
@@ -116,8 +127,8 @@ const IMAGE_MIME_EXT = {
 
 // Keep the temp dir from growing without bound. Best-effort: races and
 // unreadable entries are skipped rather than failing the paste.
-function pruneOldClipboardImages() {
-  let names;
+function pruneOldClipboardImages(): void {
+  let names: string[];
   try {
     names = fs.readdirSync(CLIPBOARD_DIR);
   } catch {
@@ -127,7 +138,9 @@ function pruneOldClipboardImages() {
   for (const name of names) {
     const full = path.join(CLIPBOARD_DIR, name);
     try {
-      if (now - fs.statSync(full).mtimeMs > CLIPBOARD_TTL_MS) {fs.unlinkSync(full);}
+      if (now - fs.statSync(full).mtimeMs > CLIPBOARD_TTL_MS) {
+        fs.unlinkSync(full);
+      }
     } catch {
       /* vanished or locked */
     }
@@ -148,20 +161,48 @@ const RETRIABLE_SPAWN_CODES = new Set(['EBADF', 'EAGAIN', 'EMFILE', 'ENFILE']);
 const FD_LIMIT_CODES = new Set(['EMFILE', 'ENFILE']);
 const SPAWN_RETRIES = 3;
 const SPAWN_RETRY_DELAY_MS = 150;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-async function spawnWithRetry(shell, args, options) {
-  let lastErr;
+interface SpawnFields {
+  code?: string;
+  message?: string;
+}
+
+// A pty setup failure can be any throw; only its oserror face is meaningful.
+function spawnError(error: unknown): SpawnFields {
+  const record = toRecord(error);
+  const fields: SpawnFields = {};
+  const code = record?.['code'];
+  const message = record?.['message'];
+  // Only present keys appear; with exactOptionalPropertyTypes, undefined is
+  // not a value for an optional property.
+  if (typeof code === 'string') {
+    fields.code = code;
+  }
+  if (typeof message === 'string') {
+    fields.message = message;
+  }
+  return fields;
+}
+
+type SpawnResult =
+  | { readonly proc: PseudoTerminal; readonly error: null }
+  | { readonly proc: null; readonly error: SpawnFields };
+
+async function spawnWithRetry(shell: string, args: readonly string[], options: SpawnOptions): Promise<SpawnResult> {
+  let lastErr: SpawnFields | null = null;
   for (let attempt = 0; attempt <= SPAWN_RETRIES; attempt++) {
     try {
-      return { proc: pty.spawn(shell, args, options) };
+      return { proc: spawn(shell, [...args], options), error: null };
     } catch (err) {
-      lastErr = err;
-      if (!RETRIABLE_SPAWN_CODES.has(err?.code) || attempt === SPAWN_RETRIES) {break;}
+      lastErr = spawnError(err);
+      if (!RETRIABLE_SPAWN_CODES.has(lastErr.code ?? '') || attempt === SPAWN_RETRIES) {
+        break;
+      }
       await sleep(SPAWN_RETRY_DELAY_MS);
     }
   }
-  return { error: lastErr };
+  return { proc: null, error: lastErr ?? {} };
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +221,7 @@ async function spawnWithRetry(shell, args, options) {
 
 const FLOW_HIGH_WATERMARK = 100_000; // pause above this many unacked chars
 const FLOW_LOW_WATERMARK = 5_000; // resume once drained below this
-const flowState = new Map(); // terminalId -> { unacked, paused }
+const flowState = new Map<string, { unacked: number; paused: boolean }>();
 
 // ---------------------------------------------------------------------------
 // Tab labels
@@ -199,36 +240,42 @@ const flowState = new Map(); // terminalId -> { unacked, paused }
 // ---------------------------------------------------------------------------
 
 const PROCESS_POLL_MS = 2000;
-const lastProcessName = new Map(); // terminalId -> last name sent
-let pollTimer = null;
+const lastProcessName = new Map<string, string>();
+let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-function pollProcessNames(send) {
+function pollProcessNames(send: (channel: string, payload: unknown) => void): void {
   if (terminals.size === 0) {
     stopPolling();
     return;
   }
   for (const [id, entry] of terminals) {
-    let name;
+    let name: string;
     try {
-      name = entry.proc?.process;
+      name = entry.proc.process;
     } catch {
       continue; // exited between the map read and the fd lookup
     }
-    if (!name || lastProcessName.get(id) === name) {continue;}
+    if (!name || lastProcessName.get(id) === name) {
+      continue;
+    }
     lastProcessName.set(id, name);
     send('terminal:process', { id, name });
   }
 }
 
-function startPolling(send) {
-  if (pollTimer) {return;}
+function startPolling(send: (channel: string, payload: unknown) => void): void {
+  if (pollTimer) {
+    return;
+  }
   pollTimer = setInterval(() => pollProcessNames(send), PROCESS_POLL_MS);
   // Never hold the event loop open on quit — this poll is decoration.
   pollTimer.unref?.();
 }
 
-function stopPolling() {
-  if (!pollTimer) {return;}
+function stopPolling(): void {
+  if (!pollTimer) {
+    return;
+  }
   clearInterval(pollTimer);
   pollTimer = null;
 }
@@ -237,18 +284,55 @@ function stopPolling() {
 // IPC
 // ---------------------------------------------------------------------------
 
+interface TerminalStartPayload {
+  readonly id: string;
+  readonly cwd: string;
+  readonly autoLaunch?: string;
+}
+interface TerminalIdPayload {
+  readonly id: string;
+}
+interface TerminalInputPayload {
+  readonly id: string;
+  readonly data: string;
+}
+interface TerminalResizePayload {
+  readonly id: string;
+  readonly cols: number;
+  readonly rows: number;
+}
+interface TerminalAckPayload {
+  readonly id: string;
+  readonly count: number;
+}
+interface TerminalClipboardPayload {
+  readonly bytes: readonly number[];
+  readonly mime: string;
+}
+
 /**
  * @param send        (channel, payload) => void — posts to the renderer
  * @param projectRoot () => string|null — the open project, for the cwd check
  */
-function registerTerminalHandlers({ send, projectRoot }) {
-  ipcMain.handle('terminal:start', async (_e, { id, cwd, autoLaunch } = {}) => {
+function registerTerminalHandlers({
+  send,
+  projectRoot,
+}: {
+  readonly send: (channel: string, payload: unknown) => void;
+  readonly projectRoot: () => string | null;
+}): void {
+  ipcMain.handle('terminal:start', async (event: unknown, payload: TerminalStartPayload) => {
     // The shell can go anywhere the user takes it, but the app only ever opens
     // one *at* the project it has open — same reach as the asset protocol.
     const root = projectRoot();
+    const cwd = payload?.cwd;
     const abs = cwd ? path.resolve(cwd) : null;
     if (!root || !abs || (abs !== root && !(abs + path.sep).startsWith(root + path.sep))) {
       return { ok: false, error: 'Terminal can only open inside the current project.' };
+    }
+    const id = payload?.id ?? '';
+    if (!id) {
+      return { ok: false, error: 'Missing terminal id.' };
     }
 
     // Ids are reused (a renderer reload re-creates "…:term-1"), so retire any
@@ -263,7 +347,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
       }
     }
 
-    const shell = isWin ? 'powershell.exe' : process.env.SHELL || '/bin/bash';
+    const shell = isWin ? 'powershell.exe' : process.env['SHELL'] || '/bin/bash';
     // Login shell on macOS/Linux so ~/.zprofile / ~/.bash_profile / ~/.profile
     // run — that's where Homebrew, nvm and CLI installers add to PATH.
     // Without it, half the user's tools are "command not found" on a GUI
@@ -279,12 +363,12 @@ function registerTerminalHandlers({ send, projectRoot }) {
     });
 
     if (!proc) {
-      const code = error?.code;
+      const code = error.code;
       return {
         ok: false,
-        error: FD_LIMIT_CODES.has(code)
+        error: FD_LIMIT_CODES.has(code ?? '')
           ? `Couldn't open a terminal — too many open files (${code}). Close a few tabs and try again.`
-          : `Couldn't start ${shell}${code ? ` (${code})` : ''}: ${error?.message || 'unknown error'}`,
+          : `Couldn't start ${shell}${code ? ` (${code})` : ''}: ${error.message || 'unknown error'}`,
       };
     }
 
@@ -304,15 +388,17 @@ function registerTerminalHandlers({ send, projectRoot }) {
     // nothing is reading stdin yet, leaving the user at an empty prompt. Wait
     // for init to fall quiet instead, which is a reliable proxy for "the
     // prompt is up".
-    const command = typeof autoLaunch === 'string' ? autoLaunch.trim() : '';
+    const command = typeof payload?.autoLaunch === 'string' ? payload.autoLaunch.trim() : '';
     let launched = !command;
-    let quietTimer = null;
-    let fallbackTimer = null;
+    let quietTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined = undefined;
     const QUIET_MS = 400;
     const FALLBACK_MS = 4000;
 
-    const launch = () => {
-      if (launched) {return;}
+    const launch = (): void => {
+      if (launched) {
+        return;
+      }
       launched = true;
       clearTimeout(quietTimer);
       clearTimeout(fallbackTimer);
@@ -323,7 +409,9 @@ function registerTerminalHandlers({ send, projectRoot }) {
       }
     };
     // Hard ceiling: an animated prompt may never fall quiet, so try anyway.
-    if (command) {fallbackTimer = setTimeout(launch, FALLBACK_MS);}
+    if (command) {
+      fallbackTimer = setTimeout(launch, FALLBACK_MS);
+    }
 
     proc.onData((data) => {
       send('terminal:data', { id, data });
@@ -341,7 +429,9 @@ function registerTerminalHandlers({ send, projectRoot }) {
         }
       }
 
-      if (launched) {return;}
+      if (launched) {
+        return;
+      }
       clearTimeout(quietTimer);
       quietTimer = setTimeout(launch, QUIET_MS);
     });
@@ -353,7 +443,9 @@ function registerTerminalHandlers({ send, projectRoot }) {
       // asynchronously, so this can fire *after* a replacement has registered
       // under the same id — clearing unconditionally would orphan the live one
       // and every input/resize/close would silently no-op against it.
-      if (terminals.get(id)?.proc !== proc) {return;}
+      if (terminals.get(id)?.proc !== proc) {
+        return;
+      }
       terminals.delete(id);
       flowState.delete(id);
       lastProcessName.delete(id);
@@ -365,11 +457,13 @@ function registerTerminalHandlers({ send, projectRoot }) {
 
   // `on`, not `handle`: keystrokes and acks are high-frequency one-way signals
   // that need no reply, so they shouldn't pay for a round trip.
-  ipcMain.on('terminal:input', (_e, { id, data } = {}) => {
-    const entry = terminals.get(id);
-    if (!entry) {return;}
+  ipcMain.on('terminal:input', (event: unknown, payload: TerminalInputPayload) => {
+    const entry = terminals.get(payload?.id ?? '');
+    if (!entry || payload?.data === undefined) {
+      return;
+    }
     try {
-      entry.proc.write(data);
+      entry.proc.write(String(payload.data));
     } catch {
       /* exited mid-keystroke */
     }
@@ -377,13 +471,20 @@ function registerTerminalHandlers({ send, projectRoot }) {
 
   // The renderer reports chars it has actually rendered. Resume a pty the high
   // watermark paused once it has drained.
-  ipcMain.on('terminal:ack', (_e, { id, count } = {}) => {
-    const flow = flowState.get(id);
-    if (!flow) {return;}
-    flow.unacked = Math.max(0, flow.unacked - (count || 0));
-    if (!flow.paused || flow.unacked > FLOW_LOW_WATERMARK) {return;}
-    const entry = terminals.get(id);
-    if (!entry) {return;}
+  ipcMain.on('terminal:ack', (event: unknown, payload: TerminalAckPayload) => {
+    const flow = flowState.get(payload?.id ?? '');
+    if (!flow) {
+      return;
+    }
+    const count = typeof payload?.count === 'number' ? payload.count : 0;
+    flow.unacked = Math.max(0, flow.unacked - count);
+    if (!flow.paused || flow.unacked > FLOW_LOW_WATERMARK) {
+      return;
+    }
+    const entry = terminals.get(payload?.id ?? '');
+    if (!entry) {
+      return;
+    }
     try {
       entry.proc.resume();
       flow.paused = false;
@@ -392,9 +493,15 @@ function registerTerminalHandlers({ send, projectRoot }) {
     }
   });
 
-  ipcMain.handle('terminal:resize', (_e, { id, cols, rows } = {}) => {
-    const entry = terminals.get(id);
-    if (!entry) {return { ok: false };}
+  ipcMain.handle('terminal:resize', (event: unknown, payload: TerminalResizePayload) => {
+    const entry = terminals.get(payload?.id ?? '');
+    const cols = payload?.cols;
+    const rows = payload?.rows;
+    if (!entry || typeof cols !== 'number' || typeof rows !== 'number') {
+      // Mirrors the original: missing sizes made node-pty throw, and the
+      // caller got { ok: false } from the catch.
+      return { ok: false };
+    }
     try {
       entry.proc.resize(cols, rows);
     } catch {
@@ -403,12 +510,15 @@ function registerTerminalHandlers({ send, projectRoot }) {
     return { ok: true };
   });
 
-  ipcMain.handle('terminal:close', (_e, { id } = {}) => {
+  ipcMain.handle('terminal:close', (event: unknown, payload: TerminalIdPayload) => {
+    const id = payload?.id ?? '';
     const entry = terminals.get(id);
     terminals.delete(id);
     flowState.delete(id);
     lastProcessName.delete(id);
-    if (!entry) {return { ok: false };}
+    if (!entry) {
+      return { ok: false };
+    }
     try {
       entry.proc.kill();
     } catch {
@@ -419,26 +529,31 @@ function registerTerminalHandlers({ send, projectRoot }) {
 
   // Persist pasted image bytes and hand back the path. Returns ok:false so the
   // renderer can fall back to forwarding the raw Ctrl+V byte.
-  ipcMain.handle('terminal:clipboardImage', (_e, { bytes, mime } = {}) => {
+  ipcMain.handle('terminal:clipboardImage', (event: unknown, payload: TerminalClipboardPayload) => {
+    const bytes = payload?.bytes;
+    const raw: number[] | Uint8Array = Array.isArray(bytes) || bytes instanceof Uint8Array ? bytes : [];
+    const buf = Buffer.from(raw);
+    if (buf.length === 0) {
+      return { ok: false, error: 'empty image' };
+    }
     try {
-      const buf = Buffer.from(bytes || []);
-      if (buf.length === 0) {return { ok: false, error: 'empty image' };}
       pruneOldClipboardImages();
       fs.mkdirSync(CLIPBOARD_DIR, { recursive: true });
-      const ext = IMAGE_MIME_EXT[mime] || 'png';
+      const ext = IMAGE_MIME_EXT[payload?.mime ?? ''] || 'png';
       const name = `clipboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const file = path.join(CLIPBOARD_DIR, name);
       fs.writeFileSync(file, buf);
       return { ok: true, path: file };
     } catch (err) {
-      return { ok: false, error: err?.message || String(err) };
+      const record = toRecord(err);
+      return { ok: false, error: record?.['message'] ?? String(err) };
     }
   });
 }
 
 // Kill every pty. Called on quit — an orphaned shell would otherwise outlive
 // the window that owned it.
-function cleanupTerminals() {
+function cleanupTerminals(): void {
   for (const [, entry] of terminals) {
     try {
       entry.proc.kill();
@@ -452,4 +567,4 @@ function cleanupTerminals() {
   stopPolling();
 }
 
-module.exports = { registerTerminalHandlers, cleanupTerminals };
+export { registerTerminalHandlers, cleanupTerminals };
