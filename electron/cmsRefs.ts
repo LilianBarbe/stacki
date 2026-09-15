@@ -27,7 +27,7 @@ function readJsonc(file: string): unknown {
   }
 }
 
-interface Alias {
+export interface Alias {
   readonly prefix: string;
   readonly wildcard: boolean;
   readonly targets: readonly string[];

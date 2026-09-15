@@ -35,14 +35,20 @@
 // and process handling. Everything here is the filesystem and git side, so it
 // can be tested (test/preview-worktree.js) without booting Astro.
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+
+interface GitResult {
+  readonly stdout: string;
+}
+
+type Git = (projectPath: string, args: readonly string[]) => Promise<GitResult>;
 
 /** Where the preview checkout lives, and the directory git must not see. */
 const PREVIEW_DIR = path.join('.stacki', 'preview');
 const EXCLUDE_LINE = '.stacki/';
 
-const previewPath = (projectPath) => path.join(projectPath, PREVIEW_DIR);
+const previewPath = (projectPath: string): string => path.join(projectPath, PREVIEW_DIR);
 
 /**
  * Make git ignore `.stacki/` locally.
@@ -51,11 +57,11 @@ const previewPath = (projectPath) => path.join(projectPath, PREVIEW_DIR);
  * user's own project — in the file picker, in the commit box, in every status
  * the app reads — and the first thing they would do is commit it.
  */
-function ensureExcluded(projectPath) {
+function ensureExcluded(projectPath: string): boolean {
   // In a worktree, `.git` is a file pointing elsewhere; the exclude file we
   // want is always the main repository's.
   const gitDir = path.join(projectPath, '.git');
-  let infoDir;
+  let infoDir: string;
   try {
     const stat = fs.statSync(gitDir);
     infoDir = stat.isDirectory()
@@ -66,9 +72,9 @@ function ensureExcluded(projectPath) {
             path.dirname(gitDir),
             fs.readFileSync(gitDir, 'utf8').replace(/^gitdir:\s*/, '').trim(),
             '..',
-            '..'
+            '..',
           ),
-          'info'
+          'info',
         );
   } catch {
     return false;
@@ -77,11 +83,13 @@ function ensureExcluded(projectPath) {
     fs.mkdirSync(infoDir, { recursive: true });
     const file = path.join(infoDir, 'exclude');
     const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-    if (current.split('\n').some((l) => l.trim() === EXCLUDE_LINE)) {return true;}
+    if (current.split('\n').some((l) => l.trim() === EXCLUDE_LINE)) {
+      return true;
+    }
     const sep = current && !current.endsWith('\n') ? '\n' : '';
     fs.appendFileSync(
       file,
-      `${sep}# Stacki's preview checkout — not part of your project.\n${EXCLUDE_LINE}\n`
+      `${sep}# Stacki's preview checkout — not part of your project.\n${EXCLUDE_LINE}\n`,
     );
     return true;
   } catch {
@@ -95,7 +103,10 @@ function ensureExcluded(projectPath) {
  * Created on first use and moved on every use after, so browsing history costs
  * one checkout rather than one per commit. Returns the path.
  */
-async function ensureWorktree(git, { projectPath, ref }) {
+async function ensureWorktree(
+  git: Git,
+  { projectPath, ref }: { readonly projectPath: string; readonly ref: string },
+): Promise<string> {
   ensureExcluded(projectPath);
   const dir = previewPath(projectPath);
 
@@ -128,7 +139,7 @@ async function ensureWorktree(git, { projectPath, ref }) {
   return dir;
 }
 
-async function isRegistered(git, projectPath, dir) {
+async function isRegistered(git: Git, projectPath: string, dir: string): Promise<boolean> {
   try {
     const { stdout } = await git(projectPath, ['worktree', 'list', '--porcelain']);
     const target = fs.existsSync(dir) ? fs.realpathSync(dir) : path.resolve(dir);
@@ -155,7 +166,10 @@ async function isRegistered(git, projectPath, dir) {
  * by definition — nothing in it was ever the user's work, so there is nothing
  * in it to protect.
  */
-async function removeWorktree(git, { projectPath }) {
+async function removeWorktree(
+  git: Git,
+  { projectPath }: { readonly projectPath: string },
+): Promise<{ ok: boolean }> {
   const dir = previewPath(projectPath);
   try {
     await git(projectPath, ['worktree', 'remove', '--force', dir]);
@@ -167,7 +181,9 @@ async function removeWorktree(git, { projectPath }) {
     fs.rmSync(dir, { recursive: true, force: true });
     // Leave `.stacki` itself only if something else put something in it.
     const parent = path.join(projectPath, '.stacki');
-    if (fs.existsSync(parent) && fs.readdirSync(parent).length === 0) {fs.rmdirSync(parent);}
+    if (fs.existsSync(parent) && fs.readdirSync(parent).length === 0) {
+      fs.rmdirSync(parent);
+    }
   } catch {
     /* nothing to remove */
   }
@@ -179,4 +195,4 @@ async function removeWorktree(git, { projectPath }) {
   return { ok: true };
 }
 
-module.exports = { ensureWorktree, removeWorktree, ensureExcluded, previewPath, PREVIEW_DIR };
+export { ensureWorktree, removeWorktree, ensureExcluded, previewPath, PREVIEW_DIR };

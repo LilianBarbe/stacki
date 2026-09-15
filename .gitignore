@@ -31,3 +31,5 @@ electron/componentFile.js
 electron/gitSnapshot.js
 electron/starter.js
 electron/cmsRefs.js
+electron/componentUsage.js
+electron/previewWorktree.js
