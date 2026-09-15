@@ -13,11 +13,8 @@
 // the work is recoverable even though the tree no longer shows it. Neither
 // rewrites history — going back is itself something you can come back from.
 
-interface GitResult {
-  readonly stdout: string;
-}
+import type { Git } from './git.js';
 
-type Git = (projectPath: string, args: readonly string[]) => Promise<GitResult>;
 
 /**
  * Save a version.

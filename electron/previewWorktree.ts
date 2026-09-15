@@ -37,12 +37,8 @@
 
 import fs from 'fs';
 import path from 'path';
+import type { Git } from './git.js';
 
-interface GitResult {
-  readonly stdout: string;
-}
-
-type Git = (projectPath: string, args: readonly string[]) => Promise<GitResult>;
 
 /** Where the preview checkout lives, and the directory git must not see. */
 const PREVIEW_DIR = path.join('.stacki', 'preview');

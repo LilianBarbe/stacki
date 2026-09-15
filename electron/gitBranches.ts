@@ -1,6 +1,10 @@
-const fs = require('fs');
-const path = require('path');
-const { parseConflict, renderResolved } = require('./conflicts');
+import fs from 'fs';
+import path from 'path';
+
+import { toArray } from '../shared/dist/record.js';
+import { parseConflict, renderResolved } from './conflicts.js';
+import { gitErrorDetail, gitErrorFull } from './git.js';
+import type { Git } from './git.js';
 
 // Merging a branch and deleting one.
 //
@@ -18,13 +22,10 @@ const { parseConflict, renderResolved } = require('./conflicts');
 // `git` is passed in rather than imported: main.js runs git through a PATH it
 // has had to repair for the packaged app, and the tests run it plainly.
 
-/** Whether the working tree has anything uncommitted in it. */
-async function isDirty(git, projectPath) {
-  const { stdout } = await git(projectPath, ['status', '--porcelain']);
-  return stdout.trim().length > 0;
-}
-
-async function currentBranch(git, projectPath) {
+/** Whether the working tree has anything uncommitted in it. — removed during
+ * conversion: `isDirty` was defined here in HEAD but never called or exported.
+ */
+async function currentBranch(git: Git, projectPath: string): Promise<string | null> {
   try {
     return (await git(projectPath, ['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim();
   } catch {
@@ -32,19 +33,20 @@ async function currentBranch(git, projectPath) {
   }
 }
 
-/**
- * Fold `branch` into the branch currently checked out.
- *
- * Named for the argument git takes, so "merge home-test" means what
- * `git merge home-test` means — the direction is never something to work out
- * from where a button sits.
- *
- * Returns `{ ok, into, changed }`. `changed` is false for a merge that moved
- * nothing: reporting "merged" there would suggest work arrived that was
- * already present.
- */
+export interface MergeClash {
+  readonly path: string;
+  readonly ours: string | null;
+  readonly theirs: string | null;
+  readonly parts: readonly unknown[] | null;
+}
+
+export type MergeOutcome =
+  | { readonly ok: true; readonly into: string | null; readonly changed: boolean; readonly resolved?: number }
+  | { readonly ok: false; readonly conflicted: true; readonly from: string | null; readonly branch: string; readonly files: readonly MergeClash[] }
+  | { readonly ok: false; readonly dirty: true; readonly from: string | null; readonly branch: string; readonly files: readonly string[] };
+
 /** One side of a conflicted file, or null when that side deleted it. */
-async function stage(git, projectPath, n, file) {
+async function stage(git: Git, projectPath: string, n: number, file: string): Promise<string | null> {
   try {
     return (await git(projectPath, ['show', `:${n}:${file}`])).stdout;
   } catch {
@@ -63,7 +65,10 @@ async function stage(git, projectPath, n, file) {
  * What comes out is an ordinary merge commit with two parents — nothing about
  * it is special afterwards, and nothing about it needs undoing differently.
  */
-async function resolveMerge(git, { projectPath, branch, choices }) {
+async function resolveMerge(
+  git: Git,
+  { projectPath, branch, choices }: { readonly projectPath: string; readonly branch: string; readonly choices?: Record<string, unknown> },
+): Promise<MergeOutcome> {
   const into = await currentBranch(git, projectPath);
   try {
     // Same style as the trial merge above, or the markers this re-parses would
@@ -85,9 +90,10 @@ async function resolveMerge(git, { projectPath, branch, choices }) {
       // An answer per disagreement — the file is rebuilt from git's own
       // markers with the chosen side of each. This is what makes it possible
       // to take part of a file from each branch.
-      if (Array.isArray(choice)) {
+      const perHunk = toArray(choice);
+      if (perHunk) {
         const parts = parseConflict(fs.readFileSync(path.join(projectPath, file), 'utf8'));
-        fs.writeFileSync(path.join(projectPath, file), renderResolved(parts, choice));
+        fs.writeFileSync(path.join(projectPath, file), renderResolved(parts, perHunk));
       } else {
         // One answer for the whole file. Defaults to keeping what is on this
         // branch: a missing choice must never silently prefer the incoming
@@ -108,14 +114,25 @@ async function resolveMerge(git, { projectPath, branch, choices }) {
     } catch {
       /* already unwound */
     }
-    throw new Error(
-      String(err.stderr || err.message || '').trim() || `Could not finish merging "${branch}".`
-    );
+    throw new Error(gitErrorDetail(err).trim() || `Could not finish merging "${branch}".`);
   }
   return { ok: true, into, changed: true, resolved: left.length };
 }
 
-async function mergeBranch(git, { projectPath, branch }) {
+/**
+ * Fold `branch` into the branch currently checked out.
+ *
+ * Named for the argument git takes, so "merge home-test" means what
+ * `git merge home-test` means — the direction is never something to work out
+ * from where a button sits.
+ *
+ * `changed` is false for a merge that moved nothing: reporting "merged" there
+ * would suggest work arrived that was already present.
+ */
+async function mergeBranch(
+  git: Git,
+  { projectPath, branch }: { readonly projectPath: string; readonly branch: string },
+): Promise<MergeOutcome> {
   const into = await currentBranch(git, projectPath);
   if (branch === into) {
     throw new Error(`"${branch}" is the branch you are on — there is nothing to merge into.`);
@@ -145,7 +162,7 @@ async function mergeBranch(git, { projectPath, branch }) {
     // out of its prose, which comes in several shapes (content, modify/delete,
     // add/add) and on STDOUT, not stderr. Read before the abort, which is what
     // clears it.
-    let files = [];
+    let files: string[] = [];
     try {
       files = (await git(projectPath, ['diff', '--name-only', '--diff-filter=U'])).stdout
         .split('\n')
@@ -160,7 +177,7 @@ async function mergeBranch(git, { projectPath, branch }) {
       // one. This is what lets the app ask "which of these two?" instead of
       // sending someone to a terminal, which for most of the people this
       // editor is for is the same as refusing.
-      const clashes = [];
+      const clashes: MergeClash[] = [];
       for (const file of files) {
         // The file as git left it, both versions in it and marked. Parsing
         // that rather than diffing the two sides here means the three-way
@@ -168,7 +185,7 @@ async function mergeBranch(git, { projectPath, branch }) {
         // and each disagreement comes back separately, so a page whose heading
         // should come from one branch and whose footer should come from the
         // other can say so.
-        let parts = null;
+        let parts: readonly unknown[] | null = null;
         try {
           parts = parseConflict(fs.readFileSync(path.join(projectPath, file), 'utf8'));
         } catch {
@@ -205,7 +222,7 @@ async function mergeBranch(git, { projectPath, branch }) {
     // moving anything, so this is a question — park it, or commit it — rather
     // than an error, and it comes back shaped like the same question from a
     // branch switch so the UI can ask it the same way.
-    const detail = `${err.stdout || ''}\n${err.stderr || err.message || ''}`;
+    const detail = gitErrorFull(err);
     if (/would be overwritten|Please commit your changes|Your local changes/i.test(detail)) {
       const inTheWay = detail
         .split('\n')
@@ -213,14 +230,15 @@ async function mergeBranch(git, { projectPath, branch }) {
         .filter((l) => l && !/^(error|Please|Aborting|warning|hint|Updating|Merge with)/i.test(l) && !l.endsWith(':'));
       return { ok: false, dirty: true, from: into, branch, files: inTheWay };
     }
-    throw new Error(
-      String(err.stderr || err.message || '').trim() ||
-        `Could not merge "${branch}" into "${into}".`
-    );
+    throw new Error(gitErrorDetail(err).trim() || `Could not merge "${branch}" into "${into}".`);
   }
   const after = (await git(projectPath, ['rev-parse', 'HEAD'])).stdout.trim();
   return { ok: true, into, changed: after !== before };
 }
+
+export type DeleteOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly unmerged: true; readonly message: string };
 
 /**
  * Delete `branch`.
@@ -232,7 +250,10 @@ async function mergeBranch(git, { projectPath, branch }) {
  * crossing IPC arrives as a bare string with nothing to branch on. Forcing past
  * it is a second, separately asked-for call with `force`.
  */
-async function deleteBranch(git, { projectPath, branch, force, allowTrunk }) {
+async function deleteBranch(
+  git: Git,
+  { projectPath, branch, force, allowTrunk }: { readonly projectPath: string; readonly branch: string; readonly force?: boolean; readonly allowTrunk?: boolean },
+): Promise<DeleteOutcome> {
   const here = await currentBranch(git, projectPath);
   if (branch === here) {
     throw new Error(`"${branch}" is the branch you are on — switch to another one first.`);
@@ -246,13 +267,13 @@ async function deleteBranch(git, { projectPath, branch, force, allowTrunk }) {
   // always somewhere for the trunk's work to have gone — no need to check.)
   if (!allowTrunk && (branch === 'main' || branch === 'master')) {
     throw new Error(
-      `"${branch}" is the branch everything comes back to. Deleting it would leave the project without its main line of work.`
+      `"${branch}" is the branch everything comes back to. Deleting it would leave the project without its main line of work.`,
     );
   }
   try {
     await git(projectPath, ['branch', force ? '-D' : '-d', branch]);
   } catch (err) {
-    const detail = String(err.stderr || err.message || '');
+    const detail = gitErrorDetail(err);
     if (/not fully merged/i.test(detail)) {
       return {
         ok: false,
@@ -264,15 +285,20 @@ async function deleteBranch(git, { projectPath, branch, force, allowTrunk }) {
     // Not the branch you are on, so the check above let it through, and git's
     // own wording leads with a path nobody asked about.
     const worktree = detail.match(/used by worktree at '([^']+)'/);
-    if (worktree) {
+    const where = worktree?.[1];
+    if (where !== undefined) {
       throw new Error(
-        `"${branch}" is checked out in another worktree (${worktree[1]}). Close or switch that one first.`
+        `"${branch}" is checked out in another worktree (${where}). Close or switch that one first.`,
       );
     }
     throw new Error(detail.trim() || `Could not delete "${branch}".`);
   }
   return { ok: true };
 }
+
+export type SwitchOutcome =
+  | { readonly ok: true; readonly from: string; readonly parked: boolean }
+  | { readonly ok: false; readonly blocked: true; readonly from: string; readonly branch: string; readonly files: readonly string[] };
 
 /**
  * Move to another branch.
@@ -291,12 +317,31 @@ async function deleteBranch(git, { projectPath, branch, force, allowTrunk }) {
  *
  * `park` and `unpark` are passed in: they live in main.js, over the stash.
  */
-async function switchBranch(git, { projectPath, branch, create, parkFirst, park, unpark }) {
+async function switchBranch(
+  git: Git,
+  {
+    projectPath,
+    branch,
+    create,
+    parkFirst,
+    park,
+    unpark,
+  }: {
+    readonly projectPath: string;
+    readonly branch: string;
+    readonly create?: boolean;
+    readonly parkFirst?: boolean;
+    readonly park?: () => Promise<boolean>;
+    readonly unpark?: (branch: string) => Promise<unknown>;
+  },
+): Promise<SwitchOutcome> {
   const from = (await git(projectPath, ['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim();
   let parked = false;
   // Only when asked. Creating a branch carries the work onto it, which is what
   // starting a branch from what is in front of you means.
-  if (parkFirst && !create && park) {parked = await park();}
+  if (parkFirst && !create && park) {
+    parked = await park();
+  }
   // `switch`, not `checkout`: it does one thing, and it cannot silently detach
   // HEAD or restore a file over a mistyped branch name.
   try {
@@ -304,8 +349,10 @@ async function switchBranch(git, { projectPath, branch, create, parkFirst, park,
   } catch (err) {
     // Put the work straight back rather than leaving it stashed behind a
     // branch change that never happened.
-    if (parked && unpark) {await unpark(from);}
-    const detail = String(err.stderr || err.message || '');
+    if (parked && unpark) {
+      await unpark(from);
+    }
+    const detail = gitErrorDetail(err);
     if (/would be overwritten|Please commit your changes|overwritten by/i.test(detail)) {
       const files = detail
         .split('\n')
@@ -318,4 +365,4 @@ async function switchBranch(git, { projectPath, branch, create, parkFirst, park,
   return { ok: true, from, parked };
 }
 
-module.exports = { mergeBranch, deleteBranch, switchBranch, resolveMerge };
+export { mergeBranch, deleteBranch, switchBranch, resolveMerge };

@@ -46,6 +46,7 @@ export default [
       'electron/scaffold.js',
       'electron/contentRefs.js',
       'electron/thumbs.js',
+      'electron/gitBranches.js',
       'electron/formats/transplant.js',
       'electron/formats/ndjson.js',
       'electron/formats/csv.js',

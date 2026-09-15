@@ -38,3 +38,4 @@ electron/contentRefs.js
 electron/formats/json.js
 electron/formats/toml.js
 electron/thumbs.js
+electron/gitBranches.js
