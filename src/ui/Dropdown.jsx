@@ -95,7 +95,7 @@ export default function Dropdown({
   const previewOption = (i) => {
     setHighlight(i);
     const o = visible[i];
-    if (!o || !livePreview) return;
+    if (!o || !livePreview) {return;}
     const applied = previewedRef.current ?? committedRef.current;
     if (o.value !== applied) {
       previewedRef.current = o.value;
@@ -114,7 +114,7 @@ export default function Dropdown({
     committedRef.current = option.value;
     previewedRef.current = null;
     setOpen(false);
-    if (option.value !== applied) onChange(option.value);
+    if (option.value !== applied) {onChange(option.value);}
     triggerRef.current?.focus();
   };
 
@@ -123,7 +123,7 @@ export default function Dropdown({
   // the popup has somewhere to render; the second measures what rendered and
   // corrects both the side and the cap.
   useLayoutEffect(() => {
-    if (!open || !triggerRef.current) return;
+    if (!open || !triggerRef.current) {return;}
     const rect = triggerRef.current.getBoundingClientRect();
     // Measured once it exists; before that, a row's worth per option.
     const wanted = popupRef.current
@@ -143,7 +143,7 @@ export default function Dropdown({
   }, [open, visible.length, pos]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {return;}
     const onDown = (e) => {
       if (
         popupRef.current && !popupRef.current.contains(e.target) &&
@@ -153,7 +153,7 @@ export default function Dropdown({
       }
     };
     const onScroll = (e) => {
-      if (popupRef.current && popupRef.current.contains(e.target)) return;
+      if (popupRef.current && popupRef.current.contains(e.target)) {return;}
       closeAndRevert();
     };
     const onResize = () => closeAndRevert();
@@ -179,7 +179,7 @@ export default function Dropdown({
   // open one just played, and the open one would sound the same row twice.
   const placedRef = useRef(false);
   useEffect(() => {
-    if (!sounds) return;
+    if (!sounds) {return;}
     if (!open) {
       if (placedRef.current) {
         placedRef.current = false;
@@ -191,19 +191,19 @@ export default function Dropdown({
       placedRef.current = true;
       return;
     }
-    if (visible[highlight]) hoverNote(highlight, visible.length);
+    if (visible[highlight]) {hoverNote(highlight, visible.length);}
   }, [sounds, open, highlight, visible]);
 
   // Keep the highlighted option in view while navigating with arrows.
   useEffect(() => {
-    if (!open || highlight < 0) return;
+    if (!open || highlight < 0) {return;}
     const el = (listRef.current || popupRef.current)?.children[highlight];
-    if (el) el.scrollIntoView({ block: 'nearest' });
+    if (el) {el.scrollIntoView({ block: 'nearest' });}
   }, [open, highlight]);
 
   // A filter box is only useful with the caret in it.
   useEffect(() => {
-    if (!open || !searchable) return undefined;
+    if (!open || !searchable) {return undefined;}
     const t = setTimeout(() => searchRef.current?.focus(), 0);
     return () => clearTimeout(t);
   }, [open, searchable]);
@@ -228,7 +228,7 @@ export default function Dropdown({
     } else if (e.key === 'Enter' || (e.key === ' ' && !searchable)) {
       // Space is a character while there is a box to type it into.
       e.preventDefault();
-      if (highlight >= 0 && visible[highlight]) pick(visible[highlight]);
+      if (highlight >= 0 && visible[highlight]) {pick(visible[highlight]);}
     } else if (e.key === 'Tab') {
       closeAndRevert();
     }

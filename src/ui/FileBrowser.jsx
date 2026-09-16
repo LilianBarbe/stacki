@@ -24,7 +24,7 @@ import FileStatus from './FileStatus.jsx';
 export function fuzzyScore(query, path) {
   const q = query.toLowerCase();
   const p = path.toLowerCase();
-  if (!q) return 0;
+  if (!q) {return 0;}
   let qi = 0;
   let score = 0;
   let streak = 0;
@@ -34,24 +34,24 @@ export function fuzzyScore(query, path) {
       streak = 0;
       continue;
     }
-    if (firstHit === -1) firstHit = i;
+    if (firstHit === -1) {firstHit = i;}
     // Runs of consecutive matches are worth more than the same letters
     // scattered, so "index" beats "i…n…d…e…x" spread across a long path.
     streak++;
     score += 1 + streak;
     // A match right after a separator is the start of a name, which is nearly
     // always what was meant.
-    if (i === 0 || '/-_.'.includes(p[i - 1])) score += 4;
+    if (i === 0 || '/-_.'.includes(p[i - 1])) {score += 4;}
     qi++;
   }
-  if (qi < q.length) return -1; // not all of the query is in there
+  if (qi < q.length) {return -1;} // not all of the query is in there
   // Shorter paths, and matches nearer the front, first.
   return score - firstHit * 0.05 - p.length * 0.02;
 }
 
 /** The best matches for a query, most likely first. */
 export function search(files, query, limit = 60) {
-  if (!query.trim()) return [];
+  if (!query.trim()) {return [];}
   return files
     .map((f) => ({ file: f, score: fuzzyScore(query.trim(), f.path) }))
     .filter((r) => r.score >= 0)
@@ -69,7 +69,7 @@ export function buildTree(files) {
     const parts = f.path.split('/');
     let node = root;
     for (let i = 0; i < parts.length - 1; i++) {
-      if (!node.dirs.has(parts[i])) node.dirs.set(parts[i], { dirs: new Map(), files: [] });
+      if (!node.dirs.has(parts[i])) {node.dirs.set(parts[i], { dirs: new Map(), files: [] });}
       node = node.dirs.get(parts[i]);
     }
     node.files.push({ ...f, name: parts[parts.length - 1] });
@@ -77,7 +77,7 @@ export function buildTree(files) {
   const sortNode = (node) => {
     node.files.sort((a, b) => a.name.localeCompare(b.name));
     node.dirs = new Map([...node.dirs.entries()].sort(([a], [b]) => a.localeCompare(b)));
-    for (const child of node.dirs.values()) sortNode(child);
+    for (const child of node.dirs.values()) {sortNode(child);}
   };
   sortNode(root);
   return root;
@@ -86,7 +86,7 @@ export function buildTree(files) {
 /** Every file path under a folder, for ticking the folder as one. */
 function pathsUnder(node, prefix) {
   const out = node.files.map((f) => f.path);
-  for (const [name, child] of node.dirs) out.push(...pathsUnder(child, `${prefix}${name}/`));
+  for (const [name, child] of node.dirs) {out.push(...pathsUnder(child, `${prefix}${name}/`));}
   return out;
 }
 
@@ -107,7 +107,7 @@ export default function FileBrowser({
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (autoFocusSearch) inputRef.current?.focus();
+    if (autoFocusSearch) {inputRef.current?.focus();}
   }, [autoFocusSearch]);
 
   const tree = useMemo(() => buildTree(files || []), [files]);
@@ -118,11 +118,11 @@ export default function FileBrowser({
 
   const isOn = (p) => !!selected?.includes(p);
   const toggle = (paths, on) => {
-    if (!onSelect) return;
+    if (!onSelect) {return;}
     const set = new Set(selected || []);
     for (const p of paths) {
-      if (on) set.delete(p);
-      else set.add(p);
+      if (on) {set.delete(p);}
+      else {set.add(p);}
     }
     onSelect([...set]);
   };
@@ -130,7 +130,7 @@ export default function FileBrowser({
   // Typing is the fastest way in, so the field takes the arrow keys and Enter
   // without anyone having to leave it.
   const onKeyDown = (e) => {
-    if (!searching || !matches.length) return;
+    if (!searching || !matches.length) {return;}
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setActive((n) => Math.min(n + 1, matches.length - 1));
@@ -140,9 +140,9 @@ export default function FileBrowser({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const f = matches[active];
-      if (!f) return;
-      if (selectable) toggle([f.path], isOn(f.path));
-      else onOpen?.(f);
+      if (!f) {return;}
+      if (selectable) {toggle([f.path], isOn(f.path));}
+      else {onOpen?.(f);}
     }
   };
 
@@ -195,8 +195,8 @@ export default function FileBrowser({
             onClick={() =>
               setClosed((c) => {
                 const next = new Set(c);
-                if (next.has(key)) next.delete(key);
-                else next.add(key);
+                if (next.has(key)) {next.delete(key);}
+                else {next.add(key);}
                 return next;
               })
             }

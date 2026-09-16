@@ -47,7 +47,7 @@ async function orchestrate() {
     const installed = childProcess.spawnSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', [
       'install', '--no-audit', '--no-fund', '--cache', path.join(dir, 'npm-cache'),
     ], { cwd: project, env, stdio: 'inherit', timeout: 180000, shell: process.platform === 'win32' });
-    if (installed.error) throw installed.error;
+    if (installed.error) {throw installed.error;}
     assert.equal(installed.status, 0, 'fixture dependencies install');
     const electron = require('electron');
     const result = await new Promise((resolve, reject) => {
@@ -84,8 +84,8 @@ async function inElectron() {
   const originalSpawn = childProcess.spawn;
   childProcess.spawn = function (cmd, args, options) {
     const child = originalSpawn.apply(this, arguments);
-    if (options?.cwd === project && args?.includes('dev')) servers.push(child);
-    if (options?.cwd === project && args?.some((arg) => String(arg).endsWith('read-config.mjs'))) contentWorkers.push(child);
+    if (options?.cwd === project && args?.includes('dev')) {servers.push(child);}
+    if (options?.cwd === project && args?.some((arg) => String(arg).endsWith('read-config.mjs'))) {contentWorkers.push(child);}
     return child;
   };
 
@@ -97,12 +97,12 @@ async function inElectron() {
   function HiddenWindow(options) {
     const win = new BrowserWindow({ ...options, show: false, webPreferences: { sandbox: true } });
     win.loadFile = () => win.loadURL('data:text/html,<title>Stacki lifecycle smoke</title>');
-    win.webContents.send = (channel, payload) => { if (channel === 'dev:log') logs.push(payload); };
+    win.webContents.send = (channel, payload) => { if (channel === 'dev:log') {logs.push(payload);} };
     return win;
   }
   Object.setPrototypeOf(HiddenWindow, BrowserWindow);
   Module._load = function (name, parent) {
-    if (name === 'electron' && parent?.filename === mainPath) return { ...electron, BrowserWindow: HiddenWindow };
+    if (name === 'electron' && parent?.filename === mainPath) {return { ...electron, BrowserWindow: HiddenWindow };}
     return originalLoad.apply(this, arguments);
   };
   require(mainPath);
@@ -115,12 +115,12 @@ async function inElectron() {
     return handlers.get(channel)({}, ...args);
   };
   const groupAlive = (child, group = true) => {
-    if (!child.pid) return false;
+    if (!child.pid) {return false;}
     try { process.kill(process.platform === 'win32' || !group ? child.pid : -child.pid, 0); return true; } catch { return false; }
   };
   const waitForExit = async (children, group = true) => {
     const deadline = Date.now() + 10000;
-    while (children.some((child) => groupAlive(child, group)) && Date.now() < deadline) await sleep(50);
+    while (children.some((child) => groupAlive(child, group)) && Date.now() < deadline) {await sleep(50);}
     assert.equal(children.filter((child) => groupAlive(child, group)).length, 0, 'all owned server processes and descendants exit');
   };
   const fetchPreview = async (url) => {
@@ -203,7 +203,7 @@ async function inElectron() {
     const spawning = invoke('dev:start', project);
     const cancelled = assert.rejects(spawning, /cancelled/);
     const deadline = Date.now() + 10000;
-    while (servers.length < 3 && Date.now() < deadline) await sleep(5);
+    while (servers.length < 3 && Date.now() < deadline) {await sleep(5);}
     assert.equal(servers.length, 3, 'cancellation reaches a real spawned process');
     await invoke('project:close');
     await cancelled;
@@ -230,7 +230,7 @@ async function inElectron() {
       let welcome = false;
       while (!welcome && Date.now() < bootDeadline) {
         welcome = await renderer.webContents.executeJavaScript("!!window.avb && !!document.querySelector('.welcome')");
-        if (!welcome) await sleep(50);
+        if (!welcome) {await sleep(50);}
       }
       assert.deepEqual(preloadErrors, []);
       assert.equal(welcome, true, 'production renderer and preload reach the welcome screen');
@@ -249,7 +249,7 @@ async function inElectron() {
         try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL'); } catch {}
       }
     }
-    for (const win of BrowserWindow.getAllWindows()) win.destroy();
+    for (const win of BrowserWindow.getAllWindows()) {win.destroy();}
   }
 }
 

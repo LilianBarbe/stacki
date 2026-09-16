@@ -24,14 +24,14 @@ export const isSimpleExpr = (n) =>
 // or a known inline element (with string-only props) — the shapes this
 // editor can round-trip.
 export function isInlineOnly(children) {
-  if (!Array.isArray(children) || children.length === 0) return false;
+  if (!Array.isArray(children) || children.length === 0) {return false;}
   return children.every((c) => {
-    if (c.kind === 'text' || isSimpleExpr(c)) return true;
-    if (c.kind !== 'element' || !INLINE_TAGS.has(String(c.name).toLowerCase())) return false;
+    if (c.kind === 'text' || isSimpleExpr(c)) {return true;}
+    if (c.kind !== 'element' || !INLINE_TAGS.has(String(c.name).toLowerCase())) {return false;}
     const propsOk = Object.values(c.props || {}).every(
       (v) => v == null || v.type === 'string' || v.type === 'bare'
     );
-    if (!propsOk) return false;
+    if (!propsOk) {return false;}
     return c.children === null || c.children.length === 0 || isInlineOnly(c.children);
   });
 }
@@ -51,7 +51,7 @@ export function isChippable(inner) {
   const t = String(inner || '').trim();
   // `{true}`, `{0}`, `{" "}` — expressions, but nothing is bound in them, and
   // a chip would take away the only way to change what they say.
-  if (/^(true|false|null|undefined)$/.test(t) || /^[-+]?(\d+\.?\d*|\.\d+)$/.test(t)) return false;
+  if (/^(true|false|null|undefined)$/.test(t) || /^[-+]?(\d+\.?\d*|\.\d+)$/.test(t)) {return false;}
   return BIND_PATH_RE.test(t);
 }
 
@@ -100,18 +100,18 @@ function domToNodes(el) {
     let last = 0;
     let m;
     while ((m = re.exec(raw)) !== null) {
-      if (m.index > last) out.push({ kind: 'text', value: raw.slice(last, m.index) });
+      if (m.index > last) {out.push({ kind: 'text', value: raw.slice(last, m.index) });}
       out.push({ kind: 'expr', value: m[0] });
       last = m.index + m[0].length;
     }
-    if (last < raw.length) out.push({ kind: 'text', value: raw.slice(last) });
+    if (last < raw.length) {out.push({ kind: 'text', value: raw.slice(last) });}
   };
   el.childNodes.forEach((n) => {
     if (n.nodeType === 3) {
-      if (n.textContent) pushText(n.textContent);
+      if (n.textContent) {pushText(n.textContent);}
       return;
     }
-    if (n.nodeType !== 1) return;
+    if (n.nodeType !== 1) {return;}
     // A chip round-trips from its attribute, not its label — the label has
     // the braces stripped for reading.
     if (n.classList?.contains('expr-chip')) {
@@ -120,8 +120,8 @@ function domToNodes(el) {
       return;
     }
     let name = n.tagName.toLowerCase();
-    if (name === 'b') name = 'strong';
-    if (name === 'i') name = 'em';
+    if (name === 'b') {name = 'strong';}
+    if (name === 'i') {name = 'em';}
     if (name === 'br') {
       out.push({ kind: 'element', name: 'br', props: {}, children: null });
       return;
@@ -134,7 +134,7 @@ function domToNodes(el) {
     const props = {};
     for (const attr of ['href', 'class', 'target', 'rel']) {
       const v = n.getAttribute(attr);
-      if (v != null && v !== '') props[attr] = { type: 'string', value: v };
+      if (v != null && v !== '') {props[attr] = { type: 'string', value: v };}
     }
     out.push({ kind: 'element', name, props, children: domToNodes(n) });
   });
@@ -164,7 +164,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
   // focus, which is exactly when an undo arrives.
   useEffect(() => {
     const el = hostRef.current;
-    if (!el) return;
+    if (!el) {return;}
     if (html !== lastEmittedRef.current) {
       el.innerHTML = html;
       lastEmittedRef.current = html;
@@ -173,7 +173,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
 
   const emit = () => {
     const el = hostRef.current;
-    if (!el) return;
+    if (!el) {return;}
     let next = domToNodes(el);
     // Deleting the last character leaves a <br> behind: a contentEditable
     // needs one line for the caret to sit on, so the browser puts a
@@ -181,7 +181,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
     // component still receives slot content — a heading emptied in the panel
     // would keep rendering, holding a line break. A lone <br> is that
     // placeholder and nothing else, so it clears to nothing.
-    if (next.length === 1 && next[0].kind === 'element' && next[0].name === 'br') next = [];
+    if (next.length === 1 && next[0].kind === 'element' && next[0].name === 'br') {next = [];}
     // Canonical, not el.innerHTML: the app hands the nodes back with ids
     // added and the browser normalises markup as you type, so only the
     // serialised form is comparable on the way back in.
@@ -198,7 +198,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
   const tagAround = (tag) => {
     const host = hostRef.current;
     const sel = window.getSelection();
-    if (!host || !sel || sel.rangeCount === 0) return null;
+    if (!host || !sel || sel.rangeCount === 0) {return null;}
     const r = sel.getRangeAt(0);
     const at = (container, offset) => {
       const n = container.nodeType === 1 ? container.childNodes[offset] || container : container;
@@ -240,9 +240,9 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
     const onSel = () => {
       const el = hostRef.current;
       const sel = window.getSelection();
-      if (!el || !sel?.rangeCount) return;
+      if (!el || !sel?.rangeCount) {return;}
       const r = sel.getRangeAt(0);
-      if (el.contains(r.commonAncestorContainer)) caretRef.current = r.cloneRange();
+      if (el.contains(r.commonAncestorContainer)) {caretRef.current = r.cloneRange();}
     };
     document.addEventListener('selectionchange', onSel);
     return () => document.removeEventListener('selectionchange', onSel);
@@ -250,11 +250,11 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
 
   // Dropping data in from outside — the Content field's own insert button.
   useEffect(() => {
-    if (!insertRef) return undefined;
+    if (!insertRef) {return undefined;}
     insertRef.current = {
       insert(path) {
         const el = hostRef.current;
-        if (!el) return;
+        if (!el) {return;}
         el.focus();
         const sel = window.getSelection();
         const saved = caretRef.current;
@@ -284,7 +284,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
   // Selection bubble: track selections anchored inside the editor.
   useEffect(() => {
     const onSelChange = () => {
-      if (linkMode) return; // keep the bubble while typing a URL
+      if (linkMode) {return;} // keep the bubble while typing a URL
       const el = hostRef.current;
       const sel = window.getSelection();
       if (
@@ -340,14 +340,14 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
   const saveSelection = () => {
     const host = hostRef.current;
     const sel = window.getSelection();
-    if (!host || !sel || sel.rangeCount === 0) return;
+    if (!host || !sel || sel.rangeCount === 0) {return;}
     const r = sel.getRangeAt(0);
-    if (host.contains(r.commonAncestorContainer)) savedRangeRef.current = r.cloneRange();
+    if (host.contains(r.commonAncestorContainer)) {savedRangeRef.current = r.cloneRange();}
   };
 
   const restoreSelection = () => {
     const r = savedRangeRef.current;
-    if (!r) return;
+    if (!r) {return;}
     const sel = window.getSelection();
     sel.removeAllRanges();
     // A clone: addRange can adopt the very range it is handed, and then
@@ -372,11 +372,11 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
   const unwrapTag = (tag) => {
     const sel = window.getSelection();
     const el = tagAround(tag);
-    if (!el) return false;
+    if (!el) {return false;}
     const parent = el.parentNode;
     const first = el.firstChild;
     const last = el.lastChild;
-    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    while (el.firstChild) {parent.insertBefore(el.firstChild, el);}
     parent.removeChild(el);
     // Keep the text selected, so the bubble stays up and the next press acts on
     // the same words.
@@ -402,7 +402,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
       return;
     }
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {return;}
     const range = sel.getRangeAt(0);
     const el = document.createElement(tag);
     try {
@@ -425,7 +425,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
     const url = linkUrl.trim();
     setLinkMode(false);
     setLinkUrl('');
-    if (!url) return;
+    if (!url) {return;}
     hostRef.current?.focus();
     restoreSelection();
     document.execCommand('createLink', false, url);
@@ -454,7 +454,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
   // click, and preventDefault, so the caret never lands inside the chip.
   const onChipMouseDown = (e) => {
     const chip = e.target.closest?.(".expr-chip");
-    if (!chip) return;
+    if (!chip) {return;}
     e.preventDefault();
     const r = chip.getBoundingClientRect();
     setChipMenu({
@@ -468,21 +468,21 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
   const pickExpr = (insert) => {
     const chip = chipMenu?.chip;
     setChipMenu(null);
-    if (!chip) return;
+    if (!chip) {return;}
     chip.setAttribute("data-expr", "{" + insert + "}");
     chip.textContent = insert;
     emit();
   };
 
   useEffect(() => {
-    if (!chipMenu) return;
+    if (!chipMenu) {return;}
     const close = (e) => {
       // Chips are excluded, not just the menu: React flushes this effect
       // synchronously for a discrete event, so the listener is live while the
       // very mousedown that opened the menu is still propagating to document.
       // Without the exclusion the menu closes on the click that opened it —
       // and clicking straight from one chip to another would too.
-      if (e.target.closest?.(".bind-menu, .expr-chip")) return;
+      if (e.target.closest?.(".bind-menu, .expr-chip")) {return;}
       setChipMenu(null);
     };
     const onKey = (e) => e.key === "Escape" && setChipMenu(null);
@@ -559,7 +559,7 @@ const RichContent = function RichContent({ nodes, onChange, bindCtx, insertRef }
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') applyLink();
+                if (e.key === 'Enter') {applyLink();}
                 if (e.key === 'Escape') {
                   setLinkMode(false);
                   setLinkUrl('');

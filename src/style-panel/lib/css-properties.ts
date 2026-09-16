@@ -43,7 +43,7 @@ export function filterCssProperties(
   custom: readonly string[] = [],
 ): readonly string[] {
   const q = query.trim().toLowerCase()
-  if (!q) return custom.length ? [...custom, ...CSS_PROPERTIES] : CSS_PROPERTIES
+  if (!q) {return custom.length ? [...custom, ...CSS_PROPERTIES] : CSS_PROPERTIES}
   const dashed = q.startsWith('-')
   const prefix: string[] = []
   const substring: string[] = []
@@ -51,13 +51,13 @@ export function filterCssProperties(
   const customSubstring: string[] = []
   for (const prop of custom) {
     const at = prop.toLowerCase().indexOf(q)
-    if (at === 0) customPrefix.push(prop)
-    else if (at > 0) customSubstring.push(prop)
+    if (at === 0) {customPrefix.push(prop)}
+    else if (at > 0) {customSubstring.push(prop)}
   }
   for (const prop of CSS_PROPERTIES) {
     const at = prop.indexOf(q)
-    if (at === 0) prefix.push(prop)
-    else if (at > 0) substring.push(prop)
+    if (at === 0) {prefix.push(prop)}
+    else if (at > 0) {substring.push(prop)}
   }
   return dashed
     ? [...customPrefix, ...prefix, ...customSubstring, ...substring]
@@ -102,6 +102,6 @@ const NEGATIVE_LENGTH = /(^|[\s,])-(?:\d+\.?\d*|\.\d+)[a-z%]*/gi
  * someone's expression is worse than letting the browser judge it.
  */
 export function clampNonNegative(prop: string, value: string): string {
-  if (!isNonNegative(prop) || value.includes('(')) return value
+  if (!isNonNegative(prop) || value.includes('(')) {return value}
   return value.replace(NEGATIVE_LENGTH, (_m, lead: string) => `${lead}0`)
 }

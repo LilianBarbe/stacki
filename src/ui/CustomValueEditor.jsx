@@ -29,7 +29,7 @@ function doesNotFit(container, value) {
     container.querySelector('.var-input') ||
     container.querySelector('input');
   // clientWidth is 0 before layout (and in jsdom); fall back to the count.
-  if (!field || !field.clientWidth) return isLong(value);
+  if (!field || !field.clientWidth) {return isLong(value);}
   return field.scrollWidth > field.clientWidth + 1 || isLong(value);
 }
 // One custom-value box at a time. Each cell owns its own, so the sheet holds a
@@ -60,7 +60,7 @@ function CustomValue({ value: initial, label, anchor, anchorEl, onCancel, onSave
   const fieldRef = useRef(null);
 
   useLayoutEffect(() => {
-    if (!anchor) return;
+    if (!anchor) {return;}
     const wanted = boxRef.current?.offsetHeight || 190;
     const box = popupBox(anchor, wanted, window.innerHeight);
     setPos({
@@ -89,7 +89,7 @@ function CustomValue({ value: initial, label, anchor, anchorEl, onCancel, onSave
   // current by the time this returns.
   const commit = () => {
     const rich = boxRef.current?.querySelector('.embed-editor_varconnect-editor');
-    if (rich && (rich === document.activeElement || rich.contains(document.activeElement))) rich.blur();
+    if (rich && (rich === document.activeElement || rich.contains(document.activeElement))) {rich.blur();}
     return draftRef.current;
   };
 
@@ -98,7 +98,7 @@ function CustomValue({ value: initial, label, anchor, anchorEl, onCancel, onSave
     closeOpenCustom?.(); // never two at once
     closeOpenCustom = close;
     return () => {
-      if (closeOpenCustom === close) closeOpenCustom = null;
+      if (closeOpenCustom === close) {closeOpenCustom = null;}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -110,7 +110,7 @@ function CustomValue({ value: initial, label, anchor, anchorEl, onCancel, onSave
   // rather than by hunting down each one and locking its overflow.
   useEffect(() => {
     const onWheel = (e) => {
-      if (!boxRef.current?.contains(e.target)) e.preventDefault();
+      if (!boxRef.current?.contains(e.target)) {e.preventDefault();}
     };
     document.addEventListener('wheel', onWheel, { passive: false, capture: true });
     document.addEventListener('touchmove', onWheel, { passive: false, capture: true });
@@ -122,14 +122,14 @@ function CustomValue({ value: initial, label, anchor, anchorEl, onCancel, onSave
 
   useEffect(() => {
     const onDown = (e) => {
-      if (!boxRef.current || boxRef.current.contains(e.target)) return;
+      if (!boxRef.current || boxRef.current.contains(e.target)) {return;}
       // The variable picker this box opens renders through a portal to the
       // body, so it is not INSIDE the box by the DOM's reckoning even though
       // it belongs to it. Without this, pressing a variable in that list read
       // as a press outside — the box closed and saved the draft it already
       // had, and the variable you just picked went nowhere. Which looked
       // exactly like the picker doing nothing at all.
-      if (e.target instanceof Element && e.target.closest('.embed-editor_varpicker')) return;
+      if (e.target instanceof Element && e.target.closest('.embed-editor_varpicker')) {return;}
       onSave(commit());
     };
     const onKey = (e) => {
@@ -175,11 +175,11 @@ function CustomValue({ value: initial, label, anchor, anchorEl, onCancel, onSave
     // The variable picker is portaled out of this popup, so it isn't "inside" it.
     !!document.activeElement?.closest?.('.embed-editor_varpicker');
   useEffect(() => {
-    if (focusIsSettled()) return undefined;
+    if (focusIsSettled()) {return undefined;}
     const t = setTimeout(() => {
       // Checked again here, not just above: the picker takes focus for its search
       // box a tick after it opens, which is this tick.
-      if (focusIsSettled()) return;
+      if (focusIsSettled()) {return;}
       const rich = boxRef.current?.querySelector('.embed-editor_varconnect-editor');
       if (!rich) {
         fieldRef.current?.select();

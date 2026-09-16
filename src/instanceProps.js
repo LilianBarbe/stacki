@@ -22,11 +22,11 @@ function valuesByPath(context, depth = 4) {
   const out = new Map();
   const walk = (nodes, level) => {
     for (const node of nodes || []) {
-      if (node.path && node.value !== undefined) out.set(node.path, node.value);
+      if (node.path && node.value !== undefined) {out.set(node.path, node.value);}
       else if (node.path && node.preview !== undefined && node.preview !== '') {
         out.set(node.path, node.preview);
       }
-      if (level < depth && Array.isArray(node.children)) walk(node.children, level + 1);
+      if (level < depth && Array.isArray(node.children)) {walk(node.children, level + 1);}
     }
   };
   try {
@@ -52,12 +52,12 @@ const unquote = (v) =>
  */
 export function resolveInstanceProps(node, context = {}) {
   const props = node?.props;
-  if (!props || typeof props !== 'object') return null;
+  if (!props || typeof props !== 'object') {return null;}
   const known = valuesByPath(context);
   const out = {};
 
   for (const [name, prop] of Object.entries(props)) {
-    if (!prop || name === 'class' || name.startsWith('class:')) continue;
+    if (!prop || name === 'class' || name.startsWith('class:')) {continue;}
     // Written as text: `variant="cover"` is its own answer.
     if (prop.type === 'string') {
       out[name] = prop.value;
@@ -68,14 +68,14 @@ export function resolveInstanceProps(node, context = {}) {
       out[name] = true;
       continue;
     }
-    if (prop.type !== 'expr') continue;
+    if (prop.type !== 'expr') {continue;}
     const src = String(prop.value ?? '').trim();
-    if (!src) continue;
+    if (!src) {continue;}
     // `cols={3}`, `overlap={true}` — a literal that happens to be written as
     // an expression, because that is how those are written.
     if (/^-?\d+(\.\d+)?$/.test(src)) { out[name] = Number(src); continue; }
     if (src === 'true' || src === 'false') { out[name] = src === 'true'; continue; }
-    if (src === 'null' || src === 'undefined') continue;
+    if (src === 'null' || src === 'undefined') {continue;}
 
     // Text and data mixed — a template literal, or a path on its own. Each
     // piece is resolved and the answer is what they spell out; one piece the
@@ -86,7 +86,7 @@ export function resolveInstanceProps(node, context = {}) {
     // chips split at it, so `featured?.data.title` would arrive in pieces
     // neither of which names anything.
     const parts = partsFromValue({ type: 'expr', value: src.replace(/\?\./g, '.') });
-    if (!parts || !parts.length) continue;
+    if (!parts || !parts.length) {continue;}
     let text = '';
     let whole = null;
     let ok = true;
@@ -99,10 +99,10 @@ export function resolveInstanceProps(node, context = {}) {
       const value = unquote(known.get(part.expr));
       // A path on its own keeps its type: a number stays a number, an object
       // stays an object, so the picker can open it.
-      if (parts.length === 1) whole = value;
-      else text += value == null ? '' : String(value);
+      if (parts.length === 1) {whole = value;}
+      else {text += value == null ? '' : String(value);}
     }
-    if (!ok) continue;
+    if (!ok) {continue;}
     out[name] = parts.length === 1 && whole !== null ? whole : text;
   }
 

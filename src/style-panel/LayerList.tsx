@@ -38,7 +38,7 @@ export type LayerListProps = {
 export default function LayerList({ count, busy, ariaLabel, renderRow, onOpen, onReorder, onRemove, isHidden, onToggleHidden }: LayerListProps) {
   const [dragFrom, setDragFrom] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
-  if (!count) return null
+  if (!count) {return null}
   return (
     <ul className="embed-editor_bg-layers" aria-label={ariaLabel}>
       {Array.from({ length: count }, (_, index) => {
@@ -49,7 +49,7 @@ export default function LayerList({ count, busy, ariaLabel, renderRow, onOpen, o
             key={index}
             className={`embed-editor_bg-layer ${dragOver === index ? 'is-drop-target' : ''} ${dragFrom === index ? 'is-dragging' : ''} ${hidden ? 'is-hidden' : ''}`}
             onDragOver={(event) => { event.preventDefault(); setDragOver(index) }}
-            onDrop={(event) => { event.preventDefault(); if (dragFrom != null) onReorder(dragFrom, index); setDragFrom(null); setDragOver(null) }}
+            onDrop={(event) => { event.preventDefault(); if (dragFrom != null) {onReorder(dragFrom, index);} setDragFrom(null); setDragOver(null) }}
           >
             <div className="embed-editor_bg-layer-row">
               <span

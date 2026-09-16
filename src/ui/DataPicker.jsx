@@ -21,10 +21,10 @@ function ancestorsOf(path) {
     // step down from `posts`, not two.
     const m = part.match(/^([^[]*)((\[\d+\])*)$/);
     acc = acc ? `${acc}.${m ? m[1] : part}` : m ? m[1] : part;
-    if (acc !== src) out.push(acc);
+    if (acc !== src) {out.push(acc);}
     for (const idx of (m?.[2] || '').match(/\[\d+\]/g) || []) {
       acc += idx;
-      if (acc !== src) out.push(acc);
+      if (acc !== src) {out.push(acc);}
     }
   }
   return out;
@@ -33,7 +33,7 @@ function ancestorsOf(path) {
 function flatten(nodes, out = []) {
   for (const n of nodes) {
     out.push(n);
-    if (n.children) flatten(n.children, out);
+    if (n.children) {flatten(n.children, out);}
   }
   return out;
 }
@@ -45,13 +45,13 @@ const SECTION_LABEL = { collections: 'Collections in this project' };
 // what the chip says, so it is shown where it belongs and marked, rather than
 // leaving the picker looking like it doesn't know what the chip points at.
 function withCurrent(tree, current) {
-  if (!current) return tree;
+  if (!current) {return tree;}
   const flat = flatten(tree || []);
-  if (flat.some((n) => n.path === current)) return tree;
+  if (flat.some((n) => n.path === current)) {return tree;}
   let anchor = null;
   for (const p of ancestorsOf(current)) {
     const found = flat.find((n) => n.path === p);
-    if (found) anchor = found;
+    if (found) {anchor = found;}
   }
   const missing = {
     path: current,
@@ -61,7 +61,7 @@ function withCurrent(tree, current) {
     children: null,
     missing: true,
   };
-  if (!anchor) return [...(tree || []), missing];
+  if (!anchor) {return [...(tree || []), missing];}
   const graft = (nodes) =>
     nodes.map((n) =>
       n.path === anchor.path
@@ -96,7 +96,7 @@ export default function DataPicker({
     // opens on data rather than on a list of closed names.
     if (!start.size) {
       const first = (tree || []).find((n) => n.children?.length);
-      if (first) start.add(first.path);
+      if (first) {start.add(first.path);}
     }
     return start;
   });
@@ -111,16 +111,16 @@ export default function DataPicker({
   useLayoutEffect(() => {
     const list = listRef.current;
     const row = selectedRef.current;
-    if (!list || !row) return;
+    if (!list || !row) {return;}
     const lr = list.getBoundingClientRect();
     const rr = row.getBoundingClientRect();
-    if (rr.top >= lr.top && rr.bottom <= lr.bottom) return; // already in view
+    if (rr.top >= lr.top && rr.bottom <= lr.bottom) {return;} // already in view
     list.scrollTop += rr.top - lr.top - (lr.height - rr.height) / 2;
   }, [current]);
 
   const q = query.trim().toLowerCase();
   const matches = useMemo(() => {
-    if (!q) return null;
+    if (!q) {return null;}
     return flatten(tree || []).filter(
       (n) => n.path.toLowerCase().includes(q) || String(n.preview).toLowerCase().includes(q)
     );
@@ -129,11 +129,11 @@ export default function DataPicker({
   const toggle = (node, e) => {
     e.stopPropagation();
     // A collection nobody has looked at yet has no rows until it is asked for.
-    if (node.lazy && !node.children?.length) onExpand?.(node);
+    if (node.lazy && !node.children?.length) {onExpand?.(node);}
     setOpen((prev) => {
       const next = new Set(prev);
-      if (next.has(node.path)) next.delete(node.path);
-      else next.add(node.path);
+      if (next.has(node.path)) {next.delete(node.path);}
+      else {next.add(node.path);}
       return next;
     });
   };

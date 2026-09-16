@@ -23,7 +23,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -150,8 +150,8 @@ const check = (what, condition, detail) => {
     const found = [];
     const walk = (list, chain) => {
       for (const n of list) {
-        if (n.kind === 'component' && n.name === 'LinkCard') found.push({ n, chain });
-        if (Array.isArray(n.children)) walk(n.children, [...chain, n]);
+        if (n.kind === 'component' && n.name === 'LinkCard') {found.push({ n, chain });}
+        if (Array.isArray(n.children)) {walk(n.children, [...chain, n]);}
       }
     };
     walk(page.model.nodes, []);

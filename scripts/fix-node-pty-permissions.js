@@ -52,7 +52,7 @@ function fixNodePtyPermissions(nodePtyDir) {
   const fixed = [];
   for (const helper of [...findSpawnHelpers(nodePtyDir), ...findBuiltHelper(nodePtyDir)]) {
     const mode = fs.statSync(helper).mode & 0o777;
-    if ((mode & 0o111) === 0o111) continue; // already executable for all
+    if ((mode & 0o111) === 0o111) {continue;} // already executable for all
     fs.chmodSync(helper, EXEC_MODE);
     fixed.push(helper);
   }
@@ -63,10 +63,10 @@ module.exports = { fixNodePtyPermissions };
 
 if (require.main === module) {
   // Windows has no spawn-helper — ConPTY needs no exec bit.
-  if (process.platform === 'win32') process.exit(0);
+  if (process.platform === 'win32') {process.exit(0);}
   const root = path.join(__dirname, '..');
   const nodePtyDir = path.join(root, 'node_modules', 'node-pty');
-  if (!fs.existsSync(nodePtyDir)) process.exit(0); // not installed yet
+  if (!fs.existsSync(nodePtyDir)) {process.exit(0);} // not installed yet
   try {
     for (const p of fixNodePtyPermissions(nodePtyDir)) {
       console.log(`  • node-pty: made ${path.relative(root, p)} executable`);

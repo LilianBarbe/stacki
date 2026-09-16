@@ -1,0 +1,29 @@
+{
+  "//": "AGENTS.md mandates this strict flag set. allowJs/checkJs let the unconverted JS tree compile untouched; converted files are renamed to .ts/.tsx and checked. When the migration completes, drop allowJs and add shared/ to include.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "verbatimModuleSyntax": true,
+
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*", "electron/**/*", "scripts/**/*", "test/**/*", "shared/**/*", "vite.config.mjs"],
+  "exclude": ["shared/dist"]
+}

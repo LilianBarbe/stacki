@@ -66,7 +66,7 @@ function fromExpression(expr) {
     const m = QUOTED.exec(part.trim());
     // Unescape: the capture is the raw source between the quotes, so `\"` in
     // the literal would otherwise reach the label with its backslash.
-    if (m) out.push(...m[2].replace(/\\(.)/g, '$1').split(/\s+/).filter(Boolean));
+    if (m) {out.push(...m[2].replace(/\\(.)/g, '$1').split(/\s+/).filter(Boolean));}
   }
   return out;
 }
@@ -79,8 +79,8 @@ export function elementClasses(node) {
     return cls.value.trim().split(/\s+/).filter(Boolean);
   }
   const list = props['class:list'];
-  if (list && list.type === 'expr') return fromExpression(list.value);
-  if (cls && cls.type === 'expr') return fromExpression(cls.value);
+  if (list && list.type === 'expr') {return fromExpression(list.value);}
+  if (cls && cls.type === 'expr') {return fromExpression(cls.value);}
   return [];
 }
 
@@ -92,7 +92,7 @@ export function elementClasses(node) {
 export function elementLabel(node) {
   if (node?.name === 'slot') {
     const named = node.props?.name;
-    if (named && named.type === 'string' && named.value.trim()) return named.value.trim();
+    if (named && named.type === 'string' && named.value.trim()) {return named.value.trim();}
   }
   return elementClasses(node)[0] || node?.name || '';
 }

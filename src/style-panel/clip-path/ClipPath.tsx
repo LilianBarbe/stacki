@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CodeEditor, type CodeEditorTokenHighlight } from '../components/CodeEditor'
@@ -328,8 +330,8 @@ function sanitizeShapeScaleVariableName(value: string) {
 // An already-valid `--name` is left untouched so existing variables keep their casing.
 function formatShapeVariableName(value: string) {
   const trimmed = value.trim()
-  if (!trimmed) return ''
-  if (/^--[a-zA-Z0-9_-]+$/.test(trimmed)) return trimmed
+  if (!trimmed) {return ''}
+  if (/^--[a-zA-Z0-9_-]+$/.test(trimmed)) {return trimmed}
   const body = trimmed
     .replace(/^-+/, '')                     // drop leading dashes (re-added as the -- prefix)
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2') // camelCase -> kebab-case
@@ -345,7 +347,7 @@ function emptySnapGuides(): SnapGuides {
 }
 
 function addSnapGuide(guides: SnapGuides, axis: keyof SnapGuides, value: number) {
-  if (guides[axis].some((guide) => Math.abs(guide - value) < 0.01)) return
+  if (guides[axis].some((guide) => Math.abs(guide - value) < 0.01)) {return}
   guides[axis].push(value)
 }
 
@@ -377,8 +379,8 @@ function snapPointToAnchors(
   const snappedY = snapAxisToAnchors(y, yAnchors, start?.y)
   const guides = emptySnapGuides()
 
-  if (snappedX.guide !== null) addSnapGuide(guides, 'x', snappedX.guide)
-  if (snappedY.guide !== null) addSnapGuide(guides, 'y', snappedY.guide)
+  if (snappedX.guide !== null) {addSnapGuide(guides, 'x', snappedX.guide)}
+  if (snappedY.guide !== null) {addSnapGuide(guides, 'y', snappedY.guide)}
 
   return {
     point: { x: snappedX.value, y: snappedY.value },
@@ -546,10 +548,10 @@ function pointsNearlyEqual(a: Point, b: Point) {
 
 function outsideBoundsSides(point: Point, bounds: CanvasHandleBounds) {
   const sides: BoundsSide[] = []
-  if (point.y < bounds.minY) sides.push('top')
-  if (point.y > bounds.maxY) sides.push('bottom')
-  if (point.x < bounds.minX) sides.push('left')
-  if (point.x > bounds.maxX) sides.push('right')
+  if (point.y < bounds.minY) {sides.push('top')}
+  if (point.y > bounds.maxY) {sides.push('bottom')}
+  if (point.x < bounds.minX) {sides.push('left')}
+  if (point.x > bounds.maxX) {sides.push('right')}
   return sides
 }
 
@@ -561,7 +563,7 @@ function addUniqueIntersection(
     item.side === intersection.side &&
     Math.abs(item.point.x - intersection.point.x) < 0.01 &&
     Math.abs(item.point.y - intersection.point.y) < 0.01
-  ))) return
+  ))) {return}
   intersections.push(intersection)
 }
 
@@ -570,9 +572,9 @@ function segmentBoundsIntersections(a: Point, b: Point, bounds: CanvasHandleBoun
   const dx = b.x - a.x
   const dy = b.y - a.y
   const addAtT = (t: number, side: BoundsSide) => {
-    if (t < 0 || t > 1) return
+    if (t < 0 || t > 1) {return}
     const point = { x: a.x + dx * t, y: a.y + dy * t }
-    if (pointInBounds(point, bounds)) addUniqueIntersection(intersections, { point, side })
+    if (pointInBounds(point, bounds)) {addUniqueIntersection(intersections, { point, side })}
   }
 
   if (Math.abs(dx) > 0.0001) {
@@ -603,8 +605,8 @@ function polygonHandleDisplayPoint(
   preferred?: PolygonDisplayProjection,
 ): { point: Point; projection: PolygonDisplayProjection | null } {
   const point = points[index]
-  if (!point) return { point: { x: 0, y: 0 }, projection: null }
-  if (!bounds || pointInBounds(point, bounds)) return { point, projection: null }
+  if (!point) {return { point: { x: 0, y: 0 }, projection: null }}
+  if (!bounds || pointInBounds(point, bounds)) {return { point, projection: null }}
 
   const prev = points[(index - 1 + points.length) % points.length]
   const next = points[(index + 1) % points.length]
@@ -754,31 +756,31 @@ function formatRawEditableClipPath(editable: RawEditableClipPath) {
   }
 
   const sides = formatCssUnitList([editable.top, editable.right, editable.bottom, editable.left])
-  if (!editable.radii) return `inset(${sides})`
+  if (!editable.radii) {return `inset(${sides})`}
   const horizontal = formatCssUnitList(editable.radii.horizontal)
   const vertical = editable.radii.vertical ? ` / ${formatCssUnitList(editable.radii.vertical)}` : ''
   return `inset(${sides} round ${horizontal}${vertical})`
 }
 
 function oppositeCorner(corner: CornerName): CornerName {
-  if (corner === 'topLeft') return 'bottomRight'
-  if (corner === 'topRight') return 'bottomLeft'
-  if (corner === 'bottomRight') return 'topLeft'
+  if (corner === 'topLeft') {return 'bottomRight'}
+  if (corner === 'topRight') {return 'bottomLeft'}
+  if (corner === 'bottomRight') {return 'topLeft'}
   return 'topRight'
 }
 
 function oppositeInsetSide(side: InsetSide): InsetSide {
-  if (side === 'top') return 'bottom'
-  if (side === 'right') return 'left'
-  if (side === 'bottom') return 'top'
+  if (side === 'top') {return 'bottom'}
+  if (side === 'right') {return 'left'}
+  if (side === 'bottom') {return 'top'}
   return 'right'
 }
 
 function insetSideForHandle(handle: HandleTarget): InsetSide | null {
-  if (handle.kind === 'inset-top') return 'top'
-  if (handle.kind === 'inset-right') return 'right'
-  if (handle.kind === 'inset-bottom') return 'bottom'
-  if (handle.kind === 'inset-left') return 'left'
+  if (handle.kind === 'inset-top') {return 'top'}
+  if (handle.kind === 'inset-right') {return 'right'}
+  if (handle.kind === 'inset-bottom') {return 'bottom'}
+  if (handle.kind === 'inset-left') {return 'left'}
   return null
 }
 
@@ -791,7 +793,7 @@ function isInsetHandle(handle: HandleTarget | null) {
 }
 
 function isInsetHandleAffected(activeHandle: HandleTarget | null, candidate: HandleTarget, mode: InsetModifierMode) {
-  if (mode === 'single' || !activeHandle || handlesMatch(activeHandle, candidate)) return false
+  if (mode === 'single' || !activeHandle || handlesMatch(activeHandle, candidate)) {return false}
 
   if (activeHandle.kind === 'inset-radius' && candidate.kind === 'inset-radius') {
     return mode === 'all' || candidate.corner === oppositeCorner(activeHandle.corner)
@@ -799,28 +801,28 @@ function isInsetHandleAffected(activeHandle: HandleTarget | null, candidate: Han
 
   const activeSide = insetSideForHandle(activeHandle)
   const candidateSide = insetSideForHandle(candidate)
-  if (!activeSide || !candidateSide) return false
+  if (!activeSide || !candidateSide) {return false}
 
   return mode === 'all' || candidateSide === oppositeInsetSide(activeSide)
 }
 
 function cornerLabel(corner: CornerName) {
-  if (corner === 'topLeft') return 'top left'
-  if (corner === 'topRight') return 'top right'
-  if (corner === 'bottomRight') return 'bottom right'
+  if (corner === 'topLeft') {return 'top left'}
+  if (corner === 'topRight') {return 'top right'}
+  if (corner === 'bottomRight') {return 'bottom right'}
   return 'bottom left'
 }
 
 function pointsClose(a: Point[], b: Point[]) {
-  if (a.length !== b.length) return false
+  if (a.length !== b.length) {return false}
   return a.every((pt, i) => Math.abs(pt.x - b[i].x) < 1 && Math.abs(pt.y - b[i].y) < 1)
 }
 
 function shapesClose(a: ClipShape, b: ClipShape) {
-  if (a.kind !== b.kind) return false
-  if (a.kind === 'none' && b.kind === 'none') return true
-  if (a.kind === 'raw' && b.kind === 'raw') return a.value === b.value
-  if (a.kind === 'polygon' && b.kind === 'polygon') return pointsClose(a.points, b.points)
+  if (a.kind !== b.kind) {return false}
+  if (a.kind === 'none' && b.kind === 'none') {return true}
+  if (a.kind === 'raw' && b.kind === 'raw') {return a.value === b.value}
+  if (a.kind === 'polygon' && b.kind === 'polygon') {return pointsClose(a.points, b.points)}
   if (a.kind === 'circle' && b.kind === 'circle') {
     return Math.abs(a.radius - b.radius) < 1 && Math.abs(a.cx - b.cx) < 1 && Math.abs(a.cy - b.cy) < 1
   }
@@ -844,7 +846,7 @@ function shapesClose(a: ClipShape, b: ClipShape) {
 }
 
 function pointsEqual(a: Point[], b: Point[]) {
-  if (a.length !== b.length) return false
+  if (a.length !== b.length) {return false}
   return a.every((pt, index) => pt.x === b[index].x && pt.y === b[index].y)
 }
 
@@ -853,12 +855,12 @@ function radiiEqual(a: CornerRadii, b: CornerRadii) {
 }
 
 function shapesEqual(a: ClipShape, b: ClipShape) {
-  if (a.kind !== b.kind) return false
-  if (a.kind === 'none' && b.kind === 'none') return true
-  if (a.kind === 'raw' && b.kind === 'raw') return a.value === b.value
-  if (a.kind === 'polygon' && b.kind === 'polygon') return pointsEqual(a.points, b.points)
-  if (a.kind === 'circle' && b.kind === 'circle') return a.radius === b.radius && a.cx === b.cx && a.cy === b.cy
-  if (a.kind === 'ellipse' && b.kind === 'ellipse') return a.rx === b.rx && a.ry === b.ry && a.cx === b.cx && a.cy === b.cy
+  if (a.kind !== b.kind) {return false}
+  if (a.kind === 'none' && b.kind === 'none') {return true}
+  if (a.kind === 'raw' && b.kind === 'raw') {return a.value === b.value}
+  if (a.kind === 'polygon' && b.kind === 'polygon') {return pointsEqual(a.points, b.points)}
+  if (a.kind === 'circle' && b.kind === 'circle') {return a.radius === b.radius && a.cx === b.cx && a.cy === b.cy}
+  if (a.kind === 'ellipse' && b.kind === 'ellipse') {return a.rx === b.rx && a.ry === b.ry && a.cx === b.cx && a.cy === b.cy}
   if (a.kind === 'inset' && b.kind === 'inset') {
     return a.top === b.top && a.right === b.right && a.bottom === b.bottom && a.left === b.left && radiiEqual(a.radii, b.radii)
   }
@@ -871,9 +873,9 @@ function shapesEqual(a: ClipShape, b: ClipShape) {
 }
 
 function handlesMatch(a: HandleTarget | null, b: HandleTarget) {
-  if (!a || a.kind !== b.kind) return false
-  if (a.kind === 'polygon-point' && b.kind === 'polygon-point') return a.index === b.index
-  if (a.kind === 'inset-radius' && b.kind === 'inset-radius') return a.corner === b.corner
+  if (!a || a.kind !== b.kind) {return false}
+  if (a.kind === 'polygon-point' && b.kind === 'polygon-point') {return a.index === b.index}
+  if (a.kind === 'inset-radius' && b.kind === 'inset-radius') {return a.corner === b.corner}
   return a.kind !== 'polygon-point' && a.kind !== 'inset-radius'
 }
 
@@ -887,7 +889,7 @@ function handleListIncludes(handles: HandleTarget[], handle: HandleTarget) {
 
 function uniqueHandles(handles: HandleTarget[]) {
   return handles.reduce<HandleTarget[]>((unique, handle) => {
-    if (!handleListIncludes(unique, handle)) unique.push(handle)
+    if (!handleListIncludes(unique, handle)) {unique.push(handle)}
     return unique
   }, [])
 }
@@ -895,7 +897,7 @@ function uniqueHandles(handles: HandleTarget[]) {
 function previousSurvivingPolygonIndex(pointCount: number, deletedIndexes: Set<number>, referenceIndex: number) {
   for (let offset = 1; offset <= pointCount; offset += 1) {
     const index = (referenceIndex - offset + pointCount) % pointCount
-    if (!deletedIndexes.has(index)) return index
+    if (!deletedIndexes.has(index)) {return index}
   }
   return null
 }
@@ -903,20 +905,20 @@ function previousSurvivingPolygonIndex(pointCount: number, deletedIndexes: Set<n
 function remapPolygonIndexAfterDelete(index: number, deletedIndexes: Set<number>) {
   let deletedBefore = 0
   deletedIndexes.forEach((deletedIndex) => {
-    if (deletedIndex < index) deletedBefore += 1
+    if (deletedIndex < index) {deletedBefore += 1}
   })
   return index - deletedBefore
 }
 
 function handleKey(handle: HandleTarget) {
-  if (handle.kind === 'polygon-point') return `${handle.kind}:${handle.index}`
-  if (handle.kind === 'inset-radius') return `${handle.kind}:${handle.corner}`
+  if (handle.kind === 'polygon-point') {return `${handle.kind}:${handle.index}`}
+  if (handle.kind === 'inset-radius') {return `${handle.kind}:${handle.corner}`}
   return handle.kind
 }
 
 function handleFromDragTarget(target: DragTarget): HandleTarget {
-  if (target.kind === 'polygon-point') return { kind: target.kind, index: target.index }
-  if (target.kind === 'inset-radius') return { kind: target.kind, corner: target.corner }
+  if (target.kind === 'polygon-point') {return { kind: target.kind, index: target.index }}
+  if (target.kind === 'inset-radius') {return { kind: target.kind, corner: target.corner }}
   return { kind: target.kind }
 }
 
@@ -932,13 +934,13 @@ const HANDLE_COLOR_CLASSES = [
 ]
 
 function handleColorClass(handle: HandleTarget) {
-  if (handle.kind === 'polygon-point') return HANDLE_COLOR_CLASSES[handle.index % HANDLE_COLOR_CLASSES.length]
-  if (handle.kind === 'circle-center' || handle.kind === 'ellipse-center') return 'clip-path_color-center'
-  if (handle.kind === 'circle-radius' || handle.kind === 'ellipse-rx' || handle.kind === 'inset-top') return 'clip-path_color-a'
-  if (handle.kind === 'ellipse-ry' || handle.kind === 'inset-right') return 'clip-path_color-b'
-  if (handle.kind === 'inset-bottom') return 'clip-path_color-c'
-  if (handle.kind === 'inset-left') return 'clip-path_color-d'
-  if (handle.kind === 'inset-radius') return HANDLE_COLOR_CLASSES[(CORNERS.indexOf(handle.corner) + 4) % HANDLE_COLOR_CLASSES.length]
+  if (handle.kind === 'polygon-point') {return HANDLE_COLOR_CLASSES[handle.index % HANDLE_COLOR_CLASSES.length]}
+  if (handle.kind === 'circle-center' || handle.kind === 'ellipse-center') {return 'clip-path_color-center'}
+  if (handle.kind === 'circle-radius' || handle.kind === 'ellipse-rx' || handle.kind === 'inset-top') {return 'clip-path_color-a'}
+  if (handle.kind === 'ellipse-ry' || handle.kind === 'inset-right') {return 'clip-path_color-b'}
+  if (handle.kind === 'inset-bottom') {return 'clip-path_color-c'}
+  if (handle.kind === 'inset-left') {return 'clip-path_color-d'}
+  if (handle.kind === 'inset-radius') {return HANDLE_COLOR_CLASSES[(CORNERS.indexOf(handle.corner) + 4) % HANDLE_COLOR_CLASSES.length]}
   return 'clip-path_color-a'
 }
 
@@ -953,14 +955,14 @@ function normalizePolygonPointColors(count: number, colors: string[] = []) {
 function nextPolygonPointColor(colors: string[], insertIndex: number) {
   const blocked = new Set([colors[insertIndex - 1], colors[insertIndex]].filter(Boolean))
   const unusedColor = HANDLE_COLOR_CLASSES.find((colorClass) => !colors.includes(colorClass) && !blocked.has(colorClass))
-  if (unusedColor) return unusedColor
+  if (unusedColor) {return unusedColor}
   return HANDLE_COLOR_CLASSES.find((colorClass) => !blocked.has(colorClass)) || HANDLE_COLOR_CLASSES[0]
 }
 
 function shorthandGroups<T>(items: T[], count = items.length) {
-  if (count <= 1) return items.length ? [[items[0], items[1], items[2], items[3]].filter(Boolean) as T[]] : []
-  if (count === 2) return [[items[0], items[2]], [items[1], items[3]]]
-  if (count === 3) return [[items[0]], [items[1], items[3]], [items[2]]]
+  if (count <= 1) {return items.length ? [[items[0], items[1], items[2], items[3]].filter(Boolean) as T[]] : []}
+  if (count === 2) {return [[items[0], items[2]], [items[1], items[3]]]}
+  if (count === 3) {return [[items[0]], [items[1], items[3]], [items[2]]]}
   return [[items[0]], [items[1]], [items[2]], [items[3]]]
 }
 
@@ -984,7 +986,7 @@ function formatPolygon(points: Point[]) {
 
 function formatShapeValueFromPoints(points: Point[]) {
   const [firstPoint, ...restPoints] = points
-  if (!firstPoint) return DEFAULT_SHAPE_VALUE
+  if (!firstPoint) {return DEFAULT_SHAPE_VALUE}
 
   return [
     `from ${formatPercent(firstPoint.x)} ${formatPercent(firstPoint.y)}`,
@@ -995,11 +997,11 @@ function formatShapeValueFromPoints(points: Point[]) {
 
 function formatShapeValueFromLoops(loops: Point[][]) {
   const [firstLoop, ...restLoops] = loops
-  if (!firstLoop?.length) return DEFAULT_SHAPE_VALUE
+  if (!firstLoop?.length) {return DEFAULT_SHAPE_VALUE}
 
   const loopCommands = (points: Point[], isFirstLoop: boolean) => {
     const [firstPoint, ...restPoints] = points
-    if (!firstPoint) return []
+    if (!firstPoint) {return []}
 
     return [
       `${isFirstLoop ? 'from' : 'move to'} ${formatPercent(firstPoint.x)} ${formatPercent(firstPoint.y)}`,
@@ -1022,7 +1024,7 @@ function mapShapeSubpathsToCss(subpaths: SvgShapeSubpath[], mapPoint: (point: Po
   return subpaths.map((subpath) => ({
     start: mapPoint(subpath.start),
     commands: subpath.commands.map((command) => {
-      if (command.kind === 'line') return { kind: 'line' as const, to: mapPoint(command.to) }
+      if (command.kind === 'line') {return { kind: 'line' as const, to: mapPoint(command.to) }}
       if (command.kind === 'curve') {
         return {
           kind: 'curve' as const,
@@ -1038,10 +1040,10 @@ function mapShapeSubpathsToCss(subpaths: SvgShapeSubpath[], mapPoint: (point: Po
 
 function formatShapeValueFromCssSubpaths(subpaths: ShapeCssSubpath[]) {
   const [firstSubpath, ...restSubpaths] = subpaths
-  if (!firstSubpath) return DEFAULT_SHAPE_VALUE
+  if (!firstSubpath) {return DEFAULT_SHAPE_VALUE}
 
   const commandToShapeValue = (command: ShapeCssCommand) => {
-    if (command.kind === 'line') return `line to ${formatShapeCssPoint(command.to)}`
+    if (command.kind === 'line') {return `line to ${formatShapeCssPoint(command.to)}`}
     if (command.kind === 'curve') {
       const control2 = command.control2
         ? ` / ${formatShapeCssPoint(command.control2)}`
@@ -1073,7 +1075,7 @@ function formatShapeValueFromSubpaths(subpaths: SvgShapeSubpath[]) {
 
 function formatPathDataFromPoints(points: Point[]) {
   const [firstPoint, ...restPoints] = points
-  if (!firstPoint) return DEFAULT_SHAPE_PATH_DATA
+  if (!firstPoint) {return DEFAULT_SHAPE_PATH_DATA}
 
   return [
     `M${firstPoint.x} ${firstPoint.y}`,
@@ -1085,7 +1087,7 @@ function formatPathDataFromPoints(points: Point[]) {
 function formatPathDataFromLoops(loops: Point[][]) {
   const commands = loops.flatMap((points) => {
     const [firstPoint, ...restPoints] = points
-    if (!firstPoint) return []
+    if (!firstPoint) {return []}
 
     return [
       `M${firstPoint.x} ${firstPoint.y}`,
@@ -1101,7 +1103,7 @@ function formatPathDataFromSubpaths(subpaths: SvgShapeSubpath[]) {
   const pathData = subpaths.flatMap((subpath) => [
     `M${subpath.start.x} ${subpath.start.y}`,
     ...subpath.commands.map((command) => {
-      if (command.kind === 'line') return `L${command.to.x} ${command.to.y}`
+      if (command.kind === 'line') {return `L${command.to.x} ${command.to.y}`}
       if (command.kind === 'curve') {
         return command.control2
           ? `C${command.control1.x} ${command.control1.y} ${command.control2.x} ${command.control2.y} ${command.to.x} ${command.to.y}`
@@ -1124,7 +1126,7 @@ function shapeFromPolygonPoints(points: Point[]): ShapeFunctionShape {
 
 function shapeFromPointLoops(loops: Point[][]): ShapeFunctionShape {
   const normalizedLoops = loops.map(simplifySvgContour).filter((loop) => loop.length >= 3)
-  if (!normalizedLoops.length) return shapeFromPolygonPoints([])
+  if (!normalizedLoops.length) {return shapeFromPolygonPoints([])}
 
   return {
     kind: 'shape',
@@ -1135,7 +1137,7 @@ function shapeFromPointLoops(loops: Point[][]): ShapeFunctionShape {
 }
 
 function shapeFromSvgSubpaths(subpaths: SvgShapeSubpath[], fillRule?: ShapeFunctionShape['fillRule']): ShapeFunctionShape {
-  if (!subpaths.length) return shapeFromPolygonPoints([])
+  if (!subpaths.length) {return shapeFromPolygonPoints([])}
 
   return {
     kind: 'shape',
@@ -1146,7 +1148,7 @@ function shapeFromSvgSubpaths(subpaths: SvgShapeSubpath[], fillRule?: ShapeFunct
 }
 
 function fitPointsToPercentBox(points: Point[]) {
-  if (!points.length) return null
+  if (!points.length) {return null}
 
   const minX = Math.min(...points.map((point) => point.x))
   const maxX = Math.max(...points.map((point) => point.x))
@@ -1154,7 +1156,7 @@ function fitPointsToPercentBox(points: Point[]) {
   const maxY = Math.max(...points.map((point) => point.y))
   const width = maxX - minX
   const height = maxY - minY
-  if (width <= SVG_POINT_EPSILON || height <= SVG_POINT_EPSILON) return null
+  if (width <= SVG_POINT_EPSILON || height <= SVG_POINT_EPSILON) {return null}
 
   return points.map((point) => ({
     x: ((point.x - minX) / width) * 100,
@@ -1164,7 +1166,7 @@ function fitPointsToPercentBox(points: Point[]) {
 
 function fitPointLoopsToPercentBox(loops: Point[][]) {
   const points = loops.flat()
-  if (!points.length) return null
+  if (!points.length) {return null}
 
   const minX = Math.min(...points.map((point) => point.x))
   const maxX = Math.max(...points.map((point) => point.x))
@@ -1172,7 +1174,7 @@ function fitPointLoopsToPercentBox(loops: Point[][]) {
   const maxY = Math.max(...points.map((point) => point.y))
   const width = maxX - minX
   const height = maxY - minY
-  if (width <= SVG_POINT_EPSILON || height <= SVG_POINT_EPSILON) return null
+  if (width <= SVG_POINT_EPSILON || height <= SVG_POINT_EPSILON) {return null}
 
   return loops.map((loop) => loop.map((point) => ({
     x: ((point.x - minX) / width) * 100,
@@ -1181,7 +1183,7 @@ function fitPointLoopsToPercentBox(loops: Point[][]) {
 }
 
 function svgShapeCommandPoints(command: SvgShapeCommand) {
-  if (command.kind === 'close') return []
+  if (command.kind === 'close') {return []}
   return command.kind === 'curve'
     ? [command.to, command.control1, command.control2].filter(Boolean) as Point[]
     : [command.to]
@@ -1196,7 +1198,7 @@ function svgShapeSubpathPoints(subpaths: SvgShapeSubpath[]) {
 
 function svgShapeSubpathBounds(subpaths: SvgShapeSubpath[]): SvgShapeBounds | null {
   const points = svgShapeSubpathPoints(subpaths)
-  if (!points.length) return null
+  if (!points.length) {return null}
 
   const minX = Math.min(...points.map((point) => point.x))
   const maxX = Math.max(...points.map((point) => point.x))
@@ -1204,13 +1206,13 @@ function svgShapeSubpathBounds(subpaths: SvgShapeSubpath[]): SvgShapeBounds | nu
   const maxY = Math.max(...points.map((point) => point.y))
   const width = maxX - minX
   const height = maxY - minY
-  if (width <= SVG_POINT_EPSILON || height <= SVG_POINT_EPSILON) return null
+  if (width <= SVG_POINT_EPSILON || height <= SVG_POINT_EPSILON) {return null}
 
   return { minX, maxX, minY, maxY, width, height }
 }
 
 function svgShapeBoundsFromViewBox(viewBox: SvgViewBox): SvgShapeBounds | null {
-  if (viewBox.width <= SVG_POINT_EPSILON || viewBox.height <= SVG_POINT_EPSILON) return null
+  if (viewBox.width <= SVG_POINT_EPSILON || viewBox.height <= SVG_POINT_EPSILON) {return null}
   return {
     minX: viewBox.x,
     maxX: viewBox.x + viewBox.width,
@@ -1222,8 +1224,8 @@ function svgShapeBoundsFromViewBox(viewBox: SvgViewBox): SvgShapeBounds | null {
 }
 
 function mapSvgShapeCommandPoints(command: SvgShapeCommand, mapper: (point: Point) => Point): SvgShapeCommand {
-  if (command.kind === 'close') return command
-  if (command.kind === 'line') return { ...command, to: mapper(command.to) }
+  if (command.kind === 'close') {return command}
+  if (command.kind === 'line') {return { ...command, to: mapper(command.to) }}
   return {
     ...command,
     to: mapper(command.to),
@@ -1234,7 +1236,7 @@ function mapSvgShapeCommandPoints(command: SvgShapeCommand, mapper: (point: Poin
 
 function fitShapeSubpathsToPercentBox(subpaths: SvgShapeSubpath[], preferredBounds?: SvgShapeBounds | null) {
   const bounds = preferredBounds || svgShapeSubpathBounds(subpaths)
-  if (!bounds) return null
+  if (!bounds) {return null}
 
   const fitPoint = (point: Point) => ({
     x: ((point.x - bounds.minX) / bounds.width) * 100,
@@ -1295,7 +1297,7 @@ type ShapeOffsetBounds = { minAx: number; minAy: number; wu: number; hu: number;
 // (the shape's width lives in WU), with OL/OT derived from the shape's near-edge position so the
 // on-canvas appearance is preserved.
 function shapeOffsetBoundsFromCanvasPoints(points: Point[]): ShapeOffsetBounds | null {
-  if (!points.length) return null
+  if (!points.length) {return null}
   const axs = points.map((point) => (point.x - 50) / 100)
   const ays = points.map((point) => (point.y - 50) / 100)
   const minAx = Math.min(...axs)
@@ -1328,7 +1330,7 @@ function containShapeSubpathsToCss(
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
 ) {
   const bounds = preferredBounds || svgShapeSubpathBounds(subpaths)
-  if (!bounds) return null
+  if (!bounds) {return null}
 
   const names = resolveShapeScaleVarNames(options)
   const centerX = bounds.minX + bounds.width / 2
@@ -1353,9 +1355,9 @@ function containShapeSubpathsToCss(
 }
 
 function formatClipPath(shape: ClipShape) {
-  if (shape.kind === 'none') return 'none'
-  if (shape.kind === 'raw') return shape.editable ? formatRawEditableClipPath(shape.editable) : shape.value
-  if (shape.kind === 'polygon') return formatPolygon(shape.points)
+  if (shape.kind === 'none') {return 'none'}
+  if (shape.kind === 'raw') {return shape.editable ? formatRawEditableClipPath(shape.editable) : shape.value}
+  if (shape.kind === 'polygon') {return formatPolygon(shape.points)}
   if (shape.kind === 'shape') {
     const prefix = shape.fillRule && shape.fillRule !== 'nonzero' ? `${shape.fillRule} ` : ''
     return `shape(${prefix}${shape.value})`
@@ -1387,37 +1389,37 @@ function previewUnitPx(unit: string, axis: 'x' | 'y', size: CanvasSize) {
   const normalized = unit.toLowerCase()
   const pxUnit = axisSize / 1600
 
-  if (normalized === '%') return axisSize / 100
-  if (normalized === 'px') return pxUnit
-  if (normalized === 'em' || normalized === 'rem' || normalized === 'lh' || normalized === 'rlh') return axisSize / 100
-  if (normalized === 'ch' || normalized === 'ex') return axisSize / 200
-  if (normalized === 'vw' || normalized === 'svw' || normalized === 'lvw' || normalized === 'dvw') return size.width / 100
-  if (normalized === 'vh' || normalized === 'svh' || normalized === 'lvh' || normalized === 'dvh') return size.height / 100
-  if (normalized === 'vmin' || normalized === 'svmin' || normalized === 'lvmin' || normalized === 'dvmin') return Math.min(size.width, size.height) / 100
-  if (normalized === 'vmax' || normalized === 'svmax' || normalized === 'lvmax' || normalized === 'dvmax') return Math.max(size.width, size.height) / 100
-  if (normalized === 'cqw' || normalized === 'cqi') return size.width / 100
-  if (normalized === 'cqh' || normalized === 'cqb') return size.height / 100
-  if (normalized === 'cqmin') return Math.min(size.width, size.height) / 100
-  if (normalized === 'cqmax') return Math.max(size.width, size.height) / 100
-  if (normalized === 'in') return 96 * pxUnit
-  if (normalized === 'cm') return (96 / 2.54) * pxUnit
-  if (normalized === 'mm') return (96 / 25.4) * pxUnit
-  if (normalized === 'q') return (96 / 101.6) * pxUnit
-  if (normalized === 'pt') return (96 / 72) * pxUnit
-  if (normalized === 'pc') return 16 * pxUnit
+  if (normalized === '%') {return axisSize / 100}
+  if (normalized === 'px') {return pxUnit}
+  if (normalized === 'em' || normalized === 'rem' || normalized === 'lh' || normalized === 'rlh') {return axisSize / 100}
+  if (normalized === 'ch' || normalized === 'ex') {return axisSize / 200}
+  if (normalized === 'vw' || normalized === 'svw' || normalized === 'lvw' || normalized === 'dvw') {return size.width / 100}
+  if (normalized === 'vh' || normalized === 'svh' || normalized === 'lvh' || normalized === 'dvh') {return size.height / 100}
+  if (normalized === 'vmin' || normalized === 'svmin' || normalized === 'lvmin' || normalized === 'dvmin') {return Math.min(size.width, size.height) / 100}
+  if (normalized === 'vmax' || normalized === 'svmax' || normalized === 'lvmax' || normalized === 'dvmax') {return Math.max(size.width, size.height) / 100}
+  if (normalized === 'cqw' || normalized === 'cqi') {return size.width / 100}
+  if (normalized === 'cqh' || normalized === 'cqb') {return size.height / 100}
+  if (normalized === 'cqmin') {return Math.min(size.width, size.height) / 100}
+  if (normalized === 'cqmax') {return Math.max(size.width, size.height) / 100}
+  if (normalized === 'in') {return 96 * pxUnit}
+  if (normalized === 'cm') {return (96 / 2.54) * pxUnit}
+  if (normalized === 'mm') {return (96 / 25.4) * pxUnit}
+  if (normalized === 'q') {return (96 / 101.6) * pxUnit}
+  if (normalized === 'pt') {return (96 / 72) * pxUnit}
+  if (normalized === 'pc') {return 16 * pxUnit}
   return axisSize / 100
 }
 
 function previewCssLengthPercentageToken(token: string, axis: 'x' | 'y', size: CanvasSize) {
   const match = token.trim().match(/^([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)(%|[a-z][a-z0-9]*)$/i)
-  if (!match) return token
+  if (!match) {return token}
 
   const value = Number(match[1])
-  if (!Number.isFinite(value)) return token
+  if (!Number.isFinite(value)) {return token}
 
   const unit = match[2]
   const axisSize = previewAxisSize(axis, size)
-  if (axisSize <= 0) return token
+  if (axisSize <= 0) {return token}
   const percent = unit === '%'
     ? value
     : (value * previewUnitPx(unit, axis, size) / axisSize) * 100
@@ -1435,7 +1437,7 @@ function previewCssCoordinateToken(value: string, axis: 'x' | 'y', size: CanvasS
     /([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)(%|[a-z][a-z0-9]*)\b/gi,
     (match, number: string, unit: string, offset: number, source: string) => {
       const previous = source[offset - 1]
-      if (previous && /[a-zA-Z0-9_-]/.test(previous)) return match
+      if (previous && /[a-zA-Z0-9_-]/.test(previous)) {return match}
       return previewCssLengthPercentageToken(`${number}${unit}`, axis, size)
     },
   )
@@ -1484,7 +1486,7 @@ function formatRawEditableClipPathForPreview(editable: RawEditableClipPath, size
     formatCssUnitValueForPreview(editable.bottom, 'y', size),
     formatCssUnitValueForPreview(editable.left, 'x', size),
   ].join(' ')
-  if (!editable.radii) return `inset(${sides})`
+  if (!editable.radii) {return `inset(${sides})`}
 
   const horizontalValues = expandCssUnitValues(editable.radii.horizontal)
   const verticalValues = expandCssUnitValues(editable.radii.vertical || editable.radii.horizontal)
@@ -1496,7 +1498,7 @@ function formatRawEditableClipPathForPreview(editable: RawEditableClipPath, size
 function formatShapeFunctionForPreview(shape: ShapeFunctionShape, size: CanvasSize) {
   const subpaths = parseShapeCssSubpaths(shape.value)
   const prefix = shape.fillRule && shape.fillRule !== 'nonzero' ? `${shape.fillRule} ` : ''
-  if (!subpaths) return `shape(${prefix}${addPreviewVariableFallbacks(shape.value)})`
+  if (!subpaths) {return `shape(${prefix}${addPreviewVariableFallbacks(shape.value)})`}
 
   const transformed = mapShapeCssSubpathPoints(subpaths, (point) => ({
     x: previewCssCoordinateToken(point.x, 'x', size),
@@ -1559,7 +1561,7 @@ function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
         previewCssCoordinateToken(token, index % 2 === 0 ? 'y' : 'x', size)
       )).join(' ')
       : insetPart
-    if (!roundPart) return `inset(${previewSides})`
+    if (!roundPart) {return `inset(${previewSides})`}
 
     const radiusParts = splitTopLevelChar(roundPart, '/')
     const horizontalTokens = splitTopLevelWhitespace(radiusParts[0] || '')
@@ -1577,14 +1579,14 @@ function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
 }
 
 function formatClipPathForPreview(shape: ClipShape, css: string, size: CanvasSize | null) {
-  if (shape.kind === 'none') return 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)'
-  if (!size) return addPreviewVariableFallbacks(css)
+  if (shape.kind === 'none') {return 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)'}
+  if (!size) {return addPreviewVariableFallbacks(css)}
   if (shape.kind === 'raw') {
     return shape.editable
       ? formatRawEditableClipPathForPreview(shape.editable, size)
       : formatRawClipPathStringForPreview(shape.value, size)
   }
-  if (shape.kind === 'shape') return formatShapeFunctionForPreview(shape, size)
+  if (shape.kind === 'shape') {return formatShapeFunctionForPreview(shape, size)}
   return addPreviewVariableFallbacks(css)
 }
 
@@ -1594,9 +1596,9 @@ function tokenRangesFromParts(value: string, parts: string[]) {
 
   parts.forEach((part) => {
     const token = part.trim()
-    if (!token) return
+    if (!token) {return}
     const index = value.indexOf(token, searchFrom)
-    if (index < 0) return
+    if (index < 0) {return}
     ranges.push({ from: index, to: index + token.length })
     searchFrom = index + token.length
   })
@@ -1612,7 +1614,7 @@ function functionContentRange(value: string) {
 
 function splitPolygonCoordinateTokens(value: string) {
   const range = functionContentRange(value)
-  if (!range) return []
+  if (!range) {return []}
   const parts = splitShapeCommandList(range.content)
   const pointParts = /^(evenodd|nonzero)$/i.test(parts[0] || '') ? parts.slice(1) : parts
   return pointParts.flatMap((part) => splitTopLevelWhitespace(part))
@@ -1620,7 +1622,7 @@ function splitPolygonCoordinateTokens(value: string) {
 
 function splitCircleCoordinateTokens(value: string) {
   const range = functionContentRange(value)
-  if (!range) return []
+  if (!range) {return []}
   const [radiusPart, centerPart] = splitTopLevelKeyword(range.content, 'at')
   return [
     ...splitTopLevelWhitespace(radiusPart),
@@ -1634,10 +1636,10 @@ function splitEllipseCoordinateTokens(value: string) {
 
 function splitInsetCoordinateTokens(value: string) {
   const range = functionContentRange(value)
-  if (!range) return []
+  if (!range) {return []}
   const [insetPart, roundPart] = splitTopLevelKeyword(range.content, 'round')
   const tokens = [...splitTopLevelWhitespace(insetPart)]
-  if (!roundPart) return tokens
+  if (!roundPart) {return tokens}
 
   splitTopLevelChar(roundPart, '/').forEach((part) => {
     tokens.push(...splitTopLevelWhitespace(part))
@@ -1674,7 +1676,7 @@ function buildClipPathCodeHighlights(shape: ClipShape, value: string, polygonPoi
   const ranges = clipPathValueTokenRanges(value, shape)
   const highlights: ClipPathCodeHighlight[] = []
   const addHighlight = (range: { from: number; to: number } | undefined, handles: HandleTarget[], colorClass = handleColorClass(handles[0])) => {
-    if (!range) return
+    if (!range) {return}
     highlights.push({ ...range, handles, colorClass, className: codeTokenClassName(colorClass) })
   }
 
@@ -1811,7 +1813,7 @@ function buildClipPathCodeHighlights(shape: ClipShape, value: string, polygonPoi
 }
 
 function parsePercent(value: string): number | null {
-  if (value.trim() === '0') return 0
+  if (value.trim() === '0') {return 0}
   const m = value.trim().match(/^(-?\d+(?:\.\d+)?)\s*%$/)
   return m ? parseFloat(m[1]) : null
 }
@@ -1823,8 +1825,8 @@ function splitTopLevelWhitespace(value: string) {
 
   for (let index = 0; index < value.length; index += 1) {
     const char = value[index]
-    if (char === '(') depth += 1
-    if (char === ')') depth = Math.max(0, depth - 1)
+    if (char === '(') {depth += 1}
+    if (char === ')') {depth = Math.max(0, depth - 1)}
 
     if (/\s/.test(char) && depth === 0) {
       if (start !== null) {
@@ -1836,7 +1838,7 @@ function splitTopLevelWhitespace(value: string) {
     }
   }
 
-  if (start !== null) tokens.push(value.slice(start))
+  if (start !== null) {tokens.push(value.slice(start))}
   return tokens.map((token) => token.trim()).filter(Boolean)
 }
 
@@ -1847,8 +1849,8 @@ function splitTopLevelChar(value: string, separator: string) {
 
   for (let index = 0; index < value.length; index += 1) {
     const char = value[index]
-    if (char === '(') depth += 1
-    if (char === ')') depth = Math.max(0, depth - 1)
+    if (char === '(') {depth += 1}
+    if (char === ')') {depth = Math.max(0, depth - 1)}
     if (char === separator && depth === 0) {
       parts.push(value.slice(start, index).trim())
       start = index + 1
@@ -1866,13 +1868,13 @@ function splitTopLevelKeyword(value: string, keyword: string) {
 
   for (let index = 0; index < value.length; index += 1) {
     const char = value[index]
-    if (char === '(') depth += 1
-    if (char === ')') depth = Math.max(0, depth - 1)
-    if (depth !== 0 || lowerValue.slice(index, index + lowerKeyword.length) !== lowerKeyword) continue
+    if (char === '(') {depth += 1}
+    if (char === ')') {depth = Math.max(0, depth - 1)}
+    if (depth !== 0 || lowerValue.slice(index, index + lowerKeyword.length) !== lowerKeyword) {continue}
 
     const before = value[index - 1]
     const after = value[index + lowerKeyword.length]
-    if ((before && !/\s/.test(before)) || (after && !/\s/.test(after))) continue
+    if ((before && !/\s/.test(before)) || (after && !/\s/.test(after))) {continue}
 
     return [
       value.slice(0, index).trim(),
@@ -1886,10 +1888,10 @@ function splitTopLevelKeyword(value: string, keyword: string) {
 function hasBalancedParens(value: string) {
   let depth = 0
   for (const char of value) {
-    if (char === '(') depth += 1
+    if (char === '(') {depth += 1}
     if (char === ')') {
       depth -= 1
-      if (depth < 0) return false
+      if (depth < 0) {return false}
     }
   }
   return depth === 0
@@ -1897,32 +1899,32 @@ function hasBalancedParens(value: string) {
 
 function isCssLengthPercentageToken(value: string) {
   const token = value.trim()
-  if (!token) return false
-  if (/^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(token)) return Number(token) === 0
-  if (/^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?(?:%|[a-z][a-z0-9]*)$/i.test(token)) return true
-  if (/^[a-z_][a-z0-9_-]*\(.*\)$/i.test(token)) return hasBalancedParens(token)
+  if (!token) {return false}
+  if (/^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(token)) {return Number(token) === 0}
+  if (/^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?(?:%|[a-z][a-z0-9]*)$/i.test(token)) {return true}
+  if (/^[a-z_][a-z0-9_-]*\(.*\)$/i.test(token)) {return hasBalancedParens(token)}
   return false
 }
 
 function parseCssUnitValue(value: string): CssUnitValue | null {
   const token = value.trim()
   const match = token.match(/^([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)(%|[a-z][a-z0-9]*)?$/i)
-  if (!match) return null
+  if (!match) {return null}
   const parsed = Number(match[1])
-  if (!Number.isFinite(parsed)) return null
+  if (!Number.isFinite(parsed)) {return null}
   const unit = match[2] || (parsed === 0 ? '%' : '')
   return unit ? { value: parsed, unit } : null
 }
 
 function parseCssCoordinateValue(value: string): CssCoordinateValue | null {
   const unitValue = parseCssUnitValue(value)
-  if (unitValue) return unitValue
+  if (unitValue) {return unitValue}
   return isCssLengthPercentageToken(value) ? { expression: value.trim() } : null
 }
 
 function parseCssUnitList(value: string, min: number, max: number) {
   const tokens = splitTopLevelWhitespace(value)
-  if (tokens.length < min || tokens.length > max) return null
+  if (tokens.length < min || tokens.length > max) {return null}
   const values = tokens.map(parseCssUnitValue)
   return values.every(Boolean) ? values as CssUnitValue[] : null
 }
@@ -1937,17 +1939,17 @@ function validRawCenter(value: string | undefined) {
 }
 
 function parsePolygon(value: string): Point[] | null {
-  if (!value) return null
+  if (!value) {return null}
   const m = value.match(/polygon\s*\(([^)]+)\)/i)
-  if (!m) return null
+  if (!m) {return null}
   const parts = m[1].split(',')
   const points: Point[] = []
   for (const part of parts) {
     const tokens = part.trim().split(/\s+/)
-    if (tokens.length !== 2) return null
+    if (tokens.length !== 2) {return null}
     const x = parsePercent(tokens[0])
     const y = parsePercent(tokens[1])
-    if (x === null || y === null) return null
+    if (x === null || y === null) {return null}
     points.push({ x, y })
   }
   return points.length >= 3 ? points : null
@@ -1955,7 +1957,7 @@ function parsePolygon(value: string): Point[] | null {
 
 function parseCenter(value: string): Point | null {
   const tokens = value.trim().split(/\s+/)
-  if (tokens.length !== 2) return null
+  if (tokens.length !== 2) {return null}
   const x = parsePercent(tokens[0])
   const y = parsePercent(tokens[1])
   return x === null || y === null ? null : { x, y }
@@ -1963,29 +1965,29 @@ function parseCenter(value: string): Point | null {
 
 function parseCircle(value: string): CircleShape | null {
   const m = value.match(/^circle\s*\((.*)\)$/i)
-  if (!m) return null
+  if (!m) {return null}
   const [radiusPart, centerPart] = m[1].split(/\s+at\s+/i).map((part) => part.trim())
   const radius = parsePercent(radiusPart)
-  if (radius === null) return null
+  if (radius === null) {return null}
   const center = centerPart ? parseCenter(centerPart) : { x: 50, y: 50 }
   return center ? { kind: 'circle', radius, cx: center.x, cy: center.y } : null
 }
 
 function parseEllipse(value: string): EllipseShape | null {
   const m = value.match(/^ellipse\s*\((.*)\)$/i)
-  if (!m) return null
+  if (!m) {return null}
   const [radiiPart, centerPart] = m[1].split(/\s+at\s+/i).map((part) => part.trim())
   const radii = radiiPart.split(/\s+/)
-  if (radii.length !== 2) return null
+  if (radii.length !== 2) {return null}
   const rx = parsePercent(radii[0])
   const ry = parsePercent(radii[1])
-  if (rx === null || ry === null) return null
+  if (rx === null || ry === null) {return null}
   const center = centerPart ? parseCenter(centerPart) : { x: 50, y: 50 }
   return center ? { kind: 'ellipse', rx, ry, cx: center.x, cy: center.y } : null
 }
 
 function expandRadiusValues(values: number[]): [number, number, number, number] | null {
-  if (values.length < 1 || values.length > 4) return null
+  if (values.length < 1 || values.length > 4) {return null}
   const topLeft = values[0]
   const topRight = values[1] ?? values[0]
   const bottomRight = values[2] ?? values[0]
@@ -1995,18 +1997,18 @@ function expandRadiusValues(values: number[]): [number, number, number, number] 
 
 function parseRadiusList(value: string): [number, number, number, number] | null {
   const values = value.trim().split(/\s+/).filter(Boolean).map(parsePercent)
-  if (values.length < 1 || values.length > 4 || values.some((item) => item === null)) return null
+  if (values.length < 1 || values.length > 4 || values.some((item) => item === null)) {return null}
   return expandRadiusValues(values as number[])
 }
 
 function parseInsetRadii(value: string | undefined): CornerRadii | null {
-  if (!value) return makeInsetRadii(0)
+  if (!value) {return makeInsetRadii(0)}
   const parts = value.split(/\s*\/\s*/)
-  if (parts.length > 2) return null
+  if (parts.length > 2) {return null}
   const horizontal = parseRadiusList(parts[0])
-  if (!horizontal) return null
+  if (!horizontal) {return null}
   const vertical = parts[1] ? parseRadiusList(parts[1]) : horizontal
-  if (!vertical) return null
+  if (!vertical) {return null}
 
   return {
     topLeft: { x: horizontal[0], y: vertical[0] },
@@ -2018,10 +2020,10 @@ function parseInsetRadii(value: string | undefined): CornerRadii | null {
 
 function parseInset(value: string): InsetShape | null {
   const m = value.match(/^inset\s*\((.*)\)$/i)
-  if (!m) return null
+  if (!m) {return null}
   const [insetPart, roundPart] = m[1].split(/\s+round\s+/i)
   const values = insetPart.trim().split(/\s+/).map(parsePercent)
-  if (values.length < 1 || values.length > 4 || values.some((item) => item === null)) return null
+  if (values.length < 1 || values.length > 4 || values.some((item) => item === null)) {return null}
   const nums = values as number[]
   const top = nums[0]
   const right = nums[1] ?? nums[0]
@@ -2041,7 +2043,7 @@ function validRawRadiusList(value: string, min: number, max: number) {
 }
 
 function validRawInsetRadii(value: string | undefined) {
-  if (!value) return true
+  if (!value) {return true}
   const parts = splitTopLevelChar(value, '/')
   return parts.length >= 1 &&
     parts.length <= 2 &&
@@ -2051,14 +2053,14 @@ function validRawInsetRadii(value: string | undefined) {
 
 function parseRawPolygon(value: string): RawClipPathShape | null {
   const m = value.match(/^polygon\s*\((.*)\)$/is)
-  if (!m) return null
+  if (!m) {return null}
 
   const parts = splitShapeCommandList(m[1])
   const fillRule = /^(evenodd|nonzero)$/i.test(parts[0] || '')
     ? parts[0].toLowerCase() as 'evenodd' | 'nonzero'
     : undefined
   const pointParts = fillRule ? parts.slice(1) : parts
-  if (pointParts.length < 3) return null
+  if (pointParts.length < 3) {return null}
 
   const parsedPoints: CssCoordinatePoint[] = []
   const valid = pointParts.every((part) => {
@@ -2084,12 +2086,12 @@ function parseRawPolygon(value: string): RawClipPathShape | null {
 
 function parseRawCircle(value: string): RawClipPathShape | null {
   const m = value.match(/^circle\s*\((.*)\)$/is)
-  if (!m) return null
+  if (!m) {return null}
 
   const [radiusPart, centerPart] = splitTopLevelKeyword(m[1], 'at')
   const radiusTokens = splitTopLevelWhitespace(radiusPart)
   const validRadius = radiusTokens.length === 1 && isCssRadiusToken(radiusTokens[0])
-  if (!validRadius || !validRawCenter(centerPart)) return null
+  if (!validRadius || !validRawCenter(centerPart)) {return null}
 
   const centerTokens = centerPart ? splitTopLevelWhitespace(centerPart) : []
   const radius = parseCssUnitValue(radiusTokens[0])
@@ -2105,10 +2107,10 @@ function parseRawCircle(value: string): RawClipPathShape | null {
 
 function parseRawEllipse(value: string): RawClipPathShape | null {
   const m = value.match(/^ellipse\s*\((.*)\)$/is)
-  if (!m) return null
+  if (!m) {return null}
 
   const [radiiPart, centerPart] = splitTopLevelKeyword(m[1], 'at')
-  if (!validRawRadiusList(radiiPart, 2, 2) || !validRawCenter(centerPart)) return null
+  if (!validRawRadiusList(radiiPart, 2, 2) || !validRawCenter(centerPart)) {return null}
 
   const radii = splitTopLevelWhitespace(radiiPart)
   const center = centerPart ? splitTopLevelWhitespace(centerPart) : []
@@ -2126,10 +2128,10 @@ function parseRawEllipse(value: string): RawClipPathShape | null {
 
 function parseRawInset(value: string): RawClipPathShape | null {
   const m = value.match(/^inset\s*\((.*)\)$/is)
-  if (!m) return null
+  if (!m) {return null}
 
   const [insetPart, roundPart] = splitTopLevelKeyword(m[1], 'round')
-  if (!validLengthPercentageList(insetPart, 1, 4) || !validRawInsetRadii(roundPart)) return null
+  if (!validLengthPercentageList(insetPart, 1, 4) || !validRawInsetRadii(roundPart)) {return null}
 
   const sideValues = parseCssUnitList(insetPart, 1, 4)
   const top = sideValues?.[0]
@@ -2160,9 +2162,9 @@ function parseRawBasicClipPath(value: string): RawClipPathShape | null {
 function parseCustomClipPath(value: string): RawClipPathShape | null {
   const trimmed = value.trim().replace(/;$/, '')
   const lowerValue = trimmed.toLowerCase()
-  if (!trimmed || lowerValue === 'none') return null
-  if (CSS_GLOBAL_CLIP_PATH_VALUES.has(lowerValue)) return { kind: 'raw', value: trimmed, preset: CUSTOM_PRESET }
-  if (CSS_GEOMETRY_BOX_CLIP_PATH_VALUES.has(lowerValue)) return { kind: 'raw', value: trimmed, preset: CUSTOM_PRESET }
+  if (!trimmed || lowerValue === 'none') {return null}
+  if (CSS_GLOBAL_CLIP_PATH_VALUES.has(lowerValue)) {return { kind: 'raw', value: trimmed, preset: CUSTOM_PRESET }}
+  if (CSS_GEOMETRY_BOX_CLIP_PATH_VALUES.has(lowerValue)) {return { kind: 'raw', value: trimmed, preset: CUSTOM_PRESET }}
   if (/^[a-z][a-z0-9-]*\s*\(/is.test(trimmed) && hasBalancedParens(trimmed)) {
     return { kind: 'raw', value: trimmed, preset: CUSTOM_PRESET }
   }
@@ -2171,7 +2173,7 @@ function parseCustomClipPath(value: string): RawClipPathShape | null {
 
 function parseShape(value: string): ShapeFunctionShape | null {
   const m = value.match(/^shape\s*\((.*)\)$/is)
-  if (!m) return null
+  if (!m) {return null}
 
   let content = m[1].trim()
   let fillRule: ShapeFunctionShape['fillRule']
@@ -2263,12 +2265,12 @@ function parseShapeOffsetCoordinate(value: string, exact = false): ShapeOffsetCo
   const trimmed = value.trim()
   const xMatch = trimmed.match(exact ? SHAPE_OFFSET_COORDINATE_X_EXACT_RE : SHAPE_OFFSET_COORDINATE_X_RE)
   const match = xMatch || trimmed.match(exact ? SHAPE_OFFSET_COORDINATE_Y_EXACT_RE : SHAPE_OFFSET_COORDINATE_Y_RE)
-  if (!match) return null
+  if (!match) {return null}
   const u = Number(match[1])
   const size = Number(match[3] ?? match[4])
   const offset = Number(match[6] ?? match[7])
   const span = Number(match[8])
-  if (![u, size, offset, span].every(Number.isFinite)) return null
+  if (![u, size, offset, span].every(Number.isFinite)) {return null}
   return {
     axis: xMatch ? 'x' : 'y',
     u,
@@ -2287,7 +2289,7 @@ function shapeOffsetCoordinateToCanvas(parsed: ShapeOffsetCoordinate) {
 function shapeOffsetVariableNamesFromValue(value: string) {
   const xMatch = value.match(SHAPE_OFFSET_LEFT_VARIABLE_NAME_RE)
   const yMatch = value.match(SHAPE_OFFSET_TOP_VARIABLE_NAME_RE)
-  if (!xMatch && !yMatch) return null
+  if (!xMatch && !yMatch) {return null}
   return {
     sizeVar: xMatch?.[2] || yMatch?.[2] || null,
     offsetLeftVar: xMatch?.[5] || null,
@@ -2306,19 +2308,19 @@ function shapeCalcCoordinateOffset(value: string, exact = false) {
   const minMatch = trimmed.match(exact ? SHAPE_MIN_COORDINATE_EXACT_RE : new RegExp(`^${SHAPE_MIN_COORDINATE_PATTERN}`, 'i'))
   if (minMatch) {
     const offset = Number(minMatch[2])
-    if (!Number.isFinite(offset)) return null
+    if (!Number.isFinite(offset)) {return null}
     return minMatch[1] === '-' ? -offset : offset
   }
 
   const scaleMatch = trimmed.match(exact ? SHAPE_SCALE_COORDINATE_EXACT_RE : SHAPE_SCALE_COORDINATE_RE)
   if (scaleMatch) {
     const offset = Number(scaleMatch[2]) * 100
-    if (!Number.isFinite(offset)) return null
+    if (!Number.isFinite(offset)) {return null}
     return scaleMatch[1] === '-' ? -offset : offset
   }
 
   const match = trimmed.match(exact ? SHAPE_CQW_COORDINATE_EXACT_RE : new RegExp(`^${SHAPE_CQW_COORDINATE_PATTERN}`, 'i'))
-  if (!match) return null
+  if (!match) {return null}
 
   if (match[3] !== undefined) {
     const offset = Number(match[3])
@@ -2326,7 +2328,7 @@ function shapeCalcCoordinateOffset(value: string, exact = false) {
   }
 
   const offset = Number(match[2])
-  if (!Number.isFinite(offset)) return null
+  if (!Number.isFinite(offset)) {return null}
   return match[1] === '-' ? -offset : offset
 }
 
@@ -2362,16 +2364,16 @@ function hasContainerQueryUnit(value: string) {
 
 function shapeScaleVariableNameFromValue(value: string) {
   const offsetNames = shapeOffsetVariableNamesFromValue(value)
-  if (offsetNames?.sizeVar) return offsetNames.sizeVar
+  if (offsetNames?.sizeVar) {return offsetNames.sizeVar}
   return value.match(SHAPE_SCALE_VARIABLE_NAME_RE)?.[3] || null
 }
 
 function readShapeCssPoint(value: string) {
   const x = readShapeCssCoordinate(value)
-  if (!x) return null
+  if (!x) {return null}
 
   const y = readShapeCssCoordinate(x.rest)
-  if (!y) return null
+  if (!y) {return null}
 
   return {
     point: { x: x.coordinate, y: y.coordinate },
@@ -2381,7 +2383,7 @@ function readShapeCssPoint(value: string) {
 
 function shapeCoordinateOffset(value: string) {
   const percent = parsePercent(value)
-  if (percent !== null) return percent - 50
+  if (percent !== null) {return percent - 50}
 
   return shapeCalcCoordinateOffset(value, true)
 }
@@ -2396,12 +2398,12 @@ function shapeCssPointToCanvasPoint(point: ShapeCssPoint): Point | null {
 
 function shapeCssBounds(shape: ShapeFunctionShape): SelectionRect | null {
   const subpaths = parseShapeCssSubpaths(shape.value)
-  if (!subpaths) return null
+  if (!subpaths) {return null}
 
   const points = collectShapeCssPoints(subpaths)
     .map(shapeCssPointToCanvasPoint)
     .filter((point): point is Point => Boolean(point))
-  if (!points.length) return null
+  if (!points.length) {return null}
 
   const xs = points.map((point) => point.x)
   const ys = points.map((point) => point.y)
@@ -2420,18 +2422,18 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
     const moveMatch = command.match(/^(from|move\s+to)\s+(.+)$/i)
     if (moveMatch) {
       const start = parseShapeCssPoint(moveMatch[2])
-      if (!start) return null
+      if (!start) {return null}
       activeSubpath = { start, commands: [] }
       subpaths.push(activeSubpath)
       continue
     }
 
-    if (!activeSubpath) return null
+    if (!activeSubpath) {return null}
 
     const lineMatch = command.match(/^line\s+to\s+(.+)$/i)
     if (lineMatch) {
       const to = parseShapeCssPoint(lineMatch[1])
-      if (!to) return null
+      if (!to) {return null}
       activeSubpath.commands.push({ kind: 'line', to })
       continue
     }
@@ -2439,13 +2441,13 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
     const curveMatch = command.match(/^curve\s+to\s+(.+)$/i)
     if (curveMatch) {
       const to = readShapeCssPoint(curveMatch[1])
-      if (!to) return null
+      if (!to) {return null}
 
       const withMatch = to.rest.match(/^with\s+(.+)$/i)
-      if (!withMatch) return null
+      if (!withMatch) {return null}
 
       const control1 = readShapeCssPoint(withMatch[1])
-      if (!control1) return null
+      if (!control1) {return null}
 
       const controlRest = control1.rest.trim()
       if (!controlRest) {
@@ -2455,7 +2457,7 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
 
       const control2Match = controlRest.match(/^\/\s*(.+)$/)
       const control2 = control2Match ? parseShapeCssPoint(control2Match[1]) : null
-      if (!control2) return null
+      if (!control2) {return null}
 
       activeSubpath.commands.push({ kind: 'curve', to: to.point, control1: control1.point, control2 })
       continue
@@ -2476,8 +2478,8 @@ function collectShapeCssPoints(subpaths: ShapeCssSubpath[]) {
   return subpaths.flatMap((subpath) => [
     subpath.start,
     ...subpath.commands.flatMap((command) => {
-      if (command.kind === 'close') return []
-      if (command.kind === 'line') return [command.to]
+      if (command.kind === 'close') {return []}
+      if (command.kind === 'line') {return [command.to]}
       return [command.to, command.control1, command.control2].filter(Boolean) as ShapeCssPoint[]
     }),
   ])
@@ -2487,7 +2489,7 @@ function mapShapeCssSubpathPoints(subpaths: ShapeCssSubpath[], mapper: (point: S
   return subpaths.map((subpath) => ({
     start: mapper(subpath.start),
     commands: subpath.commands.map((command) => {
-      if (command.kind === 'line') return { kind: 'line' as const, to: mapper(command.to) }
+      if (command.kind === 'line') {return { kind: 'line' as const, to: mapper(command.to) }}
       if (command.kind === 'curve') {
         return {
           kind: 'curve' as const,
@@ -2508,7 +2510,7 @@ function emitContainCssFromSubpaths(subpaths: ShapeCssSubpath[], options: ShapeS
     .map(shapeCssPointToCanvasPoint)
     .filter((point): point is Point => Boolean(point))
   const bounds = shapeOffsetBoundsFromCanvasPoints(canvasPoints)
-  if (!bounds) return null
+  if (!bounds) {return null}
   const names = resolveShapeScaleVarNames(options)
   return mapShapeCssSubpathPoints(subpaths, (point) => {
     const canvas = shapeCssPointToCanvasPoint(point)
@@ -2520,16 +2522,16 @@ function emitContainCssFromSubpaths(subpaths: ShapeCssSubpath[], options: ShapeS
 // Returns null if any coordinate is not in the new format (legacy/foreign shapes).
 function containModelFromShape(shape: ShapeFunctionShape): ShapeContainModel | null {
   const subpaths = parseShapeCssSubpaths(shape.value)
-  if (!subpaths) return null
+  if (!subpaths) {return null}
   const cssPoints = collectShapeCssPoints(subpaths)
-  if (!cssPoints.length) return null
+  if (!cssPoints.length) {return null}
 
   const points: Array<{ ux: number; uy: number }> = []
   let header: Omit<ShapeContainModel, 'points'> | null = null
   for (const point of cssPoints) {
     const px = parseShapeOffsetCoordinate(point.x, true)
     const py = parseShapeOffsetCoordinate(point.y, true)
-    if (!px || px.axis !== 'x' || !py || py.axis !== 'y') return null
+    if (!px || px.axis !== 'x' || !py || py.axis !== 'y') {return null}
     points.push({ ux: px.u, uy: py.u })
     if (!header) {
       header = {
@@ -2544,18 +2546,18 @@ function containModelFromShape(shape: ShapeFunctionShape): ShapeContainModel | n
       }
     }
   }
-  if (!header) return null
+  if (!header) {return null}
   return { points, ...header }
 }
 
 // Re-emit a contain shape keeping every point's own Ux/Uy but applying the model's size/offset/names.
 function shapeFromContainModel(shape: ShapeFunctionShape, model: ShapeContainModel): ShapeFunctionShape {
   const subpaths = parseShapeCssSubpaths(shape.value)
-  if (!subpaths) return shape
+  if (!subpaths) {return shape}
   const remapped = mapShapeCssSubpathPoints(subpaths, (point) => {
     const px = parseShapeOffsetCoordinate(point.x, true)
     const py = parseShapeOffsetCoordinate(point.y, true)
-    if (!px || !py) return point
+    if (!px || !py) {return point}
     return {
       x: formatShapeOffsetCoordinate(px.u, model.wu, model.size, model.ol, model.sizeVar, model.offsetLeftVar, 'x'),
       y: formatShapeOffsetCoordinate(py.u, model.hu, model.size, model.ot, model.sizeVar, model.offsetTopVar, 'y'),
@@ -2605,11 +2607,11 @@ function convertShapeFitMode(
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
 ): ShapeFunctionShape | null {
   const subpaths = parseShapeCssSubpaths(shape.value)
-  if (!subpaths) return null
+  if (!subpaths) {return null}
 
   if (fitMode === 'contain') {
     const contained = emitContainCssFromSubpaths(subpaths, options)
-    if (!contained) return null
+    if (!contained) {return null}
     return {
       ...shape,
       value: formatShapeValueFromCssSubpaths(contained),
@@ -2622,7 +2624,7 @@ function convertShapeFitMode(
   const yOffsets = collectShapeCssPoints(subpaths)
     .map((point) => shapeCoordinateOffset(point.y))
     .filter((offset): offset is number => offset !== null)
-  if (!xOffsets.length || !yOffsets.length) return null
+  if (!xOffsets.length || !yOffsets.length) {return null}
 
   const minXOffset = Math.min(...xOffsets)
   const maxXOffset = Math.max(...xOffsets)
@@ -2630,7 +2632,7 @@ function convertShapeFitMode(
   const maxYOffset = Math.max(...yOffsets)
   const xOffsetRange = maxXOffset - minXOffset
   const yOffsetRange = maxYOffset - minYOffset
-  if (xOffsetRange <= SVG_POINT_EPSILON || yOffsetRange <= SVG_POINT_EPSILON) return null
+  if (xOffsetRange <= SVG_POINT_EPSILON || yOffsetRange <= SVG_POINT_EPSILON) {return null}
 
   const stretched = mapShapeCssSubpathPoints(subpaths, (point) => {
     const xOffset = shapeCoordinateOffset(point.x)
@@ -2678,9 +2680,9 @@ function normalizeContainShapeCoordinates(
 
   // Legacy contain (or any parseable coordinates): upgrade to the offset encoding in place.
   const subpaths = parseShapeCssSubpaths(shape.value)
-  if (!subpaths) return shape
+  if (!subpaths) {return shape}
   const upgraded = emitContainCssFromSubpaths(subpaths, options)
-  if (!upgraded) return shape
+  if (!upgraded) {return shape}
   return {
     ...shape,
     value: formatShapeValueFromCssSubpaths(upgraded),
@@ -2691,7 +2693,7 @@ function normalizeShapeFitCache(
   cache: PastedShapeSvgCache | null | undefined,
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
 ) {
-  if (!cache) return null
+  if (!cache) {return null}
   const stretch = hasContainerQueryUnit(cache.stretch.value)
     ? convertShapeFitMode(cache.stretch, 'stretch', options) || cache.stretch
     : cache.stretch
@@ -2721,7 +2723,7 @@ function transformShapeCanvasPoints(
   transform: (point: Point) => Point,
 ): ShapeFunctionShape | null {
   const subpaths = parseShapeCssSubpaths(shape.value)
-  if (!subpaths) return null
+  if (!subpaths) {return null}
 
   const transformed = mapShapeCssSubpathPoints(subpaths, (point) => {
     const canvasPoint = shapeCssPointToCanvasPoint(point)
@@ -2737,9 +2739,9 @@ function transformShapeCanvasPoints(
 }
 
 function shapeResizeCornerPoint(bounds: SelectionRect, corner: ShapeResizeCorner): Point {
-  if (corner === 'topLeft') return { x: bounds.left, y: bounds.top }
-  if (corner === 'topRight') return { x: bounds.left + bounds.width, y: bounds.top }
-  if (corner === 'bottomRight') return { x: bounds.left + bounds.width, y: bounds.top + bounds.height }
+  if (corner === 'topLeft') {return { x: bounds.left, y: bounds.top }}
+  if (corner === 'topRight') {return { x: bounds.left + bounds.width, y: bounds.top }}
+  if (corner === 'bottomRight') {return { x: bounds.left + bounds.width, y: bounds.top + bounds.height }}
   return { x: bounds.left, y: bounds.top + bounds.height }
 }
 
@@ -2752,17 +2754,17 @@ function shapeFromPastedSvgCache(cache: PastedShapeSvgCache, fitMode: ShapeFitMo
 }
 
 function parseClipPath(value: string): ClipShape | null {
-  if (value.trim().toLowerCase() === 'none') return NONE_SHAPE
+  if (value.trim().toLowerCase() === 'none') {return NONE_SHAPE}
   const shape = parseShape(value)
-  if (shape) return shape
+  if (shape) {return shape}
   const polygon = parsePolygon(value)
-  if (polygon) return { kind: 'polygon', points: polygon }
+  if (polygon) {return { kind: 'polygon', points: polygon }}
   return parseCircle(value) || parseEllipse(value) || parseInset(value) || parseRawBasicClipPath(value) || parseCustomClipPath(value)
 }
 
 function parseClipPathInput(value: string): ClipShape | null {
   const trimmed = value.trim()
-  if (!trimmed) return null
+  if (!trimmed) {return null}
 
   const declarationMatch = trimmed.match(/(?:^|[;{\s])(?:-webkit-)?clip-path\s*:\s*([^;}]+)/i)
   const clipPathValue = declarationMatch ? declarationMatch[1] : trimmed
@@ -2770,15 +2772,15 @@ function parseClipPathInput(value: string): ClipShape | null {
 }
 
 function parseSvgNumber(value: string | null | undefined) {
-  if (!value) return null
+  if (!value) {return null}
   const match = value.trim().match(/^[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/i)
-  if (!match) return null
+  if (!match) {return null}
   const parsed = Number(match[0])
   return Number.isFinite(parsed) ? parsed : null
 }
 
 function parseSvgNumberList(value: string | null | undefined) {
-  if (!value) return []
+  if (!value) {return []}
   return Array.from(value.matchAll(/[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi), (match) => Number(match[0]))
     .filter(Number.isFinite)
 }
@@ -2793,7 +2795,7 @@ function svgTagName(element: Element) {
 
 function svgStyleValue(element: Element, property: string) {
   const style = element.getAttribute('style')
-  if (!style) return null
+  if (!style) {return null}
 
   const match = style.match(new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, 'i'))
   return match?.[1].trim() || null
@@ -2803,10 +2805,10 @@ function inheritedSvgAttribute(element: Element, attribute: string) {
   let current: Element | null = element
   while (current) {
     const styleValue = svgStyleValue(current, attribute)
-    if (styleValue) return styleValue
+    if (styleValue) {return styleValue}
 
     const value = current.getAttribute(attribute)
-    if (value !== null) return value
+    if (value !== null) {return value}
 
     current = current.parentElement
   }
@@ -2846,7 +2848,7 @@ function hasSvgTransform(element: Element) {
   let current: Element | null = element
   while (current && svgTagName(current) !== 'svg') {
     const transform = current.getAttribute('transform')
-    if (transform && transform.trim()) return true
+    if (transform && transform.trim()) {return true}
     current = current.parentElement
   }
 
@@ -2866,13 +2868,13 @@ function parseSvgViewBox(svg: Element, contours: Point[][]): SvgViewBox | null {
   }
 
   const points = contours.flat()
-  if (!points.length) return null
+  if (!points.length) {return null}
 
   const minX = Math.min(...points.map((point) => point.x))
   const maxX = Math.max(...points.map((point) => point.x))
   const minY = Math.min(...points.map((point) => point.y))
   const maxY = Math.max(...points.map((point) => point.y))
-  if (maxX <= minX || maxY <= minY) return null
+  if (maxX <= minX || maxY <= minY) {return null}
 
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
 }
@@ -2889,7 +2891,7 @@ function isSvgPointCollinear(a: Point, b: Point, c: Point) {
 function simplifySvgContour(points: Point[]) {
   const withoutDuplicates = points.reduce<Point[]>((unique, point) => {
     const previous = unique[unique.length - 1]
-    if (!previous || !svgPointsAlmostEqual(previous, point)) unique.push(point)
+    if (!previous || !svgPointsAlmostEqual(previous, point)) {unique.push(point)}
     return unique
   }, [])
 
@@ -2905,7 +2907,7 @@ function simplifySvgContour(points: Point[]) {
       const previous = list[(index - 1 + list.length) % list.length]
       const next = list[(index + 1) % list.length]
       const keep = !isSvgPointCollinear(previous, point, next)
-      if (!keep) changed = true
+      if (!keep) {changed = true}
       return keep
     })
   }
@@ -2915,7 +2917,7 @@ function simplifySvgContour(points: Point[]) {
 
 function parseSvgPoints(value: string | null | undefined) {
   const values = parseSvgNumberList(value)
-  if (values.length < 6 || values.length % 2 !== 0) return null
+  if (values.length < 6 || values.length % 2 !== 0) {return null}
 
   const points: Point[] = []
   for (let index = 0; index < values.length; index += 2) {
@@ -2927,13 +2929,13 @@ function parseSvgPoints(value: string | null | undefined) {
 
 function parseClosedSvgPolyline(value: string | null | undefined) {
   const values = parseSvgNumberList(value)
-  if (values.length < 8 || values.length % 2 !== 0) return null
+  if (values.length < 8 || values.length % 2 !== 0) {return null}
 
   const points: Point[] = []
   for (let index = 0; index < values.length; index += 2) {
     points.push({ x: values[index], y: values[index + 1] })
   }
-  if (!svgPointsAlmostEqual(points[0], points[points.length - 1])) return null
+  if (!svgPointsAlmostEqual(points[0], points[points.length - 1])) {return null}
 
   return simplifySvgContour(points)
 }
@@ -2941,13 +2943,13 @@ function parseClosedSvgPolyline(value: string | null | undefined) {
 function parseSvgRect(element: Element) {
   const rx = parseSvgNumber(element.getAttribute('rx')) || 0
   const ry = parseSvgNumber(element.getAttribute('ry')) || 0
-  if (rx > 0 || ry > 0) return null
+  if (rx > 0 || ry > 0) {return null}
 
   const x = parseSvgNumber(element.getAttribute('x')) || 0
   const y = parseSvgNumber(element.getAttribute('y')) || 0
   const width = parseSvgNumber(element.getAttribute('width'))
   const height = parseSvgNumber(element.getAttribute('height'))
-  if (width === null || height === null || width <= 0 || height <= 0) return []
+  if (width === null || height === null || width <= 0 || height <= 0) {return []}
 
   return [
     { x, y },
@@ -2962,7 +2964,7 @@ function svgSubpathHasArea(subpath: SvgShapeSubpath) {
     subpath.start,
     ...subpath.commands.flatMap(svgShapeCommandPoints),
   ]
-  if (points.length < 3) return false
+  if (points.length < 3) {return false}
 
   const minX = Math.min(...points.map((point) => point.x))
   const maxX = Math.max(...points.map((point) => point.x))
@@ -2983,7 +2985,7 @@ function parseSvgRectShape(element: Element) {
   const y = parseSvgNumber(element.getAttribute('y')) || 0
   const width = parseSvgNumber(element.getAttribute('width'))
   const height = parseSvgNumber(element.getAttribute('height'))
-  if (width === null || height === null || width <= 0 || height <= 0) return []
+  if (width === null || height === null || width <= 0 || height <= 0) {return []}
 
   const rawRx = parseSvgNumber(element.getAttribute('rx'))
   const rawRy = parseSvgNumber(element.getAttribute('ry'))
@@ -3043,7 +3045,7 @@ function parseSvgRectShape(element: Element) {
 }
 
 function parseSvgEllipseShape(cx: number, cy: number, rx: number, ry: number) {
-  if (rx <= 0 || ry <= 0) return []
+  if (rx <= 0 || ry <= 0) {return []}
 
   const kx = rx * SVG_ARC_KAPPA
   const ky = ry * SVG_ARC_KAPPA
@@ -3096,17 +3098,17 @@ function parseSvgEllipseElementShape(element: Element) {
 
 function parseSvgPolygonShape(element: Element, requireClosed = true) {
   const values = parseSvgNumberList(element.getAttribute('points'))
-  if (values.length < 6 || values.length % 2 !== 0) return null
+  if (values.length < 6 || values.length % 2 !== 0) {return null}
 
   const points: Point[] = []
   for (let index = 0; index < values.length; index += 2) {
     points.push({ x: values[index], y: values[index + 1] })
   }
-  if (requireClosed && points.length >= 2 && !svgPointsAlmostEqual(points[0], points[points.length - 1])) return null
+  if (requireClosed && points.length >= 2 && !svgPointsAlmostEqual(points[0], points[points.length - 1])) {return null}
 
   const simplified = simplifySvgContour(points)
   const [start, ...rest] = simplified
-  if (!start || rest.length < 2) return []
+  if (!start || rest.length < 2) {return []}
 
   return [{
     start,
@@ -3124,7 +3126,7 @@ function isSvgPathCommand(token: string) {
 function parseSimpleSvgPath(element: Element) {
   const d = element.getAttribute('d')
   const tokens = d?.match(/[a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g)
-  if (!tokens?.length) return null
+  if (!tokens?.length) {return null}
 
   let index = 0
   let command = ''
@@ -3135,7 +3137,7 @@ function parseSimpleSvgPath(element: Element) {
 
   const hasNumber = () => index < tokens.length && !isSvgPathCommand(tokens[index])
   const readNumber = () => {
-    if (!hasNumber()) return null
+    if (!hasNumber()) {return null}
     const value = Number(tokens[index])
     index += 1
     return Number.isFinite(value) ? value : null
@@ -3150,15 +3152,15 @@ function parseSimpleSvgPath(element: Element) {
       command = tokens[index]
       index += 1
     }
-    if (!command) return null
+    if (!command) {return null}
 
     const relative = command === command.toLowerCase()
     switch (command.toUpperCase()) {
       case 'M': {
-        if (points.length) return null
+        if (points.length) {return null}
         const x = readNumber()
         const y = readNumber()
-        if (x === null || y === null) return null
+        if (x === null || y === null) {return null}
         current = relative ? { x: current.x + x, y: current.y + y } : { x, y }
         start = current
         points.push(current)
@@ -3170,7 +3172,7 @@ function parseSimpleSvgPath(element: Element) {
         while (hasNumber()) {
           const x = readNumber()
           const y = readNumber()
-          if (x === null || y === null) return null
+          if (x === null || y === null) {return null}
           lineTo(relative ? { x: current.x + x, y: current.y + y } : { x, y })
         }
         break
@@ -3178,7 +3180,7 @@ function parseSimpleSvgPath(element: Element) {
       case 'H': {
         while (hasNumber()) {
           const x = readNumber()
-          if (x === null) return null
+          if (x === null) {return null}
           lineTo({ x: relative ? current.x + x : x, y: current.y })
         }
         break
@@ -3186,13 +3188,13 @@ function parseSimpleSvgPath(element: Element) {
       case 'V': {
         while (hasNumber()) {
           const y = readNumber()
-          if (y === null) return null
+          if (y === null) {return null}
           lineTo({ x: current.x, y: relative ? current.y + y : y })
         }
         break
       }
       case 'Z': {
-        if (!start) return null
+        if (!start) {return null}
         current = start
         closed = true
         command = ''
@@ -3225,7 +3227,7 @@ function svgVectorAngle(ux: number, uy: number, vx: number, vy: number) {
 }
 
 function svgArcToCubicCurves(from: Point, rawRx: number, rawRy: number, rotation: number, largeArc: boolean, sweep: boolean, to: Point) {
-  if (svgPointsAlmostEqual(from, to)) return []
+  if (svgPointsAlmostEqual(from, to)) {return []}
 
   let rx = Math.abs(rawRx)
   let ry = Math.abs(rawRy)
@@ -3253,7 +3255,7 @@ function svgArcToCubicCurves(from: Point, rawRx: number, rawRy: number, rotation
   const x1p2 = x1p * x1p
   const y1p2 = y1p * y1p
   const denominator = rx2 * y1p2 + ry2 * x1p2
-  if (denominator === 0) return [{ kind: 'line' as const, to }]
+  if (denominator === 0) {return [{ kind: 'line' as const, to }]}
 
   const sign = largeArc === sweep ? -1 : 1
   const coefficient = sign * Math.sqrt(Math.max(0, (rx2 * ry2 - rx2 * y1p2 - ry2 * x1p2) / denominator))
@@ -3268,8 +3270,8 @@ function svgArcToCubicCurves(from: Point, rawRx: number, rawRy: number, rotation
   let startAngle = svgVectorAngle(1, 0, startVector.x, startVector.y)
   let deltaAngle = svgVectorAngle(startVector.x, startVector.y, endVector.x, endVector.y)
 
-  if (!sweep && deltaAngle > 0) deltaAngle -= Math.PI * 2
-  if (sweep && deltaAngle < 0) deltaAngle += Math.PI * 2
+  if (!sweep && deltaAngle > 0) {deltaAngle -= Math.PI * 2}
+  if (sweep && deltaAngle < 0) {deltaAngle += Math.PI * 2}
 
   const segments = Math.ceil(Math.abs(deltaAngle) / (Math.PI / 2))
   const segmentAngle = deltaAngle / segments
@@ -3299,14 +3301,14 @@ function svgArcToCubicCurves(from: Point, rawRx: number, rawRy: number, rotation
   }
 
   const lastCurve = curves[curves.length - 1]
-  if (lastCurve?.kind === 'curve') lastCurve.to = to
+  if (lastCurve?.kind === 'curve') {lastCurve.to = to}
   return curves
 }
 
 function parseSvgPathShape(element: Element) {
   const d = element.getAttribute('d')
   const tokens = d?.match(/[a-zA-Z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g)
-  if (!tokens?.length) return null
+  if (!tokens?.length) {return null}
 
   let index = 0
   let command = ''
@@ -3319,7 +3321,7 @@ function parseSvgPathShape(element: Element) {
 
   const hasNumber = () => index < tokens.length && !isSvgPathCommand(tokens[index])
   const readNumber = () => {
-    if (!hasNumber()) return null
+    if (!hasNumber()) {return null}
     const value = Number(tokens[index])
     index += 1
     return Number.isFinite(value) ? value : null
@@ -3328,18 +3330,18 @@ function parseSvgPathShape(element: Element) {
     relative ? { x: current.x + x, y: current.y + y } : { x, y }
   )
   const ensureSubpath = () => {
-    if (!activeSubpath) activeSubpath = { start: current, commands: [] }
+    if (!activeSubpath) {activeSubpath = { start: current, commands: [] }}
     return activeSubpath
   }
   const finishSubpath = () => {
-    if (!activeSubpath) return
+    if (!activeSubpath) {return}
     const closed = closeSvgSubpath(activeSubpath)
-    if (svgSubpathHasArea(closed)) subpaths.push(closed)
+    if (svgSubpathHasArea(closed)) {subpaths.push(closed)}
     activeSubpath = null
   }
   const addCommand = (nextCommand: SvgShapeCommand) => {
     ensureSubpath().commands.push(nextCommand)
-    if (nextCommand.kind !== 'close') current = nextCommand.to
+    if (nextCommand.kind !== 'close') {current = nextCommand.to}
   }
   const resetControlPoints = () => {
     previousCubicControl = null
@@ -3351,14 +3353,14 @@ function parseSvgPathShape(element: Element) {
       command = tokens[index]
       index += 1
     }
-    if (!command) return null
+    if (!command) {return null}
 
     const relative = command === command.toLowerCase()
     switch (command.toUpperCase()) {
       case 'M': {
         const x = readNumber()
         const y = readNumber()
-        if (x === null || y === null) return null
+        if (x === null || y === null) {return null}
         finishSubpath()
         current = toPoint(x, y, relative)
         activeSubpath = { start: current, commands: [] }
@@ -3371,7 +3373,7 @@ function parseSvgPathShape(element: Element) {
         while (hasNumber()) {
           const x = readNumber()
           const y = readNumber()
-          if (x === null || y === null) return null
+          if (x === null || y === null) {return null}
           addCommand({ kind: 'line', to: toPoint(x, y, relative) })
         }
         resetControlPoints()
@@ -3381,7 +3383,7 @@ function parseSvgPathShape(element: Element) {
       case 'H': {
         while (hasNumber()) {
           const x = readNumber()
-          if (x === null) return null
+          if (x === null) {return null}
           addCommand({ kind: 'line', to: { x: relative ? current.x + x : x, y: current.y } })
         }
         resetControlPoints()
@@ -3391,7 +3393,7 @@ function parseSvgPathShape(element: Element) {
       case 'V': {
         while (hasNumber()) {
           const y = readNumber()
-          if (y === null) return null
+          if (y === null) {return null}
           addCommand({ kind: 'line', to: { x: current.x, y: relative ? current.y + y : y } })
         }
         resetControlPoints()
@@ -3406,7 +3408,7 @@ function parseSvgPathShape(element: Element) {
           const y2 = readNumber()
           const x = readNumber()
           const y = readNumber()
-          if (x1 === null || y1 === null || x2 === null || y2 === null || x === null || y === null) return null
+          if (x1 === null || y1 === null || x2 === null || y2 === null || x === null || y === null) {return null}
           const control1 = toPoint(x1, y1, relative)
           const control2 = toPoint(x2, y2, relative)
           const to = toPoint(x, y, relative)
@@ -3423,7 +3425,7 @@ function parseSvgPathShape(element: Element) {
           const y2 = readNumber()
           const x = readNumber()
           const y = readNumber()
-          if (x2 === null || y2 === null || x === null || y === null) return null
+          if (x2 === null || y2 === null || x === null || y === null) {return null}
           const control1: Point = previousCubicControl && ['C', 'S'].includes(previousCommand)
             ? { x: current.x * 2 - previousCubicControl.x, y: current.y * 2 - previousCubicControl.y }
             : current
@@ -3442,7 +3444,7 @@ function parseSvgPathShape(element: Element) {
           const y1 = readNumber()
           const x = readNumber()
           const y = readNumber()
-          if (x1 === null || y1 === null || x === null || y === null) return null
+          if (x1 === null || y1 === null || x === null || y === null) {return null}
           const control1 = toPoint(x1, y1, relative)
           const to = toPoint(x, y, relative)
           addCommand({ kind: 'curve', to, control1 })
@@ -3456,7 +3458,7 @@ function parseSvgPathShape(element: Element) {
         while (hasNumber()) {
           const x = readNumber()
           const y = readNumber()
-          if (x === null || y === null) return null
+          if (x === null || y === null) {return null}
           const control1: Point = previousQuadraticControl && ['Q', 'T'].includes(previousCommand)
             ? { x: current.x * 2 - previousQuadraticControl.x, y: current.y * 2 - previousQuadraticControl.y }
             : current
@@ -3480,7 +3482,7 @@ function parseSvgPathShape(element: Element) {
           if (
             rx === null || ry === null || rotation === null ||
             largeArc === null || sweep === null || x === null || y === null
-          ) return null
+          ) {return null}
           const to = toPoint(x, y, relative)
           const arcCommands = svgArcToCubicCurves(current, rx, ry, rotation, largeArc !== 0, sweep !== 0, to)
           arcCommands.forEach(addCommand)
@@ -3490,7 +3492,7 @@ function parseSvgPathShape(element: Element) {
         break
       }
       case 'Z': {
-        if (!activeSubpath) return null
+        if (!activeSubpath) {return null}
         activeSubpath.commands.push({ kind: 'close' })
         current = activeSubpath.start
         finishSubpath()
@@ -3528,10 +3530,10 @@ function pointInsidePolygon(point: Point, polygon: Point[]) {
     const current = polygon[index]
     const previous = polygon[previousIndex]
     const crossesY = current.y > point.y !== previous.y > point.y
-    if (!crossesY) continue
+    if (!crossesY) {continue}
 
     const x = ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) + current.x
-    if (point.x < x) inside = !inside
+    if (point.x < x) {inside = !inside}
   }
 
   return inside
@@ -3557,7 +3559,7 @@ function traceSvgBoundary(edges: SvgBoundaryEdge[]) {
 
   while (unused.size) {
     let edge = unused.values().next().value as SvgBoundaryEdge | undefined
-    if (!edge) break
+    if (!edge) {break}
 
     const startKey = edge.from
     const loop: Point[] = [edge.fromPoint]
@@ -3565,10 +3567,10 @@ function traceSvgBoundary(edges: SvgBoundaryEdge[]) {
     while (edge) {
       unused.delete(edge)
       loop.push(edge.toPoint)
-      if (edge.to === startKey) break
+      if (edge.to === startKey) {break}
 
       edge = (outgoing.get(edge.to) || []).find((candidate) => unused.has(candidate))
-      if (!edge) return null
+      if (!edge) {return null}
     }
 
     const simplified = simplifySvgContour(loop)
@@ -3633,8 +3635,8 @@ function closestSvgPointToLoop(point: Point, targets: Point[][]): SvgLoopPoint |
 }
 
 function connectSvgBoundaryLoops(loops: Point[][]) {
-  if (!loops.length) return null
-  if (loops.length === 1) return loops[0]
+  if (!loops.length) {return null}
+  if (loops.length === 1) {return loops[0]}
 
   const sortedLoops = [...loops].sort((a, b) => {
     const boundsA = svgContourBounds(a)
@@ -3643,7 +3645,7 @@ function connectSvgBoundaryLoops(loops: Point[][]) {
   })
   const [firstLoop, ...restLoops] = sortedLoops
   const firstBridge = closestSvgLoopPair(firstLoop, restLoops)
-  if (!firstBridge) return null
+  if (!firstBridge) {return null}
 
   const connected = rotateClosedSvgContour(firstLoop, firstBridge.sourceIndex)
   let currentLoop = restLoops[firstBridge.targetLoopIndex]
@@ -3652,11 +3654,11 @@ function connectSvgBoundaryLoops(loops: Point[][]) {
 
   while (currentLoop) {
     connected.push(...rotateClosedSvgContour(currentLoop, currentIndex))
-    if (!restLoops.length) break
+    if (!restLoops.length) {break}
 
     const currentPoint = currentLoop[currentIndex]
     const nextBridge = closestSvgPointToLoop(currentPoint, restLoops)
-    if (!nextBridge) return null
+    if (!nextBridge) {return null}
 
     currentLoop = restLoops[nextBridge.targetLoopIndex]
     currentIndex = nextBridge.targetIndex
@@ -3669,8 +3671,8 @@ function connectSvgBoundaryLoops(loops: Point[][]) {
 function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | null {
   const xs = sortedUniqueSvgValues(contours.flatMap((contour) => contour.map((point) => point.x)))
   const ys = sortedUniqueSvgValues(contours.flatMap((contour) => contour.map((point) => point.y)))
-  if (xs.length < 2 || ys.length < 2) return null
-  if ((xs.length - 1) * (ys.length - 1) > SVG_PARSE_CELL_LIMIT) return null
+  if (xs.length < 2 || ys.length < 2) {return null}
+  if ((xs.length - 1) * (ys.length - 1) > SVG_PARSE_CELL_LIMIT) {return null}
 
   const filled = new Set<string>()
   const cellKey = (xIndex: number, yIndex: number) => `${xIndex}:${yIndex}`
@@ -3688,7 +3690,7 @@ function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | 
     }
   }
 
-  if (!filled.size) return null
+  if (!filled.size) {return null}
 
   const edges: SvgBoundaryEdge[] = []
   const addEdge = (fromPoint: Point, toPoint: Point) => {
@@ -3702,22 +3704,22 @@ function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | 
 
   for (let xIndex = 0; xIndex < xs.length - 1; xIndex += 1) {
     for (let yIndex = 0; yIndex < ys.length - 1; yIndex += 1) {
-      if (!isFilled(xIndex, yIndex)) continue
+      if (!isFilled(xIndex, yIndex)) {continue}
 
       const topLeft = { x: xs[xIndex], y: ys[yIndex] }
       const topRight = { x: xs[xIndex + 1], y: ys[yIndex] }
       const bottomRight = { x: xs[xIndex + 1], y: ys[yIndex + 1] }
       const bottomLeft = { x: xs[xIndex], y: ys[yIndex + 1] }
 
-      if (!isFilled(xIndex, yIndex - 1)) addEdge(topLeft, topRight)
-      if (!isFilled(xIndex + 1, yIndex)) addEdge(topRight, bottomRight)
-      if (!isFilled(xIndex, yIndex + 1)) addEdge(bottomRight, bottomLeft)
-      if (!isFilled(xIndex - 1, yIndex)) addEdge(bottomLeft, topLeft)
+      if (!isFilled(xIndex, yIndex - 1)) {addEdge(topLeft, topRight)}
+      if (!isFilled(xIndex + 1, yIndex)) {addEdge(topRight, bottomRight)}
+      if (!isFilled(xIndex, yIndex + 1)) {addEdge(bottomRight, bottomLeft)}
+      if (!isFilled(xIndex - 1, yIndex)) {addEdge(bottomLeft, topLeft)}
     }
   }
 
   const loops = traceSvgBoundary(edges)
-  if (!loops) return null
+  if (!loops) {return null}
 
   const connectedPoints = connectSvgBoundaryLoops(loops)
   return connectedPoints ? { points: connectedPoints, loops } : null
@@ -3725,21 +3727,21 @@ function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | 
 
 function parseSvgElementContour(element: Element) {
   const tagName = svgTagName(element)
-  if (tagName === 'rect') return parseSvgRect(element)
-  if (tagName === 'polygon') return parseSvgPoints(element.getAttribute('points'))
-  if (tagName === 'polyline') return parseClosedSvgPolyline(element.getAttribute('points'))
-  if (tagName === 'path') return parseSimpleSvgPath(element)
+  if (tagName === 'rect') {return parseSvgRect(element)}
+  if (tagName === 'polygon') {return parseSvgPoints(element.getAttribute('points'))}
+  if (tagName === 'polyline') {return parseClosedSvgPolyline(element.getAttribute('points'))}
+  if (tagName === 'path') {return parseSimpleSvgPath(element)}
   return null
 }
 
 function parseSvgElementShape(element: Element) {
   const tagName = svgTagName(element)
-  if (tagName === 'rect') return parseSvgRectShape(element)
-  if (tagName === 'circle') return parseSvgCircleShape(element)
-  if (tagName === 'ellipse') return parseSvgEllipseElementShape(element)
-  if (tagName === 'polygon') return parseSvgPolygonShape(element, false)
-  if (tagName === 'polyline') return parseSvgPolygonShape(element, true)
-  if (tagName === 'path') return parseSvgPathShape(element)
+  if (tagName === 'rect') {return parseSvgRectShape(element)}
+  if (tagName === 'circle') {return parseSvgCircleShape(element)}
+  if (tagName === 'ellipse') {return parseSvgEllipseElementShape(element)}
+  if (tagName === 'polygon') {return parseSvgPolygonShape(element, false)}
+  if (tagName === 'polyline') {return parseSvgPolygonShape(element, true)}
+  if (tagName === 'path') {return parseSvgPathShape(element)}
   return null
 }
 
@@ -3763,10 +3765,10 @@ function normalizeSvgContourToPercent(points: Point[], viewBox: SvgViewBox) {
 
 function parseSvgDocument(value: string) {
   const markup = extractSvgMarkup(value)
-  if (!markup || typeof DOMParser === 'undefined') return null
+  if (!markup || typeof DOMParser === 'undefined') {return null}
 
   const document = new DOMParser().parseFromString(markup, 'image/svg+xml')
-  if (document.querySelector('parsererror')) return null
+  if (document.querySelector('parsererror')) {return null}
 
   const svg = svgTagName(document.documentElement) === 'svg'
     ? document.documentElement
@@ -3776,35 +3778,35 @@ function parseSvgDocument(value: string) {
 
 function parseSvgClipPathOutline(value: string): SvgClipPathOutline | null {
   const parsedDocument = parseSvgDocument(value)
-  if (!parsedDocument) return null
+  if (!parsedDocument) {return null}
   const { svg } = parsedDocument
 
   const supportedElements = Array.from(svg.querySelectorAll('rect, polygon, polyline, path'))
   const unsupportedElements = Array.from(svg.querySelectorAll('circle, ellipse, line'))
     .filter((element) => !isInsideSkippedSvgElement(element) && isRenderableSvgElement(element))
-  if (unsupportedElements.length) return null
+  if (unsupportedElements.length) {return null}
 
   const contours: Point[][] = []
   for (const element of supportedElements) {
-    if (isInsideSkippedSvgElement(element) || !isRenderableSvgElement(element)) continue
-    if (hasSvgTransform(element)) return null
+    if (isInsideSkippedSvgElement(element) || !isRenderableSvgElement(element)) {continue}
+    if (hasSvgTransform(element)) {return null}
 
     const contour = parseSvgElementContour(element)
-    if (contour === null) return null
-    if (contour.length >= 3) contours.push(simplifySvgContour(contour))
+    if (contour === null) {return null}
+    if (contour.length >= 3) {contours.push(simplifySvgContour(contour))}
   }
 
-  if (!contours.length) return null
+  if (!contours.length) {return null}
 
   const outline = contours.length === 1
     ? { points: contours[0], loops: [contours[0]] }
     : contours.every(isAxisAlignedSvgContour)
       ? unionAxisAlignedSvgContours(contours)
       : null
-  if (!outline?.points.length) return null
+  if (!outline?.points.length) {return null}
 
   const viewBox = parseSvgViewBox(svg, contours)
-  if (!viewBox) return null
+  if (!viewBox) {return null}
 
   const points = normalizeSvgContourToPercent(outline.points, viewBox)
   const loops = outline.loops
@@ -3819,22 +3821,22 @@ function parseSvgClipPathShape(
   options: ShapeScaleOptions = DEFAULT_SHAPE_SCALE_OPTIONS,
 ): ShapeFunctionShape | null {
   const parsedDocument = parseSvgDocument(value)
-  if (!parsedDocument) return null
+  if (!parsedDocument) {return null}
   const { svg } = parsedDocument
 
   const supportedElements = Array.from(svg.querySelectorAll('rect, circle, ellipse, polygon, polyline, path'))
   const unsupportedElements = Array.from(svg.querySelectorAll('image, text, use, line'))
     .filter((element) => !isInsideSkippedSvgElement(element) && isRenderableSvgElement(element))
-  if (unsupportedElements.length) return null
+  if (unsupportedElements.length) {return null}
 
   const renderedElements: Element[] = []
   const subpaths: SvgShapeSubpath[] = []
   for (const element of supportedElements) {
-    if (isInsideSkippedSvgElement(element) || !isRenderableSvgElement(element)) continue
-    if (hasSvgTransform(element)) return null
+    if (isInsideSkippedSvgElement(element) || !isRenderableSvgElement(element)) {continue}
+    if (hasSvgTransform(element)) {return null}
 
     const elementSubpaths = parseSvgElementShape(element)
-    if (elementSubpaths === null) return null
+    if (elementSubpaths === null) {return null}
     if (elementSubpaths.length) {
       renderedElements.push(element)
       subpaths.push(...elementSubpaths)
@@ -3844,7 +3846,7 @@ function parseSvgClipPathShape(
   const viewBox = parseSvgViewBox(svg, [svgShapeSubpathPoints(subpaths)])
   const viewBoxBounds = viewBox ? svgShapeBoundsFromViewBox(viewBox) : null
   const fitted = fitShapeSubpathsToPercentBox(subpaths, viewBoxBounds)
-  if (!fitted) return null
+  if (!fitted) {return null}
 
   const fillRule = svgShapeFillRule(svg, renderedElements)
   if (fitMode === 'contain') {
@@ -3884,7 +3886,7 @@ function normalizeClipPathValue(value: string | null | undefined) {
 }
 
 function shortcutShapeKind(shape: ClipShape) {
-  if (shape.kind !== 'raw') return shape.kind
+  if (shape.kind !== 'raw') {return shape.kind}
   return shape.editable?.kind || 'raw'
 }
 
@@ -3995,15 +3997,15 @@ function clipPathShortcutGroups(shape: ClipShape, shapeFitMode: ShapeFitMode): S
 }
 
 function matchPreset(shape: ClipShape): string | null {
-  if (shape.kind === 'polygon') return 'Polygon'
-  if (shape.kind === 'circle') return 'Circle'
-  if (shape.kind === 'ellipse') return 'Ellipse'
-  if (shape.kind === 'inset') return 'Inset'
-  if (shape.kind === 'shape') return 'Shape'
-  if (shape.kind === 'raw') return shape.preset || null
+  if (shape.kind === 'polygon') {return 'Polygon'}
+  if (shape.kind === 'circle') {return 'Circle'}
+  if (shape.kind === 'ellipse') {return 'Ellipse'}
+  if (shape.kind === 'inset') {return 'Inset'}
+  if (shape.kind === 'shape') {return 'Shape'}
+  if (shape.kind === 'raw') {return shape.preset || null}
 
   for (const [name, preset] of Object.entries(PRESETS)) {
-    if (shapesClose(preset, shape)) return name
+    if (shapesClose(preset, shape)) {return name}
   }
   return null
 }
@@ -4020,7 +4022,7 @@ function cssUnitPx(unit: string, axis: 'x' | 'y', canvas: HTMLElement) {
 function cssUnitValueToCanvasPercent(value: CssUnitValue, axis: 'x' | 'y', canvas: HTMLElement) {
   const rect = canvas.getBoundingClientRect()
   const axisSize = axis === 'x' ? rect.width : rect.height
-  if (axisSize <= 0) return value.value
+  if (axisSize <= 0) {return value.value}
   return (value.value * cssUnitPx(value.unit, axis, canvas) / axisSize) * 100
 }
 
@@ -4083,7 +4085,7 @@ function cssUnitPointToCanvasPoint(point: CssUnitPoint, canvas: HTMLElement): Po
 function cssCoordinateExpressionToCanvasPercent(expression: string, axis: 'x' | 'y', canvas: HTMLElement) {
   const rect = canvas.getBoundingClientRect()
   const axisSize = axis === 'x' ? rect.width : rect.height
-  if (axisSize <= 0 || typeof document === 'undefined') return null
+  if (axisSize <= 0 || typeof document === 'undefined') {return null}
 
   const probe = document.createElement('div')
   probe.style.position = 'absolute'
@@ -4106,7 +4108,7 @@ function cssCoordinateExpressionToCanvasPercent(expression: string, axis: 'x' | 
   const offset = axis === 'x'
     ? probeRect.left - rect.left
     : probeRect.top - rect.top
-  if (!Number.isFinite(offset)) return null
+  if (!Number.isFinite(offset)) {return null}
   return (offset / axisSize) * 100
 }
 
@@ -4125,7 +4127,7 @@ function cssCoordinatePointToCanvasPoint(point: CssCoordinatePoint, canvas: HTML
 function partialCssCoordinatePointToCanvasPoint(point: CssCoordinatePoint, canvas: HTMLElement): Point | null {
   const x = cssCoordinateValueToCanvasPercent(point.x, 'x', canvas)
   const y = cssCoordinateValueToCanvasPercent(point.y, 'y', canvas)
-  if (x === null && y === null) return null
+  if (x === null && y === null) {return null}
   return {
     x: x ?? 0,
     y: y ?? 0,
@@ -4189,13 +4191,13 @@ function rawEditableHandlePoint(editable: RawEditableClipPath, handle: HandleTar
     }
   }
 
-  if (editable.kind !== 'inset') return null
+  if (editable.kind !== 'inset') {return null}
 
   const box = rawInsetBox(editable, canvas)
-  if (handle.kind === 'inset-top') return { x: box.x0 + box.width / 2, y: box.y0 }
-  if (handle.kind === 'inset-right') return { x: box.x1, y: box.y0 + box.height / 2 }
-  if (handle.kind === 'inset-bottom') return { x: box.x0 + box.width / 2, y: box.y1 }
-  if (handle.kind === 'inset-left') return { x: box.x0, y: box.y0 + box.height / 2 }
+  if (handle.kind === 'inset-top') {return { x: box.x0 + box.width / 2, y: box.y0 }}
+  if (handle.kind === 'inset-right') {return { x: box.x1, y: box.y0 + box.height / 2 }}
+  if (handle.kind === 'inset-bottom') {return { x: box.x0 + box.width / 2, y: box.y1 }}
+  if (handle.kind === 'inset-left') {return { x: box.x0, y: box.y0 + box.height / 2 }}
 
   if (handle.kind === 'inset-radius' && editable.radii) {
     const horizontal = expandCssUnitValues(editable.radii.horizontal)
@@ -4203,9 +4205,9 @@ function rawEditableHandlePoint(editable: RawEditableClipPath, handle: HandleTar
     const index = CORNERS.indexOf(handle.corner)
     const radiusX = cssUnitValueToCanvasPercent(horizontal[index], 'x', canvas)
     const radiusY = cssUnitValueToCanvasPercent(vertical[index], 'y', canvas)
-    if (handle.corner === 'topLeft') return { x: box.x0 + radiusX, y: box.y0 + radiusY }
-    if (handle.corner === 'topRight') return { x: box.x1 - radiusX, y: box.y0 + radiusY }
-    if (handle.corner === 'bottomRight') return { x: box.x1 - radiusX, y: box.y1 - radiusY }
+    if (handle.corner === 'topLeft') {return { x: box.x0 + radiusX, y: box.y0 + radiusY }}
+    if (handle.corner === 'topRight') {return { x: box.x1 - radiusX, y: box.y0 + radiusY }}
+    if (handle.corner === 'bottomRight') {return { x: box.x1 - radiusX, y: box.y1 - radiusY }}
     return { x: box.x0 + radiusX, y: box.y1 - radiusY }
   }
 
@@ -4219,26 +4221,26 @@ function rawEditableHandleCssPoint(editable: RawEditableClipPath, handle: Handle
   }
 
   if (editable.kind === 'circle') {
-    if (handle.kind === 'circle-center') return { x: cssUnitValueToken(editable.cx), y: cssUnitValueToken(editable.cy) }
-    if (handle.kind === 'circle-radius') return { x: cssUnitCalcToken(editable.cx, '+', editable.radius), y: cssUnitValueToken(editable.cy) }
+    if (handle.kind === 'circle-center') {return { x: cssUnitValueToken(editable.cx), y: cssUnitValueToken(editable.cy) }}
+    if (handle.kind === 'circle-radius') {return { x: cssUnitCalcToken(editable.cx, '+', editable.radius), y: cssUnitValueToken(editable.cy) }}
   }
 
   if (editable.kind === 'ellipse') {
-    if (handle.kind === 'ellipse-center') return { x: cssUnitValueToken(editable.cx), y: cssUnitValueToken(editable.cy) }
-    if (handle.kind === 'ellipse-rx') return { x: cssUnitCalcToken(editable.cx, '+', editable.rx), y: cssUnitValueToken(editable.cy) }
-    if (handle.kind === 'ellipse-ry') return { x: cssUnitValueToken(editable.cx), y: cssUnitCalcToken(editable.cy, '+', editable.ry) }
+    if (handle.kind === 'ellipse-center') {return { x: cssUnitValueToken(editable.cx), y: cssUnitValueToken(editable.cy) }}
+    if (handle.kind === 'ellipse-rx') {return { x: cssUnitCalcToken(editable.cx, '+', editable.rx), y: cssUnitValueToken(editable.cy) }}
+    if (handle.kind === 'ellipse-ry') {return { x: cssUnitValueToken(editable.cx), y: cssUnitCalcToken(editable.cy, '+', editable.ry) }}
   }
 
-  if (editable.kind !== 'inset') return null
+  if (editable.kind !== 'inset') {return null}
 
   const left = cssUnitValueToken(editable.left)
   const top = cssUnitValueToken(editable.top)
   const right = `calc(100% - ${cssUnitValueToken(editable.right)})`
   const bottom = `calc(100% - ${cssUnitValueToken(editable.bottom)})`
-  if (handle.kind === 'inset-top') return { x: `calc((${left} + ${right}) / 2)`, y: top }
-  if (handle.kind === 'inset-right') return { x: right, y: `calc((${top} + ${bottom}) / 2)` }
-  if (handle.kind === 'inset-bottom') return { x: `calc((${left} + ${right}) / 2)`, y: bottom }
-  if (handle.kind === 'inset-left') return { x: left, y: `calc((${top} + ${bottom}) / 2)` }
+  if (handle.kind === 'inset-top') {return { x: `calc((${left} + ${right}) / 2)`, y: top }}
+  if (handle.kind === 'inset-right') {return { x: right, y: `calc((${top} + ${bottom}) / 2)` }}
+  if (handle.kind === 'inset-bottom') {return { x: `calc((${left} + ${right}) / 2)`, y: bottom }}
+  if (handle.kind === 'inset-left') {return { x: left, y: `calc((${top} + ${bottom}) / 2)` }}
 
   if (handle.kind === 'inset-radius' && editable.radii) {
     const horizontal = expandCssUnitValues(editable.radii.horizontal)
@@ -4246,9 +4248,9 @@ function rawEditableHandleCssPoint(editable: RawEditableClipPath, handle: Handle
     const index = CORNERS.indexOf(handle.corner)
     const radiusX = horizontal[index]
     const radiusY = vertical[index]
-    if (handle.corner === 'topLeft') return { x: cssUnitCalcToken(editable.left, '+', radiusX), y: cssUnitCalcToken(editable.top, '+', radiusY) }
-    if (handle.corner === 'topRight') return { x: `calc(100% - ${cssUnitValueToken(editable.right)} - ${cssUnitValueToken(radiusX)})`, y: cssUnitCalcToken(editable.top, '+', radiusY) }
-    if (handle.corner === 'bottomRight') return { x: `calc(100% - ${cssUnitValueToken(editable.right)} - ${cssUnitValueToken(radiusX)})`, y: `calc(100% - ${cssUnitValueToken(editable.bottom)} - ${cssUnitValueToken(radiusY)})` }
+    if (handle.corner === 'topLeft') {return { x: cssUnitCalcToken(editable.left, '+', radiusX), y: cssUnitCalcToken(editable.top, '+', radiusY) }}
+    if (handle.corner === 'topRight') {return { x: `calc(100% - ${cssUnitValueToken(editable.right)} - ${cssUnitValueToken(radiusX)})`, y: cssUnitCalcToken(editable.top, '+', radiusY) }}
+    if (handle.corner === 'bottomRight') {return { x: `calc(100% - ${cssUnitValueToken(editable.right)} - ${cssUnitValueToken(radiusX)})`, y: `calc(100% - ${cssUnitValueToken(editable.bottom)} - ${cssUnitValueToken(radiusY)})` }}
     return { x: cssUnitCalcToken(editable.left, '+', radiusX), y: `calc(100% - ${cssUnitValueToken(editable.bottom)} - ${cssUnitValueToken(radiusY)})` }
   }
 
@@ -4333,7 +4335,7 @@ function updateShapeForDrag(
   y: number,
   options: { insetSideMode?: InsetSideMode; insetRadiusMode?: InsetRadiusMode; insetRadiusUnlocked?: boolean; ellipseScaleProportional?: boolean; canvas?: HTMLElement | null } = {},
 ): ClipShape {
-  if (shape.kind === 'none') return shape
+  if (shape.kind === 'none') {return shape}
 
   if (shape.kind === 'raw' && shape.editable && options.canvas) {
     const canvas = options.canvas
@@ -4344,8 +4346,8 @@ function updateShapeForDrag(
         ? target.before.editable
         : shape.editable
       const beforePoint = beforeEditable.points[target.index]
-      if (!beforePoint) return shape
-      if (!isCssUnitValue(beforePoint.x) && !isCssUnitValue(beforePoint.y)) return shape
+      if (!beforePoint) {return shape}
+      if (!isCssUnitValue(beforePoint.x) && !isCssUnitValue(beforePoint.y)) {return shape}
       const beforeCanvasPoint = {
         x: isCssUnitValue(beforePoint.x) ? cssUnitValueToCanvasPercent(beforePoint.x, 'x', canvas) : x,
         y: isCssUnitValue(beforePoint.y) ? cssUnitValueToCanvasPercent(beforePoint.y, 'y', canvas) : y,
@@ -4355,7 +4357,7 @@ function updateShapeForDrag(
       const nextEditable: RawEditableClipPath = {
         ...shape.editable,
         points: shape.editable.points.map((point, index) => {
-          if (!selectedIndexes.has(index)) return point
+          if (!selectedIndexes.has(index)) {return point}
           const beforeSelected = beforeEditable.points[index] || point
           const beforeSelectedCanvas = {
             x: isCssUnitValue(beforeSelected.x) ? cssUnitValueToCanvasPercent(beforeSelected.x, 'x', canvas) : 0,
@@ -4528,7 +4530,7 @@ function updateShapeForDrag(
   if (target.kind === 'polygon-point' && shape.kind === 'polygon') {
     if (target.before.kind === 'polygon' && target.polygonPointIndexes?.length) {
       const beforePoint = target.before.points[target.index]
-      if (!beforePoint) return shape
+      if (!beforePoint) {return shape}
 
       const selectedIndexes = new Set(target.polygonPointIndexes)
       const dx = x - beforePoint.x
@@ -4675,37 +4677,37 @@ function isArrowKey(key: string): key is ArrowKey {
 }
 
 function arrowDelta(key: string, step = KEYBOARD_STEP) {
-  if (key === 'ArrowLeft') return { x: -step, y: 0 }
-  if (key === 'ArrowRight') return { x: step, y: 0 }
-  if (key === 'ArrowUp') return { x: 0, y: -step }
-  if (key === 'ArrowDown') return { x: 0, y: step }
+  if (key === 'ArrowLeft') {return { x: -step, y: 0 }}
+  if (key === 'ArrowRight') {return { x: step, y: 0 }}
+  if (key === 'ArrowUp') {return { x: 0, y: -step }}
+  if (key === 'ArrowDown') {return { x: 0, y: step }}
   return null
 }
 
 function ellipseRadiusValueDelta(handle: Extract<HandleTarget, { kind: 'ellipse-rx' | 'ellipse-ry' }>, key: string, step = KEYBOARD_STEP) {
   if (handle.kind === 'ellipse-rx') {
-    if (key === 'ArrowRight' || key === 'ArrowUp') return step
-    if (key === 'ArrowLeft' || key === 'ArrowDown') return -step
+    if (key === 'ArrowRight' || key === 'ArrowUp') {return step}
+    if (key === 'ArrowLeft' || key === 'ArrowDown') {return -step}
   }
 
-  if (key === 'ArrowDown' || key === 'ArrowRight') return step
-  if (key === 'ArrowUp' || key === 'ArrowLeft') return -step
+  if (key === 'ArrowDown' || key === 'ArrowRight') {return step}
+  if (key === 'ArrowUp' || key === 'ArrowLeft') {return -step}
   return 0
 }
 
 function insetValueDelta(side: InsetSide, key: string, step = KEYBOARD_STEP) {
   if (side === 'top') {
-    if (key === 'ArrowDown' || key === 'ArrowRight') return step
-    if (key === 'ArrowUp' || key === 'ArrowLeft') return -step
+    if (key === 'ArrowDown' || key === 'ArrowRight') {return step}
+    if (key === 'ArrowUp' || key === 'ArrowLeft') {return -step}
   } else if (side === 'right') {
-    if (key === 'ArrowLeft' || key === 'ArrowUp') return step
-    if (key === 'ArrowRight' || key === 'ArrowDown') return -step
+    if (key === 'ArrowLeft' || key === 'ArrowUp') {return step}
+    if (key === 'ArrowRight' || key === 'ArrowDown') {return -step}
   } else if (side === 'bottom') {
-    if (key === 'ArrowUp' || key === 'ArrowRight') return step
-    if (key === 'ArrowDown' || key === 'ArrowLeft') return -step
+    if (key === 'ArrowUp' || key === 'ArrowRight') {return step}
+    if (key === 'ArrowDown' || key === 'ArrowLeft') {return -step}
   } else if (side === 'left') {
-    if (key === 'ArrowRight' || key === 'ArrowUp') return step
-    if (key === 'ArrowLeft' || key === 'ArrowDown') return -step
+    if (key === 'ArrowRight' || key === 'ArrowUp') {return step}
+    if (key === 'ArrowLeft' || key === 'ArrowDown') {return -step}
   }
   return 0
 }
@@ -4715,10 +4717,10 @@ function cornerRadiusDelta(corner: CornerName, key: string, step = KEYBOARD_STEP
   const horizontalSign = corner === 'topRight' || corner === 'bottomRight' ? -1 : 1
   const verticalSign = corner === 'bottomRight' || corner === 'bottomLeft' ? -1 : 1
 
-  if (key === 'ArrowRight') delta.x = step * horizontalSign
-  if (key === 'ArrowLeft') delta.x = -step * horizontalSign
-  if (key === 'ArrowDown') delta.y = step * verticalSign
-  if (key === 'ArrowUp') delta.y = -step * verticalSign
+  if (key === 'ArrowRight') {delta.x = step * horizontalSign}
+  if (key === 'ArrowLeft') {delta.x = -step * horizontalSign}
+  if (key === 'ArrowDown') {delta.y = step * verticalSign}
+  if (key === 'ArrowUp') {delta.y = -step * verticalSign}
 
   return delta
 }
@@ -4735,11 +4737,11 @@ function updateShapeForKeyboard(
 ) {
   const step = options.step || KEYBOARD_STEP
   const delta = arrowDelta(key, step)
-  if (!delta || shape.kind === 'none') return { shape }
+  if (!delta || shape.kind === 'none') {return { shape }}
 
   if (shape.kind === 'raw' && shape.editable && options.canvas) {
     const currentPoint = rawEditableHandlePoint(shape.editable, handle, options.canvas)
-    if (!currentPoint) return { shape }
+    if (!currentPoint) {return { shape }}
     const target: DragTarget = {
       ...handle,
       before: shape,
@@ -4758,7 +4760,7 @@ function updateShapeForKeyboard(
 
   if (handle.kind === 'polygon-point' && shape.kind === 'polygon') {
     const point = shape.points[handle.index]
-    if (!point) return { shape }
+    if (!point) {return { shape }}
     const selectedIndexes = new Set(options.polygonPointIndexes?.length ? options.polygonPointIndexes : [handle.index])
     return {
       shape: {
@@ -4793,7 +4795,7 @@ function updateShapeForKeyboard(
 
   if (handle.kind === 'ellipse-rx' && shape.kind === 'ellipse') {
     const radiusDelta = ellipseRadiusValueDelta(handle, key, step)
-    if (!radiusDelta) return { shape }
+    if (!radiusDelta) {return { shape }}
     const nextRx = Math.max(0, shape.rx + radiusDelta)
     if (options.ellipseScaleProportional && shape.rx > 0) {
       const scale = nextRx / shape.rx
@@ -4804,7 +4806,7 @@ function updateShapeForKeyboard(
 
   if (handle.kind === 'ellipse-ry' && shape.kind === 'ellipse') {
     const radiusDelta = ellipseRadiusValueDelta(handle, key, step)
-    if (!radiusDelta) return { shape }
+    if (!radiusDelta) {return { shape }}
     const nextRy = Math.max(0, shape.ry + radiusDelta)
     if (options.ellipseScaleProportional && shape.ry > 0) {
       const scale = nextRy / shape.ry
@@ -4821,7 +4823,7 @@ function updateShapeForKeyboard(
 
       if (mode === 'all') {
         const valueDelta = insetValueDelta(side, key, step)
-        if (!valueDelta) return { shape }
+        if (!valueDelta) {return { shape }}
         const value = next[side] + valueDelta
         next.top = value
         next.right = value
@@ -4831,7 +4833,7 @@ function updateShapeForKeyboard(
       }
 
       const valueDelta = insetValueDelta(side, key, step)
-      if (!valueDelta) return { shape }
+      if (!valueDelta) {return { shape }}
       if (mode === 'opposite') {
         const oppositeSide = oppositeInsetSide(side)
         next[side] += valueDelta
@@ -4846,7 +4848,7 @@ function updateShapeForKeyboard(
     if (handle.kind === 'inset-radius') {
       const mode = options.insetRadiusMode || 'single'
       const radiusDelta = cornerRadiusDelta(handle.corner, key, step)
-      if (!radiusDelta.x && !radiusDelta.y) return { shape }
+      if (!radiusDelta.x && !radiusDelta.y) {return { shape }}
       const nextRadii = { ...shape.radii }
       const activeRadius = shape.radii[handle.corner]
       const radiusDeltaValue = radiusDelta.x || radiusDelta.y
@@ -4935,7 +4937,7 @@ function isStyleHandle(style: StyleHandle | null | undefined): style is StyleHan
 }
 
 function debugClipPath(label: string, details?: unknown) {
-  if (!CLIP_PATH_DEBUG) return
+  if (!CLIP_PATH_DEBUG) {return}
   try {
     console.log(`[Moden ClipPath debug] ${label}\n${JSON.stringify(details, null, 2)}`)
   } catch {
@@ -4944,7 +4946,7 @@ function debugClipPath(label: string, details?: unknown) {
 }
 
 function canWriteClipPathValue(style: StyleHandle | null | undefined, value: string) {
-  if (!style) return false
+  if (!style) {return false}
   return isNoneClipPathValue(value)
     ? Boolean(style.setProperty || style.removeProperty)
     : Boolean(style.setProperty)
@@ -4963,7 +4965,7 @@ function addUniqueStyleHandle(
   seenIds: Set<string>,
 ) {
   if (style.id) {
-    if (seenIds.has(style.id)) return
+    if (seenIds.has(style.id)) {return}
     seenIds.add(style.id)
   } else if (seenRefs.has(style)) {
     return
@@ -4974,7 +4976,7 @@ function addUniqueStyleHandle(
 }
 
 async function readOptional<T>(reader: (() => Promise<T> | undefined) | undefined) {
-  if (!reader) return undefined
+  if (!reader) {return undefined}
 
   try {
     return await reader()
@@ -4984,7 +4986,7 @@ async function readOptional<T>(reader: (() => Promise<T> | undefined) | undefine
 }
 
 async function readOptionalWithTimeout<T>(reader: (() => Promise<T> | undefined) | undefined, timeoutMs: number) {
-  if (!reader) return undefined
+  if (!reader) {return undefined}
 
   let timeoutId: number | null = null
   try {
@@ -5004,10 +5006,10 @@ async function readOptionalWithTimeout<T>(reader: (() => Promise<T> | undefined)
 }
 
 function selectedElementKey(element: unknown) {
-  if (!element || typeof element !== 'object') return null
+  if (!element || typeof element !== 'object') {return null}
   const id = (element as ElementStyleSource).id
-  if (!id) return null
-  if (typeof id === 'string') return id
+  if (!id) {return null}
+  if (typeof id === 'string') {return id}
 
   try {
     return JSON.stringify(id)
@@ -5044,7 +5046,7 @@ async function getElementPrimaryStyleHandles(element: unknown) {
 }
 
 function addClassNamesFromValue(classNames: Set<string>, value: unknown) {
-  if (typeof value !== 'string') return
+  if (typeof value !== 'string') {return}
 
   value
     .trim()
@@ -5054,7 +5056,7 @@ function addClassNamesFromValue(classNames: Set<string>, value: unknown) {
 }
 
 function addClassNamesFromAttributes(classNames: Set<string>, attributes: Array<ElementAttributeHandle> | null | undefined) {
-  if (!Array.isArray(attributes)) return
+  if (!Array.isArray(attributes)) {return}
 
   attributes.forEach((attribute) => {
     if (typeof attribute?.name === 'string' && attribute.name.toLowerCase() === 'class') {
@@ -5077,7 +5079,7 @@ async function getElementClassNames(element: unknown, styles?: Array<StyleHandle
   const source = element as ElementStyleSource
   const classNames = new Set<string>()
   await addClassNamesFromStyleHandles(classNames, styles)
-  if (classNames.size) return [...classNames]
+  if (classNames.size) {return [...classNames]}
 
   const [
     attributeClass,
@@ -5111,7 +5113,7 @@ function getStyleLookupCandidates(classNames: string[]) {
 
   const addCandidate = (candidate: string | string[]) => {
     const key = Array.isArray(candidate) ? candidate.join('\u0000') : candidate
-    if (seen.has(key)) return
+    if (seen.has(key)) {return}
 
     seen.add(key)
     candidates.push(candidate)
@@ -5132,7 +5134,7 @@ function getStandaloneStyleLookupCandidates(classNames: string[]) {
 }
 
 async function getStyleNamePath(style: StyleHandle, depth = 0): Promise<string[]> {
-  if (depth > 20) return []
+  if (depth > 20) {return []}
 
   const parent = await readOptionalWithTimeout(() => style.getParent?.(), STYLE_PATH_LOOKUP_TIMEOUT_MS)
   const parentPath = isStyleHandle(parent)
@@ -5182,7 +5184,7 @@ async function lookupStyleByNameCandidate(webflowApi: WebflowStyleLookup, candid
 }
 
 async function getClassStyleHandlesWithDiagnostics(classNames: string[], webflowApi: WebflowStyleLookup) {
-  if (!classNames.length) return { styles: [], diagnostics: [] as StyleLookupDiagnostic[] }
+  if (!classNames.length) {return { styles: [], diagnostics: [] as StyleLookupDiagnostic[] }}
 
   const styles: StyleHandle[] = []
   const seenRefs = new Set<StyleHandle>()
@@ -5231,17 +5233,17 @@ function styleOptionsForBreakpoint(breakpoint: BreakpointId | null | undefined):
 }
 
 function inheritedBreakpointChain(breakpoint: BreakpointId | null | undefined) {
-  if (breakpoint === 'xxl') return ['xxl', 'xl', 'large', 'main'] as const
-  if (breakpoint === 'xl') return ['xl', 'large', 'main'] as const
-  if (breakpoint === 'large') return ['large', 'main'] as const
-  if (breakpoint === 'medium') return ['medium', 'main'] as const
-  if (breakpoint === 'small') return ['small', 'medium', 'main'] as const
-  if (breakpoint === 'tiny') return ['tiny', 'small', 'medium', 'main'] as const
+  if (breakpoint === 'xxl') {return ['xxl', 'xl', 'large', 'main'] as const}
+  if (breakpoint === 'xl') {return ['xl', 'large', 'main'] as const}
+  if (breakpoint === 'large') {return ['large', 'main'] as const}
+  if (breakpoint === 'medium') {return ['medium', 'main'] as const}
+  if (breakpoint === 'small') {return ['small', 'medium', 'main'] as const}
+  if (breakpoint === 'tiny') {return ['tiny', 'small', 'medium', 'main'] as const}
   return ['main'] as const
 }
 
 function clipPathStyleOriginFromSource(sourceBreakpoint: BreakpointId | null | undefined, activeBreakpoint: BreakpointId): ClipPathStyleOrigin {
-  if (!sourceBreakpoint) return 'none'
+  if (!sourceBreakpoint) {return 'none'}
   return sourceBreakpoint === activeBreakpoint ? 'current' : 'inherited'
 }
 
@@ -5252,15 +5254,15 @@ async function readStylePropertyDeclarationAt(style: StyleHandle, property: stri
     const properties = await readOptionalWithTimeout(() => style.getProperties?.(options), STYLE_PROPERTY_LOOKUP_TIMEOUT_MS)
     propertiesWereRead = true
     const raw = normalizeStylePropertyValue(properties?.[property])
-    if (hasClipPathDeclaration(raw)) return raw
+    if (hasClipPathDeclaration(raw)) {return raw}
   } catch {
     // Fall back to direct property lookup when the property map is unavailable.
   }
 
   try {
     const raw = normalizeStylePropertyValue(await readOptionalWithTimeout(() => style.getProperty?.(property, options), STYLE_PROPERTY_LOOKUP_TIMEOUT_MS))
-    if (!hasClipPathDeclaration(raw)) return null
-    if (property === 'clip-path' && propertiesWereRead && isNoneClipPathValue(raw)) return null
+    if (!hasClipPathDeclaration(raw)) {return null}
+    if (property === 'clip-path' && propertiesWereRead && isNoneClipPathValue(raw)) {return null}
     return raw
   } catch {
     return null
@@ -5270,7 +5272,7 @@ async function readStylePropertyDeclarationAt(style: StyleHandle, property: stri
 async function readStylePropertyDeclarationWithSource(style: StyleHandle, property: string, options?: StyleTargetOptions): Promise<StylePropertyRead | null> {
   for (const breakpoint of inheritedBreakpointChain(options?.breakpoint || 'main')) {
     const value = await readStylePropertyDeclarationAt(style, property, styleOptionsForBreakpoint(breakpoint))
-    if (value && hasClipPathDeclaration(value)) return { value, breakpoint }
+    if (value && hasClipPathDeclaration(value)) {return { value, breakpoint }}
   }
   return null
 }
@@ -5307,7 +5309,7 @@ async function readPastedShapeMetadata(style: StyleHandle, options?: StyleTarget
 
 async function findClipPathStyle(styles: Array<StyleHandle | null> | null | undefined, options?: StyleTargetOptions) {
   const styleHandles = getStyleHandles(styles)
-  if (!styleHandles.length) return null
+  if (!styleHandles.length) {return null}
 
   const reads = await Promise.all(styleHandles.map(async (style) => {
     try {
@@ -5351,7 +5353,7 @@ async function resolveWritableClipPathStyleForElement(
   value: string,
   options?: StyleTargetOptions,
 ) {
-  if (!element) return null
+  if (!element) {return null}
 
   const primaryStyles = await getElementPrimaryStyleHandles(element)
   const primaryMatch = await findClipPathStyle(primaryStyles, options)
@@ -5390,9 +5392,9 @@ async function resolveWritableClipPathStyleForElement(
 // `clip-path`). getStyleByName can hand back a combo whose leaf matches, so we
 // verify the resolved path before trusting it. Read-only (never creates).
 async function findStyleForClassPath(names: string[], api: WebflowStyleLookup): Promise<StyleHandle | null> {
-  if (!names.length) return null
+  if (!names.length) {return null}
   const existing = await readOptionalWithTimeout(() => api.getStyleByName?.(names.length === 1 ? names[0] : names), STYLE_LOOKUP_TIMEOUT_MS)
-  if (!isStyleHandle(existing)) return null
+  if (!isStyleHandle(existing)) {return null}
   const path = await getStyleNamePath(existing)
   return path.length === names.length && path.every((name, index) => name === names[index]) ? existing : null
 }
@@ -5400,11 +5402,11 @@ async function findStyleForClassPath(names: string[], api: WebflowStyleLookup): 
 // Like findStyleForClassPath, but creates the exact standalone/combo (and any
 // missing parent in the chain) when it doesn't exist yet.
 async function resolveOrCreateStyleForClassPath(names: string[], api: WebflowStyleEditor): Promise<StyleHandle | null> {
-  if (!names.length) return null
+  if (!names.length) {return null}
 
   const existing = await findStyleForClassPath(names, api)
-  if (existing) return existing
-  if (!api.createStyle) return null
+  if (existing) {return existing}
+  if (!api.createStyle) {return null}
 
   if (names.length === 1) {
     const created = await readOptional(() => api.createStyle?.(names[0]))
@@ -5412,7 +5414,7 @@ async function resolveOrCreateStyleForClassPath(names: string[], api: WebflowSty
   }
 
   const parent = await resolveOrCreateStyleForClassPath(names.slice(0, -1), api)
-  if (!isStyleHandle(parent)) return null
+  if (!isStyleHandle(parent)) {return null}
   const created = await readOptional(() => api.createStyle?.(names[names.length - 1], { parent }))
   return isStyleHandle(created) ? created : null
 }
@@ -5438,16 +5440,16 @@ async function resolveCascadeWinnerClipPathStyle(
   const seenIds = new Set<string>()
   addStyleHandles(candidates, primaryStyles, seenRefs, seenIds)
   for (const standalone of standalones) {
-    if (standalone) addUniqueStyleHandle(candidates, standalone, seenRefs, seenIds)
+    if (standalone) {addUniqueStyleHandle(candidates, standalone, seenRefs, seenIds)}
   }
 
   const declaring = (await Promise.all(candidates.map(async (style) => {
     const declaration = await readClipPathDeclarationWithSource(style, options)
-    if (!hasClipPathDeclaration(declaration?.value)) return null
+    if (!hasClipPathDeclaration(declaration?.value)) {return null}
     const namePath = await getStyleNamePath(style)
     return { style, raw: declaration!.value, breakpoint: declaration!.breakpoint, namePath, specificity: namePath.length }
   }))).filter((entry): entry is { style: StyleHandle; raw: string; breakpoint: BreakpointId; namePath: string[]; specificity: number } => entry !== null)
-  if (!declaring.length) return null
+  if (!declaring.length) {return null}
 
   const maxSpecificity = Math.max(...declaring.map((entry) => entry.specificity))
   const topTier = declaring.filter((entry) => entry.specificity === maxSpecificity)
@@ -5459,11 +5461,11 @@ async function resolveCascadeWinnerClipPathStyle(
     const allStyles = (await readOptionalWithTimeout(() => api.getAllStyles?.(), STYLE_LOOKUP_TIMEOUT_MS)) || []
     const orderById = new Map<string, number>()
     allStyles.forEach((style, index) => {
-      if (style?.id) orderById.set(style.id, index)
+      if (style?.id) {orderById.set(style.id, index)}
     })
     const orderOf = (entry: typeof winner) => (entry.style.id ? (orderById.get(entry.style.id) ?? -1) : -1)
     for (const entry of topTier.slice(1)) {
-      if (orderOf(entry) > orderOf(winner)) winner = entry
+      if (orderOf(entry) > orderOf(winner)) {winner = entry}
     }
   }
 
@@ -5596,7 +5598,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       : selectedHandle
         ? [selectedHandle]
         : []
-    if (!selectedHandles.length) return codeTokenHighlights
+    if (!selectedHandles.length) {return codeTokenHighlights}
 
     const selectionHighlights: CodeEditorTokenHighlight[] = []
     const seenRanges = new Set<string>()
@@ -5608,7 +5610,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
       let group: ClipPathCodeHighlight[] = []
       const flushGroup = () => {
-        if (!group.length) return
+        if (!group.length) {return}
         const from = group[0].from
         const to = group[group.length - 1].to
         const colorClass = group[0].colorClass
@@ -5695,7 +5697,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   })
 
   const syncShapeScaleOptionsForLoadedShape = (next: ClipShape) => {
-    if (next.kind !== 'shape') return
+    if (next.kind !== 'shape') {return}
     const variableName = shapeScaleVariableNameFromValue(next.value)
     const offsetNames = shapeOffsetVariableNamesFromValue(next.value)
     const nextUseVariable = Boolean(variableName)
@@ -5717,8 +5719,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const syncShapeFitModeForLoadedShape = (next: ClipShape, fallbackMode?: ShapeFitMode) => {
-    if (next.kind !== 'shape') return
-    if (fallbackMode !== 'stretch') syncShapeScaleOptionsForLoadedShape(next)
+    if (next.kind !== 'shape') {return}
+    if (fallbackMode !== 'stretch') {syncShapeScaleOptionsForLoadedShape(next)}
     const nextMode: ShapeFitMode = fallbackMode || (hasContainerQueryUnit(next.value) ? 'contain' : 'stretch')
     shapeFitModeRef.current = nextMode
     setShapeFitMode(nextMode)
@@ -5776,7 +5778,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       window.clearInterval(keyboardMoveTimerRef.current)
       keyboardMoveTimerRef.current = null
     }
-    if (clearKeys) pressedArrowKeysRef.current.clear()
+    if (clearKeys) {pressedArrowKeysRef.current.clear()}
   }
 
   const showSnapGuides = (guides: SnapGuides) => {
@@ -5791,7 +5793,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     isShapeTransformSelectedRef.current = selected
     setIsShapeTransformSelected(selected)
     if (!selected) {
-      if (!selectedHandleRef.current) stopKeyboardMoveLoop()
+      if (!selectedHandleRef.current) {stopKeyboardMoveLoop()}
       clearSnapGuides()
       return
     }
@@ -5826,7 +5828,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const getPolygonSelection = (handle: HandleTarget) => {
-    if (!isPolygonPointHandle(handle)) return []
+    if (!isPolygonPointHandle(handle)) {return []}
 
     const selectedPolygonHandles = selectedHandlesRef.current.filter(isPolygonPointHandle)
     return handleListIncludes(selectedPolygonHandles, handle)
@@ -5840,7 +5842,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   const getActivePolygonSelection = () => {
     const selectedPolygonHandles = selectedHandlesRef.current.filter(isPolygonPointHandle)
-    if (selectedPolygonHandles.length) return selectedPolygonHandles
+    if (selectedPolygonHandles.length) {return selectedPolygonHandles}
 
     const selectedHandle = selectedHandleRef.current
     return isPolygonPointHandle(selectedHandle) ? [selectedHandle] : []
@@ -5877,9 +5879,9 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   const canvasPointFromClient = (clientX: number, clientY: number): Point | null => {
     const canvas = canvasRef.current
-    if (!canvas) return null
+    if (!canvas) {return null}
     const rect = canvas.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0) return null
+    if (rect.width <= 0 || rect.height <= 0) {return null}
     return {
       x: ((clientX - rect.left) / rect.width) * 100,
       y: ((clientY - rect.top) / rect.height) * 100,
@@ -5889,7 +5891,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   const polygonDisplayPointForSelection = (points: Point[], index: number): Point => {
     const display = polygonHandleDisplayPoint(points, index, handleBoundsRef.current, polygonDisplayProjectionsRef.current.get(index)).point
     const bounds = handleBoundsRef.current
-    if (!bounds || bounds.minX > bounds.maxX || bounds.minY > bounds.maxY) return display
+    if (!bounds || bounds.minX > bounds.maxX || bounds.minY > bounds.maxY) {return display}
     return {
       x: clampValue(display.x, bounds.minX, bounds.maxX),
       y: clampValue(display.y, bounds.minY, bounds.maxY),
@@ -5898,7 +5900,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   const applyPolygonSelectionRect = (selection: PolygonSelectionDrag) => {
     const current = shapeRef.current
-    if (current.kind !== 'polygon') return
+    if (current.kind !== 'polygon') {return}
 
     const rect = rectFromPoints(selection.start, selection.current)
     const selectedByRect = current.points
@@ -5955,12 +5957,12 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     } else {
       setActiveInsetModifierMode('single')
     }
-    if (target && focusHandle) focusSelectedHandle()
+    if (target && focusHandle) {focusSelectedHandle()}
   }
 
   const finishPolygonSelectionDrag = (applySelection = true) => {
     const selection = polygonSelectionDragRef.current
-    if (!selection) return
+    if (!selection) {return}
 
     if (applySelection && selection.didMove) {
       applyPolygonSelectionRect(selection)
@@ -5993,7 +5995,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       )
     }
 
-    if (!drag.corner) return null
+    if (!drag.corner) {return null}
     // Resize toward the opposite corner by default (it stays pinned). Hold Option/Alt to resize
     // from the shape's center instead.
     const anchor = modifiers.altKey
@@ -6006,7 +6008,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     const startVector = { x: startHandle.x - anchor.x, y: startHandle.y - anchor.y }
     const nextVector = { x: point.x - anchor.x, y: point.y - anchor.y }
     const startLengthSquared = startVector.x ** 2 + startVector.y ** 2
-    if (startLengthSquared <= SVG_POINT_EPSILON) return null
+    if (startLengthSquared <= SVG_POINT_EPSILON) {return null}
 
     const rawScale = ((nextVector.x * startVector.x) + (nextVector.y * startVector.y)) / startLengthSquared
     const scale = Math.max(0, rawScale)
@@ -6041,7 +6043,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   const loadShapeFromSelection = (next: ClipShape, lastWritten = formatClipPath(next)) => {
     clearPendingWrite()
     localWritePendingRef.current = false
-    if (!shapeMatchesPastedSvgCache(next)) clearPastedShapeSvgCache()
+    if (!shapeMatchesPastedSvgCache(next)) {clearPastedShapeSvgCache()}
     dragTargetRef.current = null
     polygonSelectionDragRef.current = null
     shapeTransformDragRef.current = null
@@ -6066,16 +6068,16 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   const commit = (next: ClipShape) => {
     const current = historyRef.current[historyIndexRef.current]
-    if (current && shapesClose(current, next)) return
+    if (current && shapesClose(current, next)) {return}
     const truncated = historyRef.current.slice(0, historyIndexRef.current + 1)
     truncated.push(next)
-    if (truncated.length > HISTORY_LIMIT) truncated.shift()
+    if (truncated.length > HISTORY_LIMIT) {truncated.shift()}
     historyRef.current = truncated
     historyIndexRef.current = truncated.length - 1
   }
 
   const undo = () => {
-    if (historyIndexRef.current <= 0) return
+    if (historyIndexRef.current <= 0) {return}
     markLocalShapeChange()
     clearPastedShapeSvgCache()
     historyIndexRef.current -= 1
@@ -6086,7 +6088,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const redo = () => {
-    if (historyIndexRef.current >= historyRef.current.length - 1) return
+    if (historyIndexRef.current >= historyRef.current.length - 1) {return}
     markLocalShapeChange()
     clearPastedShapeSvgCache()
     historyIndexRef.current += 1
@@ -6098,14 +6100,14 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   const deleteSelectedPolygonPoints = () => {
     const current = shapeRef.current
-    if (current.kind !== 'polygon') return false
+    if (current.kind !== 'polygon') {return false}
 
     const selectedIndexes = Array.from(new Set(
       getActivePolygonSelection()
         .map((handle) => handle.index)
         .filter((index) => index >= 0 && index < current.points.length),
     )).sort((a, b) => a - b)
-    if (!selectedIndexes.length || current.points.length - selectedIndexes.length < 3) return false
+    if (!selectedIndexes.length || current.points.length - selectedIndexes.length < 3) {return false}
 
     const indexesToDelete = new Set(selectedIndexes)
     const activeIndex = selectedHandleRef.current?.kind === 'polygon-point' &&
@@ -6133,16 +6135,16 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     setShape(next)
     commit(next)
     syncPresetForShape(next)
-    if (nextSelectedHandle) focusSelectedHandle()
+    if (nextSelectedHandle) {focusSelectedHandle()}
     return true
   }
 
   const duplicatePolygonPoint = (index: number, options: { commitChange?: boolean; selectDuplicate?: boolean } = {}) => {
     const current = shapeRef.current
-    if (current.kind !== 'polygon') return null
+    if (current.kind !== 'polygon') {return null}
 
     const point = current.points[index]
-    if (!point) return null
+    if (!point) {return null}
 
     const duplicateIndex = index + 1
     const next: ClipShape = {
@@ -6159,16 +6161,16 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     insertPolygonPointColor(duplicateIndex, current.points.length)
     shapeRef.current = next
     setShape(next)
-    if (options.commitChange ?? true) commit(next)
+    if (options.commitChange ?? true) {commit(next)}
     syncPresetForShape(next)
-    if (options.selectDuplicate ?? true) setHandleSelection(duplicateHandle)
+    if (options.selectDuplicate ?? true) {setHandleSelection(duplicateHandle)}
 
     return { shape: next, handle: duplicateHandle }
   }
 
   const duplicateSelectedPolygonPoint = () => {
     const [firstSelectedPoint] = getActivePolygonSelection()
-    if (!firstSelectedPoint) return false
+    if (!firstSelectedPoint) {return false}
     return Boolean(duplicatePolygonPoint(firstSelectedPoint.index))
   }
 
@@ -6194,7 +6196,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     clearPastedShapeSvgCache()
     selectHandle(null)
     clearSnapGuides()
-    if (preset.kind === 'circle') setCircleRadiusAngle(0)
+    if (preset.kind === 'circle') {setCircleRadiusAngle(0)}
     if (preset.kind === 'shape') {
       shapeScaleUseVariableRef.current = false
       shapeScaleVariableNameRef.current = DEFAULT_SHAPE_SCALE_VARIABLE_NAME
@@ -6234,7 +6236,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       return
     }
     const style = styleRef.current
-    if (!style) return
+    if (!style) {return}
 
     setIsClipPathLabelMenuOpen(false)
     clearPendingWrite()
@@ -6267,7 +6269,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   const onClipPathLabelClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     // Current → reset menu (Option-click resets immediately). Inherited → a
     // read-only "Value comes from:" popover. None → nothing.
-    if (clipPathStyleOrigin === 'none') return
+    if (clipPathStyleOrigin === 'none') {return}
 
     if (clipPathStyleOrigin === 'current' && e.altKey) {
       void resetCurrentBreakpointClipPath()
@@ -6299,7 +6301,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   const onCodeChange = (nextValue: string) => {
     setCodeValue(nextValue)
     if (!nextValue.trim()) {
-      if (shape.kind === 'none') return
+      if (shape.kind === 'none') {return}
 
       markLocalShapeChange()
       clearPastedShapeSvgCache()
@@ -6314,9 +6316,9 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     }
 
     const parsed = parseClipPathInput(nextValue)
-    if (!parsed) return
+    if (!parsed) {return}
 
-    if (shapesClose(shape, parsed)) return
+    if (shapesClose(shape, parsed)) {return}
     markLocalShapeChange()
     clearPastedShapeSvgCache()
     selectHandle(null)
@@ -6336,9 +6338,9 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const onCodeSelectionChange = (position: number) => {
-    if (dragTargetRef.current) return
+    if (dragTargetRef.current) {return}
     const activeElement = document.activeElement
-    if (!(activeElement instanceof Element) || !activeElement.closest('.code-editor')) return
+    if (!(activeElement instanceof Element) || !activeElement.closest('.code-editor')) {return}
 
     const match = codeTokenHighlights.find((highlight) => position >= highlight.from && position <= highlight.to)
     if (!match) {
@@ -6360,7 +6362,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     syncShapeFitModeForLoadedShape(next, options.shapeFitMode)
 
     const current = shapeRef.current
-    if (shapesClose(current, next)) return
+    if (shapesClose(current, next)) {return}
 
     markLocalShapeChange()
     selectHandle(null)
@@ -6376,28 +6378,28 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   const parseClipboardSvgShape = (text: string, html: string, fitMode: ShapeFitMode) => {
     const textCache = cacheFromPastedShapeSvgSource(text)
-    if (textCache) return { shape: shapeFromPastedSvgCache(textCache, fitMode), cache: textCache }
+    if (textCache) {return { shape: shapeFromPastedSvgCache(textCache, fitMode), cache: textCache }}
 
     const htmlCache = cacheFromPastedShapeSvgSource(html)
     return htmlCache ? { shape: shapeFromPastedSvgCache(htmlCache, fitMode), cache: htmlCache } : null
   }
 
   const setShapeFitModeFromControl = (nextMode: ShapeFitMode) => {
-    if (nextMode === shapeFitModeRef.current) return
+    if (nextMode === shapeFitModeRef.current) {return}
     const currentShape = shapeRef.current
-    if (currentShape.kind !== 'shape') return
+    if (currentShape.kind !== 'shape') {return}
 
     const shapeScaleOptions = currentShapeScaleOptions()
     const cache = matchingPastedSvgCacheForShape(currentShape) || cacheFromShapeFitVariants(currentShape, shapeScaleOptions)
     const nextShape = cache
       ? shapeFromPastedSvgCache(cache, nextMode)
       : convertShapeFitMode(currentShape, nextMode, shapeScaleOptions)
-    if (!nextShape) return
+    if (!nextShape) {return}
 
     setShapeFitMode(nextMode)
     shapeFitModeRef.current = nextMode
 
-    if (cache) pastedShapeSvgCacheRef.current = cache
+    if (cache) {pastedShapeSvgCacheRef.current = cache}
     applyPastedSvgClipPath(nextShape, { shapeSvgCache: cache, shapeFitMode: nextMode })
   }
 
@@ -6425,14 +6427,14 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     setShapeOffsetLeftVariableName(rawLeft)
     setShapeOffsetTopVariableName(rawTop)
 
-    if (currentShape.kind !== 'shape') return
+    if (currentShape.kind !== 'shape') {return}
 
     const currentCache = matchingPastedSvgCacheForShape(currentShape, previousOptions) ||
       cacheFromShapeFitVariants(currentShape, previousOptions)
     const nextCache = currentCache ? normalizeShapeFitCache(currentCache, normalizedOptions) : null
-    if (nextCache) pastedShapeSvgCacheRef.current = nextCache
+    if (nextCache) {pastedShapeSvgCacheRef.current = nextCache}
 
-    if (shapeFitModeRef.current !== 'contain') return
+    if (shapeFitModeRef.current !== 'contain') {return}
 
     const nextShape = nextCache?.contain || normalizeContainShapeCoordinates(currentShape, normalizedOptions)
     applyPastedSvgClipPath(nextShape, { shapeSvgCache: nextCache, shapeFitMode: 'contain' })
@@ -6475,20 +6477,20 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       return { x: targetShape.cx, y: targetShape.cy + targetShape.ry }
     }
 
-    if (targetShape.kind !== 'inset') return null
+    if (targetShape.kind !== 'inset') {return null}
 
     const { x0, y0, x1, y1, width, height } = insetBox(targetShape)
-    if (handle.kind === 'inset-top') return { x: x0 + width / 2, y: targetShape.top }
-    if (handle.kind === 'inset-right') return { x: 100 - targetShape.right, y: y0 + height / 2 }
-    if (handle.kind === 'inset-bottom') return { x: x0 + width / 2, y: 100 - targetShape.bottom }
-    if (handle.kind === 'inset-left') return { x: targetShape.left, y: y0 + height / 2 }
+    if (handle.kind === 'inset-top') {return { x: x0 + width / 2, y: targetShape.top }}
+    if (handle.kind === 'inset-right') {return { x: 100 - targetShape.right, y: y0 + height / 2 }}
+    if (handle.kind === 'inset-bottom') {return { x: x0 + width / 2, y: 100 - targetShape.bottom }}
+    if (handle.kind === 'inset-left') {return { x: targetShape.left, y: y0 + height / 2 }}
 
     if (handle.kind === 'inset-radius') {
       const radius = targetShape.radii[handle.corner]
       const canvasRadius = insetRadiusToCanvas(targetShape, radius)
-      if (handle.corner === 'topLeft') return { x: targetShape.left + canvasRadius.x, y: targetShape.top + canvasRadius.y }
-      if (handle.corner === 'topRight') return { x: x1 - canvasRadius.x, y: targetShape.top + canvasRadius.y }
-      if (handle.corner === 'bottomRight') return { x: x1 - canvasRadius.x, y: y1 - canvasRadius.y }
+      if (handle.corner === 'topLeft') {return { x: targetShape.left + canvasRadius.x, y: targetShape.top + canvasRadius.y }}
+      if (handle.corner === 'topRight') {return { x: x1 - canvasRadius.x, y: targetShape.top + canvasRadius.y }}
+      if (handle.corner === 'bottomRight') {return { x: x1 - canvasRadius.x, y: y1 - canvasRadius.y }}
       return { x: targetShape.left + canvasRadius.x, y: y1 - canvasRadius.y }
     }
 
@@ -6504,7 +6506,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   const dragPointForTarget = (target: DragTarget, rawPoint: Point) => {
     const origin = target.dragOrigin
-    if (!origin) return rawPoint
+    if (!origin) {return rawPoint}
 
     return {
       x: origin.handle.x + rawPoint.x - origin.pointer.x,
@@ -6519,7 +6521,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   ) => {
     const guides = handles.map((handle) => {
       const point = guidePointForHandle(targetShape, handle, circleAngle)
-      if (!point) return emptySnapGuides()
+      if (!point) {return emptySnapGuides()}
 
       if (targetShape.kind === 'inset' && handle.kind === 'inset-radius') {
         const { x0, y0, x1, y1, width, height } = insetBox(targetShape)
@@ -6537,7 +6539,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const handlePresetTypeahead = (key: string) => {
-    if (key.length !== 1) return false
+    if (key.length !== 1) {return false}
 
     if (presetTypeaheadTimerRef.current !== null) {
       window.clearTimeout(presetTypeaheadTimerRef.current)
@@ -6553,14 +6555,14 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     const startIndex = (activePresetIndex + 1) % PRESET_NAMES.length
     const orderedNames = [...PRESET_NAMES.slice(startIndex), ...PRESET_NAMES.slice(0, startIndex)]
     const match = orderedNames.find((name) => name.toLowerCase().startsWith(query))
-    if (!match) return true
+    if (!match) {return true}
 
     setActivePresetIndex(PRESET_NAMES.indexOf(match))
     return true
   }
 
   const onPresetButtonKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (e.altKey || e.ctrlKey || e.metaKey) return
+    if (e.altKey || e.ctrlKey || e.metaKey) {return}
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -6648,7 +6650,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const moveHandleWithKeyboard = (handle: HandleTarget, key: string, modifiers: KeyboardModifiers) => {
-    if (!isArrowKey(key)) return false
+    if (!isArrowKey(key)) {return false}
 
     const currentShape = shapeRef.current
     const currentCss = latestCssRef.current
@@ -6671,7 +6673,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     const angleChanged = typeof result.circleRadiusAngle === 'number' &&
       Math.abs(result.circleRadiusAngle - circleRadiusAngleRef.current) > 0.0001
 
-    if (!shapeChanged && !angleChanged) return false
+    if (!shapeChanged && !angleChanged) {return false}
 
     if (formatClipPath(result.shape) !== currentCss) {
       markLocalShapeChange()
@@ -6698,13 +6700,13 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   const moveShapeWithKeyboard = (key: ArrowKey) => {
     const currentShape = shapeRef.current
-    if (currentShape.kind !== 'shape') return false
+    if (currentShape.kind !== 'shape') {return false}
 
     const bounds = shapeCssBounds(currentShape)
-    if (!bounds) return false
+    if (!bounds) {return false}
 
     const delta = arrowDelta(key, spaceKeyPressedRef.current ? KEYBOARD_FAST_STEP : KEYBOARD_STEP)
-    if (!delta) return false
+    if (!delta) {return false}
 
     const fitMode: ShapeFitMode = shapeFitModeRef.current === 'contain' || hasContainerQueryUnit(currentShape.value)
       ? 'contain'
@@ -6718,7 +6720,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           currentShapeScaleOptions(),
           (point) => ({ x: point.x + delta.x, y: point.y + delta.y }),
         )
-    if (!next || shapesEqual(currentShape, next)) return false
+    if (!next || shapesEqual(currentShape, next)) {return false}
 
     const nextBounds = shapeCssBounds(next)
     showSnapGuides(nextBounds ? shapeSnapGuidesForBounds(nextBounds) : emptySnapGuides())
@@ -6755,7 +6757,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const startKeyboardMoveLoop = () => {
-    if (keyboardMoveDelayTimerRef.current !== null || keyboardMoveTimerRef.current !== null) return
+    if (keyboardMoveDelayTimerRef.current !== null || keyboardMoveTimerRef.current !== null) {return}
     keyboardMoveDelayTimerRef.current = window.setTimeout(() => {
       keyboardMoveDelayTimerRef.current = null
       runKeyboardMoveTick()
@@ -6807,15 +6809,15 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   useEffect(() => {
     const updateShapeTransformDrag = (e: PointerEvent) => {
       const drag = shapeTransformDragRef.current
-      if (!drag) return false
-      if (e.pointerId !== drag.pointerId) return true
+      if (!drag) {return false}
+      if (e.pointerId !== drag.pointerId) {return true}
 
       const point = canvasPointFromClient(e.clientX, e.clientY)
-      if (!point) return true
+      if (!point) {return true}
 
       updateKeyboardModifierRefs(e)
       const next = shapeFromTransformDrag(drag, point, keyboardModifiersRef.current)
-      if (!next || shapesEqual(shapeRef.current, next)) return true
+      if (!next || shapesEqual(shapeRef.current, next)) {return true}
 
       markLocalShapeChange()
       shapeRef.current = next
@@ -6826,11 +6828,11 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
     const updatePolygonSelectionDrag = (e: PointerEvent) => {
       const selection = polygonSelectionDragRef.current
-      if (!selection) return false
-      if (e.pointerId !== selection.pointerId) return true
+      if (!selection) {return false}
+      if (e.pointerId !== selection.pointerId) {return true}
 
       const point = canvasPointFromClient(e.clientX, e.clientY)
-      if (!point) return true
+      if (!point) {return true}
 
       selection.current = point
       const dx = e.clientX - selection.startClient.x
@@ -6849,12 +6851,12 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     }
 
     const onMove = (e: PointerEvent) => {
-      if (shapeTransformDragRef.current && updateShapeTransformDrag(e)) return
-      if (polygonSelectionDragRef.current && updatePolygonSelectionDrag(e)) return
+      if (shapeTransformDragRef.current && updateShapeTransformDrag(e)) {return}
+      if (polygonSelectionDragRef.current && updatePolygonSelectionDrag(e)) {return}
 
       let target = dragTargetRef.current
-      if (!target || !canvasRef.current) return
-      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return
+      if (!target || !canvasRef.current) {return}
+      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {return}
       if (e.pointerType === 'mouse' && e.buttons === 0) {
         finishDrag()
         return
@@ -6942,35 +6944,35 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     const onUp = (e: PointerEvent) => {
       const shapeTransform = shapeTransformDragRef.current
       if (shapeTransform) {
-        if (e.pointerId !== shapeTransform.pointerId) return
+        if (e.pointerId !== shapeTransform.pointerId) {return}
         updateShapeTransformDrag(e)
         finishShapeTransformDrag(true)
         return
       }
       const selection = polygonSelectionDragRef.current
       if (selection) {
-        if (e.pointerId !== selection.pointerId) return
+        if (e.pointerId !== selection.pointerId) {return}
         updatePolygonSelectionDrag(e)
         finishPolygonSelectionDrag(true)
         return
       }
-      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return
+      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {return}
       finishDrag(true, e)
     }
     const onCancel = (e: PointerEvent) => {
       const shapeTransform = shapeTransformDragRef.current
       if (shapeTransform) {
-        if (e.pointerId !== shapeTransform.pointerId) return
+        if (e.pointerId !== shapeTransform.pointerId) {return}
         finishShapeTransformDrag(false)
         return
       }
       const selection = polygonSelectionDragRef.current
       if (selection) {
-        if (e.pointerId !== selection.pointerId) return
+        if (e.pointerId !== selection.pointerId) {return}
         finishPolygonSelectionDrag(false)
         return
       }
-      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return
+      if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {return}
       finishDrag(false, e)
     }
     const onBlur = () => {
@@ -7003,10 +7005,10 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }, [])
 
   useEffect(() => {
-    if (!isPresetOpen) return
+    if (!isPresetOpen) {return}
 
     const onPointerDown = (event: MouseEvent) => {
-      if (presetDropdownRef.current?.contains(event.target as Node)) return
+      if (presetDropdownRef.current?.contains(event.target as Node)) {return}
       closePresetDropdown()
     }
 
@@ -7015,10 +7017,10 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }, [isPresetOpen])
 
   useEffect(() => {
-    if (!isClipPathLabelMenuOpen) return
+    if (!isClipPathLabelMenuOpen) {return}
 
     const onPointerDown = (event: MouseEvent) => {
-      if (clipPathLabelRef.current?.contains(event.target as Node)) return
+      if (clipPathLabelRef.current?.contains(event.target as Node)) {return}
       setIsClipPathLabelMenuOpen(false)
     }
 
@@ -7027,14 +7029,14 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }, [isClipPathLabelMenuOpen])
 
   useEffect(() => {
-    if (!isShortcutHelpOpen) return
+    if (!isShortcutHelpOpen) {return}
 
     const onPointerDown = (event: MouseEvent) => {
-      if (shortcutHelpRef.current?.contains(event.target as Node)) return
+      if (shortcutHelpRef.current?.contains(event.target as Node)) {return}
       setIsShortcutHelpOpen(false)
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsShortcutHelpOpen(false)
+      if (event.key === 'Escape') {setIsShortcutHelpOpen(false)}
     }
 
     document.addEventListener('mousedown', onPointerDown)
@@ -7047,13 +7049,13 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
-      if ((!selectedHandleRef.current && !isShapeTransformSelectedRef.current) || dragTargetRef.current || shapeTransformDragRef.current) return
+      if ((!selectedHandleRef.current && !isShapeTransformSelectedRef.current) || dragTargetRef.current || shapeTransformDragRef.current) {return}
       const target = event.target
-      if (target instanceof Element && target.closest('.clip-path_handle')) return
-      if (target instanceof Element && target.closest('.clip-path_shape-move')) return
-      if (target instanceof Element && target.closest('.clip-path_shape-resize')) return
-      if (target instanceof Element && target.closest('.code-editor')) return
-      if (isShapeTransformSelectedRef.current) setShapeTransformSelection(false)
+      if (target instanceof Element && target.closest('.clip-path_handle')) {return}
+      if (target instanceof Element && target.closest('.clip-path_shape-move')) {return}
+      if (target instanceof Element && target.closest('.clip-path_shape-resize')) {return}
+      if (target instanceof Element && target.closest('.code-editor')) {return}
+      if (isShapeTransformSelectedRef.current) {setShapeTransformSelection(false)}
       selectHandle(null)
     }
 
@@ -7065,10 +7067,10 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     const updateBounds = () => {
       const canvas = canvasRef.current
       const wrap = canvasWrapRef.current
-      if (!canvas || !wrap) return
+      if (!canvas || !wrap) {return}
 
       const canvasRect = canvas.getBoundingClientRect()
-      if (canvasRect.width <= 0 || canvasRect.height <= 0) return
+      if (canvasRect.width <= 0 || canvasRect.height <= 0) {return}
       const nextSize = { width: canvasRect.width, height: canvasRect.height }
       setCanvasSize((current) => (
         current &&
@@ -7095,8 +7097,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     let observer: ResizeObserver | null = null
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(updateBounds)
-      if (canvasRef.current) observer.observe(canvasRef.current)
-      if (canvasWrapRef.current) observer.observe(canvasWrapRef.current)
+      if (canvasRef.current) {observer.observe(canvasRef.current)}
+      if (canvasWrapRef.current) {observer.observe(canvasWrapRef.current)}
     }
 
     window.addEventListener('resize', updateBounds)
@@ -7107,7 +7109,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }, [])
 
   useLayoutEffect(() => {
-    if (!isPresetOpen) return
+    if (!isPresetOpen) {return}
 
     const list = presetListRef.current
     const selectedOption = list?.querySelector<HTMLElement>('[aria-selected="true"]')
@@ -7145,10 +7147,10 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
         return
       }
 
-      if (!mod) return
+      if (!mod) {return}
 
       if (key === 'd' && !e.shiftKey) {
-        if (duplicateSelectedPolygonPoint()) e.preventDefault()
+        if (duplicateSelectedPolygonPoint()) {e.preventDefault()}
         return
       }
 
@@ -7173,7 +7175,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       if (!next) {
         const fitMode = shapeFitModeRef.current
         const nextShape = parseClipboardSvgShape(text, html, fitMode)
-        if (!nextShape) return
+        if (!nextShape) {return}
 
         event.preventDefault()
         event.stopPropagation()
@@ -7201,8 +7203,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     ))
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (handledKeyboardEventsRef.current.has(e)) return
-      if (e.metaKey || e.ctrlKey || isPresetOpenRef.current) return
+      if (handledKeyboardEventsRef.current.has(e)) {return}
+      if (e.metaKey || e.ctrlKey || isPresetOpenRef.current) {return}
 
       const target = e.target as HTMLElement | null
       const handle = selectedHandleRef.current
@@ -7218,9 +7220,9 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
         return
       }
 
-      if ((!handle && !shapeSelected) || shouldIgnore) return
+      if ((!handle && !shapeSelected) || shouldIgnore) {return}
 
-      if (isHandleTarget && (isSpaceKey(e.key, e.code) || isArrowKey(e.key))) return
+      if (isHandleTarget && (isSpaceKey(e.key, e.code) || isArrowKey(e.key))) {return}
 
       updateKeyboardModifierRefs(e)
 
@@ -7230,7 +7232,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
         return
       }
 
-      if (!isArrowKey(e.key)) return
+      if (!isArrowKey(e.key)) {return}
 
       e.preventDefault()
       if (handle) {
@@ -7241,7 +7243,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     }
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (handledKeyboardEventsRef.current.has(e)) return
+      if (handledKeyboardEventsRef.current.has(e)) {return}
       const target = e.target as HTMLElement | null
       const isHandleTarget = target instanceof Element && Boolean(target.closest('.clip-path_handle'))
 
@@ -7251,16 +7253,16 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
         return
       }
 
-      if (isHandleTarget && (isSpaceKey(e.key, e.code) || isArrowKey(e.key))) return
+      if (isHandleTarget && (isSpaceKey(e.key, e.code) || isArrowKey(e.key))) {return}
 
       if (isSpaceKey(e.key, e.code)) {
         spaceKeyPressedRef.current = false
-        if (selectedHandleRef.current || isShapeTransformSelectedRef.current) e.preventDefault()
+        if (selectedHandleRef.current || isShapeTransformSelectedRef.current) {e.preventDefault()}
         return
       }
 
       updateKeyboardModifierRefs(e)
-      if (!isArrowKey(e.key)) return
+      if (!isArrowKey(e.key)) {return}
 
       releaseKeyboardMoveKey(e.key, e)
     }
@@ -7323,7 +7325,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
     const readSelectedElement = async (element: unknown | null, options: SelectionReadOptions = {}) => {
       const force = options.force ?? false
-      if (selectionReadInProgressRef.current && !force && !options.resetStyle) return
+      if (selectionReadInProgressRef.current && !force && !options.resetStyle) {return}
       selectionReadInProgressRef.current = true
       const readSeq = ++selectionReadSeqRef.current
       const nextElementKey = selectedElementKey(element)
@@ -7361,7 +7363,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       }
 
       if (!element) {
-        if (debugRead) debugClipPath('readSelectedElement:no-element')
+        if (debugRead) {debugClipPath('readSelectedElement:no-element')}
         if (!cancelled && readSeq === selectionReadSeqRef.current) {
           setElementClassNames([])
           selectedClassNamesRef.current = []
@@ -7378,8 +7380,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       try {
         const styleOptions = styleOptionsForBreakpoint(activeBreakpointRef.current)
         const styles = await getElementPrimaryStyleHandles(element)
-        if (cancelled) return
-        if (readSeq !== selectionReadSeqRef.current) return
+        if (cancelled) {return}
+        if (readSeq !== selectionReadSeqRef.current) {return}
 
         let selectedStyle = await findClipPathStyle(styles, styleOptions)
         const classNames = await getElementClassNames(element, styles)
@@ -7415,8 +7417,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           }
           const classLookup = await getClassStyleHandlesWithDiagnostics(classNames, webflow as unknown as WebflowStyleLookup)
           const classStyles = classLookup.styles
-          if (cancelled) return
-          if (readSeq !== selectionReadSeqRef.current) return
+          if (cancelled) {return}
+          if (readSeq !== selectionReadSeqRef.current) {return}
 
           let classSelectedStyle: Awaited<ReturnType<typeof findClipPathStyle>> | null = null
           if (classStyles.length) {
@@ -7437,8 +7439,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
             })
           }
         }
-        if (cancelled) return
-        if (readSeq !== selectionReadSeqRef.current) return
+        if (cancelled) {return}
+        if (readSeq !== selectionReadSeqRef.current) {return}
 
         let writeStyleHandle: StyleHandle | null = null
         let originOverride: ClipPathStyleOrigin | null = null
@@ -7470,8 +7472,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
         // just on element change.
         if (selectionIsDefaultRef.current) {
           const winner = await getCascadeWinner()
-          if (cancelled) return
-          if (readSeq !== selectionReadSeqRef.current) return
+          if (cancelled) {return}
+          if (readSeq !== selectionReadSeqRef.current) {return}
           const defaultSelection = winner ? winner.namePath.filter((name) => classNames.includes(name)) : []
           if (winner) {
             selectedStyle = { style: winner.style, raw: winner.raw, breakpoint: winner.breakpoint }
@@ -7495,12 +7497,12 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           // path-verified so we never grab a combo whose leaf name merely
           // matches, and never the element's own most-specific combo handle.
           const targetStyle = await findStyleForClassPath(selNames, webflow as unknown as WebflowStyleLookup)
-          if (cancelled) return
-          if (readSeq !== selectionReadSeqRef.current) return
+          if (cancelled) {return}
+          if (readSeq !== selectionReadSeqRef.current) {return}
 
           const targetDecl = targetStyle ? await readClipPathDeclarationWithSource(targetStyle, styleOptions) : null
-          if (cancelled) return
-          if (readSeq !== selectionReadSeqRef.current) return
+          if (cancelled) {return}
+          if (readSeq !== selectionReadSeqRef.current) {return}
 
           if (targetStyle && hasClipPathDeclaration(targetDecl?.value)) {
             writeStyleHandle = targetStyle
@@ -7511,7 +7513,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
             // effective one → inherited. Paint the orange label + the cheap
             // effective value INSTANTLY; resolve the exact cascade winner (slower)
             // afterward and only re-read if it actually differs.
-            if (targetStyle) writeStyleHandle = targetStyle
+            if (targetStyle) {writeStyleHandle = targetStyle}
             originOverride = 'inherited'
             if (!cancelled && readSeq === selectionReadSeqRef.current) {
               setClipPathStyleOrigin('inherited')
@@ -7529,14 +7531,14 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
             }
           } else {
             // Nothing renders → none on the (writable) selected class.
-            if (targetStyle) writeStyleHandle = targetStyle
+            if (targetStyle) {writeStyleHandle = targetStyle}
             loadNoneForWritableStyle(targetStyle, force)
             return
           }
         }
 
         if (!selectedStyle) {
-          if (debugRead) debugClipPath('readSelectedElement:result-none-no-style')
+          if (debugRead) {debugClipPath('readSelectedElement:result-none-no-style')}
           loadNoneIfChanged(force)
           return
         }
@@ -7601,8 +7603,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           shapesClose(normalized.shape, rawShapeSvgCache.contain)
           ? shapeSvgCache.contain
           : normalized.shape
-        if (cancelled) return
-        if (readSeq !== selectionReadSeqRef.current) return
+        if (cancelled) {return}
+        if (readSeq !== selectionReadSeqRef.current) {return}
 
         // An inherited class just painted its cheap effective value. Resolve the
         // exact cascade winner in the background; cache it and, if it actually
@@ -7612,7 +7614,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           const refineKey = inheritedWinnerRefineKey
           void (async () => {
             const winner = await resolveCascadeWinnerClipPathStyle(classNames, styles, styleOptions, webflow as unknown as WebflowStyleLookup)
-            if (cancelled || readSeq !== selectionReadSeqRef.current) return
+            if (cancelled || readSeq !== selectionReadSeqRef.current) {return}
             cascadeWinnerCacheRef.current = { key: refineKey, winner }
             const winnerCss = winner ? normalizeClipPathValue(winner.raw).css : null
             if (winnerCss && winnerCss !== lastWrittenRef.current) {
@@ -7642,9 +7644,9 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           pastedShapeSvgCacheRef.current = shapeSvgCache
         }
       } catch (error) {
-        if (debugRead) debugClipPath('readSelectedElement:error', error)
+        if (debugRead) {debugClipPath('readSelectedElement:error', error)}
         if (!cancelled && readSeq === selectionReadSeqRef.current) {
-          if (force) loadNoneIfChanged(force)
+          if (force) {loadNoneIfChanged(force)}
         }
       } finally {
         if (readSeq === selectionReadSeqRef.current) {
@@ -7657,7 +7659,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       try {
         await readSelectedElement(await webflow.getSelectedElement(), options)
       } catch {
-        if (!cancelled && options.force) loadNoneIfChanged(options.force)
+        if (!cancelled && options.force) {loadNoneIfChanged(options.force)}
       }
     }
 
@@ -7692,7 +7694,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     })
 
     const styleRefreshTimer = window.setInterval(() => {
-      if (selectionReadInProgressRef.current) return
+      if (selectionReadInProgressRef.current) {return}
       void readCurrentSelectedElement()
     }, STYLE_REFRESH_MS)
 
@@ -7730,20 +7732,20 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       localWritePendingRef.current = false
       return
     }
-    if (writeTimerRef.current !== null) return
+    if (writeTimerRef.current !== null) {return}
 
     const flush = async () => {
       const valueToWrite = latestCssRef.current
       writeTimerRef.current = null
-      if (lastWrittenRef.current === valueToWrite) return
+      if (lastWrittenRef.current === valueToWrite) {return}
 
       // Embedded mode: the parent style panel owns the write target (the user's
       // selected selector + breakpoint), so hand it the raw value and skip all of the
       // tool's own class/style resolution.
       if (onApplyRef.current) {
         try {
-          if (isNoneClipPathValue(valueToWrite)) onClearRef.current?.()
-          else onApplyRef.current(valueToWrite)
+          if (isNoneClipPathValue(valueToWrite)) {onClearRef.current?.()}
+          else {onApplyRef.current(valueToWrite)}
         } catch { /* parent write failed — next change retries */ }
         lastWrittenRef.current = valueToWrite
         setClipPathStyleOrigin(isNoneClipPathValue(valueToWrite) ? 'none' : 'current')
@@ -7762,7 +7764,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           // Class-selection mode: write to the exact selected class/combo,
           // creating it if it doesn't exist — never the element's own combo.
           targetStyle = await resolveOrCreateStyleForClassPath(selNames, webflow as unknown as WebflowStyleEditor)
-          if (targetStyle) styleRef.current = targetStyle
+          if (targetStyle) {styleRef.current = targetStyle}
         } else if (!selNames.length && !canWriteClipPathValue(targetStyle, valueToWrite) && typeof webflow !== 'undefined') {
           const webflowApi = webflow as unknown as WebflowSelectionApi
           targetStyle = await resolveWritableClipPathStyleForElement(
@@ -7771,7 +7773,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
             valueToWrite,
             styleOptionsForBreakpoint(activeBreakpointRef.current),
           )
-          if (targetStyle) styleRef.current = targetStyle
+          if (targetStyle) {styleRef.current = targetStyle}
         }
 
         if (!canWriteClipPathValue(targetStyle, valueToWrite)) {
@@ -7781,7 +7783,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
         if (targetStyle) {
           const shapeSvgCache = matchingPastedSvgCacheForShape(shapeRef.current)
-          if (shapeSvgCache) pastedShapeSvgCacheRef.current = shapeSvgCache
+          if (shapeSvgCache) {pastedShapeSvgCacheRef.current = shapeSvgCache}
           await writeClipPathToStyle(targetStyle, valueToWrite, {
             shapeSvgCache,
             styleOptions: styleOptionsForBreakpoint(activeBreakpointRef.current),
@@ -7833,8 +7835,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   const activePresetOptionId = presetOptionId(activePresetOptionName)
   const handleDisplayColorClass = (handle: HandleTarget) => {
     const codeColorClass = codeHandleColorClasses.get(handleKey(handle))
-    if (codeColorClass) return codeColorClass
-    if (handle.kind === 'polygon-point') return polygonPointColorClass(handle.index, polygonPointColors)
+    if (codeColorClass) {return codeColorClass}
+    if (handle.kind === 'polygon-point') {return polygonPointColorClass(handle.index, polygonPointColors)}
     if (handle.kind === 'inset-radius' && shape.kind === 'inset' && !hasRoundedCorners(shape.radii)) {
       return HANDLE_COLOR_CLASSES[4]
     }
@@ -7853,14 +7855,14 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   )
 
   const onAddPoint = (e: React.MouseEvent) => {
-    if (!canvasRef.current || shape.kind !== 'polygon') return
+    if (!canvasRef.current || shape.kind !== 'polygon') {return}
     markLocalShapeChange()
     const rect = canvasRef.current.getBoundingClientRect()
     const x = ((e.clientX - rect.left) / rect.width) * 100
     const y = ((e.clientY - rect.top) / rect.height) * 100
     insertPolygonPointColor(shape.points.length, shape.points.length)
     setShape((current) => {
-      if (current.kind !== 'polygon') return current
+      if (current.kind !== 'polygon') {return current}
       const next: ClipShape = { kind: 'polygon', points: [...current.points, { x, y }] }
       shapeRef.current = next
       commit(next)
@@ -7870,7 +7872,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const onRemovePoint = (index: number) => {
-    if (shape.kind !== 'polygon' || shape.points.length <= 3) return
+    if (shape.kind !== 'polygon' || shape.points.length <= 3) {return}
     const indexesToDelete = new Set([index])
     const previousOldIndex = previousSurvivingPolygonIndex(shape.points.length, indexesToDelete, index)
     const previousNewIndex = previousOldIndex === null
@@ -7893,17 +7895,17 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     setShape(next)
     commit(next)
     setActivePreset('Polygon')
-    if (nextSelectedHandle) focusSelectedHandle()
+    if (nextSelectedHandle) {focusSelectedHandle()}
   }
 
   const beginPolygonSelectionDrag = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return
-    if (dragTargetRef.current || polygonSelectionDragRef.current) return
-    if (shapeRef.current.kind !== 'polygon') return
-    if (e.target instanceof Element && e.target.closest('.clip-path_handle')) return
+    if (e.pointerType === 'mouse' && e.button !== 0) {return}
+    if (dragTargetRef.current || polygonSelectionDragRef.current) {return}
+    if (shapeRef.current.kind !== 'polygon') {return}
+    if (e.target instanceof Element && e.target.closest('.clip-path_handle')) {return}
 
     const start = canvasPointFromClient(e.clientX, e.clientY)
-    if (!start) return
+    if (!start) {return}
 
     cancelPendingSelectionRead()
     closePresetDropdown()
@@ -7938,16 +7940,16 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     mode: ShapeTransformDrag['mode'],
     corner?: ShapeResizeCorner,
   ) => (e: React.PointerEvent<HTMLElement>) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return
-    if (dragTargetRef.current || polygonSelectionDragRef.current || shapeTransformDragRef.current) return
+    if (e.pointerType === 'mouse' && e.button !== 0) {return}
+    if (dragTargetRef.current || polygonSelectionDragRef.current || shapeTransformDragRef.current) {return}
 
     const currentShape = shapeRef.current
-    if (currentShape.kind !== 'shape') return
-    if (shapeFitModeRef.current === 'stretch' && !hasContainerQueryUnit(currentShape.value)) return
+    if (currentShape.kind !== 'shape') {return}
+    if (shapeFitModeRef.current === 'stretch' && !hasContainerQueryUnit(currentShape.value)) {return}
 
     const start = canvasPointFromClient(e.clientX, e.clientY)
     const bounds = shapeCssBounds(currentShape)
-    if (!start || !bounds) return
+    if (!start || !bounds) {return}
 
     e.preventDefault()
     e.stopPropagation()
@@ -7984,9 +7986,9 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const beginDrag = (target: DragTarget) => (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return
+    if (e.pointerType === 'mouse' && e.button !== 0) {return}
     const pointerStart = canvasPointFromClient(e.clientX, e.clientY)
-    if (!pointerStart) return
+    if (!pointerStart) {return}
 
     e.preventDefault()
     cancelPendingSelectionRead()
@@ -8044,7 +8046,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       return
     }
 
-    if (!isArrowKey(e.key) || e.metaKey || e.ctrlKey) return
+    if (!isArrowKey(e.key) || e.metaKey || e.ctrlKey) {return}
     handledKeyboardEventsRef.current.add(e.nativeEvent)
     stopKeyboardEvent(e)
     pressKeyboardMoveKey(handle, e.key, e)
@@ -8059,7 +8061,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     }
 
     updateKeyboardModifierRefs(e)
-    if (!isArrowKey(e.key)) return
+    if (!isArrowKey(e.key)) {return}
 
     handledKeyboardEventsRef.current.add(e.nativeEvent)
     stopKeyboardEvent(e)
@@ -8073,11 +8075,11 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   const insetRadii = shape.kind === 'inset' ? shape.radii : makeInsetRadii(0)
   const insetRadiusHandlePosition = (corner: CornerName) => {
     const radius = insetRadii[corner]
-    if (shape.kind !== 'inset') return { x: 0, y: 0 }
+    if (shape.kind !== 'inset') {return { x: 0, y: 0 }}
     const canvasRadius = insetRadiusToCanvas(shape, radius)
-    if (corner === 'topLeft') return { x: shape.left + canvasRadius.x, y: shape.top + canvasRadius.y }
-    if (corner === 'topRight') return { x: 100 - shape.right - canvasRadius.x, y: shape.top + canvasRadius.y }
-    if (corner === 'bottomRight') return { x: 100 - shape.right - canvasRadius.x, y: 100 - shape.bottom - canvasRadius.y }
+    if (corner === 'topLeft') {return { x: shape.left + canvasRadius.x, y: shape.top + canvasRadius.y }}
+    if (corner === 'topRight') {return { x: 100 - shape.right - canvasRadius.x, y: shape.top + canvasRadius.y }}
+    if (corner === 'bottomRight') {return { x: 100 - shape.right - canvasRadius.x, y: 100 - shape.bottom - canvasRadius.y }}
     return { x: shape.left + canvasRadius.x, y: 100 - shape.bottom - canvasRadius.y }
   }
   const circleRadiusHandleX = shape.kind === 'circle'
@@ -8325,7 +8327,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
         onChange={(event) => apply(event.target.value)}
         onBlur={(event) => {
           const formatted = formatShapeVariableName(event.target.value)
-          if (event.target.value !== formatted) apply(formatted)
+          if (event.target.value !== formatted) {apply(formatted)}
         }}
         placeholder={placeholder}
         spellCheck={false}
@@ -8589,7 +8591,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
                 ]
                 return handles.map((handle) => {
                   const point = rawEditableHandleCssPoint(shape.editable!, handle)
-                  if (!point) return null
+                  if (!point) {return null}
                   return (
                     <button
                       key={handle.kind}
@@ -8615,7 +8617,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
                 { kind: 'inset-left' },
               ] as HandleTarget[]).map((handle) => {
                 const point = rawEditableHandleCssPoint(shape.editable!, handle)
-                if (!point) return null
+                if (!point) {return null}
                 return (
                   <button
                     key={handle.kind}
@@ -8632,7 +8634,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
               {shape.editable.radii ? CORNERS.map((corner) => {
                 const handle: HandleTarget = { kind: 'inset-radius', corner }
                 const point = rawEditableHandleCssPoint(shape.editable!, handle)
-                if (!point) return null
+                if (!point) {return null}
                 return (
                   <button
                     key={corner}

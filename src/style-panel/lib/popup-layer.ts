@@ -21,12 +21,12 @@ const layers: Layer[] = []
  * the returned cleanup when it closes.
  */
 export function registerPopupLayer(el: HTMLElement | null, anchor: HTMLElement | null): () => void {
-  if (!el) return () => {}
+  if (!el) {return () => {}}
   const layer: Layer = { el, anchor: anchor ?? null }
   layers.push(layer)
   return () => {
     const i = layers.indexOf(layer)
-    if (i >= 0) layers.splice(i, 1)
+    if (i >= 0) {layers.splice(i, 1)}
   }
 }
 
@@ -41,14 +41,14 @@ export function hasOwnedPopup(root: HTMLElement | null): boolean {
  * field in a popover opened from a layer row still counts as inside the layer row.
  */
 export function inOwnedPopup(target: Node | null, root: HTMLElement | null): boolean {
-  if (!target || !root) return false
+  if (!target || !root) {return false}
   const seen = new Set<Layer>()
   let layer = layers.find((l) => l.el.contains(target))
   while (layer && !seen.has(layer)) {
     seen.add(layer)
     const anchor = layer.anchor
-    if (!anchor) return false
-    if (root.contains(anchor)) return true
+    if (!anchor) {return false}
+    if (root.contains(anchor)) {return true}
     layer = layers.find((l) => l !== layer && l.el.contains(anchor))
   }
   return false

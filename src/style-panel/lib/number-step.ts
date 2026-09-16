@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Number editing for every numeric field in the tool: arrow-key stepping and
 // pointer scrubbing, sharing one set of step sizes so both gestures agree.
 //
@@ -36,10 +38,10 @@ const ROOT_PX = 16
 const NUMBER_UNIT_RE = /([-+]?(?:\d+\.?\d*|\.\d+))([a-zA-Z%]*)/g
 
 function stepSizeFor(mode: StepMode, unit: string): number {
-  if (mode === 'ten') return 10
-  if (mode === 'whole') return 1
+  if (mode === 'ten') {return 10}
+  if (mode === 'whole') {return 1}
   // Fine step (Alt): rem keeps a 1px-equivalent nudge; every other unit steps 0.1.
-  if (unit === 'rem') return 1 / ROOT_PX
+  if (unit === 'rem') {return 1 / ROOT_PX}
   return 0.1
 }
 
@@ -72,9 +74,9 @@ function numberRuns(text: string): NumberRun[] {
  */
 export function stepNumberAtCaret(text: string, caret: number, dir: 1 | -1, mode: StepMode, min?: number): { text: string; caret: number } | null {
   const hit = numberRuns(text).find((run) => caret >= run.start && caret <= run.end)
-  if (!hit) return null
+  if (!hit) {return null}
   const num = Number.parseFloat(hit.raw)
-  if (!Number.isFinite(num)) return null
+  if (!Number.isFinite(num)) {return null}
   const stepped = snapStep(num, stepSizeFor(mode, hit.unit.toLowerCase()), dir)
   const nextStr = String(min != null && stepped < min ? min : stepped)
   // Keep the caret where it was: end of the new number if it was in the number,
@@ -106,7 +108,7 @@ const SCRUB_UNITS = new Set([
 // captured into the number itself, so a hyphen here is never a sign.
 function isScrubbable(text: string, run: NumberRun): boolean {
   const before = text[run.start - 1]
-  if (before !== undefined && /[\w#-]/.test(before)) return false
+  if (before !== undefined && /[\w#-]/.test(before)) {return false}
   return SCRUB_UNITS.has(run.unit.toLowerCase())
 }
 
@@ -119,7 +121,7 @@ function isScrubbable(text: string, run: NumberRun): boolean {
 export function findScrubTarget(text: string, caret: number): NumberRun | null {
   const runs = numberRuns(text).filter((run) => isScrubbable(text, run))
   const under = runs.find((run) => caret >= run.start && caret <= run.end)
-  if (under) return under
+  if (under) {return under}
   let best: NumberRun | null = null
   let bestDistance = Infinity
   for (const run of runs) {
@@ -143,7 +145,7 @@ export function hasScrubTarget(text: string): boolean {
  */
 export function scrubNumber(text: string, run: NumberRun, steps: number, mode: StepMode): string {
   const base = Number.parseFloat(run.raw)
-  if (!Number.isFinite(base)) return text
+  if (!Number.isFinite(base)) {return text}
   const next = Math.round((base + steps * stepSizeFor(mode, run.unit.toLowerCase())) * 1e5) / 1e5
   return text.slice(0, run.start) + String(next) + text.slice(run.numEnd)
 }
@@ -162,7 +164,7 @@ export function handleArrowStep(
   event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>,
   min?: number,
 ): { text: string; caret: number } | null {
-  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return null
+  if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {return null}
   const el = event.currentTarget
   return stepNumberAtCaret(el.value, el.selectionStart ?? el.value.length, event.key === 'ArrowUp' ? 1 : -1, stepModeOf(event), min)
 }

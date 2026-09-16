@@ -25,13 +25,13 @@ export default function DragSlider({ value, min, max, disabled = false, ariaLabe
   const trackRef = useRef<HTMLDivElement>(null)
   const [local, setLocal] = useState(value)
   const dragging = useRef(false)
-  useEffect(() => { if (!dragging.current) setLocal(value) }, [value])
+  useEffect(() => { if (!dragging.current) {setLocal(value)} }, [value])
 
   const valueAt = (clientX: number): number => {
     const track = trackRef.current
-    if (!track) return local
+    if (!track) {return local}
     const rect = track.getBoundingClientRect()
-    if (rect.width <= 0) return local
+    if (rect.width <= 0) {return local}
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
     return Math.round(min + ratio * (max - min))
   }
@@ -46,7 +46,7 @@ export default function DragSlider({ value, min, max, disabled = false, ariaLabe
   const rafId = useRef<number | null>(null)
   const latestX = useRef(0)
   const lastWriteAt = useRef(0)
-  useEffect(() => () => { if (rafId.current != null) cancelAnimationFrame(rafId.current) }, [])
+  useEffect(() => () => { if (rafId.current != null) {cancelAnimationFrame(rafId.current)} }, [])
 
   const frame = () => {
     rafId.current = null
@@ -57,7 +57,7 @@ export default function DragSlider({ value, min, max, disabled = false, ariaLabe
     if (now - lastWriteAt.current >= WRITE_MS) { lastWriteAt.current = now; onInput(next) }
   }
   const down = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (disabled) return
+    if (disabled) {return}
     event.preventDefault()
     event.currentTarget.focus()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -70,26 +70,26 @@ export default function DragSlider({ value, min, max, disabled = false, ariaLabe
     // Once a drag is in progress (pointer captured), keep tracking even if `disabled`
     // toggles mid-drag: a commit may briefly flip the caller's busy flag, and that must
     // not freeze the thumb. The drag only STARTS when enabled (see `down`).
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {return}
     latestX.current = event.clientX
-    if (rafId.current == null) rafId.current = requestAnimationFrame(frame)
+    if (rafId.current == null) {rafId.current = requestAnimationFrame(frame)}
   }
   const up = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {return}
     event.currentTarget.releasePointerCapture(event.pointerId)
     if (rafId.current != null) { cancelAnimationFrame(rafId.current); rafId.current = null }
     dragging.current = false
     const next = valueAt(event.clientX); setLocal(next); onCommit(next)
   }
   const key = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (disabled) return
+    if (disabled) {return}
     const step = event.shiftKey ? 10 : 1
     let next: number | null = null
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') next = local - step
-    else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') next = local + step
-    else if (event.key === 'Home') next = min
-    else if (event.key === 'End') next = max
-    if (next == null) return
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {next = local - step}
+    else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {next = local + step}
+    else if (event.key === 'Home') {next = min}
+    else if (event.key === 'End') {next = max}
+    if (next == null) {return}
     event.preventDefault()
     const clamped = Math.min(max, Math.max(min, next))
     setLocal(clamped); onCommit(clamped)

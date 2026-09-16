@@ -73,14 +73,14 @@ function ChevronIcon() {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 const joinImportant = (value: string, important: boolean) => (important ? `${value} !important` : value)
 
 type Display = { present: boolean; value: string; important: boolean }
 function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) return { present: false, value: '', important: false }
+  if (!resolved) {return { present: false, value: '', important: false }}
   const source = resolved.source === 'selected' && resolved.selectedValue ? resolved.selectedValue : resolved.winner
   return { present: true, value: source.value, important: source.important }
 }
@@ -100,13 +100,13 @@ function LiveField({ prop, placeholder, ariaLabel, read, busy, setProp, clearPro
   const [draft, setDraft] = useState(external)
   const focused = useRef(false)
   const timer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
+  useEffect(() => { if (!focused.current) {setDraft(external)} }, [external])
   const cancel = () => { if (timer.current != null) { window.clearTimeout(timer.current); timer.current = null } }
   useEffect(() => cancel, [])
   // Undelayed live write for the scrub, which throttles its own — see useScrub.
   const liveNow = (text: string) => {
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed) {return}
     const parsed = parseImportant(trimmed)
     liveSetProp(prop, parsed.value, parsed.important)
   }
@@ -142,7 +142,7 @@ function LiveField({ prop, placeholder, ariaLabel, read, busy, setProp, clearPro
       onKeyDown={(event) => {
         if (event.key === 'Enter') { commitInPlace(event.currentTarget); return }
         const stepped = handleArrowStep(event)
-        if (!stepped) return
+        if (!stepped) {return}
         event.preventDefault()
         const el = event.currentTarget
         el.value = stepped.text
@@ -174,10 +174,10 @@ function PositionCustomField({ read, busy, setProp }: { read: Read; busy: boolea
   const external = d.present ? joinImportant(d.value, d.important) : ''
   const [draft, setDraft] = useState(external)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
+  useEffect(() => { if (!focused.current) {setDraft(external)} }, [external])
   const commit = () => {
     const parsed = parseImportant(draft)
-    if (parsed.value && (parsed.value !== d.value.trim() || parsed.important !== d.important)) setProp('position', parsed.value, parsed.important)
+    if (parsed.value && (parsed.value !== d.value.trim() || parsed.important !== d.important)) {setProp('position', parsed.value, parsed.important)}
   }
   return (
     <VariableConnect ariaLabel="Connect Position to a variable" disabled={busy} prop="position" onPick={(binding) => setProp('position', binding, false)}>
@@ -190,7 +190,7 @@ function PositionCustomField({ read, busy, setProp }: { read: Read; busy: boolea
       onChange={(event) => setDraft(event.target.value)}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; commit() }}
-      onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
       aria-label="Position value"
     />
     </VariableConnect>
@@ -209,7 +209,7 @@ function PositionControl({ read, busy, setProp, liveSetProp }: { read: Read; bus
   // …or until the property goes away. Picking Custom seeds `unset`, so custom mode
   // survives on that value; clearing it from the row label leaves nothing for the
   // free-value field to be about, and it read as "custom value" over an empty field.
-  useEffect(() => { if (!current) setForceCustom(false) }, [current])
+  useEffect(() => { if (!current) {setForceCustom(false)} }, [current])
   const custom = forceCustom || (!!current && !isPreset) || displayOf(read('position')).important
   return (
     <Select
@@ -288,7 +288,7 @@ function InsetPresets({ read, busy, setProp, clearProp }: Props) {
     // `right` stretches between them rather than moving, so a preset that only
     // added sides would give a different result from the one its icon shows.
     const others = INSET_SIDES.filter((side) => !preset.sides.includes(side))
-    if (others.length) clearProp(others as unknown as string[])
+    if (others.length) {clearProp(others as unknown as string[])}
     preset.sides.forEach((side) => setProp(side, '0', false))
   }
 
@@ -373,19 +373,19 @@ function SegmentedIconControl({ prop, ariaLabel, segments, current, busy, setPro
   const focused = useRef(false)
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
   }, [open])
-  useEffect(() => { if (customMode && !focused.current) setDraft(current) }, [customMode, current])
+  useEffect(() => { if (customMode && !focused.current) {setDraft(current)} }, [customMode, current])
   useEffect(() => {
     if (customMode && wantFocus.current && !busy) { wantFocus.current = false; inputRef.current?.focus(); inputRef.current?.select() }
   }, [customMode, busy])
 
-  const pick = (next: string) => { setOpen(false); if (next !== current) setProp(prop, next, false) }
+  const pick = (next: string) => { setOpen(false); if (next !== current) {setProp(prop, next, false)} }
   const enterCustom = () => { setOpen(false); wantFocus.current = true; setProp(prop, 'unset', false) }
   const commitCustom = () => {
     const trimmed = draft.trim()
@@ -409,7 +409,7 @@ function SegmentedIconControl({ prop, ariaLabel, segments, current, busy, setPro
           onChange={(event) => { setDraft(event.target.value); const t = event.target.value.trim(); if (t) { const p = parseImportant(t); liveSetProp(prop, p.value, p.important) } }}
           onFocus={() => { focused.current = true }}
           onBlur={() => { focused.current = false; commitCustom() }}
-          onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+          onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
           aria-label={`${ariaLabel} value`}
         />
         </VariableConnect>

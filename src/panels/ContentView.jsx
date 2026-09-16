@@ -50,8 +50,8 @@ const dirOf = (file) => file.split('/').slice(0, -1).join('/');
 // The value a new field starts at, taken from the schema so a required field
 // starts valid where it can.
 function blankFor(field) {
-  if (!field) return '';
-  if ('default' in field) return field.default;
+  if (!field) {return '';}
+  if ('default' in field) {return field.default;}
   switch (field.control) {
     case 'boolean':
       return false;
@@ -71,7 +71,7 @@ function blankFor(field) {
       );
     case 'union': {
       const member = field.members?.[0];
-      if (!member) return {};
+      if (!member) {return {};}
       return {
         ...(field.discriminator ? { [field.discriminator]: member.value } : {}),
         ...Object.fromEntries(member.fields.filter((f) => f.required).map((f) => [f.key, blankFor(f)])),
@@ -88,7 +88,7 @@ const targetCache = new Map();
 function useTargets(projectPath, name) {
   const [targets, setTargets] = useState(() => targetCache.get(`${projectPath}:${name}`) || null);
   useEffect(() => {
-    if (!name) return undefined;
+    if (!name) {return undefined;}
     const key = `${projectPath}:${name}`;
     if (targetCache.has(key)) {
       setTargets(targetCache.get(key));
@@ -99,7 +99,7 @@ function useTargets(projectPath, name) {
       .contentTargets({ projectPath, name })
       .then(({ targets: list }) => {
         targetCache.set(key, list || []);
-        if (alive) setTargets(list || []);
+        if (alive) {setTargets(list || []);}
       })
       .catch(() => alive && setTargets([]));
     return () => {
@@ -177,7 +177,7 @@ function TagsField({ value, onChange }) {
   const [draft, setDraft] = useState('');
   const add = () => {
     const next = draft.trim();
-    if (!next) return;
+    if (!next) {return;}
     onChange([...list, next]);
     setDraft('');
   };
@@ -201,7 +201,7 @@ function TagsField({ value, onChange }) {
             e.preventDefault();
             add();
           }
-          if (e.key === 'Backspace' && !draft && list.length) onChange(list.slice(0, -1));
+          if (e.key === 'Backspace' && !draft && list.length) {onChange(list.slice(0, -1));}
         }}
       />
     </div>
@@ -222,7 +222,7 @@ function RecordField({ value, field, ctx, path, onChange }) {
               value={key}
               onChange={(e) => {
                 const next = {};
-                for (const [k, v] of Object.entries(record)) next[k === key ? e.target.value : k] = v;
+                for (const [k, v] of Object.entries(record)) {next[k === key ? e.target.value : k] = v;}
                 onChange(next);
               }}
             />
@@ -249,7 +249,7 @@ function RecordField({ value, field, ctx, path, onChange }) {
           placeholder="New key…"
           onChange={(e) => setAdding(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key !== 'Enter' || !adding.trim()) return;
+            if (e.key !== 'Enter' || !adding.trim()) {return;}
             onChange({ ...record, [adding.trim()]: blankFor(field.value) });
             setAdding('');
           }}
@@ -280,14 +280,14 @@ function UnionField({ field, value, ctx, path, onChange }) {
 
   const switchTo = (next) => {
     const target = field.members.find((m) => String(m.value) === String(next));
-    if (!target) return;
+    if (!target) {return;}
     stash.current.set(String(current[key]), current);
     const remembered = stash.current.get(String(target.value)) || {};
     const keep = {};
     for (const f of target.fields) {
-      if (f.key in remembered) keep[f.key] = remembered[f.key];
-      else if (f.key in current) keep[f.key] = current[f.key];
-      else if (f.required) keep[f.key] = blankFor(f);
+      if (f.key in remembered) {keep[f.key] = remembered[f.key];}
+      else if (f.key in current) {keep[f.key] = current[f.key];}
+      else if (f.required) {keep[f.key] = blankFor(f);}
     }
     onChange({ ...(key ? { [key]: target.value } : {}), ...keep });
   };
@@ -342,7 +342,7 @@ function ListField({ field, value, ctx, path, onChange }) {
   const complex = ['object', 'union'].includes(item.control);
 
   const move = (from, to) => {
-    if (from == null || to == null || from === to) return;
+    if (from == null || to == null || from === to) {return;}
     const next = [...list];
     const [moved] = next.splice(from, 1);
     next.splice(to > from ? to - 1 : to, 0, moved);
@@ -351,7 +351,7 @@ function ListField({ field, value, ctx, path, onChange }) {
   const reorder = useListReorder({ count: list.length, onMove: move });
 
   const titleOf = (entry, index) => {
-    if (!isPlainObject(entry)) return String(entry ?? `Item ${index + 1}`);
+    if (!isPlainObject(entry)) {return String(entry ?? `Item ${index + 1}`);}
     if (item.control === 'union' && item.discriminator) {
       const member = item.members.find((m) => m.value === entry[item.discriminator]);
       const label = member?.label || entry[item.discriminator];
@@ -359,7 +359,7 @@ function ListField({ field, value, ctx, path, onChange }) {
       return name ? `${label} — ${name}` : label;
     }
     for (const key of ['title', 'name', 'label', 'heading', 'question', 'status']) {
-      if (entry[key]) return String(entry[key]);
+      if (entry[key]) {return String(entry[key]);}
     }
     return `Item ${index + 1}`;
   };
@@ -658,7 +658,7 @@ export default function ContentView({ project, name, hidden, showToast, onClose,
   const entries = state?.entries || [];
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return entries.map((entry, index) => ({ entry, index }));
+    if (!q) {return entries.map((entry, index) => ({ entry, index }));}
     return entries
       .map((entry, index) => ({ entry, index }))
       .filter(({ entry }) => `${entry.title} ${entry.id}`.toLowerCase().includes(q));
@@ -673,7 +673,7 @@ export default function ContentView({ project, name, hidden, showToast, onClose,
 
   // Fields for an entry that has no schema at all: whatever the file holds.
   const freeformFields = useMemo(() => {
-    if (!shape.freeform || !isPlainObject(data)) return [];
+    if (!shape.freeform || !isPlainObject(data)) {return [];}
     return Object.keys(data).map((key) =>
       describeField(typeof data[key] === 'number' ? { type: 'number' } : { type: 'string' }, key, {})
     );
@@ -681,10 +681,10 @@ export default function ContentView({ project, name, hidden, showToast, onClose,
 
   const save = useCallback(
     async (next) => {
-      if (!entry) return;
+      if (!entry) {return;}
       const edits = editsBetween(entry.data, next.data);
       const bodyChanged = next.body !== undefined && next.body !== entry.body;
-      if (!edits.length && !bodyChanged) return;
+      if (!edits.length && !bodyChanged) {return;}
       try {
         await window.avb.writeContentEntry({
           projectPath: project.path,
@@ -745,7 +745,7 @@ export default function ContentView({ project, name, hidden, showToast, onClose,
       inFile: (path) => {
         let node = entry?.data;
         for (const key of path) {
-          if (!node || typeof node !== 'object' || !(key in node)) return false;
+          if (!node || typeof node !== 'object' || !(key in node)) {return false;}
           node = node[key];
         }
         return true;
@@ -762,7 +762,7 @@ export default function ContentView({ project, name, hidden, showToast, onClose,
     (issue) => !issue.path.length || !(shape.fields || []).some((f) => f.key === issue.path[0])
   );
 
-  if (!state) return <div className={`cms-view ${hidden ? 'hidden' : ''}`} />;
+  if (!state) {return <div className={`cms-view ${hidden ? 'hidden' : ''}`} />;}
 
   const readOnly = state.readOnly;
 

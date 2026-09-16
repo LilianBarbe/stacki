@@ -13,7 +13,7 @@ function load(source) {
   let allocated = 0;
   const start = source.indexOf('function diffChildren(');
   const end = source.indexOf('// Raised when the live document', start);
-  if (start < 0 || end < 0) throw new Error('Cannot locate the preview diff in this revision.');
+  if (start < 0 || end < 0) {throw new Error('Cannot locate the preview diff in this revision.');}
   const diff = new Function('Int32Array', `${source.slice(start, end)}\nreturn diffChildren;`)(function TrackedArray(size) {
     allocated += size * Int32Array.BYTES_PER_ELEMENT;
     return new Int32Array(size);
@@ -36,12 +36,12 @@ function measure(implementation, a, b) {
   implementation.reset();
   const runs = 5;
   const start = performance.now();
-  for (let i = 0; i < runs; i++) implementation.diff(a, b);
+  for (let i = 0; i < runs; i++) {implementation.diff(a, b);}
   return { ms: ((performance.now() - start) / runs).toFixed(3), matrixBytes: implementation.allocation() / runs };
 }
 
 console.log('Preview sibling diff; mean of 5 warm runs. Matrix bytes exclude input/output arrays.');
 for (const [label, a, b] of cases) {
-  if (before) assert.deepEqual(current.diff(a, b), before.diff(a, b), `${label} preserves exact edit operations`);
+  if (before) {assert.deepEqual(current.diff(a, b), before.diff(a, b), `${label} preserves exact edit operations`);}
   console.log(JSON.stringify({ case: label, siblings: a.length, ...(before ? { before: measure(before, a, b) } : {}), after: measure(current, a, b) }));
 }

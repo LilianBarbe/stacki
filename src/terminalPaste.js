@@ -48,33 +48,33 @@ export function decideTerminalPaste(items, plainText, getPathForFile, isWindows)
   let imageFile = null;
   for (const item of items) {
     const isImage = item.type.startsWith('image/');
-    if (isImage) hasImage = true;
-    if (item.kind !== 'file') continue;
+    if (isImage) {hasImage = true;}
+    if (item.kind !== 'file') {continue;}
     const file = item.getAsFile();
-    if (!file) continue;
+    if (!file) {continue;}
     // Capture the first image blob's bytes whether or not it's
     // filesystem-backed — screenshots aren't.
-    if (isImage && !imageFile) imageFile = file;
-    if (!getPathForFile) continue;
+    if (isImage && !imageFile) {imageFile = file;}
+    if (!getPathForFile) {continue;}
     let p = '';
     try {
       p = getPathForFile(file) || '';
     } catch {
       /* in-memory File with no filesystem backing */
     }
-    if (p) paths.push(p);
+    if (p) {paths.push(p);}
   }
   if (paths.length > 0) {
     const escape = isWindows ? quoteWindowsPath : escapePosixPath;
     return { kind: 'paths', text: paths.map(escape).join(' ') };
   }
 
-  if (!hasImage) return { kind: 'text' };
+  if (!hasImage) {return { kind: 'text' };}
 
   // 2. An image alongside meaningful text (spreadsheet cells and rich browser
   //    copies put both flavors on the clipboard): the text is what a native
   //    terminal pastes — keep it.
-  if (plainText.trim()) return { kind: 'text' };
+  if (plainText.trim()) {return { kind: 'text' };}
 
   // 3. Pure image data → persist the bytes and paste the temp file's path.
   return { kind: 'image', file: imageFile };

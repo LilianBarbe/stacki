@@ -37,16 +37,16 @@ const RESERVED = new Set(['Fragment', 'Astro', 'Component', 'Props', 'Slot']);
  */
 export function componentNameError(input, taken = []) {
   const raw = String(input ?? '').trim();
-  if (!raw) return 'Give the component a name.';
+  if (!raw) {return 'Give the component a name.';}
   const name = toComponentName(raw);
-  if (!name) return 'Use letters or numbers for the name.';
-  if (/^[0-9]/.test(name)) return "A name can't start with a number.";
-  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) return 'Use letters and numbers only.';
-  if (RESERVED.has(name)) return `${name} already means something in Astro.`;
+  if (!name) {return 'Use letters or numbers for the name.';}
+  if (/^[0-9]/.test(name)) {return "A name can't start with a number.";}
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) {return 'Use letters and numbers only.';}
+  if (RESERVED.has(name)) {return `${name} already means something in Astro.`;}
   // Case-insensitively: two files whose names differ only in case can't both
   // exist on a Mac, and two imports that differ only in case are a trap even
   // where they can.
   const clash = taken.find((other) => String(other).toLowerCase() === name.toLowerCase());
-  if (clash) return `There's already a component called ${clash}.`;
+  if (clash) {return `There's already a component called ${clash}.`;}
   return null;
 }

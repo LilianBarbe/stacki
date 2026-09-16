@@ -19,7 +19,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -99,7 +99,7 @@ const check = (what, condition, detail) => {
     const presets = () => [...host.querySelectorAll('.embed-editor_inset-preset')];
     const press = async (label) => {
       const btn = presets().find((b) => b.getAttribute('aria-label') === label);
-      if (!btn) throw new Error(`no preset button "${label}"`);
+      if (!btn) {throw new Error(`no preset button "${label}"`);}
       await act(async () => {
         btn.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
       });

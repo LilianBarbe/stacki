@@ -8,7 +8,7 @@ export default function AutoTextarea({ value, minRows = 2, style, ...props }) {
 
   const fit = () => {
     const el = ref.current;
-    if (!el) return;
+    if (!el) {return;}
     el.style.height = 'auto';
     // +2 accounts for the 1px top/bottom borders (border-box sizing).
     el.style.height = el.scrollHeight + 2 + 'px';
@@ -18,7 +18,7 @@ export default function AutoTextarea({ value, minRows = 2, style, ...props }) {
 
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
+    if (!el || typeof ResizeObserver === 'undefined') {return;}
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();

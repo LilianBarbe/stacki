@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Native Webflow class styles — the responsive/breakpoint model + the pure
 // helpers that project a NativeModel (read in webflow.ts) into the resolved
 // style panel. Class styles are read/written through the Designer Style API
@@ -78,7 +80,7 @@ export function nativeContextKey(breakpoint: BreakpointId, state: StateKey): str
 export function breakpointForAtContext(atContext: string): BreakpointId | null {
   const norm = normalizeMedia(atContext)
   for (const bp of BREAKPOINTS) {
-    if (bp.media && normalizeMedia(bp.media) === norm) return bp.id
+    if (bp.media && normalizeMedia(bp.media) === norm) {return bp.id}
   }
   return null
 }
@@ -93,9 +95,9 @@ export function breakpointForAtContext(atContext: string): BreakpointId | null {
  */
 export function readOptionsFor(breakpoint: BreakpointId, state: StateKey): NativeStyleOptions | undefined {
   const options: NativeStyleOptions = {}
-  if (breakpoint !== 'main') options.breakpoint = breakpoint
+  if (breakpoint !== 'main') {options.breakpoint = breakpoint}
   const pseudo = PSEUDO_FOR_STATE[state]
-  if (pseudo) options.pseudo = pseudo
+  if (pseudo) {options.pseudo = pseudo}
   return Object.keys(options).length ? options : undefined
 }
 
@@ -107,9 +109,9 @@ export function readOptionsFor(breakpoint: BreakpointId, state: StateKey): Nativ
  */
 export function optionsFor(context: StyleContext, state: StateKey): NativeStyleOptions | undefined {
   const options: NativeStyleOptions = {}
-  if (context.breakpoint && context.breakpoint !== 'main') options.breakpoint = context.breakpoint
+  if (context.breakpoint && context.breakpoint !== 'main') {options.breakpoint = context.breakpoint}
   const pseudo = PSEUDO_FOR_STATE[state]
-  if (pseudo) options.pseudo = pseudo
+  if (pseudo) {options.pseudo = pseudo}
   return Object.keys(options).length ? options : undefined
 }
 
@@ -118,10 +120,10 @@ export function optionsFor(context: StyleContext, state: StateKey): NativeStyleO
 /** Breakpoints where any applied style has native values (across read states). */
 export function nativeBreakpointsWithValues(model: NativeModel | null): Set<BreakpointId> {
   const out = new Set<BreakpointId>()
-  if (!model) return out
+  if (!model) {return out}
   for (const style of model.styles) {
     for (const [key, props] of style.propsByContext) {
-      if (props.size) out.add(key.split('|')[0] as BreakpointId)
+      if (props.size) {out.add(key.split('|')[0] as BreakpointId)}
     }
   }
   return out
@@ -155,7 +157,7 @@ export function buildStyleContexts(
   const usedBp = new Set<BreakpointId>()
 
   const nativeBps = nativeBreakpointsWithValues(model)
-  if (currentBreakpoint && currentBreakpoint !== 'main') nativeBps.add(currentBreakpoint)
+  if (currentBreakpoint && currentBreakpoint !== 'main') {nativeBps.add(currentBreakpoint)}
 
   embedContextKeys.forEach((key) => {
     if (key === '') {
@@ -170,14 +172,14 @@ export function buildStyleContexts(
       // string) so the selected breakpoint stays stable across elements —
       // different elements may or may not have an equivalent embed @media, but
       // Tablet is always Tablet.
-      if (usedBp.has(bp)) return
-      if (!nativeBps.has(bp) && !styledEmbedContexts.has(key)) return
+      if (usedBp.has(bp)) {return}
+      if (!nativeBps.has(bp) && !styledEmbedContexts.has(key)) {return}
       usedBp.add(bp)
       list.push({ key: `bp:${bp}`, label: breakpointLabel(bp), breakpoint: bp, embedAtContext: key })
     } else {
       // A custom @media/@container: show only when the element has styles there,
       // so it doesn't clutter the list for every page-wide query in an embed.
-      if (!styledEmbedContexts.has(key)) return
+      if (!styledEmbedContexts.has(key)) {return}
       list.push({ key, label: key, breakpoint: null, embedAtContext: key })
     }
   })
@@ -185,8 +187,8 @@ export function buildStyleContexts(
   // Any breakpoint the loop above did not reach, on the same terms: it is
   // listed because something is written there, not because it exists.
   for (const def of BREAKPOINTS) {
-    if (def.id === 'main' || usedBp.has(def.id)) continue
-    if (!nativeBps.has(def.id)) continue
+    if (def.id === 'main' || usedBp.has(def.id)) {continue}
+    if (!nativeBps.has(def.id)) {continue}
     usedBp.add(def.id)
     list.push({ key: `bp:${def.id}`, label: def.label, breakpoint: def.id, embedAtContext: null })
   }
@@ -198,8 +200,8 @@ export function buildStyleContexts(
 }
 
 function rank(context: StyleContext, ownContexts: ReadonlySet<string>): number {
-  if (context.key === '') return -1
-  if (context.breakpoint) return BREAKPOINTS.findIndex((bp) => bp.id === context.breakpoint)
+  if (context.key === '') {return -1}
+  if (context.breakpoint) {return BREAKPOINTS.findIndex((bp) => bp.id === context.breakpoint)}
   // Non-breakpoint embed contexts (@container, custom @media) come last — and
   // among those, the open component's own queries come first. They're the ones
   // being worked on; a query reaching this element from a project-wide stylesheet
@@ -216,10 +218,10 @@ function rank(context: StyleContext, ownContexts: ReadonlySet<string>): number {
 export function breakpointCascade(target: BreakpointId): BreakpointId[] {
   const t = BREAKPOINTS.findIndex((bp) => bp.id === target)
   const m = BREAKPOINTS.findIndex((bp) => bp.id === 'main')
-  if (t < 0 || t === m) return ['main']
+  if (t < 0 || t === m) {return ['main']}
   const chain: BreakpointId[] = ['main']
   const step = t > m ? 1 : -1
-  for (let i = m + step; i !== t + step; i += step) chain.push(BREAKPOINTS[i].id)
+  for (let i = m + step; i !== t + step; i += step) {chain.push(BREAKPOINTS[i].id)}
   return chain
 }
 
@@ -241,7 +243,7 @@ export function nativeContribsFor(
   context: StyleContext,
   state: StateKey,
 ): NativeContribution[] {
-  if (!model) return []
+  if (!model) {return []}
   // An embed-only query context (@media/@container that isn't a Webflow breakpoint) has
   // no breakpoint of its own, but the element's native class styles still apply inside it
   // — fall back to the base (main) native cascade so they fold in (as inherited/orange),
@@ -263,7 +265,7 @@ export function nativeContribsFor(
     chain.forEach((bp, bpTier) => {
       for (const st of stateChain) {
         const props = style.propsByContext.get(nativeContextKey(bp, st))
-        if (!props) continue
+        if (!props) {continue}
         const atState = st === state
         const classDepth = baseDepth + (st ? 1 : 0) // the :state pseudo adds specificity
         const selector = `${baseSelector}${st}`
@@ -288,7 +290,7 @@ export type NativeSelectorChip = { text: string; classDepth: number; state: Stat
  * selectors from every query are listed.
  */
 export function nativeSelectorChips(model: NativeModel | null, breakpoint: BreakpointId): NativeSelectorChip[] {
-  if (!model) return []
+  if (!model) {return []}
   const out: NativeSelectorChip[] = []
   for (const style of model.styles) {
     const classDepth = style.applied ? style.index + 1 : 1
@@ -298,7 +300,7 @@ export function nativeSelectorChips(model: NativeModel | null, breakpoint: Break
         const p = style.propsByContext.get(nativeContextKey(bp.id, state))
         return !!(p && p.size)
       })
-      if (!hasAnywhere) continue
+      if (!hasAnywhere) {continue}
       const here = style.propsByContext.get(nativeContextKey(breakpoint, state))
       out.push({ text: `${base}${state}`, classDepth, state, inContext: !!(here && here.size) })
     }
@@ -310,7 +312,7 @@ export function nativeSelectorChips(model: NativeModel | null, breakpoint: Break
 function pickedClassNames(selectedTokens: string[]): string[] | null {
   const names: string[] = []
   for (const token of selectedTokens) {
-    if (!token.startsWith('class:')) return null
+    if (!token.startsWith('class:')) {return null}
     names.push(compileClass(token.slice('class:'.length)))
   }
   return names.length ? names : null
@@ -326,15 +328,15 @@ function pickedClassNames(selectedTokens: string[]): string[] | null {
  * panel, yet a Webflow class of that name exists and is editable.
  */
 export function selectedNativeIndexFor(model: NativeModel | null, selectedTokens: string[]): number | null {
-  if (!model) return null
+  if (!model) {return null}
   const picked = pickedClassNames(selectedTokens)
-  if (!picked) return null
+  if (!picked) {return null}
   const pickedSet = new Set(picked)
 
   // Combo-chain match against the applied prefix classes[0..i].
   const applied = model.styles.filter((style) => style.applied)
   for (let i = 0; i < applied.length; i += 1) {
-    if (i + 1 !== pickedSet.size) continue
+    if (i + 1 !== pickedSet.size) {continue}
     const chain = new Set(applied.slice(0, i + 1).map((style) => style.className))
     if (chain.size === pickedSet.size && [...pickedSet].every((name) => chain.has(name))) {
       return model.styles.indexOf(applied[i])
@@ -346,7 +348,7 @@ export function selectedNativeIndexFor(model: NativeModel | null, selectedTokens
   if (pickedSet.size === 1) {
     const [name] = [...pickedSet]
     const standalone = model.styles.find((style) => !style.applied && style.className === name)
-    if (standalone) return model.styles.indexOf(standalone)
+    if (standalone) {return model.styles.indexOf(standalone)}
   }
   return null
 }

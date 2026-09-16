@@ -18,7 +18,7 @@
 
 /** @param {{name?: string}|null|undefined} node */
 export function rendersOwnElement(node) {
-  if (!node) return false;
+  if (!node) {return false;}
   return node.name !== 'Fragment' && node.name !== 'slot';
 }
 
@@ -37,8 +37,8 @@ export function liveClassesById(classesByPath, nodes, prefix = '') {
       const hit = classesByPath[prefix + t.join('.')];
       // Only for a node that put an element of its own there: what the page
       // reports for a Fragment is whatever the Fragment holds.
-      if (hit && hit.length && rendersOwnElement(node)) byId.set(node.id, hit);
-      if (Array.isArray(node.children)) walk(node.children, t);
+      if (hit && hit.length && rendersOwnElement(node)) {byId.set(node.id, hit);}
+      if (Array.isArray(node.children)) {walk(node.children, t);}
     });
   };
   walk(nodes, []);

@@ -46,7 +46,7 @@ export default function LeftRail({ active, onSelect }) {
   // P / Z / ⇧A / J / ⌥C / ⌥H toggle the panels (ignored while typing in a field).
   useEffect(() => {
     const onKey = (e) => {
-      if (e.metaKey || e.ctrlKey) return;
+      if (e.metaKey || e.ctrlKey) {return;}
       const t = e.target;
       if (
         t instanceof HTMLElement &&
@@ -68,10 +68,10 @@ export default function LeftRail({ active, onSelect }) {
       }
       const k = e.key.toLowerCase();
       let id = null;
-      if (k === 'p' && !e.shiftKey) id = 'pages';
-      else if (k === 'z' && !e.shiftKey) id = 'navigator';
-      else if (k === 'a' && e.shiftKey) id = 'components';
-      else if (k === 'j' && !e.shiftKey) id = 'assets';
+      if (k === 'p' && !e.shiftKey) {id = 'pages';}
+      else if (k === 'z' && !e.shiftKey) {id = 'navigator';}
+      else if (k === 'a' && e.shiftKey) {id = 'components';}
+      else if (k === 'j' && !e.shiftKey) {id = 'assets';}
       if (id) {
         e.preventDefault();
         onSelect(id);

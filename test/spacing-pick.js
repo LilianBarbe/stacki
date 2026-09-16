@@ -20,7 +20,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -78,7 +78,7 @@ const check = (what, condition, detail) => {
   // at length. It is noise, and loud enough to bury the failures below it.
   const realError = console.error;
   console.error = (...args) => {
-    if (typeof args[0] === 'string' && args[0].includes('flushSync was called from inside a lifecycle')) return;
+    if (typeof args[0] === 'string' && args[0].includes('flushSync was called from inside a lifecycle')) {return;}
     realError(...args);
   };
 

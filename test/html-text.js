@@ -23,7 +23,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const { decodeEntities, encodeText } = require('../electron/htmlText.js');
@@ -123,8 +123,8 @@ if (fs.existsSync(REAL)) {
   const values = [];
   const walk = (list) => {
     for (const n of list) {
-      if (n.kind === 'text') values.push(n.value);
-      if (Array.isArray(n.children)) walk(n.children);
+      if (n.kind === 'text') {values.push(n.value);}
+      if (Array.isArray(n.children)) {walk(n.children);}
     }
   };
   walk(model.nodes);

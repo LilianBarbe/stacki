@@ -27,7 +27,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -148,7 +148,7 @@ const check = (what, condition, detail) => {
   const view = () => { const el = cm(); return el ? EditorView.findFromDOM(el) : null };
   const type = async (text) => {
     const v = view();
-    if (!v) return false;
+    if (!v) {return false;}
     await act(async () => {
       v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: text } });
     });

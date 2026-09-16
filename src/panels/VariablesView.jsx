@@ -100,16 +100,16 @@ function Cell({ cell, onSave, fluidOf, onDraft }) {
   // Every keystroke goes up as well as into the field: another row's badge may
   // be about this value.
   useEffect(() => {
-    if (!cell?.name) return undefined;
+    if (!cell?.name) {return undefined;}
     onDraft?.(cell.name, draft);
     return () => onDraft?.(cell.name, null);
   }, [cell?.name, draft, onDraft]);
 
-  if (!cell) return <div className="var-cell empty">—</div>;
+  if (!cell) {return <div className="var-cell empty">—</div>;}
 
   const commit = async (next = value) => {
     setDraft(null);
-    if (next === cell.value) return;
+    if (next === cell.value) {return;}
     await onSave(cell, next);
   };
 
@@ -118,7 +118,7 @@ function Cell({ cell, onSave, fluidOf, onDraft }) {
   const commitRef = useRef(commit);
   commitRef.current = commit;
   useEffect(() => {
-    if (!curve) return undefined;
+    if (!curve) {return undefined;}
     closeOpenCurve?.(); // never two at once
     const close = () => {
       setCurve(null);
@@ -126,7 +126,7 @@ function Cell({ cell, onSave, fluidOf, onDraft }) {
     };
     closeOpenCurve = close;
     return () => {
-      if (closeOpenCurve === close) closeOpenCurve = null;
+      if (closeOpenCurve === close) {closeOpenCurve = null;}
     };
   }, [curve]);
 
@@ -153,9 +153,9 @@ function Cell({ cell, onSave, fluidOf, onDraft }) {
     <div
       className="var-cell"
       onMouseDownCapture={(e) => {
-        if (custom || alwaysOwn(e.target)) return;
+        if (custom || alwaysOwn(e.target)) {return;}
         // Fits: everything in the field keeps its own press, chip included.
-        if (!doesNotFit(e.currentTarget, value)) return;
+        if (!doesNotFit(e.currentTarget, value)) {return;}
         e.preventDefault();
         // And nothing else gets this press. preventDefault only cancels the
         // browser's own reaction (focus, caret); the chip's handler is another
@@ -169,7 +169,7 @@ function Cell({ cell, onSave, fluidOf, onDraft }) {
       onKeyDownCapture={(e) => {
         // The same shortcut, wherever the caret is — the token editor holds it
         // as often as the input does.
-        if (e.key !== '=' || custom) return;
+        if (e.key !== '=' || custom) {return;}
         e.preventDefault();
         openCustom(e.currentTarget);
       }}
@@ -239,8 +239,8 @@ function Cell({ cell, onSave, fluidOf, onDraft }) {
           // Dragging in the picker fires live updates; only the settled value
           // is written, or a drag would be a hundred edits to the file.
           onChange={(color, live) => {
-            if (live) setDraft(color);
-            else commit(color);
+            if (live) {setDraft(color);}
+            else {commit(color);}
           }}
         />
       )}
@@ -267,7 +267,7 @@ function Cell({ cell, onSave, fluidOf, onDraft }) {
           // — so clicking a value moved the caret into the hidden input behind
           // the field, where nothing typed and nothing showed.
           onFocus={(e) => {
-            if (document.activeElement !== e.currentTarget) return;
+            if (document.activeElement !== e.currentTarget) {return;}
             e.currentTarget.select();
           }}
           onMouseDown={(e) => {
@@ -286,7 +286,7 @@ function Cell({ cell, onSave, fluidOf, onDraft }) {
             // is what gets skipped. A second click, once the field already has
             // focus, behaves normally and can place the caret or drag over
             // part of the value.
-            if (document.activeElement === e.currentTarget) return;
+            if (document.activeElement === e.currentTarget) {return;}
             e.preventDefault();
             e.currentTarget.focus();
             e.currentTarget.select();
@@ -391,7 +391,7 @@ export default function VariablesView({ project, selected, hidden, onClose, show
   const putFiles = useCallback(
     async (texts) => {
       for (const [rel, css] of Object.entries(texts)) {
-        if (css == null) continue;
+        if (css == null) {continue;}
         await bridge('writeStyleFile', { filePath: `${project.path}/${rel}`, css });
       }
       await refresh();
@@ -415,12 +415,12 @@ export default function VariablesView({ project, selected, hidden, onClose, show
         Object.fromEntries(await Promise.all(list.map(async (rel) => [rel, await fileText(rel)])));
       const before = list.length ? await read() : {};
       const ok = await run();
-      if (ok === false || !list.length) return;
+      if (ok === false || !list.length) {return;}
       const after = await read();
       const changed = list.filter(
         (rel) => before[rel] != null && after[rel] != null && before[rel] !== after[rel]
       );
-      if (!changed.length) return;
+      if (!changed.length) {return;}
       const only = (texts) => Object.fromEntries(changed.map((rel) => [rel, texts[rel]]));
       onRecordUndo?.({
         label,
@@ -471,15 +471,15 @@ export default function VariablesView({ project, selected, hidden, onClose, show
   const move = useCallback(
     async (slots, from, to) => {
       const plan = dropPlan(slots, from, to);
-      if (!plan) return;
+      if (!plan) {return;}
       if (plan.kind === 'rows') {
-        if (!plan.moves.length) return;
+        if (!plan.moves.length) {return;}
         // Every file the plan names, not just the first: one name can be
         // declared in two stylesheets, and putting back half of a move is
         // worse than not putting it back at all.
         await writeWithUndo(plan.moves.map((m) => m.file), 'the move', async () => {
           const result = await bridge('moveCssVariables', { projectPath: project.path, moves: plan.moves });
-          if (!result.ok) showToast?.(result.error || 'Could not move that.', 'error');
+          if (!result.ok) {showToast?.(result.error || 'Could not move that.', 'error');}
           await refresh();
           return result.ok;
         });
@@ -496,7 +496,7 @@ export default function VariablesView({ project, selected, hidden, onClose, show
           expect: plan.block.title,
           before: plan.before,
         });
-        if (!result.ok) showToast?.(result.error || 'Could not move that.', 'error');
+        if (!result.ok) {showToast?.(result.error || 'Could not move that.', 'error');}
         await refresh();
         return result.ok;
       });
@@ -510,22 +510,22 @@ export default function VariablesView({ project, selected, hidden, onClose, show
     async (list, from, to) => {
       const source = list[from];
       const target = to > from ? list[to] : list[to] ?? null;
-      if (!source || source === target) return;
+      if (!source || source === target) {return;}
       const columns = source.rows[0]?.cells?.length || 1;
       const moves = [];
       for (let column = 0; column < columns; column++) {
         const names = source.rows.map((row) => row.cells[column]).filter(Boolean).map((c) => c.name);
-        if (!names.length) continue;
+        if (!names.length) {continue;}
         const anchor = source.rows.find((row) => row.cells[column])?.cells[column];
         const landing = target?.rows.map((row) => row.cells[column]).find(Boolean);
         moves.push({ file: anchor.file, selector: anchor.selector, names, target: landing ? landing.name : null });
       }
-      if (!moves.length) return;
+      if (!moves.length) {return;}
       // A group can be declared in more than one stylesheet, so the edit is
       // whatever files its moves name.
       await writeWithUndo(moves.map((m) => m.file), 'the group', async () => {
         const result = await bridge('moveCssVariables', { projectPath: project.path, moves });
-        if (!result.ok) showToast?.(result.error || 'Could not move that.', 'error');
+        if (!result.ok) {showToast?.(result.error || 'Could not move that.', 'error');}
         await refresh();
         return result.ok;
       });
@@ -541,22 +541,22 @@ export default function VariablesView({ project, selected, hidden, onClose, show
   const add = useCallback(
     async (block, columns, word) => {
       const typed = word.trim().replace(/^--/, '');
-      if (!typed) return;
+      if (!typed) {return;}
       const last = block.rows[block.rows.length - 1];
       const adds = [];
       columns.forEach((column, index) => {
         const anchor = last?.cells[index] || block.rows.map((r) => r.cells[index]).filter(Boolean).pop();
-        if (!anchor) return;
+        if (!anchor) {return;}
         const name =
           block.kind === 'matrix'
             ? `--${column.label}-${typed}`
             : `${stemOf(block)}${typed}`;
         adds.push({ file: anchor.file, selector: anchor.selector, name, value: 'unset', after: anchor.name });
       });
-      if (!adds.length) return;
+      if (!adds.length) {return;}
       await writeWithUndo(adds.map((a) => a.file), 'the variable', async () => {
         const result = await bridge('addCssVariables', { projectPath: project.path, adds });
-        if (!result.ok) showToast?.(result.error || 'Could not add that.', 'error');
+        if (!result.ok) {showToast?.(result.error || 'Could not add that.', 'error');}
         await refresh();
         return result.ok;
       });
@@ -570,7 +570,7 @@ export default function VariablesView({ project, selected, hidden, onClose, show
   // panel reloads from the files afterwards either way.
   const rename = useCallback(
     async (renames) => {
-      if (!renames?.length) return true;
+      if (!renames?.length) {return true;}
       const result = await bridge('renameCssVariables', { projectPath: project.path, renames });
       if (!result.ok) {
         showToast?.(result.error || 'Could not rename that.', 'error');
@@ -645,7 +645,7 @@ export default function VariablesView({ project, selected, hidden, onClose, show
           title: `${block.title} copy`,
           at: block.titleStart,
         });
-        if (!result.ok) showToast?.(result.error || 'Could not duplicate that.', 'error');
+        if (!result.ok) {showToast?.(result.error || 'Could not duplicate that.', 'error');}
         await refresh();
         return result.ok;
       });
@@ -665,7 +665,7 @@ export default function VariablesView({ project, selected, hidden, onClose, show
           end: block.titleEnd,
           expect: block.title,
         });
-        if (!result.ok) showToast?.(result.error || 'Could not delete that.', 'error');
+        if (!result.ok) {showToast?.(result.error || 'Could not delete that.', 'error');}
         await refresh();
         return result.ok;
       });
@@ -677,7 +677,7 @@ export default function VariablesView({ project, selected, hidden, onClose, show
   // with whatever is in the fields on top.
   const fluidOf = useCallback(
     (cell) => {
-      if (!cell) return null;
+      if (!cell) {return null;}
       const own = drafts[cell.name];
       const check = fluidCheck(resolveValue(own ?? cell.value, values, drafts));
       return check && check.status !== 'ok' ? check : null;
@@ -688,7 +688,7 @@ export default function VariablesView({ project, selected, hidden, onClose, show
   const noteDraft = useCallback((name, value) => {
     setDrafts((current) => {
       if (value === null) {
-        if (!(name in current)) return current;
+        if (!(name in current)) {return current;}
         const next = { ...current };
         delete next[name];
         return next;
@@ -698,9 +698,9 @@ export default function VariablesView({ project, selected, hidden, onClose, show
   }, []);
 
   const blocks = useMemo(() => {
-    if (!group) return [];
+    if (!group) {return [];}
     const q = query.trim().toLowerCase();
-    if (!q) return group.blocks;
+    if (!q) {return group.blocks;}
     return group.blocks
       .map((block) => ({
         ...block,
@@ -713,7 +713,7 @@ export default function VariablesView({ project, selected, hidden, onClose, show
       .filter((block) => block.rows.length);
   }, [group, query]);
 
-  if (!group) return <div className={`cms-view vars-view ${hidden ? 'hidden' : ''}`} />;
+  if (!group) {return <div className={`cms-view vars-view ${hidden ? 'hidden' : ''}`} />;}
 
 
   return (
@@ -776,26 +776,26 @@ export function createScrollSync() {
 
   return {
     register(count, el) {
-      if (!el) return undefined;
+      if (!el) {return undefined;}
       const peers = byColumns.get(count) || new Set();
       peers.add(el);
       byColumns.set(count, peers);
       return () => {
         peers.delete(el);
-        if (!peers.size) byColumns.delete(count);
+        if (!peers.size) {byColumns.delete(count);}
       };
     },
     broadcast(count, from, left) {
-      if (echoing) return;
+      if (echoing) {return;}
       echoing = true;
       for (const el of byColumns.get(count) || []) {
         // Compared before writing: an assignment that changes nothing still
         // costs a layout, and there is one per group per scroll event.
-        if (el !== from && Math.abs(el.scrollLeft - left) > 0.5) el.scrollLeft = left;
+        if (el !== from && Math.abs(el.scrollLeft - left) > 0.5) {el.scrollLeft = left;}
       }
       // Next frame, by which time the echoes have arrived and been ignored.
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(release);
-      else setTimeout(release, 0);
+      if (typeof requestAnimationFrame === 'function') {requestAnimationFrame(release);}
+      else {setTimeout(release, 0);}
     },
   };
 }
@@ -816,7 +816,7 @@ const valueTracks = (count) => `repeat(${count}, var(--vars-col))`;
 // leaves `--selection-`; a plain list leaves `--`.
 function stemOf(block) {
   const row = block.rows.find((r) => r.name);
-  if (!row) return '--';
+  if (!row) {return '--';}
   return row.name.slice(0, row.name.length - row.label.length) || '--';
 }
 
@@ -860,7 +860,7 @@ function SectionMenu({ onRename, onDuplicate, onDelete }) {
 // step with each other.
 export function dropPlan(slots, from, to) {
   const source = slots?.[from];
-  if (!source) return null;
+  if (!source) {return null;}
   // Where it lands: in front of the next real row at or after the drop point.
   let landing = null;
   for (let at = to; at < slots.length; at++) {
@@ -870,16 +870,16 @@ export function dropPlan(slots, from, to) {
     // A heading that has not actually moved: it is already the thing directly
     // above `landing`.
     const here = slots.indexOf(source);
-    if (to === here || to === here + 1) return null;
+    if (to === here || to === here + 1) {return null;}
     return { kind: 'heading', block: source.block, before: landing ? landing.row.name : null };
   }
-  if (source.kind !== 'row') return null;
+  if (source.kind !== 'row') {return null;}
   return { kind: 'rows', moves: movesForDrop(slots, from, to) };
 }
 
 export function movesForDrop(slots, from, to) {
   const source = slots?.[from];
-  if (!source || source.kind !== 'row') return [];
+  if (!source || source.kind !== 'row') {return [];}
   // The next thing in the sheet that is a line in the file: a variable, or a
   // HEADING. Headings count, and this is the whole of the bug they fix — a group
   // ends at its next comment, so a drop at the end of a group that lands "in
@@ -890,10 +890,10 @@ export function movesForDrop(slots, from, to) {
   for (let at = to; at < slots.length; at++) {
     if (slots[at].kind === 'row' || slots[at].kind === 'heading') { landing = slots[at]; break; }
   }
-  if (landing?.kind === 'row' && landing.row === source.row) return [];
+  if (landing?.kind === 'row' && landing.row === source.row) {return [];}
   return source.row.cells
     .map((cell, index) => {
-      if (!cell) return null;
+      if (!cell) {return null;}
       // A heading is a place in the text rather than a name to land in front of.
       // Only a heading the panel read out of a comment HAS such a place; the
       // headings of a modes table are shared name prefixes, and a run there is
@@ -925,7 +925,7 @@ function EditableName({ value, onRename, className, title, openSignal, children 
   // and the field takes that as "open now" rather than owning a second way in.
   const seen = useRef(openSignal);
   useEffect(() => {
-    if (openSignal === seen.current) return;
+    if (openSignal === seen.current) {return;}
     seen.current = openSignal;
     setText(value);
     setEditing(true);
@@ -935,7 +935,7 @@ function EditableName({ value, onRename, className, title, openSignal, children 
   const done = useRef(false);
 
   useEffect(() => {
-    if (!editing) return undefined;
+    if (!editing) {return undefined;}
     done.current = false;
     const el = inputRef.current;
     el?.focus();
@@ -944,7 +944,7 @@ function EditableName({ value, onRename, className, title, openSignal, children 
   }, [editing]);
 
   const commit = async () => {
-    if (done.current) return;
+    if (done.current) {return;}
     done.current = true;
     const next = text.trim();
     setEditing(false);
@@ -953,7 +953,7 @@ function EditableName({ value, onRename, className, title, openSignal, children 
     // the file either way, but the field would otherwise sit there showing a
     // name the project does not have.
     const ok = await onRename?.(next);
-    if (!ok) setText(value);
+    if (!ok) {setText(value);}
   };
   const cancel = () => { done.current = true; setEditing(false); setText(value); };
 
@@ -1004,7 +1004,7 @@ function Sheet({ blocks, group, onSave, onMove, onMoveGroup, onAdd, onRename, on
   const slots = useMemo(() => {
     const list = [];
     blocks.forEach((block, bi) => {
-      if (block.title != null) list.push({ kind: 'heading', block, bi });
+      if (block.title != null) {list.push({ kind: 'heading', block, bi });}
       block.rows.forEach((row) => list.push({ kind: 'row', block, row, bi }));
       list.push({ kind: 'end', block, bi });
     });
@@ -1043,11 +1043,11 @@ function Sheet({ blocks, group, onSave, onMove, onMoveGroup, onAdd, onRename, on
   // rather than guessed — a row's height is set in CSS and read here.
   useLayoutEffect(() => {
     const el = headRef.current;
-    if (!el || typeof ResizeObserver !== 'function') return undefined;
+    if (!el || typeof ResizeObserver !== 'function') {return undefined;}
     // Set on the scroller, not on the head itself: the group titles that read
     // it are siblings, and a custom property travels down rather than across.
     const host = el.parentElement;
-    if (!host) return undefined;
+    if (!host) {return undefined;}
     const apply = () => host.style.setProperty('--vars-head-h', `${el.offsetHeight}px`);
     apply();
     const ro = new ResizeObserver(apply);
@@ -1122,14 +1122,14 @@ function NewVariable({ block, columns, onAdd, template, slotProps, dropping }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (typing) inputRef.current?.focus();
+    if (typing) {inputRef.current?.focus();}
   }, [typing]);
 
   const commit = async () => {
     const next = word.trim();
     setTyping(false);
     setWord('');
-    if (next) await onAdd?.(block, columns, next);
+    if (next) {await onAdd?.(block, columns, next);}
   };
 
   if (!typing) {
@@ -1180,9 +1180,9 @@ function NewVariable({ block, columns, onAdd, template, slotProps, dropping }) {
 // here.
 function sectionPrefix(block) {
   const title = block.title;
-  if (!title || block.kind === 'matrix') return null;
+  if (!title || block.kind === 'matrix') {return null;}
   const rows = block.rows.filter((r) => r.name);
-  if (!rows.length) return null;
+  if (!rows.length) {return null;}
   return rows.every((r) => r.name.startsWith(`--${title}-`)) ? title : null;
 }
 
@@ -1191,14 +1191,14 @@ function sectionPrefix(block) {
 // column (`--h1-size`, `--h2-size`), so it is one rename per column.
 function rowRenames(block, row, typed) {
   const next = typed.trim().replace(/^--/, '');
-  if (!next) return [];
+  if (!next) {return [];}
   if (block.kind === 'matrix') {
     return row.cells
       .filter(Boolean)
       .map((cell) => ({ from: cell.name, to: `--${cell.name.slice(2, cell.name.length - row.label.length - 1)}-${next}` }))
       .filter((r) => r.from !== r.to);
   }
-  if (!row.name) return [];
+  if (!row.name) {return [];}
   const to = `${stemOf(block)}${next}`;
   return to === row.name ? [] : [{ from: row.name, to }];
 }
@@ -1386,7 +1386,7 @@ function Table({ block, group, onSave, onAdd, onRename, onRetitle, onDuplicateSe
           ref={rowsRef}
           onScroll={(e) => {
             const { scrollLeft } = e.currentTarget;
-            if (headRef.current) headRef.current.scrollLeft = scrollLeft;
+            if (headRef.current) {headRef.current.scrollLeft = scrollLeft;}
             scrollSync?.broadcast(columns.length, e.currentTarget, scrollLeft);
           }}
         >

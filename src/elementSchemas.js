@@ -172,16 +172,16 @@ const ONLY_CHILDREN = {
 export function canContainTag(parentTag, childTag) {
   const parent = String(parentTag || '').toLowerCase();
   const child = String(childTag || '').toLowerCase();
-  if (!parent || !child) return true;
-  if (VOID_TAGS.has(parent)) return false;
+  if (!parent || !child) {return true;}
+  if (VOID_TAGS.has(parent)) {return false;}
 
   const only = ONLY_CHILDREN[parent];
-  if (Array.isArray(only)) return only.includes(child);
+  if (Array.isArray(only)) {return only.includes(child);}
 
-  if (TEXT_ONLY_PARENTS.has(parent)) return PHRASING_TAGS.has(child);
+  if (TEXT_ONLY_PARENTS.has(parent)) {return PHRASING_TAGS.has(child);}
   // An <a> may wrap flow content, but never another link or button.
-  if (parent === 'a') return child !== 'a' && child !== 'button';
-  if (parent === 'button') return PHRASING_TAGS.has(child) && child !== 'button' && child !== 'a';
+  if (parent === 'a') {return child !== 'a' && child !== 'button';}
+  if (parent === 'button') {return PHRASING_TAGS.has(child) && child !== 'button' && child !== 'a';}
   // <li>, <div>, <section>, … take flow content; only list/table parts are
   // out of place without their proper parent.
   return !['li', 'dt', 'dd', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot', 'option', 'optgroup'].includes(

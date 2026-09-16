@@ -23,7 +23,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const schemaFor = (doc) =>
@@ -95,7 +95,7 @@ if (table) {
   const byVariant = {};
   for (const b of table.branches) {
     const pinned = (b.pins.variant || [])[0];
-    if (pinned) byVariant[pinned] = b.defaults?.label;
+    if (pinned) {byVariant[pinned] = b.defaults?.label;}
   }
   check('play branch falls back to Play', byVariant.play === 'Play', JSON.stringify(byVariant));
   check('close branch falls back to Close', byVariant.close === 'Close', JSON.stringify(byVariant));

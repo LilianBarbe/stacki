@@ -41,7 +41,7 @@ export default function StylePanel({
 
   useEffect(() => {
     let live = true;
-    if (!project?.path) return undefined;
+    if (!project?.path) {return undefined;}
     window.avb
       .listStyleFiles(project.path)
       .then((r) => live && setFiles(r?.files || []))
@@ -56,7 +56,7 @@ export default function StylePanel({
   // shouldn't need a restart before its rules show up.
   useEffect(() => {
     let live = true;
-    if (!project?.path) return undefined;
+    if (!project?.path) {return undefined;}
     window.avb
       .listAstroStyleFiles(project.path)
       .then((r) => live && setAstroFiles(r?.files || []))
@@ -102,7 +102,7 @@ export default function StylePanel({
   const hostRef = useRef(null);
   useEffect(() => {
     const el = hostRef.current;
-    if (!el) return undefined;
+    if (!el) {return undefined;}
     const publish = () => {
       const r = el.getBoundingClientRect();
       const root = document.documentElement.style;
@@ -128,7 +128,7 @@ export default function StylePanel({
   // costs no layout.
   const popupOpen = usePopupOpen(hostRef);
 
-  if (!project) return null;
+  if (!project) {return null;}
 
   return (
     // Every button in the panel, in one place rather than in each of them. A
@@ -142,7 +142,7 @@ export default function StylePanel({
       ref={hostRef}
       onClick={(event) => {
         const button = event.target instanceof Element ? event.target.closest('button') : null;
-        if (button && !button.disabled) clickNote();
+        if (button && !button.disabled) {clickNote();}
       }}
     >
       {!node ? (

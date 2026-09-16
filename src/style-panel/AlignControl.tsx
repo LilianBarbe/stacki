@@ -70,7 +70,7 @@ const ALIGN_PATHS: Record<string, ReactNode> = {
 function iconFor(value: string, prop: string, axis: 'x' | 'y'): ReactNode {
   const isJustify = prop === 'justify-content'
   const paths = (isJustify ? JUSTIFY_PATHS : ALIGN_PATHS)[value]
-  if (!paths) return undefined
+  if (!paths) {return undefined}
   const naturalAxis = isJustify ? 'x' : 'y'
   const rotate = axis === naturalAxis ? 0 : isJustify ? 90 : -90
   return <Icon rotate={rotate}>{paths}</Icon>
@@ -99,8 +99,8 @@ const ALIGN_VALUES = ['flex-start', 'center', 'flex-end', 'stretch', 'baseline']
 // Map assorted spellings onto the canonical values used above.
 function norm(value: string): string {
   const v = value.trim().toLowerCase()
-  if (v === 'start' || v === 'self-start' || v === 'left') return 'flex-start'
-  if (v === 'end' || v === 'self-end' || v === 'right') return 'flex-end'
+  if (v === 'start' || v === 'self-start' || v === 'left') {return 'flex-start'}
+  if (v === 'end' || v === 'self-end' || v === 'right') {return 'flex-end'}
   return v
 }
 
@@ -134,14 +134,14 @@ function CustomInput({ value, busy, ariaLabel, autoFocus, onCommit, onLive, onCl
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
   const liveTimer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancelLive = () => { if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null } }
   useEffect(() => cancelLive, [])
   const scheduleLive = (text: string) => {
     cancelLive()
-    liveTimer.current = window.setTimeout(() => { liveTimer.current = null; const t = text.trim(); if (t) onLive(t) }, 100)
+    liveTimer.current = window.setTimeout(() => { liveTimer.current = null; const t = text.trim(); if (t) {onLive(t)} }, 100)
   }
-  const commit = () => { const t = draft.trim(); if (t) onCommit(t); else onClear() }
+  const commit = () => { const t = draft.trim(); if (t) {onCommit(t);} else {onClear()} }
   return (
     <input
       className="u-select-custom-input"
@@ -149,7 +149,7 @@ function CustomInput({ value, busy, ariaLabel, autoFocus, onCommit, onLive, onCl
       onChange={(event) => { setDraft(event.target.value); scheduleLive(event.target.value) }}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; cancelLive(); commit() }}
-      onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
       disabled={busy}
       spellCheck={false}
       placeholder="unset"

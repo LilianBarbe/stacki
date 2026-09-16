@@ -29,11 +29,11 @@ export default function WelcomeScreen({ onOpen, setBusy, showToast }) {
   // project should not be competing with a screenshot for the same machine.
   useEffect(() => {
     const stale = recents.filter((r) => r.canRefresh && (r.stale || !r.thumb));
-    if (!stale.length) return undefined;
+    if (!stale.length) {return undefined;}
     let live = true;
     (async () => {
       for (const project of stale) {
-        if (!live) return;
+        if (!live) {return;}
         setRefreshing((r) => ({ ...r, [project.path]: true }));
         try {
           const result = await window.avb.refreshThumb(project.path);
@@ -48,7 +48,7 @@ export default function WelcomeScreen({ onOpen, setBusy, showToast }) {
           // A project that will not render keeps the picture it had. There is
           // nothing here the user asked for, so there is nothing to report.
         } finally {
-          if (live) setRefreshing((r) => ({ ...r, [project.path]: false }));
+          if (live) {setRefreshing((r) => ({ ...r, [project.path]: false }));}
         }
       }
     })();
@@ -62,7 +62,7 @@ export default function WelcomeScreen({ onOpen, setBusy, showToast }) {
   const openExisting = async () => {
     setError(null);
     const result = await window.avb.openProjectDialog();
-    if (result.canceled) return;
+    if (result.canceled) {return;}
     if (result.error) {
       setError(result.error);
       return;
@@ -75,7 +75,7 @@ export default function WelcomeScreen({ onOpen, setBusy, showToast }) {
   const createNew = async () => {
     setError(null);
     const result = await window.avb.newProjectDialog();
-    if (result.canceled) return;
+    if (result.canceled) {return;}
     if (result.error) {
       setError(result.error);
       return;
@@ -89,7 +89,7 @@ export default function WelcomeScreen({ onOpen, setBusy, showToast }) {
   const startFromLumos = async () => {
     setError(null);
     const result = await window.avb.parentDialog();
-    if (result.canceled) return;
+    if (result.canceled) {return;}
     if (result.error) {
       setError(result.error);
       return;
@@ -218,7 +218,7 @@ function StarterWizard({ parentPath, onClose, onDone }) {
   useEffect(() => window.avb.onCreateLog((chunk) => setLog((l) => l + chunk)), []);
   useEffect(() => {
     const el = logRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {el.scrollTop = el.scrollHeight;}
   }, [log]);
 
   const invalid = !name.trim() || !/^[A-Za-z0-9._-]+$/.test(name.trim());
@@ -257,7 +257,7 @@ function StarterWizard({ parentPath, onClose, onDone }) {
               disabled={running}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !invalid && !running) run();
+                if (e.key === 'Enter' && !invalid && !running) {run();}
               }}
             />
           </label>
@@ -306,7 +306,7 @@ function NewProjectWizard({ dir, onClose, onDone }) {
 
   useEffect(() => {
     const el = logRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {el.scrollTop = el.scrollHeight;}
   }, [log]);
 
   const run = async () => {

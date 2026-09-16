@@ -47,7 +47,7 @@ export default function PropField({
   // would never fire until the drag stopped.
   const liveNow = (text: string) => {
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed) {return}
     const parsed = parseImportant(trimmed)
     onLiveSetProp(prop, parsed.value, parsed.important)
   }
@@ -87,7 +87,7 @@ export default function PropField({
         onKeyDown={(event) => {
           if (event.key === 'Enter') { event.currentTarget.blur(); return }
           const stepped = handleArrowStep(event)
-          if (!stepped) return
+          if (!stepped) {return}
           event.preventDefault()
           const el = event.currentTarget
           el.value = stepped.text

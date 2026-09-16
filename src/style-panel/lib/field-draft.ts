@@ -21,12 +21,12 @@ export function useFieldDraft(external: string, busy: boolean) {
 
   // The ordinary sync: a value that changed elsewhere, while nobody is typing
   // in this field.
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
+  useEffect(() => { if (!focused.current) {setDraft(external)} }, [external])
 
   // And the end of a save, which is the moment the model is worth believing
   // again — the value may be the same string it was before the edit, so there
   // is nothing above for the change to fire on.
-  useEffect(() => { if (!busy && !focused.current) setDraft(external) }, [busy])
+  useEffect(() => { if (!busy && !focused.current) {setDraft(external)} }, [busy])
 
   return { draft, setDraft, focused, cleared: () => setDraft('') }
 }

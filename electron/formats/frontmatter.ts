@@ -1,0 +1,60 @@
+// Markdown, MDX and Markdoc entries: YAML frontmatter over a body.
+//
+// The body is never touched. MDX bodies hold imports, JSX and the odd
+// `export const`; Markdoc bodies hold {% tags %}; markdown bodies hold whatever
+// the author typed. None of it survives a reformat, none of it is the editor's
+// business, and all of it is preserved by only ever replacing the frontmatter
+// span — or, when the body itself is edited, only the body span.
+
+import * as yaml from './yaml.js';
+
+const FRONTMATTER = /^(---)([ \t]*\r?\n)([\s\S]*?)(\r?\n)(---)([ \t]*)(\r?\n?)/;
+
+export interface ParsedFrontmatter {
+  readonly data: unknown; // null when the file has no frontmatter
+  readonly frontmatter: string | null;
+  readonly body: string;
+  readonly offset: number;
+}
+
+/** { data, body, frontmatter } — data is null when the file has no frontmatter. */
+function parse(text: string): ParsedFrontmatter {
+  const m = text.match(FRONTMATTER);
+  const block = m?.[3];
+  if (!m || block === undefined) {
+    return { data: null, frontmatter: null, body: text, offset: 0 };
+  }
+  return {
+    data: yaml.parseData(block + '\n') ?? {},
+    frontmatter: block,
+    body: text.slice(m[0].length),
+    offset: m[0].length,
+  };
+}
+
+const parseData = (text: string): unknown => parse(text).data;
+
+/**
+ * Applies edits to the frontmatter, and replaces the body when `body` is given.
+ * A file with no frontmatter grows one; a file whose body is not passed keeps
+ * the bytes it had.
+ */
+function applyEdits(text: string, edits: readonly yaml.Edit[], { body }: { readonly body?: string | undefined } = {}): string {
+  const m = text.match(FRONTMATTER);
+  const block = m?.[3];
+  if (!m || block === undefined) {
+    if (!edits.length) {
+      return body === undefined ? text : body;
+    }
+    const written = yaml.applyEdits('', edits).replace(/\n?$/, '\n');
+    return `---\n${written}---\n${body === undefined ? text : body}`;
+  }
+  const written = edits.length
+    ? yaml.applyEdits(block + '\n', edits).replace(/\n$/, '')
+    : block;
+  const head = `${m[1]}${m[2]}${written}${m[4]}${m[5]}${m[6]}${m[7]}`;
+  return head + (body === undefined ? text.slice(m[0].length) : body);
+}
+
+export { parse, parseData, applyEdits };
+export const DELETE = yaml.DELETE;

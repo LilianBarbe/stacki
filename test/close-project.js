@@ -23,7 +23,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
@@ -90,7 +90,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
       pendingProject: async () => null,
       scanProject: async (p) => {
         opened.push(p);
-        return { pages: [], layouts: [], components: [] };
+        return { pages: [], layouts: [], components: [], pageFolders: [] };
       },
       listProjectClasses: async () => [],
       startDevServer: async () => ({ url: 'http://localhost:4321' }),
@@ -130,7 +130,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
   const fire = async (channel, ...args) => {
     const cb = menu.get(channel);
-    if (!cb) return false;
+    if (!cb) {return false;}
     await act(async () => {
       await cb(...args);
       await settle(40);

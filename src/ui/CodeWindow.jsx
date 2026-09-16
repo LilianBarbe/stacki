@@ -26,7 +26,7 @@ export default function CodeWindow({ title, language, value, onChange, onClose, 
   });
 
   const startDrag = (e) => {
-    if (e.target.closest('button')) return;
+    if (e.target.closest('button')) {return;}
     e.preventDefault();
     const sx = e.clientX;
     const sy = e.clientY;
@@ -57,8 +57,8 @@ export default function CodeWindow({ title, language, value, onChange, onClose, 
       const dy = ev.clientY - sy;
       setRect(() => {
         let { x, y, w, h } = start;
-        if (edge.includes('e')) w = Math.max(MIN_W, start.w + dx);
-        if (edge.includes('s')) h = Math.max(MIN_H, start.h + dy);
+        if (edge.includes('e')) {w = Math.max(MIN_W, start.w + dx);}
+        if (edge.includes('s')) {h = Math.max(MIN_H, start.h + dy);}
         if (edge.includes('w')) {
           w = Math.max(MIN_W, start.w - dx);
           x = start.x + (start.w - w);

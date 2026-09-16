@@ -26,18 +26,18 @@ import { useEffect } from 'react';
  */
 export default function useDismiss(ref, active, onDismiss) {
   useEffect(() => {
-    if (!active) return undefined;
+    if (!active) {return undefined;}
 
     const onDown = (e) => {
       const el = ref?.current;
-      if (el && !el.contains(e.target)) onDismiss();
+      if (el && !el.contains(e.target)) {onDismiss();}
     };
 
     const onBlur = () => {
       // Read after the browser has moved focus, which it has not yet done when
       // blur fires.
       setTimeout(() => {
-        if (document.activeElement?.tagName === 'IFRAME') onDismiss();
+        if (document.activeElement?.tagName === 'IFRAME') {onDismiss();}
       }, 0);
     };
 
@@ -47,7 +47,7 @@ export default function useDismiss(ref, active, onDismiss) {
     // a menu left hanging over the page is the thing being fixed.
     const onMessage = (e) => {
       const t = e.data?.type;
-      if (typeof t === 'string' && (t === 'avb:click-node' || t === 'avb:open-node')) onDismiss();
+      if (typeof t === 'string' && (t === 'avb:click-node' || t === 'avb:open-node')) {onDismiss();}
     };
 
     document.addEventListener('mousedown', onDown);

@@ -83,7 +83,7 @@ test('scripts retain ordering, multiplicity, and loading attributes', () => {
   morph.runScripts(added);
   const loaded = document.head.querySelector('script');
   const wanted = tree(script).firstChild;
-  for (const attr of wanted.attributes) assert.equal(loaded.getAttribute(attr.name), attr.value);
+  for (const attr of wanted.attributes) {assert.equal(loaded.getAttribute(attr.name), attr.value);}
   morph.runScripts(added);
   assert.equal(document.head.querySelectorAll('script').length, 1);
 });

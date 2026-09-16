@@ -44,7 +44,7 @@ test('tree index preserves locations, ancestry and anchors after moves', () => {
 
 test('deep tree lookup does not exhaust the JavaScript call stack', () => {
   let node = { id: 'leaf' };
-  for (let i = 0; i < 15000; i++) node = { id: `parent${i}`, children: [node] };
+  for (let i = 0; i < 15000; i++) {node = { id: `parent${i}`, children: [node] };}
   assert.equal(tree.findNodeById([node], 'leaf').id, 'leaf');
   assert.equal(tree.pathOfNode([node], 'leaf').length, 15001);
 });
@@ -92,7 +92,7 @@ test('saving serializes concurrent writes and drains newer edits before navigati
   const save = createPageSaver({
     readCurrent: () => current,
     write: (path, state) => { writes.push({ path, state }); const gate = deferred(); gates.push(gate); return gate.promise; },
-    markSaved: (saved) => { if (current.pageState === saved) current = { ...current, pageState: { ...saved, dirty: false } }; },
+    markSaved: (saved) => { if (current.pageState === saved) {current = { ...current, pageState: { ...saved, dirty: false } };} },
   });
   const one = save();
   await tick();
@@ -137,7 +137,7 @@ test('failed saves can retry and completing an old save never cleans another pag
 
 test('external edits recognize pages, components and layouts as editable files', () => {
   const scan = { pages: [{ path: 'a.astro' }], components: [{ path: 'b.astro' }], layouts: [{ path: 'c.astro' }] };
-  for (const file of ['a.astro', 'b.astro', 'c.astro']) assert.equal(scanContainsFile(scan, file), true);
+  for (const file of ['a.astro', 'b.astro', 'c.astro']) {assert.equal(scanContainsFile(scan, file), true);}
   assert.equal(scanContainsFile(scan, 'deleted.astro'), false);
 });
 
@@ -169,7 +169,7 @@ test('failed code window writes are retained for an explicit retry', async () =>
   let attempts = 0;
   const errors = [];
   const saver = createFileSaver({ delay: 10000, onError: (error) => errors.push(error.message) });
-  saver.schedule('a.css', async () => { attempts++; if (fail) throw new Error('disk full'); });
+  saver.schedule('a.css', async () => { attempts++; if (fail) {throw new Error('disk full');} });
   await assert.rejects(saver.flush(), /disk full/);
   assert.deepEqual(errors, ['disk full']);
   fail = false;

@@ -141,14 +141,14 @@ function AngleDial({ deg, busy, onChange }: { deg: number; busy: boolean; onChan
     return Math.round(((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360)
   }
   const onDown = (event: React.PointerEvent) => {
-    if (busy) return
+    if (busy) {return}
     event.preventDefault()
     dragging.current = true
     ref.current?.setPointerCapture(event.pointerId)
     onChange(angleFrom(event), true)
   }
-  const onMove = (event: React.PointerEvent) => { if (dragging.current) onChange(angleFrom(event), true) }
-  const onUp = (event: React.PointerEvent) => { if (!dragging.current) return; dragging.current = false; onChange(angleFrom(event), false) }
+  const onMove = (event: React.PointerEvent) => { if (dragging.current) {onChange(angleFrom(event), true)} }
+  const onUp = (event: React.PointerEvent) => { if (!dragging.current) {return;} dragging.current = false; onChange(angleFrom(event), false) }
   const rad = (deg * Math.PI) / 180
   return (
     <button ref={ref} type="button" className="embed-editor_grad-dial" disabled={busy}
@@ -177,7 +177,7 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
   const external = useMemo(() => serializeGradient(gradient), [gradient])
   const [draft, setDraft] = useState<Gradient>(gradient)
   const editing = useRef(false)
-  useEffect(() => { if (!editing.current) setDraft(gradient) }, [external]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!editing.current) {setDraft(gradient)} }, [external]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [selected, setSelected] = useState(0)
   const barRef = useRef<HTMLDivElement>(null)
@@ -204,7 +204,7 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
 
   // Drag a stop along the bar (live), commit + sort on release.
   const onHandleDown = (i: number) => (e: React.PointerEvent) => {
-    if (busy) return
+    if (busy) {return}
     e.preventDefault()
     setSelected(i)
     dragStop.current = i
@@ -214,14 +214,14 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
   const onHandleMove = (e: React.PointerEvent) => {
     const i = dragStop.current
     const bar = barRef.current
-    if (i == null || !bar) return
+    if (i == null || !bar) {return}
     const rect = bar.getBoundingClientRect()
     const pct = Math.round(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)))
     setStop(i, { pos: `${pct}%` }, true)
   }
   const onHandleUp = (e: React.PointerEvent) => {
     const i = dragStop.current
-    if (i == null) return
+    if (i == null) {return}
     dragStop.current = null
     editing.current = false
     ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
@@ -230,9 +230,9 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
 
   // Click the bar background → insert a stop there (color = nearest stop's).
   const onBarClick = (e: React.MouseEvent) => {
-    if (busy || dragStop.current != null) return
+    if (busy || dragStop.current != null) {return}
     const bar = barRef.current
-    if (!bar) return
+    if (!bar) {return}
     const rect = bar.getBoundingClientRect()
     const pct = Math.round(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)))
     // Nearest existing stop by position → copy its color.
@@ -247,7 +247,7 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
     patchStops(sorted, false)
   }
   const removeStop = (i: number) => {
-    if (stops.length <= 2) return
+    if (stops.length <= 2) {return}
     patchStops(stops.filter((_, k) => k !== i), false)
     setSelected((s) => Math.max(0, Math.min(s, stops.length - 2)))
   }
@@ -258,10 +258,10 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
   // while a text field (color / position) is focused.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (busy || (e.key !== 'Delete' && e.key !== 'Backspace')) return
+      if (busy || (e.key !== 'Delete' && e.key !== 'Backspace')) {return}
       const el = document.activeElement as HTMLElement | null
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return
-      if (sel < 0 || sel >= stops.length || stops.length <= 2) return
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) {return}
+      if (sel < 0 || sel >= stops.length || stops.length <= 2) {return}
       e.preventDefault()
       removeStop(sel)
     }
@@ -374,7 +374,7 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
             onFocus={() => { editing.current = true }}
             onChange={(e) => setStop(sel, { color: e.target.value }, true)}
             onBlur={() => { editing.current = false; setStop(sel, { color: current.color }) }}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitInPlace(e.currentTarget) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') {commitInPlace(e.currentTarget)} }}
           />
           <NumField value={current.pos || `${Math.round(stopPercent(stops, sel))}%`} unit="%" label="Stop position" busy={busy}
             onLive={(v) => setStop(sel, { pos: v }, true)} onCommit={(v) => { setStop(sel, { pos: v }); sortStops(sel) }} />

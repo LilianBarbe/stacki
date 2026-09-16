@@ -23,9 +23,9 @@ const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp)$/i;
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v|ogv|ogg)$/i;
 const AUDIO_EXT = /\.(mp3|wav|m4a|aac|flac|oga)$/i;
 const kindMatches = (kind, name) => {
-  if (kind === 'image') return IMAGE_EXT.test(name);
-  if (kind === 'video') return VIDEO_EXT.test(name);
-  if (kind === 'audio') return AUDIO_EXT.test(name);
+  if (kind === 'image') {return IMAGE_EXT.test(name);}
+  if (kind === 'video') {return VIDEO_EXT.test(name);}
+  if (kind === 'audio') {return AUDIO_EXT.test(name);}
   return true;
 };
 const pickPrompt = {
@@ -83,7 +83,7 @@ export default function AssetsPanel({ project, showToast, onOpenFile, pick, onPi
       placedRef.current = null;
       return;
     }
-    if (placedRef.current === pickKey) return;
+    if (placedRef.current === pickKey) {return;}
     if (pick.current?.includes('/')) {
       setCwd(parentOf(pick.current));
       placedRef.current = pickKey;
@@ -92,7 +92,7 @@ export default function AssetsPanel({ project, showToast, onOpenFile, pick, onPi
     // Nothing set yet: start in src/assets, where Astro wants the images it
     // optimises. Only when something of the kind being asked for is actually
     // in there — otherwise an empty folder is a worse start than the roots.
-    if (!entries.length) return; // listing hasn't landed; this runs again when it does
+    if (!entries.length) {return;} // listing hasn't landed; this runs again when it does
     const inHome = (e) => e.rel === PICK_HOME || e.rel.startsWith(`${PICK_HOME}/`);
     const hasMatch = entries.some(
       (e) => !e.isDir && inHome(e) && kindMatches(pick.mediaKind, e.name)
@@ -119,12 +119,12 @@ export default function AssetsPanel({ project, showToast, onOpenFile, pick, onPi
 
   const dropPayload = (e) => {
     const rel = e.dataTransfer.getData('avb/asset');
-    if (rel) return { kind: 'asset', rel };
+    if (rel) {return { kind: 'asset', rel };}
     if (e.dataTransfer.files?.length) {
       const paths = [...e.dataTransfer.files]
         .map((f) => window.avb.getFilePath(f))
         .filter(Boolean);
-      if (paths.length) return { kind: 'os', paths };
+      if (paths.length) {return { kind: 'os', paths };}
     }
     return null;
   };
@@ -137,9 +137,9 @@ export default function AssetsPanel({ project, showToast, onOpenFile, pick, onPi
     e.stopPropagation();
     setDragTarget(null);
     const payload = dropPayload(e);
-    if (!payload) return;
+    if (!payload) {return;}
     if (payload.kind === 'asset') {
-      if (payload.rel === destRel || parentOf(payload.rel) === destRel) return;
+      if (payload.rel === destRel || parentOf(payload.rel) === destRel) {return;}
       const fromDir = parentOf(payload.rel);
       const name = payload.rel.slice(payload.rel.lastIndexOf('/') + 1);
       const landedRel = destRel ? `${destRel}/${name}` : name;
@@ -173,7 +173,7 @@ export default function AssetsPanel({ project, showToast, onOpenFile, pick, onPi
   const commitRename = (entry, value) => {
     setRenaming(null);
     const clean = value.trim();
-    if (!clean || clean === entry.name) return;
+    if (!clean || clean === entry.name) {return;}
     const dir = parentOf(entry.rel);
     const toRel = dir ? `${dir}/${clean}` : clean;
     const rename = (rel, newName) => window.avb.renameAsset({ projectPath: project.path, rel, newName });
@@ -204,9 +204,9 @@ export default function AssetsPanel({ project, showToast, onOpenFile, pick, onPi
         confirmLabel: 'Delete',
         danger: true,
       });
-      if (!yes) return;
+      if (!yes) {return;}
       const result = await window.avb.deleteAsset({ projectPath: project.path, rel: file.rel });
-      if (result?.ok === false) showToast(`${file.name} was already gone.`, 'error');
+      if (result?.ok === false) {showToast(`${file.name} was already gone.`, 'error');}
     });
   };
 
@@ -314,7 +314,7 @@ export default function AssetsPanel({ project, showToast, onOpenFile, pick, onPi
         className={`panel-body asset-body ${dragTarget === cwd ? 'drop' : ''}`}
         onDragOver={dragOverInto(cwd)}
         onDragLeave={(e) => {
-          if (e.target === e.currentTarget) setDragTarget(null);
+          if (e.target === e.currentTarget) {setDragTarget(null);}
         }}
         onDrop={dropInto(cwd)}
       >
@@ -334,7 +334,7 @@ export default function AssetsPanel({ project, showToast, onOpenFile, pick, onPi
                 }
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Enter') {e.currentTarget.blur();}
                 if (e.key === 'Escape') {
                   e.currentTarget.value = '';
                   e.currentTarget.blur();
@@ -461,7 +461,7 @@ function RenameInput({ entry, onCommit }) {
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => onCommit(entry, value)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Enter') {e.currentTarget.blur();}
         if (e.key === 'Escape') {
           setValue(entry.name);
           onCommit(entry, entry.name);

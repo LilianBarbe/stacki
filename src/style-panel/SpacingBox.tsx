@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { HoverTooltip } from './components/SegmentedControl'
@@ -36,7 +38,7 @@ type Display = {
   winnerSelector: string
 }
 function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) return { present: false, isSelected: false, value: '', important: false, overridden: false, winnerSelector: '' }
+  if (!resolved) {return { present: false, isSelected: false, value: '', important: false, overridden: false, winnerSelector: '' }}
   const isSelected = resolved.source === 'selected'
   // A wrapped value that Webflow cannot round-trip is moved to the selected embed
   // rule, while its native class can still read back as the inner Variable object.
@@ -60,7 +62,7 @@ function displayOf(resolved: ResolvedProp | undefined): Display {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 
@@ -82,8 +84,8 @@ const OPPOSITE: Record<Side, Side> = { top: 'bottom', bottom: 'top', left: 'righ
 // side + its opposite, otherwise just the dragged side. All affected sides are
 // set to the same value (they equalise as you drag).
 function affectedSides(side: Side, event: { shiftKey: boolean; altKey: boolean }): Side[] {
-  if (event.shiftKey) return ALL_SIDES
-  if (event.altKey) return [side, OPPOSITE[side]]
+  if (event.shiftKey) {return ALL_SIDES}
+  if (event.altKey) {return [side, OPPOSITE[side]]}
   return [side]
 }
 
@@ -91,7 +93,7 @@ function affectedSides(side: Side, event: { shiftKey: boolean; altKey: boolean }
 // `padding-`, the bare inset `right` → ``). Only sides share a prefix this way,
 // so anything else stays a one-property edit.
 function siblingProps(prop: string, side: Side, sides: Side[]): string[] {
-  if (!prop.endsWith(side)) return [prop]
+  if (!prop.endsWith(side)) {return [prop]}
   const prefix = prop.slice(0, prop.length - side.length)
   return sides.map((s) => `${prefix}${s}`)
 }
@@ -102,7 +104,7 @@ const DRAG_SENSITIVITY = 0.5
 /** Split a length into its number and unit (unit '' when absent / non-numeric). */
 function parseNumUnit(value: string): { num: number; unit: string } {
   const match = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i)
-  if (!match) return { num: 0, unit: '' }
+  if (!match) {return { num: 0, unit: '' }}
   return { num: parseFloat(match[1]), unit: match[2].toLowerCase() }
 }
 
@@ -258,21 +260,21 @@ function useSideDrag({
     const d = drag.current!
     const px = (d.axis === 'x' ? d.x - d.startX : d.y - d.startY) * d.sign
     let next = d.startNum + (px * DRAG_SENSITIVITY) / pxPerUnit(d.unit)
-    if (inward && next < 0) next = 0 // padding can't go negative; insets/margins can
+    if (inward && next < 0) {next = 0} // padding can't go negative; insets/margins can
     return formatLength(next, d.unit)
   }
 
   const flush = () => {
     raf.current = null
     const d = drag.current
-    if (d && pending.current != null) d.props.forEach((prop) => liveSetProp(prop, pending.current!, d.important))
+    if (d && pending.current != null) {d.props.forEach((prop) => liveSetProp(prop, pending.current!, d.important))}
   }
 
   // Everything the drag does on any change — the pointer moving, or a modifier
   // going down or up under a pointer that is standing still.
   const apply = () => {
     const d = drag.current
-    if (!d || !d.active) return
+    if (!d || !d.active) {return}
     dragged.current = true
     const next = affectedSides(d.side, d).map((s) => propFor(s))
     // A side the modifier just dropped goes back to what it was. It was only
@@ -285,12 +287,12 @@ function useSideDrag({
       }
     }
     d.props = next
-    for (const prop of next) d.written.add(prop)
+    for (const prop of next) {d.written.add(prop)}
     const value = valueAt()
     // Update the labels every time (cheap setState); throttle the canvas write to rAF.
     onLive(d.props, d.important ? `${value} !important` : value)
     pending.current = value
-    if (raf.current == null) raf.current = requestAnimationFrame(flush)
+    if (raf.current == null) {raf.current = requestAnimationFrame(flush)}
   }
 
   // While a drag is live, Shift and Option are read as they are pressed rather
@@ -299,7 +301,7 @@ function useSideDrag({
   useEffect(() => {
     const follow = ({ shiftKey, altKey }: { shiftKey: boolean; altKey: boolean }) => {
       const d = drag.current
-      if (!d || (d.shiftKey === shiftKey && d.altKey === altKey)) return
+      if (!d || (d.shiftKey === shiftKey && d.altKey === altKey)) {return}
       d.shiftKey = shiftKey
       d.altKey = altKey
       apply()
@@ -319,10 +321,10 @@ function useSideDrag({
   }, [])
 
   const onPointerDown = (side: Side) => (event: React.PointerEvent) => {
-    if (busy) return
+    if (busy) {return}
     // A band has nothing else to be, so it takes the press outright. A number is
     // a button: leave it its focus and its click until the pointer moves.
-    if (threshold === 0) event.preventDefault()
+    if (threshold === 0) {event.preventDefault()}
     const shown = displayOf(read(propFor(side)))
     const { num, unit } = parseNumUnit(shown.value)
     const a = SIDE_AXIS[side]
@@ -352,7 +354,7 @@ function useSideDrag({
 
   const onPointerMove = (event: React.PointerEvent) => {
     const d = drag.current
-    if (!d) return
+    if (!d) {return}
     d.x = event.clientX
     d.y = event.clientY
     d.shiftKey = event.shiftKey
@@ -360,7 +362,7 @@ function useSideDrag({
     if (!d.active) {
       const far =
         Math.abs(event.clientX - d.startX) >= threshold || Math.abs(event.clientY - d.startY) >= threshold
-      if (!far) return
+      if (!far) {return}
       d.active = true
     }
     apply()
@@ -368,7 +370,7 @@ function useSideDrag({
 
   const onPointerUp = (event: React.PointerEvent) => {
     const d = drag.current
-    if (!d) return
+    if (!d) {return}
     cancelFrame()
     if (d.active) {
       d.x = event.clientX
@@ -387,7 +389,7 @@ function useSideDrag({
     pending.current = null
     // Pressed and let go without moving: that was a click, and the click handler
     // is the one that should hear about it.
-    if (value == null) return
+    if (value == null) {return}
     onLiveEnd()
     props.forEach((prop) => setProp(prop, value, important))
   }
@@ -426,7 +428,7 @@ function useSideHover({ propFor, kind, read }: { propFor: (side: Side) => string
   useEffect(() => {
     const follow = ({ shiftKey, altKey }: { shiftKey: boolean; altKey: boolean }) => {
       const o = over.current
-      if (!o || (o.shiftKey === shiftKey && o.altKey === altKey)) return
+      if (!o || (o.shiftKey === shiftKey && o.altKey === altKey)) {return}
       o.shiftKey = shiftKey
       o.altKey = altKey
       reportRef.current()
@@ -456,7 +458,7 @@ function useSideHover({ propFor, kind, read }: { propFor: (side: Side) => string
       offModifiers()
       if (over.current) { over.current = null; getHost().onSpacingHover?.(null) }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   return {
@@ -472,14 +474,14 @@ function useSideHover({ propFor, kind, read }: { propFor: (side: Side) => string
       report()
     },
     onLeave: () => {
-      if (!over.current) return
+      if (!over.current) {return}
       over.current = null
       report()
     },
     /** Follow a modifier held while the pointer moves within the same side. */
     onOver: (event: React.MouseEvent | React.PointerEvent) => {
       const o = over.current
-      if (!o || (o.shiftKey === event.shiftKey && o.altKey === event.altKey)) return
+      if (!o || (o.shiftKey === event.shiftKey && o.altKey === event.altKey)) {return}
       o.shiftKey = event.shiftKey
       o.altKey = event.altKey
       report()
@@ -546,7 +548,7 @@ function variableFor(value: string, variables: ProjectVariable[]): ProjectVariab
   const binding = raw.match(/var\(\s*--[A-Za-z0-9_-]+[^)]*\)/i)?.[0]
   // Purple is reserved for a direct variable value. Expressions that merely contain
   // a variable, such as `calc(var(--space) * 2)`, remain normal blue property values.
-  if (binding) return binding === raw ? variables.find((variable) => variable.binding === binding) : undefined
+  if (binding) {return binding === raw ? variables.find((variable) => variable.binding === binding) : undefined}
   return variables.find((variable) => {
     const fullName = variable.group ? `${variable.group}/${variable.name}` : variable.name
     return raw === fullName || raw === variable.name
@@ -554,7 +556,7 @@ function variableFor(value: string, variables: ProjectVariable[]): ProjectVariab
 }
 
 function isWrappedValue(value: string | undefined): boolean {
-  if (!value) return false
+  if (!value) {return false}
   const raw = value.trim().replace(/\s*!important$/i, '')
   return /^(?!var\()[a-z-]+\(/i.test(raw)
 }
@@ -631,7 +633,7 @@ export function SpacingLabel({
   const hasValue = override != null || d.present
   const openTooltip = () => {
     clearTooltipTimer()
-    if (!hasValue) return
+    if (!hasValue) {return}
     tooltipTimer.current = window.setTimeout(() => { tooltipTimer.current = null; setShowTooltip(true) }, 350)
   }
   const closeTooltip = () => { clearTooltipTimer(); setShowTooltip(false) }
@@ -671,7 +673,7 @@ export function SpacingLabel({
         onMouseLeave={closeTooltip}
         onPointerEnter={hover.onEnter(side)}
         onPointerLeave={hover.onLeave}
-        onFocus={() => { if (hasValue) setShowTooltip(true) }}
+        onFocus={() => { if (hasValue) {setShowTooltip(true)} }}
         onBlur={closeTooltip}
         onPointerDown={(event) => { closeTooltip(); onPointerDown(side)(event) }}
         onPointerMove={(event) => { hover.onOver(event); onPointerMove(event) }}
@@ -679,7 +681,7 @@ export function SpacingLabel({
         onPointerCancel={onPointerUp}
         onClick={(event) => {
           closeTooltip()
-          if (wasDrag()) return // that press was a drag; it has already been applied
+          if (wasDrag()) {return} // that press was a drag; it has already been applied
           if (event.altKey) { clearProp(prop); return } // Alt/Option-click removes the value
           onEdit(prop, side)
         }}
@@ -772,7 +774,7 @@ export function SpacingEditor({
   // Undelayed live write for the scrub, which throttles its own — see useScrub.
   const liveNow = (text: string) => {
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed) {return}
     const parsed = parseImportant(trimmed)
     liveSetProp(prop, parsed.value, parsed.important)
   }
@@ -794,7 +796,7 @@ export function SpacingEditor({
   // Commit the latest draft (via ref, so the document listener's stale closure
   // still reads it) and close — guarded so blur + outside-click can't double-fire.
   const close = () => {
-    if (closed.current) return
+    if (closed.current) {return}
     closed.current = true
     cancelLive()
     // Only apply on an explicit Enter or an actual edit. Opening the popover and
@@ -804,7 +806,7 @@ export function SpacingEditor({
     const changed = trimmed !== originalRef.current.trim()
     if (commitRequested.current || changed) {
       const props = commitProps.current
-      if (!trimmed) clearProp(props)
+      if (!trimmed) {clearProp(props)}
       else {
         const parsed = parseImportant(trimmed)
         props.forEach((target) => setProp(target, parsed.value, parsed.important))
@@ -825,14 +827,14 @@ export function SpacingEditor({
   // suppresses the compat mousedown + blur (e.g. the drag bands).
   useEffect(() => {
     const onDocDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return
+      if (rootRef.current?.contains(event.target as Node)) {return}
       // The variable picker opens from the dot in this popover but portals to the
       // body, so a press in it is a press in here — see lib/popup-layer.
-      if (inOwnedPopup(event.target as Node, rootRef.current)) return
+      if (inOwnedPopup(event.target as Node, rootRef.current)) {return}
       // Pressing this side's own label should net to a close (not reopen): flag it
       // so the label's click doesn't re-open the popover we're about to close.
       const labelProp = (event.target as Element).closest?.('.embed-editor_spacing-label')?.getAttribute('data-prop')
-      if (labelProp === prop) onSameLabelPress()
+      if (labelProp === prop) {onSameLabelPress()}
       close()
     }
     document.addEventListener('pointerdown', onDocDown)
@@ -851,8 +853,8 @@ export function SpacingEditor({
       // refusing the caret.
       onMouseDown={(event) => {
         const t = event.target
-        if (t === inputRef.current) return
-        if (t instanceof Element && t.closest('.embed-editor_varconnect')) return
+        if (t === inputRef.current) {return}
+        if (t instanceof Element && t.closest('.embed-editor_varconnect')) {return}
         event.preventDefault()
       }}
       // Which sides the pending commit writes is decided HERE rather than on the
@@ -906,8 +908,8 @@ export function SpacingEditor({
             // blur the focus has left one element and not yet reached the next.
             onBlur={() => {
               window.setTimeout(() => {
-                if (hasOwnedPopup(rootRef.current)) return
-                if (inOwnedPopup(document.activeElement, rootRef.current)) return
+                if (hasOwnedPopup(rootRef.current)) {return}
+                if (inOwnedPopup(document.activeElement, rootRef.current)) {return}
                 close()
               }, 0)
             }}
@@ -927,7 +929,7 @@ export function SpacingEditor({
               // Padding stops at 0; a margin or an inset is free to go negative,
               // which is the whole point of pulling something out of its box.
               const stepped = handleArrowStep(event, isNonNegative(prop) ? 0 : undefined)
-              if (!stepped) return
+              if (!stepped) {return}
               event.preventDefault()
               const el = event.currentTarget
               el.value = stepped.text

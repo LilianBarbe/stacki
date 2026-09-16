@@ -14,15 +14,15 @@ const isChip = (node) => !!node && node.nodeType === 1 && node.classList.contain
 // where an ordinary character delete is what was meant.
 function chipBesideCaret(host, dir) {
   const sel = window.getSelection();
-  if (!sel || sel.rangeCount === 0) return null;
+  if (!sel || sel.rangeCount === 0) {return null;}
   const range = sel.getRangeAt(0);
-  if (!range.collapsed || !host.contains(range.startContainer)) return null;
+  if (!range.collapsed || !host.contains(range.startContainer)) {return null;}
   const node = range.startContainer;
   const offset = range.startOffset;
   if (node.nodeType === 3) {
     // Only from the very edge of the text: anywhere else there is a character
     // to remove, which is what the key is for.
-    if (dir < 0 ? offset > 0 : offset < node.nodeValue.length) return null;
+    if (dir < 0 ? offset > 0 : offset < node.nodeValue.length) {return null;}
     const sib = dir < 0 ? node.previousSibling : node.nextSibling;
     return isChip(sib) ? sib : null;
   }
@@ -36,11 +36,11 @@ function chipBesideCaret(host, dir) {
  * has changed without the browser's own editing having run.
  */
 export function deleteChipAtCaret(host, event) {
-  if (!host) return false;
-  if (event.key !== 'Backspace' && event.key !== 'Delete') return false;
-  if (event.metaKey || event.ctrlKey || event.altKey) return false;
+  if (!host) {return false;}
+  if (event.key !== 'Backspace' && event.key !== 'Delete') {return false;}
+  if (event.metaKey || event.ctrlKey || event.altKey) {return false;}
   const chip = chipBesideCaret(host, event.key === 'Backspace' ? -1 : 1);
-  if (!chip) return false;
+  if (!chip) {return false;}
   // Put the caret where the chip was, so typing carries on from that spot
   // rather than jumping to an end of the field.
   const parent = chip.parentNode;

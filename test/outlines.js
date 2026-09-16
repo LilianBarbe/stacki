@@ -25,7 +25,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const box = (x, y, w, h) => ({ x, y, w, h });
@@ -159,7 +159,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
   );
   check(
     'a step within a copy keeps it',
-    /if \(sameCopy\(previous, selPath\)\) return;/.test(pane),
+    /if \(sameCopy\(previous, selPath\)\) \{return;\}/.test(pane),
     'every selection outside the canvas is back to meaning the first copy'
   );
   check(

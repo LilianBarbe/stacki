@@ -19,7 +19,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // The two rules the field is built on, as the panel defines them.
@@ -28,16 +28,16 @@ const NO_SOURCE = '[]';
 
 function sourceChip(value) {
   const text = String(value || '').trim();
-  if (!text || text === NO_SOURCE) return '';
+  if (!text || text === NO_SOURCE) {return '';}
   const match = SOURCE_RE.exec(text);
-  if (!match) return '';
+  if (!match) {return '';}
   let name = match[1];
   // A segment that is called is not part of the path: `posts.filter(…)` is
   // `posts`, done to — and a call on the whole thing (`getPosts()`) names a
   // function, which is not a source anything can be swapped for.
   while (text[name.length] === '(') {
     const at = name.lastIndexOf('.');
-    if (at < 0) return '';
+    if (at < 0) {return '';}
     name = name.slice(0, at);
   }
   return name;
@@ -45,7 +45,7 @@ function sourceChip(value) {
 
 function withSource(value, path) {
   const current = sourceChip(value);
-  if (!current) return path;
+  if (!current) {return path;}
   const text = String(value);
   const at = text.indexOf(current);
   return text.slice(0, at) + path + text.slice(at + current.length);

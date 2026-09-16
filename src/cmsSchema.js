@@ -44,25 +44,25 @@ export function inferType(value) {
   // A name bound to a picture is a picture. The file says which one — the CMS
   // is handed that beside the name — so the field can show it and swap it,
   // rather than showing the word `dailyDevotionals` in a code box.
-  if (isExpr(value)) return typeof value.__asset === 'string' && IMAGE_RE.test(value.__asset) ? 'image' : 'code';
-  if (value === null || value === undefined || value === '') return 'empty';
-  if (typeof value === 'boolean') return 'boolean';
-  if (typeof value === 'number') return 'number';
+  if (isExpr(value)) {return typeof value.__asset === 'string' && IMAGE_RE.test(value.__asset) ? 'image' : 'code';}
+  if (value === null || value === undefined || value === '') {return 'empty';}
+  if (typeof value === 'boolean') {return 'boolean';}
+  if (typeof value === 'number') {return 'number';}
   if (Array.isArray(value)) {
-    if (value.length && value.every(isPlainObject)) return 'objects';
+    if (value.length && value.every(isPlainObject)) {return 'objects';}
     return 'list';
   }
-  if (isPlainObject(value)) return 'object';
+  if (isPlainObject(value)) {return 'object';}
   const s = String(value);
-  if (IMAGE_RE.test(s)) return 'image';
-  if (COLOR_RE.test(s)) return 'color';
-  if (DATE_RE.test(s)) return 'date';
-  if (s.startsWith('mailto:') || EMAIL_RE.test(s)) return 'email';
-  if (s.startsWith('tel:')) return 'phone';
+  if (IMAGE_RE.test(s)) {return 'image';}
+  if (COLOR_RE.test(s)) {return 'color';}
+  if (DATE_RE.test(s)) {return 'date';}
+  if (s.startsWith('mailto:') || EMAIL_RE.test(s)) {return 'email';}
+  if (s.startsWith('tel:')) {return 'phone';}
   // Only absolute URLs — a relative path is as likely to be a slug or a
   // filename as a link, and a URL input would fight the user over it.
-  if (/^https?:\/\//.test(s)) return 'link';
-  if (s.length > 80 || s.includes('\n')) return 'longtext';
+  if (/^https?:\/\//.test(s)) {return 'link';}
+  if (s.length > 80 || s.includes('\n')) {return 'longtext';}
   return 'text';
 }
 
@@ -75,7 +75,7 @@ export function labelize(raw) {
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!words) return base;
+  if (!words) {return base;}
   return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
 }
 
@@ -95,7 +95,7 @@ export function collectionOf(file) {
     error: file.error || null,
   };
   const data = file.data;
-  if (file.error || data === undefined) return { ...base, items: [], single: false, rootKey: null };
+  if (file.error || data === undefined) {return { ...base, items: [], single: false, rootKey: null };}
 
   if (Array.isArray(data)) {
     return { ...base, rootKey: null, items: data, single: false };
@@ -114,8 +114,8 @@ export function collectionOf(file) {
 
 // Puts edited items back in the shape the file had.
 export function reassemble(collection, items) {
-  if (collection.single) return items[0] ?? {};
-  if (collection.rootKey) return { ...(collection.raw || {}), [collection.rootKey]: items };
+  if (collection.single) {return items[0] ?? {};}
+  if (collection.rootKey) {return { ...(collection.raw || {}), [collection.rootKey]: items };}
   return items;
 }
 
@@ -125,7 +125,7 @@ export function fieldsOf(items) {
   const order = [];
   const types = new Map();
   for (const item of items) {
-    if (!isPlainObject(item)) continue;
+    if (!isPlainObject(item)) {continue;}
     for (const [key, value] of Object.entries(item)) {
       if (!types.has(key)) {
         order.push(key);
@@ -153,10 +153,10 @@ export function titleOf(item, index) {
   }
   for (const key of TITLE_KEYS) {
     const v = item[key];
-    if (typeof v === 'string' && v.trim()) return v.trim();
+    if (typeof v === 'string' && v.trim()) {return v.trim();}
   }
   for (const v of Object.values(item)) {
-    if (typeof v === 'string' && v.trim() && v.length <= 60) return v.trim();
+    if (typeof v === 'string' && v.trim() && v.length <= 60) {return v.trim();}
   }
   return `Item ${index + 1}`;
 }
@@ -165,13 +165,13 @@ export function titleOf(item, index) {
 // fields already in place instead of an empty object.
 export function blankLike(value) {
   const type = inferType(value);
-  if (type === 'boolean') return false;
-  if (type === 'number') return 0;
-  if (type === 'objects') return [];
-  if (type === 'list') return [];
+  if (type === 'boolean') {return false;}
+  if (type === 'number') {return 0;}
+  if (type === 'objects') {return [];}
+  if (type === 'list') {return [];}
   if (type === 'object') {
     const out = {};
-    for (const [k, v] of Object.entries(value)) out[k] = blankLike(v);
+    for (const [k, v] of Object.entries(value)) {out[k] = blankLike(v);}
     return out;
   }
   return '';
@@ -201,18 +201,18 @@ export function keyFor(name) {
     .trim()
     .split(/\s+/)
     .filter(Boolean);
-  if (!words.length) return '';
+  if (!words.length) {return '';}
   return words
     .map((w, i) => (i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
     .join('');
 }
 
 export function emptyValueFor(type) {
-  if (type === 'code') return { [EXPR_KEY]: '' };
-  if (type === 'boolean') return false;
-  if (type === 'number') return 0;
-  if (type === 'list' || type === 'objects') return [];
-  if (type === 'object') return {};
+  if (type === 'code') {return { [EXPR_KEY]: '' };}
+  if (type === 'boolean') {return false;}
+  if (type === 'number') {return 0;}
+  if (type === 'list' || type === 'objects') {return [];}
+  if (type === 'object') {return {};}
   return '';
 }
 
@@ -222,7 +222,7 @@ export function duplicateItem(item) {
   const copy = JSON.parse(JSON.stringify(item));
   if (isPlainObject(copy)) {
     for (const key of ['slug', 'id']) {
-      if (typeof copy[key] === 'string' && copy[key]) copy[key] = `${copy[key]}-copy`;
+      if (typeof copy[key] === 'string' && copy[key]) {copy[key] = `${copy[key]}-copy`;}
     }
     for (const key of ['name', 'title']) {
       if (typeof copy[key] === 'string' && copy[key]) {
@@ -249,8 +249,8 @@ export function objectsAt(items, path) {
     const next = [];
     for (const obj of current) {
       const value = obj[key];
-      if (Array.isArray(value)) next.push(...value.filter(isPlainObject));
-      else if (isPlainObject(value)) next.push(value);
+      if (Array.isArray(value)) {next.push(...value.filter(isPlainObject));}
+      else if (isPlainObject(value)) {next.push(value);}
     }
     current = next;
   }
@@ -260,11 +260,11 @@ export function objectsAt(items, path) {
 export const fieldsAt = (items, path) => fieldsOf(objectsAt(items, path));
 
 function transformAt(value, path, fn) {
-  if (!path.length) return isPlainObject(value) ? fn(value) : value;
-  if (!isPlainObject(value)) return value;
+  if (!path.length) {return isPlainObject(value) ? fn(value) : value;}
+  if (!isPlainObject(value)) {return value;}
   const [key, ...rest] = path;
   const child = value[key];
-  if (child === undefined) return value;
+  if (child === undefined) {return value;}
   return {
     ...value,
     [key]: Array.isArray(child)
@@ -279,14 +279,14 @@ export function applyToItems(items, path, fn) {
 
 // Renaming rebuilds the object so the field keeps its position in the file.
 export const renameKey = (from, to) => (obj) => {
-  if (!(from in obj) || from === to) return obj;
+  if (!(from in obj) || from === to) {return obj;}
   const out = {};
-  for (const [k, v] of Object.entries(obj)) out[k === from ? to : k] = v;
+  for (const [k, v] of Object.entries(obj)) {out[k === from ? to : k] = v;}
   return out;
 };
 
 export const dropKey = (key) => (obj) => {
-  if (!(key in obj)) return obj;
+  if (!(key in obj)) {return obj;}
   const out = { ...obj };
   delete out[key];
   return out;
@@ -296,8 +296,8 @@ export const putKey = (key, type) => (obj) => (key in obj ? obj : { ...obj, [key
 
 export const orderKeys = (keys) => (obj) => {
   const out = {};
-  for (const k of keys) if (k in obj) out[k] = obj[k];
-  for (const k of Object.keys(obj)) if (!(k in out)) out[k] = obj[k];
+  for (const k of keys) {if (k in obj) {out[k] = obj[k];}}
+  for (const k of Object.keys(obj)) {if (!(k in out)) {out[k] = obj[k];}}
   return out;
 };
 

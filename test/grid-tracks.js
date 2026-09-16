@@ -19,7 +19,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -379,7 +379,7 @@ const check = (what, condition, detail) => {
     );
     // The guard has grown other reasons to bow out (the picker being open, for one);
     // what matters here is that `expanded` is one of them.
-    check('the press that opens it respects that', /if \(disabled \|\| big \|\| expanded[^)]*\) return/.test(vc));
+    check('the press that opens it respects that', /if \(disabled \|\| big \|\| expanded[^)]*\) \{return/.test(vc));
     check("and so does the '=' shortcut", /e\.key === '=' && !disabled && !big && !expanded/.test(vc));
   }
 

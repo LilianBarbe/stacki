@@ -34,7 +34,7 @@ export function onePerPlace(boxes) {
   const order = [...list].sort((a, b) => b.w * b.h - a.w * a.h);
   const kept = [];
   for (const box of order) {
-    if (!kept.some((k) => covers(k, box))) kept.push(box);
+    if (!kept.some((k) => covers(k, box))) {kept.push(box);}
   }
   return list.filter((b) => kept.includes(b));
 }
@@ -54,8 +54,8 @@ export function onePerPlace(boxes) {
  * outlines all of them — already covers whichever copy is hovered.
  */
 export function hoverIsSelection(hover, selection) {
-  if (!hover?.path || !selection?.path) return false;
-  if (hover.path !== selection.path) return false;
+  if (!hover?.path || !selection?.path) {return false;}
+  if (hover.path !== selection.path) {return false;}
   return hover.occ == null || selection.occ == null || hover.occ === selection.occ;
 }
 
@@ -80,7 +80,7 @@ export function hoverIsSelection(hover, selection) {
  * into another file's markup is not a step within a copy.
  */
 export function sameCopy(from, to) {
-  if (!from || !to || from === to) return false;
+  if (!from || !to || from === to) {return false;}
   const split = (p) => {
     const text = String(p);
     const bar = text.lastIndexOf('|');
@@ -91,12 +91,12 @@ export function sameCopy(from, to) {
   };
   const a = split(from);
   const b = split(to);
-  if (a.file !== b.file) return false;
+  if (a.file !== b.file) {return false;}
   const shorter = Math.min(a.trail.length, b.trail.length);
   // A sibling differs only in its last step; an ancestor or descendant agrees
   // the whole way down the shorter of the two.
   const common = a.trail.length === b.trail.length ? shorter - 1 : shorter;
-  for (let i = 0; i < common; i++) if (a.trail[i] !== b.trail[i]) return false;
+  for (let i = 0; i < common; i++) {if (a.trail[i] !== b.trail[i]) {return false;}}
   return true;
 }
 

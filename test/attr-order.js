@@ -27,7 +27,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const { parsePage, serializePage, parseTemplate, serializeNodes } = require('../electron/astroParser.js');
@@ -55,7 +55,7 @@ const S = (value) => ({ type: 'string', value });
 // The tag as it comes back out, after `edit` has had the node.
 function after(body, edit, pick = (nodes) => nodes[0]) {
   const parsed = parsePage(page(body));
-  if (!parsed.editable) return `(code view: ${parsed.reason})`;
+  if (!parsed.editable) {return `(code view: ${parsed.reason})`;}
   edit(pick(parsed.model.nodes), parsed.model);
   return serializePage(parsed.model).split('\n').slice(2, -1).join('\n');
 }

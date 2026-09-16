@@ -24,7 +24,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
         const name = path.basename(args.path, '.jsx');
         // Keep both preview components real: a mocked pane cannot reveal frame
         // replacement, navigation, or an inspector vanishing beside the frame.
-        if (name === 'PreviewPane' || name === 'CanvasView') return;
+        if (name === 'PreviewPane' || name === 'CanvasView') {return;}
         return { contents: `export const relativeTime = () => ''; export default function Panel(props) { globalThis.__componentPanels[${JSON.stringify(name)}] = props; return null; }`, loader: 'jsx' };
       });
     } }],
@@ -32,7 +32,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true });
   global.window = dom.window;
-  for (const name of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) global[name] = dom.window[name];
+  for (const name of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) {global[name] = dom.window[name];}
   global.getComputedStyle = dom.window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
@@ -42,7 +42,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   global.__componentPanels = {};
   global.IS_REACT_ACT_ENVIRONMENT = true;
   const page = { name: 'index.astro', path: '/project/src/pages/index.astro', route: '/' };
-  const card = { name: 'Card', path: '/project/src/components/Card.astro' };
+  const card = { name: 'Card', path: '/project/src/components/Card.astro', folder: '' };
   const states = new Map([
     [page.path, parsePage("---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>")],
     [card.path, parsePage('<section class="card"><p>Card content</p></section>')],
@@ -52,14 +52,14 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   let writeError = null;
   const bridge = new Proxy({
     pendingProject: async () => null,
-    scanProject: async () => ({ pages: [page], components: [card], layouts: [] }),
+    scanProject: async () => ({ pages: [page], components: [card], layouts: [], pageFolders: [] }),
     hasNodeModules: async () => true,
     startDevServer: async () => ({ url: 'http://localhost:4321' }),
     listProjectClasses: async () => [],
     resolveImport: async () => ({ path: card.path }),
     readPage: async (file) => heldReads.get(file)?.promise ?? structuredClone(states.get(file)),
     writePage: async ({ pagePath, model }) => {
-      if (writeError) throw writeError;
+      if (writeError) {throw writeError;}
       writes.push({ pagePath, model });
       states.set(pagePath, { editable: true, model: structuredClone(model) });
     },

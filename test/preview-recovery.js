@@ -35,7 +35,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -216,7 +216,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     let reloads = 0;
     let asks = 0;
     const watch = createPreviewWatch({
-      probe: async () => { asks++; if (asks < 3) throw new Error('no server'); return { ok: true } },
+      probe: async () => { asks++; if (asks < 3) {throw new Error('no server');} return { ok: true } },
       onRecover: () => { reloads++ },
       retryMs: 20,
       settleMs: 5,
@@ -265,7 +265,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     );
     check(
       'and not for the app’s own writes, which say it themselves',
-      /if \(isSelfWrite\(changed\)\) return;\s*notePageMayHaveChanged\(true\);/.test(handler),
+      /if \(isSelfWrite\(changed\)\) \{\s*return;\s*\}\s*notePageMayHaveChanged\(true\);/.test(handler),
       handler.slice(0, 400)
     );
     check(

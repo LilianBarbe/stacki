@@ -20,18 +20,18 @@ const TYPES = [
 ];
 
 function detectType(str, pages) {
-  if (!str) return 'url';
-  if (str.startsWith('#')) return 'section';
-  if (str.startsWith('mailto:')) return 'email';
-  if (str.startsWith('tel:')) return 'phone';
-  if ((pages || []).some((p) => p.route === str)) return 'page';
-  if (str.startsWith('/') && /\.[a-z0-9]+$/i.test(str)) return 'asset';
+  if (!str) {return 'url';}
+  if (str.startsWith('#')) {return 'section';}
+  if (str.startsWith('mailto:')) {return 'email';}
+  if (str.startsWith('tel:')) {return 'phone';}
+  if ((pages || []).some((p) => p.route === str)) {return 'page';}
+  if (str.startsWith('/') && /\.[a-z0-9]+$/i.test(str)) {return 'asset';}
   return 'url';
 }
 
 function parseMailto(str) {
   const m = String(str).match(/^mailto:([^?]*)(?:\?(.*))?$/);
-  if (!m) return { email: '', subject: '' };
+  if (!m) {return { email: '', subject: '' };}
   let subject = '';
   try {
     subject = new URLSearchParams(m[2] || '').get('subject') || '';
@@ -81,7 +81,7 @@ export default function LinkField({ value, context, onChange }) {
   };
   useLayoutEffect(measure);
   useLayoutEffect(() => {
-    if (!rowRef.current || typeof ResizeObserver === 'undefined') return undefined;
+    if (!rowRef.current || typeof ResizeObserver === 'undefined') {return undefined;}
     const ro = new ResizeObserver(measure);
     ro.observe(rowRef.current);
     return () => ro.disconnect();

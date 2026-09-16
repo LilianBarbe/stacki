@@ -1,0 +1,30 @@
+{
+  "//": "Emits shared/ to shared/dist as CJS + declarations: Electron main (CJS) requires it, Vite and node --test consume the same artifact. Strict flags mirror the root config.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "lib": ["ES2022"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    // The root project enforces verbatimModuleSyntax on these same sources;
+    // this project's only job is emitting CJS for Node/Electron, and the flag
+    // forbids ESM syntax in a CommonJS emit target.
+    "verbatimModuleSyntax": false,
+
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["*.ts"],
+  "exclude": ["dist"]
+}

@@ -58,7 +58,7 @@ async function checkFragment(syntax) {
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true, url: 'http://localhost/' });
   global.window = dom.window;
-  for (const name of ['document', 'navigator', 'Element', 'HTMLElement', 'Node']) global[name] = dom.window[name];
+  for (const name of ['document', 'navigator', 'Element', 'HTMLElement', 'Node']) {global[name] = dom.window[name];}
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
   global.ResizeObserver = class { observe() {} disconnect() {} };

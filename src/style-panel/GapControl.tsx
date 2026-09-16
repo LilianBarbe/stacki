@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import { displayOf, GroupLabel, PropLabel } from './TypographySection'
 import useScrub from './components/useScrub'
@@ -35,7 +37,7 @@ const GAP_PROPS = [ROW, COL, ROW_LEGACY, COL_LEGACY, SHORTHAND]
 // `gap: <row> [<column>]` — one value sets both axes.
 function shorthandPart(value: string, axis: 'row' | 'col'): string {
   const parts = splitTopLevelSpaces(value).filter(Boolean)
-  if (!parts.length) return ''
+  if (!parts.length) {return ''}
   return axis === 'row' ? parts[0] : (parts[1] ?? parts[0])
 }
 
@@ -83,7 +85,7 @@ function axisState(
 
 // The effective raw value + !important (not lowercased) — mirrors EmbedEditor's helper.
 function rawEffective(resolved: ResolvedProp | undefined): { value: string; important: boolean } {
-  if (!resolved) return { value: '', important: false }
+  if (!resolved) {return { value: '', important: false }}
   const src = resolved.source === 'selected' && resolved.selectedValue ? resolved.selectedValue : resolved.winner
   return { value: src.value, important: src.important }
 }
@@ -110,7 +112,7 @@ function UnlockedIcon() {
 // ones are one each. Hovering says which spaces on the page this number holds
 // open, the same way hovering a padding side does.
 function axesFor(prop: string, linked: boolean): GapAxis[] {
-  if (linked) return ['row', 'column']
+  if (linked) {return ['row', 'column']}
   return prop === COL ? ['column'] : ['row']
 }
 
@@ -126,7 +128,7 @@ function GapInput({ prop, value, busy, ariaLabel, axes, onLive, onCommit }: {
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
   const liveTimer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancelLive = () => { if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null } }
   useEffect(() => cancelLive, [])
   const scheduleLive = (text: string) => {
@@ -156,7 +158,7 @@ function GapInput({ prop, value, busy, ariaLabel, axes, onLive, onCommit }: {
         if (event.key === 'Enter') { event.currentTarget.blur(); return }
         // A gap has no negative side to step onto.
         const stepped = handleArrowStep(event, isNonNegative(prop) ? 0 : undefined)
-        if (!stepped) return
+        if (!stepped) {return}
         event.preventDefault()
         const el = event.currentTarget
         el.value = stepped.text
@@ -197,14 +199,14 @@ export default function GapControl({ show, read, busy, setProp, clearProp, liveS
   const linked = linkOverride ?? (row === col)
 
   // All hooks run above this guard so the component keeps its state while hidden.
-  if (!show) return null
+  if (!show) {return null}
 
   const put = (live: boolean) => (live ? liveSetProp : setProp)
   // Write an axis: update whatever form(s) it already uses, or add the modern longhand.
   const writeAxis = (axis: Axis, fallback: string, next: string, live: boolean) => {
     const v = next.trim()
     const targets = axis.targets.length ? axis.targets : [fallback]
-    if (!v) { if (!live) clearProp(targets); return }
+    if (!v) { if (!live) {clearProp(targets);} return }
     targets.forEach((prop) => put(live)(prop, v, axis.important))
   }
   // Linked → both axes take the same value; unlinked → each field owns one.
@@ -216,8 +218,8 @@ export default function GapControl({ show, read, busy, setProp, clearProp, liveS
     if (linked) { setLinkOverride(false); return }
     setLinkOverride(true)
     const single = row || col
-    if (single) writeBoth(single, false)
-    else clearProp(GAP_PROPS)
+    if (single) {writeBoth(single, false)}
+    else {clearProp(GAP_PROPS)}
   }
 
   return (

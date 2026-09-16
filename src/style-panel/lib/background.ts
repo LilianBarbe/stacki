@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Multi-layer `background` model. CSS backgrounds are parallel comma-separated
 // lists — background-image holds the layers (index 0 = the TOP layer), and
 // background-size / -position / -repeat / -attachment hold one entry per layer.
@@ -36,13 +38,13 @@ export function splitTopLevelCommas(value: string): string[] {
   for (let i = 0; i < value.length; i += 1) {
     const ch = value[i]
     if (quote) {
-      if (ch === '\\') i += 1
-      else if (ch === quote) quote = null
+      if (ch === '\\') {i += 1}
+      else if (ch === quote) {quote = null}
       continue
     }
-    if (ch === '"' || ch === "'") quote = ch
-    else if (ch === '(' || ch === '[') depth += 1
-    else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1)
+    if (ch === '"' || ch === "'") {quote = ch}
+    else if (ch === '(' || ch === '[') {depth += 1}
+    else if (ch === ')' || ch === ']') {depth = Math.max(0, depth - 1)}
     else if (ch === ',' && depth === 0) {
       parts.push(value.slice(start, i).trim())
       start = i + 1
@@ -57,12 +59,12 @@ export function splitTopLevelCommas(value: string): string[] {
  *  that colour, or null when the value isn't a solid-colour gradient. */
 export function colorOverlayOf(image: string): string | null {
   const match = image.trim().match(/^linear-gradient\((.*)\)$/is)
-  if (!match) return null
+  if (!match) {return null}
   const parts = splitTopLevelCommas(match[1])
-  if (!parts.length) return null
+  if (!parts.length) {return null}
   const isDirection = (s: string) => /^to\s/i.test(s.trim()) || /^-?[\d.]+(deg|grad|rad|turn)$/i.test(s.trim())
   const stops = isDirection(parts[0]) ? parts.slice(1) : parts
-  if (stops.length < 2) return null
+  if (stops.length < 2) {return null}
   // Strip a trailing stop position (e.g. `#000 0%`, `red 10px`) to compare colours.
   const colours = stops.map((s) => s.trim().replace(/\s+-?[\d.]+(%|px|em|rem|vw|vh|vmin|vmax)?$/i, '').trim())
   const first = colours[0]
@@ -90,16 +92,16 @@ export function splitTopLevelSpaces(value: string): string[] {
     if (quote) {
       cur += ch
       if (ch === '\\' && i + 1 < chars.length) { cur += chars[i + 1]; i += 1 }
-      else if (ch === quote) quote = null
+      else if (ch === quote) {quote = null}
       continue
     }
     if (ch === '"' || ch === "'") { quote = ch; cur += ch }
     else if (ch === '(' || ch === '[') { depth += 1; cur += ch }
     else if (ch === ')' || ch === ']') { depth = Math.max(0, depth - 1); cur += ch }
     else if (/\s/.test(ch) && depth === 0) { if (cur) { parts.push(cur); cur = '' } }
-    else cur += ch
+    else {cur += ch}
   }
-  if (cur) parts.push(cur)
+  if (cur) {parts.push(cur)}
   return parts
 }
 
@@ -135,7 +137,7 @@ export function splitBackgroundShorthand(bg: string): BackgroundLonghands & { co
       if (isImageToken(t)) { image = t; continue }
       if (REPEAT_KW.has(lt)) { repeat = repeat ? `${repeat} ${lt}` : lt; continue }
       if (ATTACH_KW.has(lt)) { attachment = lt; continue }
-      if (BOX_KW.has(lt)) continue // origin / clip — not modeled here
+      if (BOX_KW.has(lt)) {continue} // origin / clip — not modeled here
       if (afterSlash) { sizeTokens.push(t); continue }
       if (isPositionToken(t)) { posTokens.push(t); continue }
       // A leftover (non-position) token in the LAST layer is the background-color
@@ -145,7 +147,7 @@ export function splitBackgroundShorthand(bg: string): BackgroundLonghands & { co
     }
     // A layer with no image is just the trailing colour — don't emit it as a layer.
     if (!image) {
-      if (li === layerStrs.length - 1 && !color) color = posTokens.join(' ').trim()
+      if (li === layerStrs.length - 1 && !color) {color = posTokens.join(' ').trim()}
       return
     }
     images.push(image || 'none')
@@ -168,18 +170,18 @@ export function splitBackgroundShorthand(bg: string): BackgroundLonghands & { co
 /** Which kind of layer an image value is, from its function/keyword. */
 export function layerKind(image: string): LayerKind {
   const v = image.trim().toLowerCase()
-  if (v.startsWith('url(')) return 'image'
-  if (colorOverlayOf(image) != null) return 'color'
-  if (v.startsWith('linear-gradient') || v.startsWith('repeating-linear-gradient')) return 'linear'
-  if (v.startsWith('radial-gradient') || v.startsWith('repeating-radial-gradient')) return 'radial'
-  if (v.startsWith('conic-gradient') || v.startsWith('repeating-conic-gradient')) return 'conic'
+  if (v.startsWith('url(')) {return 'image'}
+  if (colorOverlayOf(image) != null) {return 'color'}
+  if (v.startsWith('linear-gradient') || v.startsWith('repeating-linear-gradient')) {return 'linear'}
+  if (v.startsWith('radial-gradient') || v.startsWith('repeating-radial-gradient')) {return 'radial'}
+  if (v.startsWith('conic-gradient') || v.startsWith('repeating-conic-gradient')) {return 'conic'}
   return 'other'
 }
 
 /** The file name inside a `url(…)`, or null when the value isn't a url(). */
 export function urlFileName(image: string): string | null {
   const match = image.match(/url\(\s*['"]?([^'")]+?)['"]?\s*\)/i)
-  if (!match) return null
+  if (!match) {return null}
   const path = match[1].split('?')[0]
   const file = path.split(/[\\/]/).pop() ?? path
   return file || path
@@ -202,7 +204,7 @@ export function parseLayers(props: BackgroundLonghands): BgLayer[] {
   const images = props.image.trim() ? splitTopLevelCommas(props.image) : []
   // `none` (the initial value, or an explicit reset) means there are no layers.
   const cleaned = images.filter((img) => img && img.toLowerCase() !== 'none')
-  if (!cleaned.length) return []
+  if (!cleaned.length) {return []}
   const sizes = props.size.trim() ? splitTopLevelCommas(props.size) : []
   const positions = props.position.trim() ? splitTopLevelCommas(props.position) : []
   const repeats = props.repeat.trim() ? splitTopLevelCommas(props.repeat) : []
@@ -224,7 +226,7 @@ const INITIAL = { size: 'auto', position: '0% 0%', repeat: 'repeat', attachment:
  *  leaves unset comes back '' (→ clear the property); otherwise it's the full
  *  comma list, padding unset layers with the CSS initial so indexes line up. */
 export function serializeLayers(layers: BgLayer[]): BackgroundLonghands {
-  if (!layers.length) return { image: '', size: '', position: '', repeat: '', attachment: '' }
+  if (!layers.length) {return { image: '', size: '', position: '', repeat: '', attachment: '' }}
   const list = (key: 'size' | 'position' | 'repeat' | 'attachment'): string =>
     layers.some((l) => l[key].trim())
       ? layers.map((l) => l[key].trim() || INITIAL[key]).join(', ')

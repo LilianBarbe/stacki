@@ -21,15 +21,15 @@ const quoted = (name) => `"${name}"`;
 
 /** Every class name the attribute mentions literally. */
 export function namesIn(prop) {
-  if (!prop) return [];
-  if (prop.type === 'string') return String(prop.value).trim().split(/\s+/).filter(Boolean);
+  if (!prop) {return [];}
+  if (prop.type === 'string') {return String(prop.value).trim().split(/\s+/).filter(Boolean);}
   const text = String(prop.value || '');
   // Quoted strings in an expression, plus the words inside a template literal —
   // the literal parts only, since `${theme}` is not a name until it runs.
   const out = [];
   for (const m of text.matchAll(/"([^"]*)"|'([^']*)'|`([^`]*)`/g)) {
     const inner = m[1] ?? m[2] ?? m[3] ?? '';
-    for (const word of inner.split(/\$\{[^}]*\}|\s+/)) if (word) out.push(word);
+    for (const word of inner.split(/\$\{[^}]*\}|\s+/)) {if (word) {out.push(word);}}
   }
   return out;
 }
@@ -37,7 +37,7 @@ export function namesIn(prop) {
 /** Whether the element already carries `name`, however its classes are written. */
 export function hasClass(props, name) {
   const clean = String(name || '').trim();
-  if (!clean) return true;
+  if (!clean) {return true;}
   return ['class', LIST].some((key) => namesIn(props?.[key]).includes(clean));
 }
 
@@ -51,12 +51,12 @@ export function hasClass(props, name) {
  */
 export function withClass(props, name) {
   const clean = String(name || '').trim();
-  if (!clean || /\s/.test(clean)) return null;
-  if (hasClass(props, clean)) return null;
+  if (!clean || /\s/.test(clean)) {return null;}
+  if (hasClass(props, clean)) {return null;}
 
   const list = props?.[LIST];
   if (list) {
-    if (list.type !== 'expr') return null;
+    if (list.type !== 'expr') {return null;}
     const text = String(list.value || '').trim();
     const at = text.lastIndexOf(']');
     if (!text.startsWith('[') || at < 0) {
@@ -84,7 +84,7 @@ export function withClass(props, name) {
   }
 
   const cls = props?.class;
-  if (!cls) return { key: 'class', value: { type: 'string', value: clean } };
+  if (!cls) {return { key: 'class', value: { type: 'string', value: clean } };}
   if (cls.type === 'string') {
     const words = namesIn(cls);
     return { key: 'class', value: { type: 'string', value: [...words, clean].join(' ') } };

@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { GroupLabel } from './TypographySection'
@@ -196,22 +198,22 @@ function splitTracks(value: string): string[] {
     if (ch === '(' || ch === '[') { depth += 1; cur += ch }
     else if (ch === ')' || ch === ']') { depth = Math.max(0, depth - 1); cur += ch }
     else if (/\s/.test(ch) && depth === 0) { if (cur) { parts.push(cur); cur = '' } }
-    else cur += ch
+    else {cur += ch}
   }
-  if (cur) parts.push(cur)
+  if (cur) {parts.push(cur)}
   return parts
 }
 // Number of tracks a grid-template value defines — expands `repeat(n, …)`, ignores
 // [line-name] tokens. 0 when unset / none.
 function countTracks(value: string): number {
   const v = value.trim().toLowerCase()
-  if (!v || v === 'none') return 0
+  if (!v || v === 'none') {return 0}
   let count = 0
   for (const t of splitTracks(v)) {
-    if (t.startsWith('[')) continue
+    if (t.startsWith('[')) {continue}
     const rep = t.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/i)
-    if (rep) count += parseInt(rep[1], 10) * Math.max(1, splitTracks(rep[2]).filter((x) => !x.startsWith('[')).length)
-    else count += 1
+    if (rep) {count += parseInt(rep[1], 10) * Math.max(1, splitTracks(rep[2]).filter((x) => !x.startsWith('[')).length)}
+    else {count += 1}
   }
   return count
 }
@@ -258,10 +260,10 @@ const CustomizeIcon = () => (
 // sizes) is "custom" and belongs in the Configure-grid modal.
 const isUniformTracks = (value: string) => {
   const t = splitTracks(value.trim()).filter((x) => !x.startsWith('['))
-  if (t.length === 0) return false
+  if (t.length === 0) {return false}
   if (t.length === 1) {
     const rep = t[0].match(/^repeat\(\s*\d+\s*,(.*)\)$/i)
-    if (rep) return splitTracks(rep[1]).filter((x) => !x.startsWith('[')).length === 1
+    if (rep) {return splitTracks(rep[1]).filter((x) => !x.startsWith('[')).length === 1}
   }
   return t.every((x) => x === t[0])
 }
@@ -270,7 +272,7 @@ const isUniformTracks = (value: string) => {
 function TemplateField({ value, busy, ariaLabel, onCommit }: { value: string; busy: boolean; ariaLabel: string; onCommit: (v: string) => void }) {
   const [text, setText] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setText(value) }, [value])
+  useEffect(() => { if (!focused.current) {setText(value)} }, [value])
   return (
     <VariableConnect code ariaLabel={`Connect ${ariaLabel} to a variable`} disabled={busy} prop="grid-template-columns" onPick={(binding) => onCommit(binding)}>
       <input
@@ -283,7 +285,7 @@ function TemplateField({ value, busy, ariaLabel, onCommit }: { value: string; bu
         onChange={(e) => setText(e.target.value)}
         onFocus={() => { focused.current = true }}
         onBlur={() => { focused.current = false; onCommit(text.trim()) }}
-        onKeyDown={(e) => { if (e.key === 'Enter') commitInPlace(e.currentTarget) }}
+        onKeyDown={(e) => { if (e.key === 'Enter') {commitInPlace(e.currentTarget)} }}
       />
     </VariableConnect>
   )
@@ -293,7 +295,7 @@ function TemplateField({ value, busy, ariaLabel, onCommit }: { value: string; bu
 // (a CSS-wide keyword, var(), …) is a custom value edited in the text field.
 function isPresetFlow(value: string): boolean {
   const v = value.trim().toLowerCase()
-  if (!v) return true
+  if (!v) {return true}
   return v.split(/\s+/).every((t) => t === 'row' || t === 'column' || t === 'dense')
 }
 function parseImportant(input: string): { value: string; important: boolean } {
@@ -319,12 +321,12 @@ function GridDirectionControl({ value, busy, onSet, onCommitCustom }: {
   const wantFocus = useRef(false)
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) setOpen(false) }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) {setOpen(false)} }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
@@ -341,7 +343,7 @@ function GridDirectionControl({ value, busy, onSet, onCommitCustom }: {
 
   const enterCustom = () => { setOpen(false); setForceCustom(true); wantFocus.current = true; onCommitCustom('unset', false) }
   const pickPreset = (d: string) => { setOpen(false); setForceCustom(false); onSet(buildFlow(d, dense)) }
-  const commitCustom = () => { const p = parseImportant(draft); if (p.value) onCommitCustom(p.value, p.important) }
+  const commitCustom = () => { const p = parseImportant(draft); if (p.value) {onCommitCustom(p.value, p.important)} }
 
   return (
     <div ref={rootRef} className="embed-editor_grid-direction">
@@ -356,7 +358,7 @@ function GridDirectionControl({ value, busy, onSet, onCommitCustom }: {
             onChange={(e) => setDraft(e.target.value)}
             onFocus={() => { focused.current = true }}
             onBlur={() => { focused.current = false; commitCustom() }}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitInPlace(e.currentTarget) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') {commitInPlace(e.currentTarget)} }}
             disabled={busy}
             spellCheck={false}
             placeholder="e.g. row dense"
@@ -414,12 +416,12 @@ function GridContentControl({ value, prop, vertical, ariaLabel, busy, onSet, onC
   const wantFocus = useRef(false)
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) setOpen(false) }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) {setOpen(false)} }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
@@ -435,7 +437,7 @@ function GridContentControl({ value, prop, vertical, ariaLabel, busy, onSet, onC
 
   const enterCustom = () => { setOpen(false); setForceCustom(true); wantFocus.current = true }
   const pickPreset = (v: string) => { setOpen(false); setForceCustom(false); onSet(v) }
-  const commitCustom = () => { const p = parseImportant(draft); if (p.value) onCommitCustom(p.value, p.important) }
+  const commitCustom = () => { const p = parseImportant(draft); if (p.value) {onCommitCustom(p.value, p.important)} }
   // Unset → show stretch selected (grid's default); a known value shows itself.
   const segValue = cur ? (GRID_CONTENT.includes(cur) ? cur : '') : shownContent
 
@@ -449,7 +451,7 @@ function GridContentControl({ value, prop, vertical, ariaLabel, busy, onSet, onC
           onChange={(e) => setDraft(e.target.value)}
           onFocus={() => { focused.current = true }}
           onBlur={() => { focused.current = false; commitCustom() }}
-          onKeyDown={(e) => { if (e.key === 'Enter') commitInPlace(e.currentTarget) }}
+          onKeyDown={(e) => { if (e.key === 'Enter') {commitInPlace(e.currentTarget)} }}
           disabled={busy}
           spellCheck={false}
           placeholder="custom value"
@@ -478,7 +480,7 @@ function GridContentControl({ value, prop, vertical, ariaLabel, busy, onSet, onC
 function CountField({ value, busy, ariaLabel, onCommit }: { value: number; busy: boolean; ariaLabel: string; onCommit: (n: number) => void }) {
   const [text, setText] = useState(value > 0 ? String(value) : '')
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setText(value > 0 ? String(value) : '') }, [value])
+  useEffect(() => { if (!focused.current) {setText(value > 0 ? String(value) : '')} }, [value])
   const clampN = (n: number) => Math.min(500, Math.max(1, n))
   const commit = (t: string) => {
     const n = parseInt(t, 10)
@@ -581,8 +583,8 @@ function GridAxisCustomInput({ value, busy, ariaLabel, autoFocus, onCommit, onCl
 }) {
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
-  const commit = () => { const t = draft.trim(); if (t) onCommit(t); else onClear() }
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
+  const commit = () => { const t = draft.trim(); if (t) {onCommit(t);} else {onClear()} }
   return (
     <input
       className="u-select-custom-input"
@@ -590,7 +592,7 @@ function GridAxisCustomInput({ value, busy, ariaLabel, autoFocus, onCommit, onCl
       onChange={(e) => setDraft(e.target.value)}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; commit() }}
-      onKeyDown={(e) => { if (e.key === 'Enter') commitInPlace(e.currentTarget) }}
+      onKeyDown={(e) => { if (e.key === 'Enter') {commitInPlace(e.currentTarget)} }}
       disabled={busy}
       spellCheck={false}
       placeholder="unset"
@@ -677,7 +679,7 @@ export default function GridControls({ read, busy, setProp, clearProp, liveSetPr
 }) {
   const val = (prop: string) => {
     const r = read(prop)
-    if (!r) return ''
+    if (!r) {return ''}
     return (r.source === 'selected' && r.selectedValue ? r.selectedValue.value : r.winner.value).trim()
   }
 

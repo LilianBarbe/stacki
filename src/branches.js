@@ -15,7 +15,7 @@
 // still what the file writes out. This is only which rows the tree draws.
 
 const branchNamed = (node, isElse) => {
-  if (!node || node.kind !== 'cond') return null;
+  if (!node || node.kind !== 'cond') {return null;}
   const kids = Array.isArray(node.children) ? node.children : [];
   const found = kids.find((k) => k?.kind === 'branch' && (k.name === 'else') === isElse);
   return found || null;
@@ -34,7 +34,7 @@ export function elseBranch(node) {
 /** The children the tree shows under a row. */
 export function rowChildren(node) {
   const then = thenBranch(node);
-  if (!then) return Array.isArray(node?.children) ? node.children : [];
+  if (!then) {return Array.isArray(node?.children) ? node.children : [];}
   // What the then holds, then the else itself — the one branch worth a row,
   // and it comes after the markup it is the alternative to.
   const otherwise = elseBranch(node);

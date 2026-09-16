@@ -30,7 +30,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -68,7 +68,7 @@ const check = (what, condition, detail) => {
   const slotsOf = (blocks) => {
     const list = [];
     blocks.forEach((block, bi) => {
-      if (block.title != null) list.push({ kind: 'heading', block, bi });
+      if (block.title != null) {list.push({ kind: 'heading', block, bi });}
       block.rows.forEach((r) => list.push({ kind: 'row', block, row: r, bi }));
       list.push({ kind: 'end', block, bi });
     });
@@ -225,7 +225,7 @@ const check = (what, condition, detail) => {
     let live = liveSlots();
     const emptyEnd = live.findIndex((slot) => slot.kind === 'end' && slot.block.title === 'Swatches');
     const intoEmpty = movesForDrop(live, 0, emptyEnd);
-    for (const m of intoEmpty) cssVars.moveVariable(dir, m);
+    for (const m of intoEmpty) {cssVars.moveVariable(dir, m);}
     check('a variable dropped into an empty group ends up in it', groupsNow().includes('Swatches:--light-100'), groupsNow());
     check('and not in the group after it', !groupsNow().includes('Typography:--light-100'), groupsNow());
 
@@ -233,14 +233,14 @@ const check = (what, condition, detail) => {
     live = liveSlots();
     const onBold = live.findIndex((slot) => slot.kind === 'row' && slot.row.name === '--primary-bold');
     const light200 = live.findIndex((slot) => slot.kind === 'row' && slot.row.name === '--light-200');
-    for (const m of movesForDrop(live, light200, onBold)) cssVars.moveVariable(dir, m);
+    for (const m of movesForDrop(live, light200, onBold)) {cssVars.moveVariable(dir, m);}
     check('a variable dropped onto another lands in front of it', /--light-200: #eee;\n\s*--primary-bold/.test(fs.readFileSync(sheet, 'utf8')), fs.readFileSync(sheet, 'utf8'));
     check('which puts it in that group', groupsNow().includes('Typography:--primary-family,--light-200,--primary-bold'), groupsNow());
 
     // Dropped past everything: the end of the rule, inside the last group.
     live = liveSlots();
     const first = live.findIndex((slot) => slot.kind === 'row');
-    for (const m of movesForDrop(live, first, live.length)) cssVars.moveVariable(dir, m);
+    for (const m of movesForDrop(live, first, live.length)) {cssVars.moveVariable(dir, m);}
     check('a variable dropped past everything goes to the last group', groupsNow().endsWith('--primary-bold,--light-100') || groupsNow().includes('--primary-bold,--light-100'), groupsNow());
 
     fs.rmSync(dir, { recursive: true, force: true });

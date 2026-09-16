@@ -30,7 +30,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const ROOT = path.join(__dirname, '..');
@@ -40,12 +40,12 @@ const ENTRY = path.join('electron', 'astroParser.js');
 // a bare specifier is a package, which asar handles for the app itself and
 // which this parser deliberately has none of.
 function closureOf(rel, seen = new Set()) {
-  if (seen.has(rel)) return seen;
+  if (seen.has(rel)) {return seen;}
   seen.add(rel);
   const source = fs.readFileSync(path.join(ROOT, rel), 'utf8');
   for (const m of source.matchAll(/require\(\s*['"](\.[^'"]+)['"]\s*\)/g)) {
     let next = path.join(path.dirname(rel), m[1]);
-    if (!fs.existsSync(path.join(ROOT, next))) next += '.js';
+    if (!fs.existsSync(path.join(ROOT, next))) {next += '.js';}
     if (!fs.existsSync(path.join(ROOT, next))) {
       check(`the require ${JSON.stringify(m[1])} in ${rel} resolves`, false, 'nothing on disk answers to it');
       continue;
@@ -56,7 +56,7 @@ function closureOf(rel, seen = new Set()) {
 }
 
 const covers = (pattern, rel) => {
-  if (pattern === rel) return true;
+  if (pattern === rel) {return true;}
   // The globs electron-builder takes, as far as this needs to read them.
   const re = new RegExp(
     '^' +

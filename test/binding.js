@@ -22,7 +22,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -89,7 +89,7 @@ const check = (what, condition, detail) => {
     ['a backslash in typed text', [{ text: 'a\\b' }, { expr: 'y' }]],
     ['two chips side by side', [{ expr: 'a' }, { text: ' ' }, { expr: 'b' }]],
   ])
-    check(`${name} round trips`, J(round(parts)) === J(parts), J(round(parts)));
+    {check(`${name} round trips`, J(round(parts)) === J(parts), J(round(parts)));}
 
   // ── data inside an expression ─────────────────────────────────────────────
   // `a ?? b` is not one thing to bind, it is two with a fallback between them.
@@ -696,11 +696,11 @@ const check = (what, condition, detail) => {
   // they came from — a chip that swallowed or dropped a character would edit
   // the file just by being looked at.
   for (const src of ['featured?.data.title', 'post?.data.seo?.title ?? post.data.title', 'a?.b + 1'])
-    check(
+    {check(
       `${src} survives being split into chips`,
       valueFromParts(partsFromValue(expr(src)), { mode: 'code' })?.value === src,
       J(valueFromParts(partsFromValue(expr(src)), { mode: 'code' }))
-    );
+    );}
 
   // …so every label in the panel carries the guard. A new one without it opens
   // the hole again, silently.

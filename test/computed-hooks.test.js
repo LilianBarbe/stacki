@@ -51,11 +51,11 @@ test('computed hooks discard stale selections and documents without waking liter
   };
   const answer = async (batch, color, display) => {
     await React.act(async () => {
-      for (const query of batch) query.resolve({
+      for (const query of batch) {query.resolve({
         computed: Object.fromEntries(query.colors.map((key) => [key, color])),
         computedProps: Object.fromEntries(query.props.map((key) => [key, display])),
         identity: { tag: 'div' },
-      });
+      });}
     });
   };
 

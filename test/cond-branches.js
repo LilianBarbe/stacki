@@ -37,7 +37,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const { parsePage, serializePage, serializePageMarked } = require('../electron/astroParser.js');
@@ -46,11 +46,11 @@ const page = (body) => `---\n---\n<div>\n${body}\n</div>\n`;
 const first = (src) => parsePage(src).model.nodes[0].children.find((n) => n.kind !== 'text');
 // What the tree looks like, flattened: `cond(then:a, else:expr)`.
 const shape = (node) => {
-  if (!node) return 'nothing';
+  if (!node) {return 'nothing';}
   if (node.kind === 'cond') {
     return `cond(${(node.children || []).map((b) => `${b.name}:${(b.children || []).map(shape).join('+') || 'empty'}`).join(', ')})`;
   }
-  if (node.kind === 'element' || node.kind === 'component') return node.name;
+  if (node.kind === 'element' || node.kind === 'component') {return node.name;}
   return node.kind;
 };
 
@@ -118,7 +118,7 @@ const shape = (node) => {
   const edited = parsePage(LINK);
   const node = edited.model.nodes[0].children.find((n) => n.kind === 'cond');
   check('there is a conditional to edit', !!node, 'it never became one');
-  if (node) delete node.source; // what an edit does
+  if (node) {delete node.source;} // what an edit does
   const written = serializePage(edited.model);
   check('the value goes back in as itself', /\) : \(\n\s+heading\n\s+\)/.test(written), written);
   check('not wrapped in braces, which there would be a block', !/\{heading\}\s*\n\s*\)/.test(written), written);

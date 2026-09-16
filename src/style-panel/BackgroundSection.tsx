@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
@@ -51,7 +53,7 @@ type Props = {
 type Display = { present: boolean; isSelected: boolean; overridden: boolean; winnerSelector: string; value: string; important: boolean }
 
 function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }
+  if (!resolved) {return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }}
   const isSelected = resolved.source === 'selected'
   const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner
   return { present: true, isSelected, overridden: resolved.overridden, winnerSelector: resolved.winner.selectorText, value: source.value, important: source.important }
@@ -59,7 +61,7 @@ function displayOf(resolved: ResolvedProp | undefined): Display {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 
@@ -116,7 +118,7 @@ function BgField({ prop, label, placeholder, prefix, swatchLabel, read, busy, se
   // Undelayed live write for the scrub, which throttles its own — see useScrub.
   const liveNow = (text: string) => {
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed) {return}
     const parsed = parseImportant(trimmed)
     liveSetProp(prop, parsed.value, parsed.important)
   }
@@ -151,7 +153,7 @@ function BgField({ prop, label, placeholder, prefix, swatchLabel, read, busy, se
       onKeyDown={(event) => {
         if (event.key === 'Enter') { commitInPlace(event.currentTarget); return }
         const stepped = handleArrowStep(event)
-        if (!stepped) return
+        if (!stepped) {return}
         event.preventDefault()
         const el = event.currentTarget
         el.value = stepped.text
@@ -205,13 +207,13 @@ const PlusIcon = () => (
 // (label left / control right, divider-separated) run edge to edge like Webflow.
 function LayerEditorModal({ onClose, children }: { onClose: () => void; children: ReactNode }) {
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {onClose()} }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
   return createPortal(
-    <div className="embed-editor_bg-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <div className="embed-editor_bg-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) {onClose()} }}>
       <div className="embed-editor_bg-modal u-surface-surface" role="dialog" aria-modal="true" aria-label="Background layer">
         {children}
       </div>
@@ -240,7 +242,7 @@ function LayerLonghandField({ layers, index, field, prop, label, placeholder, bu
   const [draft, setDraft] = useState(external)
   const focused = useRef(false)
 
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
+  useEffect(() => { if (!focused.current) {setDraft(external)} }, [external])
 
   const listFor = (text: string): string => {
     const next = layers.map((l, i) => (i === index ? { ...l, [field]: text } : l))
@@ -248,9 +250,9 @@ function LayerLonghandField({ layers, index, field, prop, label, placeholder, bu
   }
   const commit = (live: boolean, text = draft) => {
     const value = listFor(text.trim())
-    if (live) { if (value) liveSetProp(prop, value, false); return }
-    if (value) setProp(prop, value, false)
-    else clearProp(prop)
+    if (live) { if (value) {liveSetProp(prop, value, false);} return }
+    if (value) {setProp(prop, value, false)}
+    else {clearProp(prop)}
   }
   const scrub = useScrub({
     value: draft,
@@ -272,7 +274,7 @@ function LayerLonghandField({ layers, index, field, prop, label, placeholder, bu
       onKeyDown={(event) => {
         if (event.key === 'Enter') { commitInPlace(event.currentTarget); return }
         const stepped = handleArrowStep(event)
-        if (!stepped) return
+        if (!stepped) {return}
         event.preventDefault()
         const el = event.currentTarget
         el.value = stepped.text
@@ -353,7 +355,7 @@ function BgPartInput({ value, placeholder, label, busy, disabled, onLive, onComm
 }) {
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const scrub = useScrub({
     value: draft,
     disabled: busy || disabled,
@@ -376,7 +378,7 @@ function BgPartInput({ value, placeholder, label, busy, disabled, onLive, onComm
       onKeyDown={(e) => {
         if (e.key === 'Enter') { commitInPlace(e.currentTarget); return }
         const stepped = handleArrowStep(e)
-        if (!stepped) return
+        if (!stepped) {return}
         e.preventDefault()
         const el = e.currentTarget
         el.value = stepped.text
@@ -392,16 +394,16 @@ function BgPartInput({ value, placeholder, label, busy, disabled, onLive, onComm
 type SizeMode = 'custom' | 'cover' | 'contain'
 function parseSize(size: string): { mode: SizeMode; width: string; height: string } {
   const v = size.trim().toLowerCase()
-  if (v === 'cover') return { mode: 'cover', width: '', height: '' }
-  if (v === 'contain') return { mode: 'contain', width: '', height: '' }
+  if (v === 'cover') {return { mode: 'cover', width: '', height: '' }}
+  if (v === 'contain') {return { mode: 'contain', width: '', height: '' }}
   const parts = splitTopLevelSpaces(size.trim())
   return { mode: 'custom', width: parts[0] ?? '', height: parts[1] ?? '' }
 }
 function serializeSize(mode: SizeMode, width: string, height: string): string {
-  if (mode === 'cover') return 'cover'
-  if (mode === 'contain') return 'contain'
+  if (mode === 'cover') {return 'cover'}
+  if (mode === 'contain') {return 'contain'}
   const w = width.trim(); const h = height.trim()
-  if (!w && !h) return ''
+  if (!w && !h) {return ''}
   return `${w || 'auto'} ${h || 'auto'}`
 }
 const SIZE_MODE_OPTIONS: ReadonlyArray<SegmentedOption<SizeMode>> = [
@@ -413,8 +415,8 @@ function LayerSizeField({ layers, index, busy, setProp, clearProp, liveSetProp }
   const parsed = parseSize(layers[index]?.size ?? '')
   const writeSize = (value: string, live: boolean) => {
     const list = serializeLayers(layers.map((l, i) => (i === index ? { ...l, size: value } : l))).size
-    if (live) { if (list) liveSetProp('background-size', list, false); return }
-    if (list) setProp('background-size', list, false); else clearProp('background-size')
+    if (live) { if (list) {liveSetProp('background-size', list, false);} return }
+    if (list) {setProp('background-size', list, false);} else {clearProp('background-size')}
   }
   // Cover / Contain size the image for you, so the Width/Height fields stay visible
   // but disabled (Webflow parity) — showing "Auto" since neither axis is authored.
@@ -443,9 +445,9 @@ function LayerSizeField({ layers, index, busy, setProp, clearProp, liveSetProp }
 // ── Position: a 3×3 preset grid + Left/Top offsets ──
 function axisIndex(token: string): number {
   const t = token.trim().toLowerCase()
-  if (t === '' || t === 'left' || t === 'top' || t === '0' || t === '0%' || t === '0px') return 0
-  if (t === 'center' || t === '50%') return 1
-  if (t === 'right' || t === 'bottom' || t === '100%') return 2
+  if (t === '' || t === 'left' || t === 'top' || t === '0' || t === '0%' || t === '0px') {return 0}
+  if (t === 'center' || t === '50%') {return 1}
+  if (t === 'right' || t === 'bottom' || t === '100%') {return 2}
   return -1
 }
 const AXIS_PCT = ['0%', '50%', '100%']
@@ -454,8 +456,8 @@ function LayerPositionField({ layers, index, busy, setProp, clearProp, liveSetPr
   const x = parts[0] ?? ''; const y = parts[1] ?? ''
   const writePos = (value: string, live: boolean) => {
     const list = serializeLayers(layers.map((l, i) => (i === index ? { ...l, position: value } : l))).position
-    if (live) { if (list) liveSetProp('background-position', list, false); return }
-    if (list) setProp('background-position', list, false); else clearProp('background-position')
+    if (live) { if (list) {liveSetProp('background-position', list, false);} return }
+    if (list) {setProp('background-position', list, false);} else {clearProp('background-position')}
   }
   const activeCol = axisIndex(x); const activeRow = axisIndex(y)
   return (
@@ -526,12 +528,12 @@ function imageUrlOf(image: string): string | null {
 // falls through to the next when one does not load — the same fallback
 // AssetThumb already uses for its two url schemes.
 function assetSrcCandidates(url: string | null): string[] {
-  if (!url) return []
+  if (!url) {return []}
   const clean = url.split(/[?#]/)[0]
   // Hosted elsewhere, or inline: not a file, and shown from where it points.
-  if (/^(https?:)?\/\//.test(clean) || clean.startsWith('data:')) return [clean]
+  if (/^(https?:)?\/\//.test(clean) || clean.startsWith('data:')) {return [clean]}
   const root = getHost().projectPath
-  if (!root) return [clean]
+  if (!root) {return [clean]}
   const rel = clean.replace(/^\/+/, '')
   const base = root.replace(/[\\/]+$/, '')
   // public/ first: a leading-slash url is nearly always served from there.
@@ -543,7 +545,7 @@ function assetSrcCandidates(url: string | null): string[] {
 function FallbackImg({ srcs, alt = '', onLoad }: { srcs: string[]; alt?: string; onLoad?: (d: { w: number; h: number }) => void }) {
   const [i, setI] = useState(0)
   useEffect(() => { setI(0) }, [srcs.join('|')])
-  if (!srcs.length || i >= srcs.length) return null
+  if (!srcs.length || i >= srcs.length) {return null}
   return (
     <img
       src={srcs[i]}
@@ -611,7 +613,7 @@ function LayerColorField({ layers, index, busy, setProp, liveSetProp }: {
   const external = colorOverlayOf(layers[index]?.image ?? '') ?? ''
   const [draft, setDraft] = useState(external)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(external) }, [external])
+  useEffect(() => { if (!focused.current) {setDraft(external)} }, [external])
 
   const listFor = (color: string): string => {
     const image = colorOverlayImage(color)
@@ -620,8 +622,8 @@ function LayerColorField({ layers, index, busy, setProp, liveSetProp }: {
   }
   const commit = (live: boolean) => {
     const value = listFor(draft.trim() || 'rgba(0, 0, 0, 0.5)')
-    if (live) liveSetProp('background-image', value, false)
-    else setProp('background-image', value, false)
+    if (live) {liveSetProp('background-image', value, false)}
+    else {setProp('background-image', value, false)}
   }
 
   return (
@@ -629,7 +631,7 @@ function LayerColorField({ layers, index, busy, setProp, liveSetProp }: {
       <ColorSwatch value={draft} busy={busy} ariaLabel="Overlay color" onChange={(c, live) => {
         setDraft(c)
         const value = listFor(c.trim() || 'rgba(0, 0, 0, 0.5)')
-        if (live) liveSetProp('background-image', value, false); else setProp('background-image', value, false)
+        if (live) {liveSetProp('background-image', value, false);} else {setProp('background-image', value, false)}
       }} />
       <VariableConnect ariaLabel="Connect overlay color to a variable" disabled={busy} className="is-fill" prop="background-color" onPick={(binding) => { setDraft(binding); setProp('background-image', listFor(binding), false) }}>
       <input
@@ -638,7 +640,7 @@ function LayerColorField({ layers, index, busy, setProp, liveSetProp }: {
         onChange={(event) => { setDraft(event.target.value); commit(true) }}
         onFocus={() => { focused.current = true }}
         onBlur={() => { focused.current = false; commit(false) }}
-        onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+        onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
         disabled={busy}
         spellCheck={false}
         placeholder="rgba(0, 0, 0, 0.5)"
@@ -659,7 +661,7 @@ function LayerEditor({ layers, index, busy, setProp, clearProp, liveSetProp, app
   applyLayers: (layers: BgLayer[]) => void
 }) {
   const layer = layers[index]
-  if (!layer) return null
+  if (!layer) {return null}
   const kind = layerKind(layer.image)
   // The Type buttons show four kinds; a conic/unknown value maps to the nearest.
   const displayKind: LayerKind =
@@ -668,7 +670,7 @@ function LayerEditor({ layers, index, busy, setProp, clearProp, liveSetProp, app
     : 'image'
 
   const setKind = (next: LayerKind) => {
-    if (next === displayKind) return
+    if (next === displayKind) {return}
     // Switching between gradient kinds keeps the colours.
     //
     // The stops are the work — picked, positioned, adjusted — and the kind is
@@ -726,8 +728,8 @@ function LayerEditor({ layers, index, busy, setProp, clearProp, liveSetProp, app
   const gradient = isGradient ? parseGradient(layer.image) : null
   const writeImage = (image: string, live: boolean) => {
     const list = serializeLayers(layers.map((l, i) => (i === index ? { ...l, image } : l))).image
-    if (live) liveSetProp('background-image', list, false)
-    else setProp('background-image', list, false)
+    if (live) {liveSetProp('background-image', list, false)}
+    else {setProp('background-image', list, false)}
   }
 
   return (
@@ -826,8 +828,8 @@ export default function BackgroundSection(props: Props) {
     const write = (prop: string, value: string) => {
       const own = ownValue(prop)
       const v = value.trim()
-      if (v) { if (own !== v) setProp(prop, v, false) }
-      else if (own != null) clearProp(prop)
+      if (v) { if (own !== v) {setProp(prop, v, false)} }
+      else if (own != null) {clearProp(prop)}
     }
     write('background-image', s.image)
     write('background-size', s.size)
@@ -836,7 +838,7 @@ export default function BackgroundSection(props: Props) {
     write('background-attachment', s.attachment)
     if (fromShorthand) {
       clearProp('background')
-      if (longhands.color && !val('background-color').trim()) setProp('background-color', longhands.color, false)
+      if (longhands.color && !val('background-color').trim()) {setProp('background-color', longhands.color, false)}
     }
   }
 
@@ -852,7 +854,7 @@ export default function BackgroundSection(props: Props) {
     setOpenLayer((cur) => (cur === index ? null : cur != null && cur > index ? cur - 1 : cur))
   }
   const reorder = (from: number, to: number) => {
-    if (from === to) return
+    if (from === to) {return}
     const next = [...layers]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)

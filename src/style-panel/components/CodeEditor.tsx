@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import ReactCodeMirror from '@uiw/react-codemirror'
 import { useMemo } from 'react'
 import { css } from '@codemirror/lang-css'
@@ -141,7 +143,7 @@ export function CodeEditor({
       ]
       : []
 
-    if (!highlights.length) return [...codeEditorExtensions[language], ...selectionExtensions]
+    if (!highlights.length) {return [...codeEditorExtensions[language], ...selectionExtensions]}
 
     return [
       ...codeEditorExtensions[language],

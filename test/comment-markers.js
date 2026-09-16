@@ -52,7 +52,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 const { parsePage, serializePageMarked } = require('../electron/astroParser.js');
@@ -242,12 +242,12 @@ const marked = (body, frontmatter = 'import Split from "./Split.astro";\nimport 
     const preload = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
     check(
       'a comment is a marker',
-      /if \(n\.nodeType === 8\) \{[\s\S]*?avb-\$\{kind\}:/.test(preload),
+      /if \(isComment\(n\)\) \{[\s\S]*?avb-\$\{kind\}:/.test(preload),
       'the collector cannot read a comment marker'
     );
     check(
       'and a template still is too, for a page served before this update',
-      /n\.tagName === 'TEMPLATE'\) return n\.getAttribute\(`data-avb-\$\{kind\}`\)/.test(preload),
+      /n\.tagName === 'TEMPLATE'\) \{[\s\S]*?return n\.getAttribute\(`data-avb-\$\{kind\}`\)/.test(preload),
       'a running dev server would go blank on update'
     );
   }

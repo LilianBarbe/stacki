@@ -166,7 +166,7 @@ export default function CodeEditor({ value, language, onChange, revealLine }) {
   // Apply external value changes (file reloads, undo from app level).
   useEffect(() => {
     const view = viewRef.current;
-    if (!view) return;
+    if (!view) {return;}
     const cur = view.state.doc.toString();
     if ((value ?? '') !== cur) {
       view.dispatch({
@@ -180,7 +180,7 @@ export default function CodeEditor({ value, language, onChange, revealLine }) {
   // the top of a file you then have to search.
   useEffect(() => {
     const view = viewRef.current;
-    if (!view || !revealLine) return;
+    if (!view || !revealLine) {return;}
     const line = view.state.doc.line(Math.max(1, Math.min(revealLine, view.state.doc.lines)));
     view.dispatch({
       selection: { anchor: line.from },

@@ -44,8 +44,8 @@ const PATTERN_HINTS = [
 ];
 
 export function patternHint(pattern) {
-  if (!pattern) return null;
-  for (const [test, hint] of PATTERN_HINTS) if (test.test(pattern)) return hint;
+  if (!pattern) {return null;}
+  for (const [test, hint] of PATTERN_HINTS) {if (test.test(pattern)) {return hint;}}
   return null;
 }
 
@@ -55,19 +55,19 @@ const isNullBranch = (node) => node && node.type === 'null';
 // and knows it may also be nothing.
 function unwrapNullable(node) {
   const branches = node?.anyOf || node?.oneOf;
-  if (!Array.isArray(branches) || branches.length !== 2) return { node, nullable: false };
+  if (!Array.isArray(branches) || branches.length !== 2) {return { node, nullable: false };}
   const nulls = branches.filter(isNullBranch);
   const rest = branches.filter((b) => !isNullBranch(b));
-  if (nulls.length !== 1 || rest.length !== 1) return { node, nullable: false };
+  if (nulls.length !== 1 || rest.length !== 1) {return { node, nullable: false };}
   return { node: { ...rest[0], default: node.default ?? rest[0].default }, nullable: true };
 }
 
 const defsOf = (root) => root?.$defs || {};
 
 function deref(node, root, seen = new Set()) {
-  if (!node?.$ref) return node;
+  if (!node?.$ref) {return node;}
   const name = String(node.$ref).split('/').pop();
-  if (seen.has(name)) return { ...defsOf(root)[name], recursive: name };
+  if (seen.has(name)) {return { ...defsOf(root)[name], recursive: name };}
   return { ...defsOf(root)[name], recursive: name };
 }
 
@@ -77,30 +77,30 @@ const branchesOf = (node) => node?.oneOf || node?.anyOf || null;
 // literal — that key is what the user picks, and it decides the rest of the
 // form.
 function discriminatorOf(branches) {
-  if (!branches || branches.length < 2) return null;
+  if (!branches || branches.length < 2) {return null;}
   const first = branches[0]?.properties || {};
   for (const key of Object.keys(first)) {
     const values = branches.map((b) => b?.properties?.[key]);
-    if (values.every((v) => v && v.const !== undefined)) return key;
+    if (values.every((v) => v && v.const !== undefined)) {return key;}
   }
   return null;
 }
 
 function controlFor(node, key, nullable) {
-  if (!node || node.recursiveOnly) return 'unknown';
-  if (node.astroImage) return 'image';
-  if (node.astroReference) return 'reference';
-  if (node.astroDate) return 'date';
-  if (node.enum) return 'enum';
-  if (node.const !== undefined) return 'const';
+  if (!node || node.recursiveOnly) {return 'unknown';}
+  if (node.astroImage) {return 'image';}
+  if (node.astroReference) {return 'reference';}
+  if (node.astroDate) {return 'date';}
+  if (node.enum) {return 'enum';}
+  if (node.const !== undefined) {return 'const';}
 
   const type = Array.isArray(node.type) ? node.type.find((t) => t !== 'null') : node.type;
-  if (type === 'boolean') return 'boolean';
-  if (type === 'integer' || type === 'number') return 'number';
+  if (type === 'boolean') {return 'boolean';}
+  if (type === 'integer' || type === 'number') {return 'number';}
   if (type === 'array') {
     const items = node.items || {};
-    if (items.astroReference) return 'references';
-    if (items.type === 'string' && !items.properties) return 'tags';
+    if (items.astroReference) {return 'references';}
+    if (items.type === 'string' && !items.properties) {return 'tags';}
     return 'list';
   }
   if (type === 'object') {
@@ -109,13 +109,13 @@ function controlFor(node, key, nullable) {
     }
     return 'object';
   }
-  if (branchesOf(node)) return 'union';
+  if (branchesOf(node)) {return 'union';}
   if (type === 'string') {
-    if (MARKDOWN_KEYS.test(key)) return 'markdown';
-    if (CODE_KEYS.test(key)) return 'code';
-    if (node.format === 'uri') return 'url';
-    if (node.format === 'email') return 'email';
-    if ((node.maxLength && node.maxLength > 200) || LONG_KEYS.test(key)) return 'longtext';
+    if (MARKDOWN_KEYS.test(key)) {return 'markdown';}
+    if (CODE_KEYS.test(key)) {return 'code';}
+    if (node.format === 'uri') {return 'url';}
+    if (node.format === 'email') {return 'email';}
+    if ((node.maxLength && node.maxLength > 200) || LONG_KEYS.test(key)) {return 'longtext';}
     return 'text';
   }
   // No type at all: a value zod could not describe on the way in. It is still
@@ -125,24 +125,24 @@ function controlFor(node, key, nullable) {
 
 function constraintsOf(node) {
   const out = {};
-  if (node.minLength != null) out.minLength = node.minLength;
-  if (node.maxLength != null) out.maxLength = node.maxLength;
-  if (node.minimum != null) out.min = node.minimum;
-  if (node.maximum != null) out.max = node.maximum;
-  if (node.exclusiveMinimum != null) out.min = node.exclusiveMinimum + (node.type === 'integer' ? 1 : 0);
-  if (node.exclusiveMaximum != null) out.max = node.exclusiveMaximum - (node.type === 'integer' ? 1 : 0);
-  if (node.type === 'integer') out.integer = true;
+  if (node.minLength != null) {out.minLength = node.minLength;}
+  if (node.maxLength != null) {out.maxLength = node.maxLength;}
+  if (node.minimum != null) {out.min = node.minimum;}
+  if (node.maximum != null) {out.max = node.maximum;}
+  if (node.exclusiveMinimum != null) {out.min = node.exclusiveMinimum + (node.type === 'integer' ? 1 : 0);}
+  if (node.exclusiveMaximum != null) {out.max = node.exclusiveMaximum - (node.type === 'integer' ? 1 : 0);}
+  if (node.type === 'integer') {out.integer = true;}
   if (node.pattern) {
     out.pattern = node.pattern;
     out.patternHint = patternHint(node.pattern);
   }
-  if (node.minItems != null) out.minItems = node.minItems;
-  if (node.maxItems != null) out.maxItems = node.maxItems;
+  if (node.minItems != null) {out.minItems = node.minItems;}
+  if (node.maxItems != null) {out.maxItems = node.maxItems;}
   // A number whose maximum is the largest integer JavaScript has is not really
   // bounded; zod writes that for .int(), and showing it as a rule would be a
   // lie.
-  if (out.max === Number.MAX_SAFE_INTEGER) delete out.max;
-  if (out.min === -Number.MAX_SAFE_INTEGER) delete out.min;
+  if (out.max === Number.MAX_SAFE_INTEGER) {delete out.max;}
+  if (out.min === -Number.MAX_SAFE_INTEGER) {delete out.min;}
   return out;
 }
 
@@ -165,16 +165,16 @@ export function describeField(rawNode, key, { required = false, root, depth = 0 
     transform: !!node.astroTransform,
     coerced: !!node.astroCoerced,
   };
-  if ('default' in node) field.default = node.default;
-  if (node.enum) field.options = node.enum;
-  if (node.const !== undefined) field.const = node.const;
-  if (node.astroReference) field.target = node.astroReference;
-  if (node.items?.astroReference) field.target = node.items.astroReference;
-  if (node.recursive) field.recursive = node.recursive;
+  if ('default' in node) {field.default = node.default;}
+  if (node.enum) {field.options = node.enum;}
+  if (node.const !== undefined) {field.const = node.const;}
+  if (node.astroReference) {field.target = node.astroReference;}
+  if (node.items?.astroReference) {field.target = node.items.astroReference;}
+  if (node.recursive) {field.recursive = node.recursive;}
 
   // Deep structures are described one level at a time: a recursive schema has
   // no bottom, and a form only ever draws the level it is showing.
-  if (depth > 6) return field;
+  if (depth > 6) {return field;}
 
   if (control === 'object') {
     field.fields = fieldsOf(node, { root, depth: depth + 1 });
@@ -214,7 +214,7 @@ export function fieldsOf(schema, { root = schema, depth = 0 } = {}) {
  * the form can switch on it.
  */
 export function collectionFields(schema) {
-  if (!schema) return { fields: [], freeform: true };
+  if (!schema) {return { fields: [], freeform: true };}
   const branches = branchesOf(schema);
   if (branches) {
     const field = describeField(schema, null, { root: schema });
@@ -225,11 +225,11 @@ export function collectionFields(schema) {
 
 /** Which union member a value is, by its discriminator. */
 export function memberFor(union, value) {
-  if (!union?.members?.length) return null;
+  if (!union?.members?.length) {return null;}
   const key = union.discriminator;
   if (key && value && typeof value === 'object') {
     const found = union.members.find((m) => m.value === value[key]);
-    if (found) return found;
+    if (found) {return found;}
   }
   return union.members[0];
 }
@@ -242,26 +242,26 @@ export function memberFor(union, value) {
 export function fieldIssue(field, value) {
   const c = field.constraints || {};
   if (value === undefined || value === null || value === '') {
-    if (field.required && !field.nullable && value !== 0 && value !== false) return 'Required';
+    if (field.required && !field.nullable && value !== 0 && value !== false) {return 'Required';}
     return null;
   }
   if (typeof value === 'string') {
-    if (c.minLength && value.length < c.minLength) return `At least ${c.minLength} characters`;
-    if (c.maxLength && value.length > c.maxLength) return `At most ${c.maxLength} characters`;
+    if (c.minLength && value.length < c.minLength) {return `At least ${c.minLength} characters`;}
+    if (c.maxLength && value.length > c.maxLength) {return `At most ${c.maxLength} characters`;}
     if (c.pattern && !new RegExp(c.pattern).test(value)) {
       return c.patternHint ? `Needs ${c.patternHint}` : `Does not match ${c.pattern}`;
     }
-    if (field.control === 'url' && !/^https?:\/\//i.test(value)) return 'Needs a full URL, starting with http';
-    if (field.control === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Needs an email address';
+    if (field.control === 'url' && !/^https?:\/\//i.test(value)) {return 'Needs a full URL, starting with http';}
+    if (field.control === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {return 'Needs an email address';}
   }
   if (typeof value === 'number') {
-    if (c.integer && !Number.isInteger(value)) return 'Whole numbers only';
-    if (c.min != null && value < c.min) return `At least ${c.min}`;
-    if (c.max != null && value > c.max) return `At most ${c.max}`;
+    if (c.integer && !Number.isInteger(value)) {return 'Whole numbers only';}
+    if (c.min != null && value < c.min) {return `At least ${c.min}`;}
+    if (c.max != null && value > c.max) {return `At most ${c.max}`;}
   }
   if (Array.isArray(value)) {
-    if (c.minItems && value.length < c.minItems) return `At least ${c.minItems}`;
-    if (c.maxItems && value.length > c.maxItems) return `At most ${c.maxItems}`;
+    if (c.minItems && value.length < c.minItems) {return `At least ${c.minItems}`;}
+    if (c.maxItems && value.length > c.maxItems) {return `At most ${c.maxItems}`;}
   }
   return null;
 }
@@ -270,19 +270,19 @@ export function fieldIssue(field, value) {
 export function hintFor(field) {
   const c = field.constraints || {};
   const bits = [];
-  if (field.description) bits.push(field.description);
-  if (c.patternHint) bits.push(c.patternHint);
-  else if (c.pattern) bits.push(`matches ${c.pattern}`);
-  if (c.minLength && c.maxLength) bits.push(`${c.minLength}–${c.maxLength} characters`);
-  else if (c.maxLength) bits.push(`up to ${c.maxLength} characters`);
-  else if (c.minLength) bits.push(`at least ${c.minLength} characters`);
-  if (c.min != null && c.max != null) bits.push(`${c.min}–${c.max}`);
-  else if (c.min != null) bits.push(`${c.min} or more`);
-  else if (c.max != null) bits.push(`up to ${c.max}`);
-  if (c.minItems && c.maxItems) bits.push(`${c.minItems}–${c.maxItems} items`);
-  else if (c.maxItems) bits.push(`up to ${c.maxItems} items`);
-  else if (c.minItems) bits.push(`at least ${c.minItems}`);
-  if (field.transform) bits.push('stored differently in the file than it reads here');
+  if (field.description) {bits.push(field.description);}
+  if (c.patternHint) {bits.push(c.patternHint);}
+  else if (c.pattern) {bits.push(`matches ${c.pattern}`);}
+  if (c.minLength && c.maxLength) {bits.push(`${c.minLength}–${c.maxLength} characters`);}
+  else if (c.maxLength) {bits.push(`up to ${c.maxLength} characters`);}
+  else if (c.minLength) {bits.push(`at least ${c.minLength} characters`);}
+  if (c.min != null && c.max != null) {bits.push(`${c.min}–${c.max}`);}
+  else if (c.min != null) {bits.push(`${c.min} or more`);}
+  else if (c.max != null) {bits.push(`up to ${c.max}`);}
+  if (c.minItems && c.maxItems) {bits.push(`${c.minItems}–${c.maxItems} items`);}
+  else if (c.maxItems) {bits.push(`up to ${c.maxItems} items`);}
+  else if (c.minItems) {bits.push(`at least ${c.minItems}`);}
+  if (field.transform) {bits.push('stored differently in the file than it reads here');}
   return bits.join(' · ') || null;
 }
 
@@ -297,7 +297,7 @@ export function editsBetween(before, after, path = []) {
   const isObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
   if (Array.isArray(before) || Array.isArray(after)) {
-    if (JSON.stringify(before) !== JSON.stringify(after)) edits.push({ path, value: after });
+    if (JSON.stringify(before) !== JSON.stringify(after)) {edits.push({ path, value: after });}
     return edits;
   }
   if (isObject(before) && isObject(after)) {
@@ -314,7 +314,7 @@ export function editsBetween(before, after, path = []) {
     }
     return edits;
   }
-  if (before !== after) edits.push({ path, value: after });
+  if (before !== after) {edits.push({ path, value: after });}
   return edits;
 }
 

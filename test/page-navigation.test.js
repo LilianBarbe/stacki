@@ -25,7 +25,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   });
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true });
   const { window } = dom;
-  for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) global[key] = key === 'window' ? window : window[key];
+  for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) {global[key] = key === 'window' ? window : window[key];}
   global.getComputedStyle = window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
@@ -35,7 +35,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   global.__panels = {};
   global.IS_REACT_ACT_ENVIRONMENT = true;
   const pages = ['index', 'second', 'third'].map((name) => ({ name: `${name}.astro`, path: `/project/src/pages/${name}.astro`, route: name === 'index' ? '/' : `/${name}` }));
-  const scan = { pages, components: [{ name: 'Card', path: '/project/src/components/Card.astro' }], layouts: [] };
+  const scan = { pages, components: [{ name: 'Card', path: '/project/src/components/Card.astro', folder: '' }], layouts: [], pageFolders: [] };
   const reads = [];
   const scans = [];
   let deferScans = false;
@@ -45,7 +45,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   const bridge = new Proxy({
     pendingProject: async () => null,
     scanProject: async () => {
-      if (!deferScans) return scan;
+      if (!deferScans) {return scan;}
       const request = deferred();
       scans.push(request);
       return request.promise;
@@ -54,7 +54,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
     startDevServer: async () => ({ url: 'http://localhost:4321' }),
     listProjectClasses: async () => [],
     readPage: (path) => { const request = deferred(); reads.push({ path, ...request }); return request.promise; },
-    writePage: async (payload) => { if (writeError) throw writeError; writes.push(payload); },
+    writePage: async (payload) => { if (writeError) {throw writeError;} writes.push(payload); },
     onFsChanged: (cb) => { onFsChanged = cb; return () => {}; },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},
@@ -141,7 +141,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   await act(async () => { earlierScanEvent = onFsChanged({ files: [pages[1].path] }); await tick(); });
   await act(async () => { laterScanEvent = onFsChanged({ files: ['/project/src/components/New.astro'] }); await tick(); });
   assert.equal(scans.length, 2);
-  const latestScan = { ...scan, layouts: [{ name: 'NewLayout', path: '/project/src/layouts/NewLayout.astro' }] };
+  const latestScan = { ...scan, layouts: [{ name: 'NewLayout', path: '/project/src/layouts/NewLayout.astro', folder: 'layouts' }] };
   await act(async () => { scans[1].resolve(latestScan); await tick(); });
   assert.equal(reads[9].path, pages[1].path, 'the unrelated later event keeps the earlier page change');
   await act(async () => { reads[9].resolve(pageState('after-newest-scan')); await laterScanEvent; await tick(); });

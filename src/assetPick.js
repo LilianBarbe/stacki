@@ -13,7 +13,7 @@ let pending = null;
 export function onAssetRequest(fn) {
   listener = fn;
   return () => {
-    if (listener === fn) listener = null;
+    if (listener === fn) {listener = null;}
   };
 }
 

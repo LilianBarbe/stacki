@@ -11,17 +11,17 @@ export function createQueryCache(query: Query) {
   let timer: ReturnType<typeof setTimeout> | null = null
   let scope: unknown[] = []
   const listeners = new Set<() => void>()
-  const notify = () => { for (const listener of listeners) listener() }
+  const notify = () => { for (const listener of listeners) {listener()} }
 
   function clear(notifyListeners = true) {
-    if (timer !== null) clearTimeout(timer)
+    if (timer !== null) {clearTimeout(timer)}
     timer = null
     for (const values of entries.values()) {
-      for (const entry of values.values()) if (entry.value === undefined) entry.resolve(null)
+      for (const entry of values.values()) {if (entry.value === undefined) {entry.resolve(null)}}
     }
     entries = new Map()
     queued = new Map()
-    if (notifyListeners) notify()
+    if (notifyListeners) {notify()}
   }
 
   function flush() {
@@ -32,7 +32,7 @@ export function createQueryCache(query: Query) {
     for (const [path, keys] of batch) {
       // Promise.resolve also contains a bridge that throws before returning.
       void Promise.resolve().then(() => query(path, [...keys])).catch(() => null).then((answer) => {
-        if (generation !== entries) return
+        if (generation !== entries) {return}
         for (const key of keys) {
           const entry = entries.get(path)!.get(key)!
           entry.value = answer?.[key] ?? null
@@ -48,7 +48,7 @@ export function createQueryCache(query: Query) {
     // Called during render as well as effects: paths are reused by different
     // documents. Never show a cached value from the previously open file.
     setScope(next: unknown[]) {
-      if (scope.length === next.length && scope.every((value, i) => value === next[i])) return
+      if (scope.length === next.length && scope.every((value, i) => value === next[i])) {return}
       scope = next
       clear(false)
     },
@@ -57,16 +57,16 @@ export function createQueryCache(query: Query) {
     },
     request(path: string, key: string): Promise<Answer> {
       let values = entries.get(path)
-      if (!values) entries.set(path, values = new Map())
+      if (!values) {entries.set(path, values = new Map())}
       const existing = values.get(key)
-      if (existing) return existing.promise
+      if (existing) {return existing.promise}
       let resolve!: Entry['resolve']
       const promise = new Promise<Answer>((done) => { resolve = done })
       values.set(key, { promise, resolve })
       let keys = queued.get(path)
-      if (!keys) queued.set(path, keys = new Set())
+      if (!keys) {queued.set(path, keys = new Set())}
       keys.add(key)
-      if (timer === null) timer = setTimeout(flush, 0)
+      if (timer === null) {timer = setTimeout(flush, 0)}
       return promise
     },
     subscribe(listener: () => void) {

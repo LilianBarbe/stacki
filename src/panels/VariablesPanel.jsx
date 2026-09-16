@@ -33,9 +33,9 @@ export default function VariablesPanel({ project, selected, onSelect }) {
   // than back at the list — unless the file is one of those, in which case the
   // list of stylesheets is where it belongs.
   useEffect(() => {
-    if (!selected || openFile) return;
+    if (!selected || openFile) {return;}
     const file = files.find((f) => f.rel === selected.file);
-    if (!file || onlyGroup(file)) return;
+    if (!file || onlyGroup(file)) {return;}
     setOpenFile(selected.file);
   }, [selected, openFile, files]);
 
@@ -75,8 +75,8 @@ export default function VariablesPanel({ project, selected, onSelect }) {
                 // names with an empty sheet beside it is a second click to
                 // reach the thing you came for — and where there is only one
                 // group, the list of names is not worth a level of its own.
-                if (!file.groups?.length) return;
-                if (!onlyGroup(file)) setOpenFile(file.rel);
+                if (!file.groups?.length) {return;}
+                if (!onlyGroup(file)) {setOpenFile(file.rel);}
                 onSelect({ file: file.rel, index: 0 });
               }}
             >

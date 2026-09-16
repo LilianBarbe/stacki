@@ -21,7 +21,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -42,7 +42,7 @@ const check = (what, condition, detail) => {
   // What the panel does when the kind changes.
   const switchKind = (css, next) => {
     const current = parseGradient(css);
-    if (!current?.stops?.length) return null;
+    if (!current?.stops?.length) {return null;}
     return serializeGradient({
       ...blankGradientOf(next),
       repeating: current.repeating,

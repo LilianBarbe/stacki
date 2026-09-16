@@ -27,7 +27,7 @@ function collect(dir) {
   const walk = (d) => {
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
       if (entry.isDirectory()) {
-        if (!SKIP_DIRS.has(entry.name)) walk(path.join(d, entry.name));
+        if (!SKIP_DIRS.has(entry.name)) {walk(path.join(d, entry.name));}
       } else if (entry.name.endsWith('.astro')) {
         out.push(path.join(d, entry.name));
       }
@@ -45,7 +45,7 @@ function classify(file) {
   } catch (err) {
     return { status: 'threw', detail: err.message };
   }
-  if (!parsed.editable) return { status: 'not-editable', detail: parsed.reason || '' };
+  if (!parsed.editable) {return { status: 'not-editable', detail: parsed.reason || '' };}
   let output;
   try {
     output = serializePage(parsed.model);

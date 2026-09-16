@@ -18,15 +18,15 @@ import {
 function buildTree(pages, folders) {
   const root = { dirs: new Map(), pages: [] };
   const dirNode = (rel) => {
-    if (!rel) return root;
+    if (!rel) {return root;}
     let node = root;
     for (const part of rel.split('/')) {
-      if (!node.dirs.has(part)) node.dirs.set(part, { dirs: new Map(), pages: [] });
+      if (!node.dirs.has(part)) {node.dirs.set(part, { dirs: new Map(), pages: [] });}
       node = node.dirs.get(part);
     }
     return node;
   };
-  for (const f of folders) dirNode(f);
+  for (const f of folders) {dirNode(f);}
   for (const p of pages) {
     const parts = p.name.split('/');
     dirNode(parts.slice(0, -1).join('/')).pages.push({ ...p, base: parts[parts.length - 1] });
@@ -36,7 +36,7 @@ function buildTree(pages, folders) {
 
 function countPages(node) {
   let n = node.pages.length;
-  for (const child of node.dirs.values()) n += countPages(child);
+  for (const child of node.dirs.values()) {n += countPages(child);}
   return n;
 }
 
@@ -82,8 +82,8 @@ export default function PagesPanel({
     } catch {
       return;
     }
-    if (!payload?.name) return;
-    if (dirOf(payload.name) === dirRel) return; // already there
+    if (!payload?.name) {return;}
+    if (dirOf(payload.name) === dirRel) {return;} // already there
     const base = payload.name.split('/').pop();
     onMovePage(payload, dirRel ? `${dirRel}/${base}` : base);
   };
@@ -102,7 +102,7 @@ export default function PagesPanel({
   const commitPageRename = (page, text) => {
     setEditing(null);
     const base = text.trim().replace(/\.(astro|md)$/i, '').replace(/[^\w-]+/g, '-');
-    if (!base || base === stripExt(page.base)) return;
+    if (!base || base === stripExt(page.base)) {return;}
     const dir = dirOf(page.name);
     onMovePage(page, `${dir ? dir + '/' : ''}${base}${extOf(page.base)}`);
   };
@@ -111,7 +111,7 @@ export default function PagesPanel({
     setEditing(null);
     const name = text.trim().replace(/[^\w-]+/g, '-');
     const parts = rel.split('/');
-    if (!name || name === parts[parts.length - 1]) return;
+    if (!name || name === parts[parts.length - 1]) {return;}
     onRenameFolder(rel, [...parts.slice(0, -1), name].join('/'));
   };
 
@@ -177,8 +177,8 @@ export default function PagesPanel({
             !isEditing &&
             setCollapsed((prev) => {
               const next = new Set(prev);
-              if (next.has(rel)) next.delete(rel);
-              else next.add(rel);
+              if (next.has(rel)) {next.delete(rel);}
+              else {next.add(rel);}
               return next;
             })
           }
@@ -258,7 +258,7 @@ export default function PagesPanel({
             title="New folder"
             onClick={async () => {
               const name = await onCreateFolder();
-              if (name) setEditing({ type: 'folder', key: name });
+              if (name) {setEditing({ type: 'folder', key: name });}
             }}
           >
             <FolderPlusIcon size={13} />
@@ -281,7 +281,7 @@ export default function PagesPanel({
       <div
         className={`panel-body ${dropDir === '' ? 'pages-root-drop' : ''}`}
         onDragLeave={(e) => {
-          if (e.currentTarget === e.target) setDropDir(null);
+          if (e.currentTarget === e.target) {setDropDir(null);}
         }}
         {...(searchResults ? {} : dragProps(''))}
       >
@@ -387,8 +387,8 @@ function RenameInput({ initial, onCommit }) {
       onChange={(e) => setText(e.target.value)}
       onBlur={() => onCommit(text)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') onCommit(text);
-        else if (e.key === 'Escape') onCommit(initial);
+        if (e.key === 'Enter') {onCommit(text);}
+        else if (e.key === 'Escape') {onCommit(initial);}
       }}
     />
   );
@@ -399,7 +399,7 @@ function NewPageModal({ layouts, onClose, onCreate }) {
   const [layout, setLayout] = useState(layouts[0]?.name || '');
 
   const submit = () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {return;}
     onCreate(name.trim(), layout || null);
   };
 

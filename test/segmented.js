@@ -25,7 +25,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // Segment geometry, since jsdom lays nothing out: the track is 320px wide with
@@ -72,7 +72,7 @@ const SEG = (TRACK - PAD * 2) / 4;
   const index = (el) => [...(el.parentElement?.children ?? [])].filter((n) => n.tagName === 'BUTTON').indexOf(el);
   Object.defineProperty(dom.window.HTMLElement.prototype, 'offsetLeft', {
     get() {
-      if (!this.className?.includes?.('display-seg')) return 0;
+      if (!this.className?.includes?.('display-seg')) {return 0;}
       return PAD + index(this) * SEG;
     },
   });
@@ -256,7 +256,7 @@ const SEG = (TRACK - PAD * 2) / 4;
     let from = 0;
     for (;;) {
       const at = css.indexOf(selector + ' {', from);
-      if (at < 0) break;
+      if (at < 0) {break;}
       const end = css.indexOf('}', at);
       out.push(css.slice(at, end));
       from = end + 1;

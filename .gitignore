@@ -1,6 +1,7 @@
 node_modules/
 dist/
 release/
+shared/dist/
 .DS_Store
 
 # Signing material and credentials — never commit these
@@ -11,3 +12,39 @@ release/
 *.pem
 *.key
 *.mobileprovision
+electron/htmlText.js
+electron/serialQueue.js
+electron/selfWrites.js
+electron/windowBounds.js
+electron/assetRefs.js
+electron/frontmatter.js
+electron/jsCollections.js
+electron/devProbe.js
+electron/injectedRoutes.js
+electron/projectWatcher.js
+electron/formats/transplant.js
+electron/formats/ndjson.js
+electron/formats/csv.js
+electron/formats/yaml.js
+electron/formats/frontmatter.js
+electron/componentFile.js
+electron/gitSnapshot.js
+electron/starter.js
+electron/cmsRefs.js
+electron/componentUsage.js
+electron/previewWorktree.js
+electron/scaffold.js
+electron/contentRefs.js
+electron/formats/json.js
+electron/formats/toml.js
+electron/thumbs.js
+electron/gitBranches.js
+electron/gitHistory.js
+electron/contentEntries.js
+electron/conflicts.js
+electron/contentConfig.js
+electron/terminal.js
+electron/morphClient.js
+electron/markdownParser.js
+electron/cssVars.js
+electron/preload.js

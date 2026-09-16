@@ -36,7 +36,7 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
   const [span] = useState(() => panelSpan(anchorEl))
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el) {return}
     const a = anchorEl.getBoundingClientRect()
     const gap = 6
     const h = el.offsetHeight // rendered height (the zoomed content already collapsed it)
@@ -49,7 +49,7 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
   // outgrows the screen clips.
   useLayoutEffect(() => {
     const box = boxRef.current
-    if (!box) return undefined
+    if (!box) {return undefined}
     const measure = () => setScrolls(box.scrollHeight > window.innerHeight * 0.94)
     measure()
     const ro = new ResizeObserver(measure)
@@ -73,14 +73,14 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
       const t = e.target as Node
       // A popup this one opened (the colour picker from a swatch in here) is drawn
       // through a portal, so `contains` says outside — see lib/popup-layer.
-      if (inOwnedPopup(t, ref.current)) return
-      if (ref.current?.contains(t) || anchorEl.contains(t)) return
+      if (inOwnedPopup(t, ref.current)) {return}
+      if (ref.current?.contains(t) || anchorEl.contains(t)) {return}
       // The anchor row is excluded above: pressing it toggles the popover shut
       // through its own handler, which is a press meant for it.
       swallowNextClick()
       onClose()
     }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
     // Closing on scroll is about the page moving out from under a popover that is
     // pinned to a rectangle it can no longer see. A list scrolling INSIDE it is
     // not that — and a dropdown scrolls itself the moment it opens, to bring the
@@ -88,7 +88,7 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
     // one control most of these editors lead with.
     const onScroll = (e: Event) => {
       const t = e.target
-      if (t instanceof Node && ref.current?.contains(t)) return
+      if (t instanceof Node && ref.current?.contains(t)) {return}
       onClose()
     }
     document.addEventListener('mousedown', onDown)

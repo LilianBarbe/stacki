@@ -30,7 +30,7 @@ function CenterHorizontallyIcon() {
 // The effective (winning) value of a side, for the centered-state check.
 function sideValue(read: Read, prop: string): string {
   const r = read(prop)
-  if (!r) return ''
+  if (!r) {return ''}
   const src = r.source === 'selected' && r.selectedValue ? r.selectedValue : r.winner
   return src.value.trim().toLowerCase()
 }

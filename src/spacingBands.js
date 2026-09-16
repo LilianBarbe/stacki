@@ -39,7 +39,7 @@ export function spacingBands(box, spacing, kind, sides) {
       .filter((b) => want.has(b.axis) && b.w > 0 && b.h > 0)
       .map((b) => ({ side: b.axis, x: b.x, y: b.y, w: b.w, h: b.h }));
   }
-  if (!box || !spacing?.[kind]) return [];
+  if (!box || !spacing?.[kind]) {return [];}
   const size = spacing[kind];
   const want = new Set(sides || []);
   const at = (side) => Math.max(0, Number(size[side]) || 0);

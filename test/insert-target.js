@@ -24,7 +24,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -139,7 +139,7 @@ const check = (what, condition, detail) => {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         const hit = findComponent(full, name);
-        if (hit) return hit;
+        if (hit) {return hit;}
       } else if (entry.name === `${name}.astro`) {
         return fs.readFileSync(full, 'utf8');
       }
@@ -153,7 +153,7 @@ const check = (what, condition, detail) => {
       ['Img', false, null],
     ]) {
       const src = findComponent(LUMOS, name);
-      if (src == null) continue; // not in this project any more
+      if (src == null) {continue;} // not in this project any more
       check(
         `the real <${name}> ${slots ? 'takes' : 'takes no'} default content`,
         parseSlots(src).includes('default') === slots,

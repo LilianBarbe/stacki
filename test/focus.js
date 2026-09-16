@@ -21,7 +21,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -168,9 +168,9 @@ const check = (what, condition, detail) => {
     const source = fs.readFileSync(path.join(panel, file), 'utf8');
     for (const effect of source.split('useEffect(').slice(1)) {
       const body = effect.slice(0, effect.indexOf('}, ['));
-      if (!/inputRef\.current\?\.focus\(\)/.test(body)) continue;
+      if (!/inputRef\.current\?\.focus\(\)/.test(body)) {continue;}
       // Gated on something: the mode was entered, or the caller asked.
-      if (/wantFocus|autoFocus|didFocus/.test(body)) continue;
+      if (/wantFocus|autoFocus|didFocus/.test(body)) {continue;}
       ungated.push(file);
     }
   }

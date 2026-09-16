@@ -27,7 +27,7 @@ import { createQueryCache } from './query-cache'
  */
 export function needsPage(value: string): boolean {
   const v = String(value ?? '').trim().toLowerCase()
-  if (!v) return false
+  if (!v) {return false}
   return (
     v.includes('var(') ||
     v.includes('color-mix(') ||
@@ -72,7 +72,7 @@ export function useResolvedColor(value: string): string {
   const resolved = enabled ? cache.read(path, raw) : null
 
   useEffect(() => {
-    if (!pageDependent) return undefined
+    if (!pageDependent) {return undefined}
     const sync = () => bump((n) => n + 1)
     const offCache = cache.subscribe(sync)
     const offHost = onHostChange(sync)
@@ -80,7 +80,7 @@ export function useResolvedColor(value: string): string {
   }, [pageDependent])
 
   useEffect(() => {
-    if (enabled && resolved === undefined) void cache.request(path, raw)
+    if (enabled && resolved === undefined) {void cache.request(path, raw)}
   })
 
   return resolved || raw

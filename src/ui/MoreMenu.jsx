@@ -19,11 +19,11 @@ export default function MoreMenu({ items, title = 'Options', className = '', wid
   useDismiss(menuRef, open, () => setOpen(false));
 
   const rows = (items || []).filter(Boolean);
-  if (!rows.length) return null;
+  if (!rows.length) {return null;}
 
   const show = () => {
     const rect = buttonRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) {return;}
     const place = popupBox(rect, rows.length * 30 + 12, window.innerHeight);
     setBox({ left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)), ...place });
     setOpen(true);
@@ -44,8 +44,8 @@ export default function MoreMenu({ items, title = 'Options', className = '', wid
           // folder, picks an asset, starts a rename.
           e.stopPropagation();
           e.preventDefault();
-          if (open) setOpen(false);
-          else show();
+          if (open) {setOpen(false);}
+          else {show();}
         }}
       >
         <MoreIcon size={13} />

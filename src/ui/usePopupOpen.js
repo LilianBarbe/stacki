@@ -28,7 +28,7 @@ export default function usePopupOpen(host) {
     look();
     const watch = new MutationObserver(look);
     watch.observe(document.body, { childList: true });
-    if (host?.current) watch.observe(host.current, { childList: true, subtree: true });
+    if (host?.current) {watch.observe(host.current, { childList: true, subtree: true });}
     return () => watch.disconnect();
   }, [host]);
   return open;

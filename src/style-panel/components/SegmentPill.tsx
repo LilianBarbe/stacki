@@ -22,16 +22,16 @@ export default function SegmentPill() {
 
   useLayoutEffect(() => {
     const track = ref.current?.parentElement
-    if (!track) return
+    if (!track) {return}
     const watched = new ResizeObserver(() => measure())
     function measure() {
       const track2 = ref.current?.parentElement
-      if (!track2) return
+      if (!track2) {return}
       const segs = [...track2.querySelectorAll<HTMLElement>('.embed-editor_display-seg')]
       // Re-observed on every measure: which buttons exist changes with the
       // control (a custom value shows none at all), and observe() on one
       // already watched is a no-op.
-      for (const seg of segs) watched.observe(seg)
+      for (const seg of segs) {watched.observe(seg)}
       const selected = segs.find((seg) => seg.classList.contains('is-selected'))
       // Layout offsets, not getBoundingClientRect: under a CSS `zoom` ancestor a
       // rect comes back in scaled coordinates while the inline px below is

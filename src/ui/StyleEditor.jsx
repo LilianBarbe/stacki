@@ -26,17 +26,17 @@ const styleMode = StreamLanguage.define({
     // One declaration per line, so a new line starts a new property — even
     // when the previous one was left without its semicolon. Values that wrap
     // inside parens (a long gradient) are the exception, hence the depth.
-    if (stream.sol() && state.depth === 0) state.inValue = false;
-    if (stream.eatSpace()) return null;
+    if (stream.sol() && state.depth === 0) {state.inValue = false;}
+    if (stream.eatSpace()) {return null;}
 
     if (stream.match('/*')) {
       while (!stream.eol()) {
-        if (stream.match('*/')) break;
+        if (stream.match('*/')) {break;}
         stream.next();
       }
       return 'comment';
     }
-    if (stream.match(/^!\s*important\b/i)) return 'important';
+    if (stream.match(/^!\s*important\b/i)) {return 'important';}
 
     const ch = stream.peek();
     if (ch === '"' || ch === "'") {
@@ -44,7 +44,7 @@ const styleMode = StreamLanguage.define({
       let escaped = false;
       while (!stream.eol()) {
         const c = stream.next();
-        if (!escaped && c === ch) break;
+        if (!escaped && c === ch) {break;}
         escaped = !escaped && c === '\\';
       }
       return 'str';
@@ -61,8 +61,8 @@ const styleMode = StreamLanguage.define({
     }
     if (/[(),/]/.test(ch)) {
       stream.next();
-      if (ch === '(') state.depth++;
-      else if (ch === ')') state.depth = Math.max(0, state.depth - 1);
+      if (ch === '(') {state.depth++;}
+      else if (ch === ')') {state.depth = Math.max(0, state.depth - 1);}
       return 'punct';
     }
     if (ch === '#') {
@@ -77,7 +77,7 @@ const styleMode = StreamLanguage.define({
     // Bare word: a property before the colon, a function if a ( follows,
     // otherwise a keyword value (auto, none, …) or a var()/custom property.
     if (stream.match(/^[-\w\\]+/)) {
-      if (stream.peek() === '(') return 'fn';
+      if (stream.peek() === '(') {return 'fn';}
       return state.inValue ? 'val' : 'prop';
     }
     stream.next();
@@ -106,7 +106,7 @@ export function splitDeclarations(text) {
     const c = text[i];
     if (quote) {
       buf += c;
-      if (c === quote && text[i - 1] !== '\\') quote = null;
+      if (c === quote && text[i - 1] !== '\\') {quote = null;}
       continue;
     }
     if (c === '"' || c === "'") {
@@ -167,13 +167,13 @@ export default function StyleEditor({ value, onChange, autoFocus, placeholder = 
           appHighlight,
           EditorView.lineWrapping,
           EditorView.updateListener.of((u) => {
-            if (u.docChanged) onChangeRef.current?.(u.state.doc.toString());
+            if (u.docChanged) {onChangeRef.current?.(u.state.doc.toString());}
           }),
         ],
       }),
     });
     viewRef.current = view;
-    if (autoFocus) view.focus();
+    if (autoFocus) {view.focus();}
     return () => {
       viewRef.current = null;
       view.destroy();
@@ -188,9 +188,9 @@ export default function StyleEditor({ value, onChange, autoFocus, placeholder = 
   // edit straight back is a no-op and typing is never interrupted.
   useEffect(() => {
     const view = viewRef.current;
-    if (!view) return;
+    if (!view) {return;}
     const next = value || '';
-    if (collapseDeclarations(view.state.doc.toString()) === next) return;
+    if (collapseDeclarations(view.state.doc.toString()) === next) {return;}
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: expandDeclarations(next) },
     });

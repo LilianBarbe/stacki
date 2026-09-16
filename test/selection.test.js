@@ -36,7 +36,7 @@ function everyNode(nodes, prefix = '') {
   nodes.forEach((node, i) => {
     const key = prefix ? `${prefix}.${i}` : String(i);
     out.push({ key, node });
-    if (Array.isArray(node.children)) out.push(...everyNode(node.children, key));
+    if (Array.isArray(node.children)) {out.push(...everyNode(node.children, key));}
   });
   return out;
 }

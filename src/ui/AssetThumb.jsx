@@ -14,7 +14,7 @@ const cleanPath = (v) => String(v || '').trim().split(/[?#]/)[0];
 // with a known asset extension ("/videos/clip.webm"), not a URL or a route.
 export function looksLikeAssetPath(value) {
   const p = cleanPath(value);
-  if (!p.startsWith('/') || p.startsWith('//')) return false;
+  if (!p.startsWith('/') || p.startsWith('//')) {return false;}
   return (
     IMAGE_EXT.test(p) || VIDEO_EXT.test(p) || AUDIO_EXT.test(p) ||
     TEXT_EXT.test(p) || FONT_DOC_EXT.test(p)
@@ -24,9 +24,9 @@ export function looksLikeAssetPath(value) {
 // Which picker filter suits a value ("image" | "video" | "audio" | "asset").
 export function mediaKindFor(value) {
   const p = cleanPath(value);
-  if (VIDEO_EXT.test(p)) return 'video';
-  if (AUDIO_EXT.test(p)) return 'audio';
-  if (IMAGE_EXT.test(p)) return 'image';
+  if (VIDEO_EXT.test(p)) {return 'video';}
+  if (AUDIO_EXT.test(p)) {return 'audio';}
+  if (IMAGE_EXT.test(p)) {return 'image';}
   return 'asset';
 }
 
@@ -52,7 +52,7 @@ export const FONT_EXT = /\.(woff2?|ttf|otf)$/i;
 // same font share it.
 const familyFor = (abs) => {
   let h = 0;
-  for (let i = 0; i < abs.length; i++) h = (h * 31 + abs.charCodeAt(i)) | 0;
+  for (let i = 0; i < abs.length; i++) {h = (h * 31 + abs.charCodeAt(i)) | 0;}
   return `avb-font-${(h >>> 0).toString(36)}`;
 };
 
@@ -106,10 +106,10 @@ export default function AssetThumb({ file, className = '', onImageLoad, onClick 
   const [fontFamily, setFontFamily] = useState(null);
   React.useEffect(() => {
     setFontFamily(null);
-    if (!isFont) return undefined;
+    if (!isFont) {return undefined;}
     let alive = true;
     loadFontPreview(file.abs, candidates).then((f) => {
-      if (alive) setFontFamily(f);
+      if (alive) {setFontFamily(f);}
     });
     return () => {
       alive = false;
@@ -118,14 +118,14 @@ export default function AssetThumb({ file, className = '', onImageLoad, onClick 
 
   const hoverPlay = () => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v) {return;}
     v.loop = true;
     v.muted = true;
     v.play().catch(() => {});
   };
   const hoverStop = () => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v) {return;}
     v.pause();
     try {
       v.currentTime = 0.1;

@@ -13,16 +13,16 @@
 // React mounts.
 
 function describe(node: Node | null | undefined): string {
-  if (!node) return 'none'
-  if (node instanceof Element) return `${node.tagName.toLowerCase()}.${node.className || '(no-class)'}`
-  if (node.nodeType === Node.TEXT_NODE) return `#text("${(node.textContent ?? '').slice(0, 20)}")`
+  if (!node) {return 'none'}
+  if (node instanceof Element) {return `${node.tagName.toLowerCase()}.${node.className || '(no-class)'}`}
+  if (node.nodeType === Node.TEXT_NODE) {return `#text("${(node.textContent ?? '').slice(0, 20)}")`}
   return node.nodeName
 }
 
 let installed = false
 
 export function installDomSafetyGuards(): void {
-  if (installed || typeof Node === 'undefined') return
+  if (installed || typeof Node === 'undefined') {return}
   installed = true
 
   const originalRemoveChild = Node.prototype.removeChild

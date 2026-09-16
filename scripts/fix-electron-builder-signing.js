@@ -14,7 +14,7 @@ const hash = (source) => createHash('sha256').update(source).digest('hex');
 
 function patchSigningSource(source) {
   const digest = hash(source);
-  if (digest === PATCHED_HASH) return source;
+  if (digest === PATCHED_HASH) {return source;}
   if (digest !== ORIGINAL_HASH) {
     throw new Error('Unrecognized electron-builder signing source; review the signing backport before installing.');
   }
@@ -25,7 +25,7 @@ function patchSigningSource(source) {
       'async function importCerts(keychainFile, paths, keyPasswords, keychainPassword) {')
     .replace('["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", password, keychainFile]',
       '["set-key-partition-list", "-S", "apple-tool:,apple:", "-s", "-k", keychainPassword, keychainFile]');
-  if (hash(patched) !== PATCHED_HASH) throw new Error('Electron-builder signing backport failed validation.');
+  if (hash(patched) !== PATCHED_HASH) {throw new Error('Electron-builder signing backport failed validation.');}
   return patched;
 }
 
@@ -36,7 +36,7 @@ function fixElectronBuilderSigning(projectDir = path.resolve(__dirname, '..')) {
     builderPackage = projectRequire.resolve('electron-builder/package.json');
   } catch (error) {
     // electron-builder is a devDependency, omitted from production installs.
-    if (error.code === 'MODULE_NOT_FOUND') return 'not-installed';
+    if (error.code === 'MODULE_NOT_FOUND') {return 'not-installed';}
     throw error;
   }
   // Resolve from the builder itself, including non-hoisted dependency layouts.
@@ -48,7 +48,7 @@ function fixElectronBuilderSigning(projectDir = path.resolve(__dirname, '..')) {
   const file = path.join(path.dirname(libraryPackage), 'out/codeSign/macCodeSign.js');
   const source = fs.readFileSync(file, 'utf8');
   const patched = patchSigningSource(source);
-  if (source === patched) return 'already-patched';
+  if (source === patched) {return 'already-patched';}
 
   // Validate everything before replacing the file, and publish it atomically.
   const temporary = `${file}.stacki-${randomUUID()}.tmp`;

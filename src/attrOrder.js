@@ -14,12 +14,12 @@
 // Renames a prop in place. A name the tag already had gives up its slot to the
 // rename — that is what overwriting it means. Returns whether anything moved.
 export function renameAttr(node, oldName, newName) {
-  if (!node?.props || !(oldName in node.props)) return false;
-  if (!newName || newName === oldName) return false;
+  if (!node?.props || !(oldName in node.props)) {return false;}
+  if (!newName || newName === oldName) {return false;}
   const next = {};
   for (const [k, v] of Object.entries(node.props)) {
-    if (k === oldName) next[newName] = v;
-    else if (k !== newName) next[k] = v;
+    if (k === oldName) {next[newName] = v;}
+    else if (k !== newName) {next[k] = v;}
   }
   node.props = next;
   if (Array.isArray(node.attrOrder)) {

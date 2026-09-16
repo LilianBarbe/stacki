@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Color parsing + conversion for the color picker. Parsing leans on a shared
 // canvas 2d context (the browser normalizes ANY CSS color — named, hex, rgb(),
 // hsl(), transparent — to rgb/rgba), so we never ship a 148-name table.
@@ -8,7 +10,7 @@ export type HSVA = { h: number; s: number; v: number; a: number } // h 0–360, 
 let ctx: CanvasRenderingContext2D | null | undefined
 
 function canvasCtx(): CanvasRenderingContext2D | null {
-  if (ctx !== undefined) return ctx
+  if (ctx !== undefined) {return ctx}
   try {
     ctx = document.createElement('canvas').getContext('2d')
   } catch {
@@ -23,9 +25,9 @@ const round = (n: number) => Math.round(n)
 /** Parse any CSS color string to RGBA, or null when it isn't a valid color. */
 export function parseColor(input: string): RGBA | null {
   const value = input.trim()
-  if (!value) return null
+  if (!value) {return null}
   const c = canvasCtx()
-  if (!c) return parseColorFallback(value)
+  if (!c) {return parseColorFallback(value)}
   // Invalid values leave fillStyle unchanged, so probe with two different sentinels
   // — if the readback matches neither-changed, the input was rejected.
   c.fillStyle = '#000000'
@@ -34,7 +36,7 @@ export function parseColor(input: string): RGBA | null {
   c.fillStyle = '#ffffff'
   c.fillStyle = value
   const b = c.fillStyle
-  if (a !== b) return null
+  if (a !== b) {return null}
   return parseNormalized(a)
 }
 
@@ -45,7 +47,7 @@ function parseNormalized(s: string): RGBA | null {
     return { r: parseInt(hex.slice(0, 2), 16), g: parseInt(hex.slice(2, 4), 16), b: parseInt(hex.slice(4, 6), 16), a: 1 }
   }
   const m = /rgba?\(([^)]+)\)/i.exec(s)
-  if (!m) return null
+  if (!m) {return null}
   const parts = m[1].split(',').map((p) => p.trim())
   return { r: round(parseFloat(parts[0])), g: round(parseFloat(parts[1])), b: round(parseFloat(parts[2])), a: parts[3] != null ? clamp(parseFloat(parts[3]), 0, 1) : 1 }
 }
@@ -56,11 +58,11 @@ function parseColorFallback(value: string): RGBA | null {
   // is written as all over this panel, and a browser normalizes it to exactly
   // this. Left out, the fallback answers "not a colour" for the value the panel
   // shows most often.
-  if (value.toLowerCase() === 'transparent') return { r: 0, g: 0, b: 0, a: 0 }
+  if (value.toLowerCase() === 'transparent') {return { r: 0, g: 0, b: 0, a: 0 }}
   const hex = /^#([0-9a-f]{3,8})$/i.exec(value)
   if (hex) {
     let h = hex[1]
-    if (h.length === 3 || h.length === 4) h = h.split('').map((c) => c + c).join('')
+    if (h.length === 3 || h.length === 4) {h = h.split('').map((c) => c + c).join('')}
     return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16), a: h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1 }
   }
   return parseNormalized(value)
@@ -71,11 +73,11 @@ export function rgbaToHsva({ r, g, b, a }: RGBA): HSVA {
   const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn), d = max - min
   let h = 0
   if (d) {
-    if (max === rn) h = ((gn - bn) / d) % 6
-    else if (max === gn) h = (bn - rn) / d + 2
-    else h = (rn - gn) / d + 4
+    if (max === rn) {h = ((gn - bn) / d) % 6}
+    else if (max === gn) {h = (bn - rn) / d + 2}
+    else {h = (rn - gn) / d + 4}
     h *= 60
-    if (h < 0) h += 360
+    if (h < 0) {h += 360}
   }
   return { h: round(h), s: round(max === 0 ? 0 : (d / max) * 100), v: round(max * 100), a }
 }
@@ -110,8 +112,8 @@ export function formatRgba({ r, g, b, a }: RGBA): string {
 export type ColorMode = 'hex' | 'rgb' | 'hsl' | 'hsb'
 
 export function formatColor(c: RGBA, mode: ColorMode): string {
-  if (mode === 'rgb' || mode === 'hsb') return formatRgba(c)
-  if (mode === 'hsl') return formatHsla(c)
+  if (mode === 'rgb' || mode === 'hsb') {return formatRgba(c)}
+  if (mode === 'hsl') {return formatHsla(c)}
   return formatHex(c)
 }
 
@@ -124,9 +126,9 @@ export function rgbaToHsl({ r, g, b }: RGBA): { h: number; s: number; l: number 
   let s = 0
   if (d) {
     s = d / (1 - Math.abs(2 * l - 1))
-    if (max === rn) h = ((gn - bn) / d) % 6
-    else if (max === gn) h = (bn - rn) / d + 2
-    else h = (rn - gn) / d + 4
+    if (max === rn) {h = ((gn - bn) / d) % 6}
+    else if (max === gn) {h = (bn - rn) / d + 2}
+    else {h = (rn - gn) / d + 4}
     h = (h * 60 + 360) % 360
   }
   return { h: round(h), s: round(s * 100), l: round(l * 100) }
@@ -140,7 +142,7 @@ function formatHsla(c: RGBA): string {
 /** Detect the notation a color string is written in (to keep output style stable). */
 export function colorMode(input: string): ColorMode {
   const s = input.trim().toLowerCase()
-  if (s.startsWith('hsl')) return 'hsl'
-  if (s.startsWith('rgb')) return 'rgb'
+  if (s.startsWith('hsl')) {return 'hsl'}
+  if (s.startsWith('rgb')) {return 'rgb'}
   return 'hex'
 }

@@ -10,13 +10,13 @@
 let measurer: CanvasRenderingContext2D | null | undefined
 
 function context(): CanvasRenderingContext2D | null {
-  if (measurer === undefined) measurer = document.createElement('canvas').getContext('2d')
+  if (measurer === undefined) {measurer = document.createElement('canvas').getContext('2d')}
   return measurer
 }
 
 /** The font shorthand for canvas. `computed.font` is empty in some engines, so rebuild it. */
 function fontOf(computed: CSSStyleDeclaration): string {
-  if (computed.font) return computed.font
+  if (computed.font) {return computed.font}
   return `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} / ${computed.lineHeight} ${computed.fontFamily}`
 }
 
@@ -32,9 +32,9 @@ function fontOf(computed: CSSStyleDeclaration): string {
  */
 export function caretAtX(el: HTMLInputElement | HTMLTextAreaElement, clientX: number): number {
   const text = el.value
-  if (!text) return 0
+  if (!text) {return 0}
   const ctx = context()
-  if (!ctx) return text.length
+  if (!ctx) {return text.length}
 
   const computed = window.getComputedStyle(el)
   ctx.font = fontOf(computed)
@@ -51,27 +51,27 @@ export function caretAtX(el: HTMLInputElement | HTMLTextAreaElement, clientX: nu
   const width = ctx.measureText(text).width
   const inner = rect.width - borderLeft - borderRight - padLeft - padRight
   const wraps = el.tagName === 'TEXTAREA' && (text.includes('\n') || width > inner)
-  if (wraps) return el.selectionStart ?? 0
+  if (wraps) {return el.selectionStart ?? 0}
 
   // Where the first glyph starts. Short text inside a centred/right-aligned field is
   // offset by the slack, and a long value is scrolled.
   let originX = rect.left + borderLeft + padLeft - el.scrollLeft
   if (width < inner) {
     const align = computed.textAlign
-    if (align === 'center') originX += (inner - width) / 2
-    else if (align === 'right' || align === 'end') originX += inner - width
+    if (align === 'center') {originX += (inner - width) / 2}
+    else if (align === 'right' || align === 'end') {originX += inner - width}
   }
 
   const x = clientX - originX
-  if (x <= 0) return 0
-  if (x >= width) return text.length
+  if (x <= 0) {return 0}
+  if (x >= width) {return text.length}
 
   // Walk the prefixes and stop at the boundary whose midpoint we've passed — the same
   // rule a text caret uses, so the index matches where a click would put it.
   let previous = 0
   for (let i = 1; i <= text.length; i++) {
     const current = ctx.measureText(text.slice(0, i)).width
-    if (x < (previous + current) / 2) return i - 1
+    if (x < (previous + current) / 2) {return i - 1}
     previous = current
   }
   return text.length

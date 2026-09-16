@@ -29,7 +29,7 @@ const send = (entry) => {
 };
 
 export function setCanvasFrame(win) {
-  if (frame === win) return;
+  if (frame === win) {return;}
   frame = win || null;
   // A new document can't answer questions the old one was asked.
   for (const [, entry] of pending) {
@@ -58,7 +58,7 @@ export function tellCanvas(message) {
 // Resolves null when the canvas can't answer — the caller then falls back rather
 // than treating silence as "no".
 export function queryCanvas(path, selectors = [], compute = [], props = []) {
-  if (!frame || typeof path !== 'string') return Promise.resolve(null);
+  if (!frame || typeof path !== 'string') {return Promise.resolve(null);}
   const id = nextId++;
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -86,14 +86,14 @@ export function queryCanvas(path, selectors = [], compute = [], props = []) {
 // re-send carries the original id, so a duplicate answer to one already
 // resolved finds no pending entry and is ignored.
 export function noteCanvasReady() {
-  for (const entry of pending.values()) send(entry);
+  for (const entry of pending.values()) {send(entry);}
 }
 
 // PreviewPane hands replies over; it already owns the message listener and
 // knows which frame they came from.
 export function receiveCanvasReply(data) {
   const entry = pending.get(data?.id);
-  if (!entry) return;
+  if (!entry) {return;}
   // "I don't have that element" from a page that hasn't walked its markers yet
   // means "not yet", and taking it at face value hands the panel a null it then
   // only corrects on its next 1.5s poll. Hold the question instead — the page

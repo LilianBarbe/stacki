@@ -128,9 +128,9 @@ let modifiers: Modifiers = { shiftKey: false, altKey: false }
 const modifierListeners = new Set<(held: Modifiers) => void>()
 
 export function setModifiers(shiftKey: boolean, altKey: boolean) {
-  if (modifiers.shiftKey === shiftKey && modifiers.altKey === altKey) return
+  if (modifiers.shiftKey === shiftKey && modifiers.altKey === altKey) {return}
   modifiers = { shiftKey, altKey }
-  for (const fn of modifierListeners) fn(modifiers)
+  for (const fn of modifierListeners) {fn(modifiers)}
 }
 
 export function getModifiers(): Modifiers {
@@ -152,11 +152,11 @@ const listeners = new Set<() => void>()
 // render that patches several fields wakes subscribers once.
 let notifying = false
 function notifyHost() {
-  if (notifying) return
+  if (notifying) {return}
   notifying = true
   queueMicrotask(() => {
     notifying = false
-    for (const fn of listeners) fn()
+    for (const fn of listeners) {fn()}
   })
 }
 
@@ -168,7 +168,7 @@ export function setHost(patch: Partial<HostState>) {
       changed = true
     }
   }
-  if (changed) notifyHost()
+  if (changed) {notifyHost()}
 }
 
 export function getHost(): HostState {
@@ -188,15 +188,15 @@ export function walkNodes(
 ) {
   for (const n of nodes || []) {
     visit(n, parent)
-    if (Array.isArray(n.children)) walkNodes(n.children, visit, n)
+    if (Array.isArray(n.children)) {walkNodes(n.children, visit, n)}
   }
 }
 
 export function findNode(nodes: HostNode[] | null | undefined, id: string): HostNode | null {
   for (const node of nodes || []) {
-    if (node.id === id) return node
+    if (node.id === id) {return node}
     const found = node.children && findNode(node.children, id)
-    if (found) return found
+    if (found) {return found}
   }
   return null
 }
@@ -205,6 +205,6 @@ export function findNode(nodes: HostNode[] | null | undefined, id: string): Host
 // the panel matches selectors against text, and `class={x}` has no text.
 export function propText(node: HostNode | null | undefined, name: string): string {
   const p = node?.props?.[name]
-  if (!p || p.type !== 'string') return ''
+  if (!p || p.type !== 'string') {return ''}
   return String(p.value ?? '')
 }

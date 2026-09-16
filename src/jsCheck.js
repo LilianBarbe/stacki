@@ -22,7 +22,7 @@ function firstError(code) {
   let at = -1;
   tree.iterate({
     enter: (node) => {
-      if (at >= 0) return false;
+      if (at >= 0) {return false;}
       if (node.type.isError) {
         at = node.from;
         return false;
@@ -53,16 +53,16 @@ function tokenAt(code, pos) {
  */
 export function checkStatement(code) {
   const src = String(code ?? '');
-  if (!src.trim()) return { ok: true };
+  if (!src.trim()) {return { ok: true };}
   const at = firstError(src);
-  if (at < 0) return { ok: true };
+  if (at < 0) {return { ok: true };}
   const token = tokenAt(src, at);
   const line = lineOf(src, at);
   const where = src.split('\n').length > 1 ? ` on line ${line}` : '';
   // Past the end: the statement stops in the middle of itself, which reads
   // very differently from a stray character and is the commoner of the two
   // while typing.
-  if (at >= src.trimEnd().length) return { ok: false, message: 'This looks unfinished — the statement stops early.' };
+  if (at >= src.trimEnd().length) {return { ok: false, message: 'This looks unfinished — the statement stops early.' };}
   return {
     ok: false,
     message: token ? `Unexpected “${token}”${where}.` : `There's a mistake${where}.`,

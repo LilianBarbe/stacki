@@ -44,7 +44,7 @@ let checked = 0;
 
 function check(what, condition, detail) {
   checked++;
-  if (condition) return;
+  if (condition) {return;}
   failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
 }
 
@@ -53,9 +53,9 @@ function check(what, condition, detail) {
 function propAt(schema, dotted) {
   let node = schema;
   for (const key of dotted.split('.')) {
-    if (!node) return null;
-    if (node.$ref) node = defOf(schema, node.$ref);
-    if (node.type === 'array') node = node.items;
+    if (!node) {return null;}
+    if (node.$ref) {node = defOf(schema, node.$ref);}
+    if (node.type === 'array') {node = node.items;}
     node = node?.properties?.[key];
   }
   return node || null;
@@ -78,7 +78,7 @@ const defOf = (root, ref) => root?.$defs?.[String(ref).split('/').pop()] || null
   const by = Object.fromEntries(result.collections.map((c) => [c.name, c]));
   const has = (name) => {
     const c = by[name];
-    if (!c) failures.push(`  ${name}: not in the manifest`);
+    if (!c) {failures.push(`  ${name}: not in the manifest`);}
     return c;
   };
 

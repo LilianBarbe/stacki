@@ -10,12 +10,12 @@
 // is left to follow. `overrides` is what is being typed right now, which is not
 // yet what the file says.
 export function resolveValue(value, values, overrides, depth = 0) {
-  if (depth > 8) return value;
+  if (depth > 8) {return value;}
   const next = String(value).replace(
     /var\(\s*(--[\w-]+)\s*(?:,([^()]*(?:\([^()]*\)[^()]*)*))?\)/g,
     (whole, name, fallback) => {
       const found = overrides?.[name] ?? values?.[name];
-      if (found !== undefined) return found;
+      if (found !== undefined) {return found;}
       return fallback !== undefined ? fallback.trim() : whole;
     }
   );
@@ -50,8 +50,8 @@ export function splitArgs(text) {
   let start = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (ch === '(') depth++;
-    else if (ch === ')') depth--;
+    if (ch === '(') {depth++;}
+    else if (ch === ')') {depth--;}
     else if (ch === ',' && depth === 0) {
       out.push(text.slice(start, i));
       start = i + 1;
@@ -68,17 +68,17 @@ export function evaluate(text, vw) {
   let at = 0;
   const src = String(text);
   const skip = () => {
-    while (at < src.length && /\s/.test(src[at])) at++;
+    while (at < src.length && /\s/.test(src[at])) {at++;}
   };
   const expression = () => {
     let value = term();
     for (;;) {
       skip();
       const op = src[at];
-      if (op !== '+' && op !== '-') return value;
+      if (op !== '+' && op !== '-') {return value;}
       at++;
       const right = term();
-      if (right === null || value === null) return null;
+      if (right === null || value === null) {return null;}
       value = op === '+' ? value + right : value - right;
     }
   };
@@ -87,10 +87,10 @@ export function evaluate(text, vw) {
     for (;;) {
       skip();
       const op = src[at];
-      if (op !== '*' && op !== '/') return value;
+      if (op !== '*' && op !== '/') {return value;}
       at++;
       const right = factor();
-      if (right === null || value === null) return null;
+      if (right === null || value === null) {return null;}
       value = op === '*' ? value * right : value / right;
     }
   };
@@ -100,7 +100,7 @@ export function evaluate(text, vw) {
       at++;
       const value = expression();
       skip();
-      if (src[at] !== ')') return null;
+      if (src[at] !== ')') {return null;}
       at++;
       return value;
     }
@@ -110,7 +110,7 @@ export function evaluate(text, vw) {
       return value === null ? null : -value;
     }
     const match = /^([0-9]*\.?[0-9]+)(px|rem|em|vw|vh|%)?/.exec(src.slice(at));
-    if (!match) return null;
+    if (!match) {return null;}
     at += match[0].length;
     const n = parseFloat(match[1]);
     switch (match[2]) {
@@ -141,9 +141,9 @@ export const FLUID_LINK =
 export function fluidCheck(resolved) {
   const text = String(resolved || '').trim();
   const match = /^clamp\(([\s\S]*)\)$/i.exec(text);
-  if (!match) return null;
+  if (!match) {return null;}
   const args = splitArgs(match[1]);
-  if (args.length !== 3) return null;
+  if (args.length !== 3) {return null;}
 
   const min = evaluate(args[0], 0);
   const max = evaluate(args[2], 0);
@@ -151,10 +151,10 @@ export function fluidCheck(resolved) {
   // viewport at all is the rem part, and the step to one vw is the coefficient.
   const base = evaluate(args[1], 0);
   const atOne = evaluate(args[1], 1);
-  if ([min, max, base, atOne].some((n) => n === null || !Number.isFinite(n))) return null;
+  if ([min, max, base, atOne].some((n) => n === null || !Number.isFinite(n))) {return null;}
   const vw = atOne - base;
   // No viewport term is a clamp, but not a fluid one — nothing here applies.
-  if (vw === 0) return null;
+  if (vw === 0) {return null;}
 
   // Inverted values (a max below the min) are read the way they render, or the
   // ratio test passes on a value that fails it in the other direction.

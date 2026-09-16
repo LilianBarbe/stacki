@@ -35,7 +35,7 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
   const addToken = (text) => {
     const t = text.trim();
     setDraft('');
-    if (!t) return;
+    if (!t) {return;}
     if (tokens.includes(t)) {
       setCaret(tokens.indexOf(t) + 1);
       return;
@@ -47,7 +47,7 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
   };
 
   const removeAt = (i) => {
-    if (i < 0 || i >= tokens.length) return;
+    if (i < 0 || i >= tokens.length) {return;}
     const next = tokens.filter((_, j) => j !== i);
     setCaret(Math.max(0, i));
     commit(next);
@@ -68,7 +68,7 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
   // collapsing the list mid-preview would shift every index under it.
   const writeAt = (i, cls, { immediate, dedupe }) => {
     let next = tokens.map((t, j) => (j === i ? cls : t));
-    if (dedupe) next = next.filter((t, j, all) => all.indexOf(t) === j);
+    if (dedupe) {next = next.filter((t, j, all) => all.indexOf(t) === j);}
     onChange(next.join(' '), immediate);
   };
 
@@ -87,12 +87,12 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
   };
 
   const previewFamily = (n) => {
-    if (!family) return;
+    if (!family) {return;}
     setFamHighlight(n);
     const cls = family.options[n];
-    if (!cls) return;
+    if (!cls) {return;}
     const applied = famPreview.current ?? famOriginal.current;
-    if (cls === applied) return;
+    if (cls === applied) {return;}
     famPreview.current = cls;
     // Immediate, like every other menu that previews on hover (the prop
     // dropdowns): a preview that waits out the typing debounce reads as lag.
@@ -102,19 +102,19 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
   };
 
   const applyFamily = (n) => {
-    if (!family) return;
+    if (!family) {return;}
     const cls = family.options[n];
     const i = family.index;
     famPreview.current = null;
     setFamily(null);
     setFamHighlight(-1);
-    if (cls) writeAt(i, cls, { immediate: true, dedupe: true });
+    if (cls) {writeAt(i, cls, { immediate: true, dedupe: true });}
   };
 
   useEffect(() => {
-    if (!family) return undefined;
+    if (!family) {return undefined;}
     const onDown = (e) => {
-      if (!e.target.closest?.('.class-family')) closeFamily(true);
+      if (!e.target.closest?.('.class-family')) {closeFamily(true);}
     };
     document.addEventListener('mousedown', onDown, true);
     return () => document.removeEventListener('mousedown', onDown, true);
@@ -122,7 +122,7 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
 
   // Keep the arrowed option in view.
   useEffect(() => {
-    if (!family || famHighlight < 0) return;
+    if (!family || famHighlight < 0) {return;}
     famRef.current?.children[famHighlight]?.scrollIntoView({ block: 'nearest' });
   }, [family, famHighlight]);
 
@@ -131,7 +131,7 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
   // already on this element, which may not be used anywhere else yet.
   const familyOf = (cls) => {
     const prefix = familyPrefix(cls);
-    if (!prefix) return [];
+    if (!prefix) {return [];}
     const pool = new Set([...suggestions, ...tokens]);
     return [...pool].filter((s) => s.startsWith(prefix)).sort(collator.compare);
   };
@@ -203,8 +203,8 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
       setHighlight((h) => Math.max(h - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (matches.length) addToken(matches[Math.min(highlight, matches.length - 1)]);
-      else addToken(draft);
+      if (matches.length) {addToken(matches[Math.min(highlight, matches.length - 1)]);}
+      else {addToken(draft);}
     } else if (e.key === ' ') {
       e.preventDefault();
       addToken(draft);
@@ -237,14 +237,14 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
       onFocus={() => setFocused(true)}
       onBlur={() => {
         setFocused(false);
-        if (draft.trim()) addToken(draft);
+        if (draft.trim()) {addToken(draft);}
       }}
     />
   );
 
   const items = [];
   tokens.forEach((t, i) => {
-    if (i === at) items.push(inputEl);
+    if (i === at) {items.push(inputEl);}
     items.push(
       <span
         key={`${t}-${i}`}
@@ -268,7 +268,7 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
           }
           closeFamily(true);
           const options = familyOf(t);
-          if (options.length < 2) return;
+          if (options.length < 2) {return;}
           const r = e.currentTarget.getBoundingClientRect();
           famOriginal.current = t;
           famPreview.current = null;
@@ -280,7 +280,7 @@ export default function ClassInput({ value, suggestions = [], onChange }) {
       </span>
     );
   });
-  if (at >= tokens.length) items.push(inputEl);
+  if (at >= tokens.length) {items.push(inputEl);}
 
   return (
     <>

@@ -96,7 +96,7 @@ export default function InsertSearch({ components, allowSlot, onInsert, onClose 
   // Keep the highlighted row scrolled into view.
   useEffect(() => {
     const el = listRef.current?.children[highlight];
-    if (el) el.scrollIntoView({ block: 'nearest' });
+    if (el) {el.scrollIntoView({ block: 'nearest' });}
   }, [highlight]);
 
   const onKeyDown = (e) => {
@@ -111,7 +111,7 @@ export default function InsertSearch({ components, allowSlot, onInsert, onClose 
       setHighlight((h) => Math.max(h - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (results[highlight]) onInsert(results[highlight]);
+      if (results[highlight]) {onInsert(results[highlight]);}
     } else if (e.key === 'Tab') {
       e.preventDefault();
       const idx = TABS.findIndex((t) => t.key === tab);

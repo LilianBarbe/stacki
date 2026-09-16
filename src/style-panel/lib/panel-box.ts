@@ -47,6 +47,6 @@ export function panelSpan(anchor: Element): { left: number; width: number } {
   const root = getComputedStyle(document.documentElement)
   const left = parseFloat(root.getPropertyValue('--style-panel-left'))
   const width = parseFloat(root.getPropertyValue('--style-panel-width'))
-  if (Number.isFinite(left) && Number.isFinite(width) && width > 0) return { left, width }
+  if (Number.isFinite(left) && Number.isFinite(width) && width > 0) {return { left, width }}
   return { left: 0, width: window.innerWidth }
 }

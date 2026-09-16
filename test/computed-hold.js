@@ -28,7 +28,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -98,7 +98,7 @@ const check = (what, condition, detail) => {
   // failure in the output.
   const realError = console.error;
   console.error = (...args) => {
-    if (typeof args[0] === 'string' && args[0].includes('not wrapped in act')) return;
+    if (typeof args[0] === 'string' && args[0].includes('not wrapped in act')) {return;}
     realError(...args);
   };
 

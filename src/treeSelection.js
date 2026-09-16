@@ -64,10 +64,10 @@ export function noteIndexAbove(list, index) {
 // Node plus the list it sits in and the node holding that list.
 export function findWithParent(nodes, id, parent = null) {
   for (const [i, n] of nodes.entries()) {
-    if (n.id === id) return { node: n, parent, siblings: nodes, index: i };
+    if (n.id === id) {return { node: n, parent, siblings: nodes, index: i };}
     if (Array.isArray(n.children)) {
       const found = findWithParent(n.children, id, n);
-      if (found) return found;
+      if (found) {return found;}
     }
   }
   return null;
@@ -81,16 +81,16 @@ export function findWithParent(nodes, id, parent = null) {
 // selection can go.
 export function selectionAfterDelete(model, nodeId) {
   const found = findWithParent(model.nodes, nodeId);
-  if (!found) return null;
+  if (!found) {return null;}
   const { parent, siblings, index } = found;
   const gone = new Set([index]);
   const noteAt = noteIndexAbove(siblings, index); // the node's own note goes too
-  if (noteAt !== -1) gone.add(noteAt);
+  if (noteAt !== -1) {gone.add(noteAt);}
   const rest = siblings.filter((_, i) => !gone.has(i));
-  if (!rest.length) return parent ? parent.id : null;
+  if (!rest.length) {return parent ? parent.id : null;}
   // Children that are all text or simple {expr} render no rows at all, so the
   // nearest thing to select is what held them.
-  if (rest.every(isContentOnlyChild)) return parent ? parent.id : null;
+  if (rest.every(isContentOnlyChild)) {return parent ? parent.id : null;}
   // Where the hole is, in the surviving list.
   const at = siblings.slice(0, index).filter((_, i) => !gone.has(i)).length;
   // Rows the selection can't land on: a comment folded into the row beneath
@@ -101,8 +101,8 @@ export function selectionAfterDelete(model, nodeId) {
     (rest[i].kind === 'comment' &&
       rest[i + 1] &&
       (rest[i + 1].kind === 'element' || rest[i + 1].kind === 'component'));
-  for (let i = at; i < rest.length; i++) if (!folded(i)) return rest[i].id;
-  for (let i = at - 1; i >= 0; i--) if (!folded(i)) return rest[i].id;
+  for (let i = at; i < rest.length; i++) {if (!folded(i)) {return rest[i].id;}}
+  for (let i = at - 1; i >= 0; i--) {if (!folded(i)) {return rest[i].id;}}
   return parent ? parent.id : null;
 }
 
@@ -127,10 +127,10 @@ export function noteText(raw) {
 
 export function noteValue(previous, text) {
   const body = String(text ?? '').trim();
-  if (!body) return null; // the caller removes the node
+  if (!body) {return null;} // the caller removes the node
   const full = String(previous ?? '').trim();
   const lead = full.match(RULE);
-  if (!lead) return ` ${body} `;
+  if (!lead) {return ` ${body} `;}
   const rule = lead[1];
   const width = Math.max(3, full.length - body.length - 1);
   return ` ${rule.repeat(width)} ${body} `;

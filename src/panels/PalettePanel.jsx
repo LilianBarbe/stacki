@@ -76,9 +76,9 @@ export default function PalettePanel({
   // again after cancelling opens the dialog again.
   const firstRequest = useRef(createRequest);
   useEffect(() => {
-    if (createRequest === firstRequest.current) return;
+    if (createRequest === firstRequest.current) {return;}
     firstRequest.current = createRequest;
-    if (canCreate) setCreating(true);
+    if (canCreate) {setCreating(true);}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createRequest]);
   const [preview, setPreview] = useState(null); // {name, left, top}
@@ -100,7 +100,7 @@ export default function PalettePanel({
     const byFolder = new Map();
     for (const c of list) {
       const key = c.folder || '';
-      if (!byFolder.has(key)) byFolder.set(key, []);
+      if (!byFolder.has(key)) {byFolder.set(key, []);}
       byFolder.get(key).push(c);
     }
     return [...byFolder.entries()].sort(([a], [b]) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)));
@@ -178,7 +178,7 @@ export default function PalettePanel({
               // Switch the left panel to the Navigator so the component can
               // be dropped into the tree. Deferred so the browser captures
               // the drag before this row unmounts.
-              if (onDragBegin) setTimeout(onDragBegin, 0);
+              if (onDragBegin) {setTimeout(onDragBegin, 0);}
             }}
             onDragEnd={clearDrag}
             onDoubleClick={() => onInsert(comp.name)}
@@ -282,7 +282,7 @@ function CreateComponentModal({ suggested, taken, from, props = [], onClose, onC
   // Only once there's something to say about: an empty field on the way to a
   // name isn't a mistake yet.
   const shown = text.trim() ? error : null;
-  const submit = () => { if (!error) onCreate(name, { withProps }); };
+  const submit = () => { if (!error) {onCreate(name, { withProps });} };
 
   return (
     <div className="modal-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -298,8 +298,8 @@ function CreateComponentModal({ suggested, taken, from, props = [], onClose, onC
               placeholder="Card"
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') submit();
-                else if (e.key === 'Escape') onClose();
+                if (e.key === 'Enter') {submit();}
+                else if (e.key === 'Escape') {onClose();}
               }}
             />
             {shown ? (
@@ -358,7 +358,7 @@ const InstancesPopup = React.forwardRef(function InstancesPopup(
   const [place, setPlace] = useState(null);
   useLayoutEffect(() => {
     const el = boxRef.current;
-    if (!el || !anchor) return;
+    if (!el || !anchor) {return;}
     const margin = 8;
     const h = el.offsetHeight;
     const w = el.offsetWidth;
@@ -382,8 +382,8 @@ const InstancesPopup = React.forwardRef(function InstancesPopup(
       style={{ left: place ? place.left : anchor.left, top: place ? place.top : anchor.bottom + 6 }}
       ref={(node) => {
         boxRef.current = node;
-        if (typeof ref === 'function') ref(node);
-        else if (ref) ref.current = node;
+        if (typeof ref === 'function') {ref(node);}
+        else if (ref) {ref.current = node;}
       }}
     >
       <div className="instances-head">
@@ -450,6 +450,6 @@ const InstancesPopup = React.forwardRef(function InstancesPopup(
 // known by its name, spaced the way the list above spells it.
 function fileLabel(f) {
   const base = f.rel.replace(/^src\//, '').replace(/\.astro$/, '');
-  if (f.kind === 'page') return base.replace(/^pages\//, '');
+  if (f.kind === 'page') {return base.replace(/^pages\//, '');}
   return prettyName(base.split('/').pop());
 }

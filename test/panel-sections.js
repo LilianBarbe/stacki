@@ -25,7 +25,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 (async () => {
@@ -96,7 +96,7 @@ const check = (what, condition, detail) => {
   const { JSDOM } = require('jsdom');
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true, url: 'http://localhost/' });
   global.window = dom.window;
-  for (const key of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) global[key] = dom.window[key];
+  for (const key of ['document', 'navigator', 'HTMLElement', 'Element', 'Node', 'MutationObserver']) {global[key] = dom.window[key];}
   global.getComputedStyle = dom.window.getComputedStyle;
   global.requestAnimationFrame = (fn) => setTimeout(fn, 0);
   global.cancelAnimationFrame = clearTimeout;
@@ -162,7 +162,7 @@ const check = (what, condition, detail) => {
         await commit(input, next);
         const written = writes.some(([p, v]) => p === prop && v === next);
         check(`${prop} can be edited through its side control`, written, JSON.stringify(writes));
-        if (input && written) dynamicControls.add(prop);
+        if (input && written) {dynamicControls.add(prop);}
       }
     }
   }
@@ -174,7 +174,7 @@ const check = (what, condition, detail) => {
       const label = `${axis[0].toUpperCase() + axis.slice(1)} ${position[0].toUpperCase() + position.slice(1)}`;
       const input = inputFor(label);
       check(`${prop} has a field showing its value`, input?.value === value, input?.value);
-      if (input?.value === value) dynamicControls.add(prop);
+      if (input?.value === value) {dynamicControls.add(prop);}
     }
     await commit(inputFor(`${axis[0].toUpperCase() + axis.slice(1)} Start`), '4');
     check(`grid-${axis} placement can be edited`, writes.some(([p, v]) => p === `grid-${axis}` && v === `4 / ${end}`), JSON.stringify(writes));
@@ -195,7 +195,7 @@ const check = (what, condition, detail) => {
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const file = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(file);
+      if (entry.isDirectory()) {walk(file);}
       else if (/\.(tsx|ts)$/.test(entry.name) && !file.endsWith(path.join('lib', 'sections.ts'))) {
         sources.push(fs.readFileSync(file, 'utf8'));
       }

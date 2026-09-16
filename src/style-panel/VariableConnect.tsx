@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, MutableRefObject, ReactElement, ReactNode } from 'react'
 import { createPortal, flushSync } from 'react-dom'
@@ -119,15 +121,15 @@ const STRING_PROPS = new Set([
   'backface-visibility', 'transform-style', 'will-change',
 ])
 function varTypeAllowed(prop: string | undefined, type: string): boolean {
-  if (!prop) return true
+  if (!prop) {return true}
   const p = prop.toLowerCase()
-  if (COLOR_PROP_RE.test(p) || p === 'fill' || p === 'stroke') return type === 'Color'
+  if (COLOR_PROP_RE.test(p) || p === 'fill' || p === 'stroke') {return type === 'Color'}
   // Keyword/string props (incl. font-family) take a FontFamily or String variable —
   // both are "not a length, not a colour". A font stack that isn't named …font-family
   // (`--font-display: "Inter", sans-serif`) types as String, and a keyword variable
   // (`--h6-text-transform: none`) can only ever be String, so requiring FontFamily here
   // left those fields with an empty picker.
-  if (STRING_PROPS.has(p)) return type === 'FontFamily' || type === 'String'
+  if (STRING_PROPS.has(p)) {return type === 'FontFamily' || type === 'String'}
   return type !== 'Color' && type !== 'FontFamily'
 }
 
@@ -140,8 +142,8 @@ function byCollection(vars: ProjectVariable[]): VarCollection[] {
     let groups = colls.get(v.collection)
     if (!groups) { groups = new Map(); colls.set(v.collection, groups) }
     const list = groups.get(v.group)
-    if (list) list.push(v)
-    else groups.set(v.group, [v])
+    if (list) {list.push(v)}
+    else {groups.set(v.group, [v])}
   }
   return [...colls.entries()].map(([collection, groups]) => ({
     collection,
@@ -158,11 +160,11 @@ let sharedDone = false
 let sharedLoading = false
 const sharedListeners = new Set<() => void>()
 function ensureSharedVars() {
-  if (sharedDone || sharedLoading) return
+  if (sharedDone || sharedLoading) {return}
   sharedLoading = true
   const seen = new Set<string>()
   void streamProjectVariables((v) => {
-    if (seen.has(v.binding)) return
+    if (seen.has(v.binding)) {return}
     seen.add(v.binding)
     sharedVars = [...sharedVars, v]
     sharedListeners.forEach((fn) => fn())
@@ -171,7 +173,7 @@ function ensureSharedVars() {
 export function useSharedVars(active: boolean): { vars: ProjectVariable[]; loading: boolean } {
   const [, force] = useState(0)
   useEffect(() => {
-    if (!active) return
+    if (!active) {return}
     ensureSharedVars()
     const fn = () => force((n) => n + 1)
     sharedListeners.add(fn)
@@ -193,7 +195,7 @@ export function useSharedVars(active: boolean): { vars: ProjectVariable[]; loadi
 const FREE_MIN_WIDTH = 280
 const FREE_MAX_WIDTH = 420
 function pickerSpan(anchor: HTMLElement): { left: number; width: number } {
-  if (panelBox(anchor)) return panelSpan(anchor)
+  if (panelBox(anchor)) {return panelSpan(anchor)}
   const margin = 8
   const row = (anchor.parentElement ?? anchor).getBoundingClientRect()
   // At least readable, at most not a curtain — and never wider than the window.
@@ -225,10 +227,10 @@ export function VariablePicker({ anchor, vars, loading, prop, selectedBinding, o
   // Scroll the selected item to the middle of the list, once, when it first mounts.
   const scrolledToSelected = useRef(false)
   const selectedItemRef = (el: HTMLButtonElement | null) => {
-    if (!el || scrolledToSelected.current) return
+    if (!el || scrolledToSelected.current) {return}
     scrolledToSelected.current = true
     const list = el.closest<HTMLElement>('.embed-editor_varpicker-list')
-    if (!list) return
+    if (!list) {return}
     const l = list.getBoundingClientRect()
     const e = el.getBoundingClientRect()
     list.scrollTop += (e.top - l.top) - (list.clientHeight - el.clientHeight) / 2
@@ -239,7 +241,7 @@ export function VariablePicker({ anchor, vars, loading, prop, selectedBinding, o
   const [style, setStyle] = useState<CSSProperties>(() => ({ position: 'fixed', top: 0, ...pickerSpan(anchor), visibility: 'hidden' }))
   const toggleCollapse = (name: string) => setCollapsed((prev) => {
     const next = new Set(prev)
-    if (next.has(name)) next.delete(name); else next.add(name)
+    if (next.has(name)) {next.delete(name);} else {next.add(name)}
     return next
   })
 
@@ -256,7 +258,7 @@ export function VariablePicker({ anchor, vars, loading, prop, selectedBinding, o
   // from pickerSpan: the style panel's span inside the panel, the row's own otherwise.
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el) {return}
     const margin = 8
     const row = (anchor.parentElement ?? anchor).getBoundingClientRect()
     const { height } = el.getBoundingClientRect()
@@ -298,7 +300,7 @@ export function VariablePicker({ anchor, vars, loading, prop, selectedBinding, o
     let swallowClick: ((ev: Event) => void) | null = null
     const onDown = (e: PointerEvent) => {
       const t = e.target as Node
-      if (ref.current?.contains(t) || anchor.contains(t)) return
+      if (ref.current?.contains(t) || anchor.contains(t)) {return}
       onClose()
       // Consume the dismiss gesture: swallow the click this pointerdown becomes, so the
       // element under the pointer (e.g. a section's collapse toggle) isn't ALSO activated.
@@ -306,7 +308,7 @@ export function VariablePicker({ anchor, vars, loading, prop, selectedBinding, o
       document.addEventListener('click', swallowClick, true)
       window.setTimeout(() => { if (swallowClick) { document.removeEventListener('click', swallowClick, true); swallowClick = null } }, 300)
     }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
     document.addEventListener('pointerdown', onDown, true)
     document.addEventListener('keydown', onKey, true)
     return () => {
@@ -325,12 +327,12 @@ export function VariablePicker({ anchor, vars, loading, prop, selectedBinding, o
   // scrollbar), reserve that width as padding so the panel content doesn't shift.
   useEffect(() => {
     const scroller = panelBox(anchor)
-    if (!scroller) return
+    if (!scroller) {return}
     const barWidth = scroller.offsetWidth - scroller.clientWidth
     const prevOverflow = scroller.style.overflow
     const prevPad = scroller.style.paddingRight
     scroller.style.overflow = 'hidden'
-    if (barWidth > 0) scroller.style.paddingRight = `${parseFloat(getComputedStyle(scroller).paddingRight) + barWidth}px`
+    if (barWidth > 0) {scroller.style.paddingRight = `${parseFloat(getComputedStyle(scroller).paddingRight) + barWidth}px`}
     return () => { scroller.style.overflow = prevOverflow; scroller.style.paddingRight = prevPad }
   }, [anchor])
 
@@ -447,19 +449,19 @@ function tokenChipHtml(chip: Chip): string {
 // type `calc(` before a variable that IS the whole value). serializeTokens strips them.
 export function buildTokenHtml(value: string, chips: Chip[], code = false): string {
   const write = code ? highlightCss : escapeHtml
-  if (!chips.length) return write(value)
+  if (!chips.length) {return write(value)}
   let out = ''
   let at = 0
   chips.forEach((chip, index) => {
     const idx = value.indexOf(chip.text, at)
-    if (idx < 0) return
+    if (idx < 0) {return}
     let before = spaceRun(write(value.slice(at, idx)))
-    if (before === '' && index === 0) before = '\u200B'
+    if (before === '' && index === 0) {before = '\u200B'}
     out += before + tokenChipHtml(chip)
     at = idx + chip.text.length
   })
   let after = spaceRun(write(value.slice(at)))
-  if (after === '') after = '\u200B'
+  if (after === '') {after = '\u200B'}
   return out + after
 }
 
@@ -475,7 +477,7 @@ export function buildTokenHtml(value: string, chips: Chip[], code = false): stri
 // already, and the serializer reads text nodes wherever they are, so nothing
 // about the value changes either way.
 function spaceRun(html: string): string {
-  if (html === '' || html.trim() !== '') return html
+  if (html === '' || html.trim() !== '') {return html}
   return `<span class="embed-editor_varconnect-space">${html}</span>`
 }
 
@@ -488,10 +490,10 @@ function fieldText(root: HTMLElement): string {
   let out = ''
   const walk = (node: Node) => {
     node.childNodes.forEach((child) => {
-      if (child.nodeType === Node.TEXT_NODE) out += child.textContent ?? ''
-      else if (child instanceof HTMLElement && child.dataset.chip != null) out += CHIP_MARK
+      if (child.nodeType === Node.TEXT_NODE) {out += child.textContent ?? ''}
+      else if (child instanceof HTMLElement && child.dataset.chip != null) {out += CHIP_MARK}
       else if (child instanceof HTMLElement && child.tagName === 'BR') { /* browser filler */ }
-      else walk(child)
+      else {walk(child)}
     })
   }
   walk(root)
@@ -516,9 +518,9 @@ function paint(root: HTMLElement, text: string, at: number | null, chips: Chip[]
     const chip = chips[i - 1]
     html += (chip ? tokenChipHtml(chip) : '') + highlightCss(parts[i])
   }
-  if (html === root.innerHTML) return
+  if (html === root.innerHTML) {return}
   root.innerHTML = html
-  if (at != null) setCaretOffset(root, at)
+  if (at != null) {setCaretOffset(root, at)}
 }
 
 // contentEditable → value string. The chip serializes to `bare` when it stands alone and
@@ -540,7 +542,7 @@ export function serializeTokens(root: HTMLElement, bare: string, varForm: string
       if (child.nodeType === Node.TEXT_NODE) {
         const t = child.textContent ?? ''
         out += t
-        if (t.replace(/\u200B/g, '').trim() !== '') hasText = true
+        if (t.replace(/\u200B/g, '').trim() !== '') {hasText = true}
       } else if (child instanceof HTMLElement && child.dataset.chip != null) {
         chips.push(child.dataset.binding ?? '')
         out += '\u0000' // the variable — resolved below once we know if it stands alone
@@ -558,7 +560,7 @@ export function serializeTokens(root: HTMLElement, bare: string, varForm: string
   return out
     .replace(/\u0000/g, () => {
       const binding = chips[at++]
-      if (chips.length === 1 && !hasText) return bare
+      if (chips.length === 1 && !hasText) {return bare}
       return binding || varForm
     })
     .replace(/\u200B/g, '')
@@ -569,9 +571,9 @@ export function serializeTokens(root: HTMLElement, bare: string, varForm: string
 // `!important`. Returns true when it handled the key (so the caller preventDefaults).
 function jumpCaretPastChip(root: HTMLElement, dir: 'left' | 'right'): boolean {
   const sel = window.getSelection()
-  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return false
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) {return false}
   const chip = root.querySelector<HTMLElement>('[data-chip]')
-  if (!chip) return false
+  if (!chip) {return false}
   const { startContainer: node, startOffset: off } = sel.getRangeAt(0)
   const before = chip.previousSibling
   const after = chip.nextSibling
@@ -637,7 +639,7 @@ function TokenField({
 
   useLayoutEffect(() => {
     const el = editorRef.current
-    if (!el || value === synced.current) return
+    if (!el || value === synced.current) {return}
     synced.current = value
     // Rebuilding replaces every node in here, and the caret — with the focus — goes
     // with them. That is fine for a field nobody is in, and it is what happens on
@@ -647,16 +649,16 @@ function TokenField({
     const focused = el.ownerDocument.activeElement === el
     const at = focused ? caretOffset(el) : null
     el.innerHTML = buildTokenHtml(value, chips, code)
-    if (!focused) return
+    if (!focused) {return}
     el.focus()
-    if (at != null) setCaretOffset(el, Math.min(at, fieldText(el).length))
+    if (at != null) {setCaretOffset(el, Math.min(at, fieldText(el).length))}
   }, [value, chipKey(chips), code, editorRef])
 
   // Refresh the chip label if it resolves later (async variable load) — but only while
   // unfocused, so an active caret is never disturbed.
   useEffect(() => {
     const el = editorRef.current
-    if (!el || document.activeElement === el) return
+    if (!el || document.activeElement === el) {return}
     synced.current = value
     el.innerHTML = buildTokenHtml(value, chips, code)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -690,7 +692,7 @@ function TokenField({
         // Re-colour what was just typed. The browser has already put the
         // characters in; this replaces the markup around them and puts the
         // caret back where it was, counted in characters rather than nodes.
-        if (!code) return
+        if (!code) {return}
         paint(el, fieldText(el), caretOffset(el), chipsOf(el))
       }}
       onKeyDown={(e) => {
@@ -726,14 +728,14 @@ function TokenField({
           const step = stepSize(e) * (e.key === 'ArrowUp' ? 1 : -1)
           const next = at == null ? null : stepNumberAt(fieldText(el), at, step, stepMin)
           // No number under the caret — let the key do whatever it normally does.
-          if (!next) return
+          if (!next) {return}
           e.preventDefault()
           paint(el, next.text, next.caret, chipsOf(el))
           report(el)
           return
         }
-        if (e.key === 'ArrowRight' && jumpCaretPastChip(e.currentTarget, 'right')) e.preventDefault()
-        else if (e.key === 'ArrowLeft' && jumpCaretPastChip(e.currentTarget, 'left')) e.preventDefault()
+        if (e.key === 'ArrowRight' && jumpCaretPastChip(e.currentTarget, 'right')) {e.preventDefault()}
+        else if (e.key === 'ArrowLeft' && jumpCaretPastChip(e.currentTarget, 'left')) {e.preventDefault()}
       }}
       onMouseDown={(e) => {
         if ((e.target as HTMLElement).closest('[data-chip]')) { e.preventDefault(); onChipClick() }
@@ -809,7 +811,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
   const cur = embedVar
     ? vars.find((v) => v.binding === embedVar)
     : (nameLike ? vars.find((v) => {
-        if (!varTypeAllowed(prop, v.type)) return false
+        if (!varTypeAllowed(prop, v.type)) {return false}
         const catalogNames = [...nativeVariableNames(v.name), ...nativeVariableNames(fullPath(v))]
         return nativeNames.some((name) => catalogNames.includes(name))
       }) : undefined)
@@ -830,7 +832,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
         return { text: m[0], name: known?.name ?? bindingName(m[0]), type: known?.type ?? 'Size' }
       })
     : []
-  if (!chips.length && varText) chips.push({ text: varText, name: chipName, type: chipType })
+  if (!chips.length && varText) {chips.push({ text: varText, name: chipName, type: chipType })}
   // Render the token editor while a variable is applied, or while it still has focus.
   const showToken = isVar || active || !!code
 
@@ -840,8 +842,8 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
   const attachRef = (el: HTMLInputElement | HTMLTextAreaElement | null) => {
     inputRef.current = el
     const r = child ? (child as unknown as { ref?: unknown }).ref : null
-    if (typeof r === 'function') (r as (n: HTMLInputElement | null) => void)(el)
-    else if (r && typeof r === 'object') (r as MutableRefObject<HTMLInputElement | null>).current = el
+    if (typeof r === 'function') {(r as (n: HTMLInputElement | null) => void)(el)}
+    else if (r && typeof r === 'object') {(r as MutableRefObject<HTMLInputElement | null>).current = el}
   }
   const prepared = child ? cloneElement(child as ReactElement<{ ref?: unknown }>, { ref: attachRef }) : children
   const childClass = child ? ((child.props as { className?: string }).className ?? 'u-input') : 'u-input'
@@ -902,7 +904,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
   // accident away, which is what made the wipe show up every time.)
   const liveValue = (): string => {
     const el = editorRef.current
-    if (el) return serializeTokens(el, binding ?? varText, binding ?? varText)
+    if (el) {return serializeTokens(el, binding ?? varText, binding ?? varText)}
     return inputRef.current?.value ?? value
   }
 
@@ -912,7 +914,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
   // runs. A caller that wants the drafts itself (the big value editor) passes its own.
   const pushDraft = (next: string) => {
     const el = inputRef.current
-    if (!el) return
+    if (!el) {return}
     setInputValue(el, next)
     childHandlersRef.current?.onChange?.(fakeEvent())
   }
@@ -938,7 +940,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
     // forgetting it: recording the caret as it moves is only worth anything if the
     // answer survives until the pick, and a forgotten one puts the variable at the
     // end of the value.
-    if (at == null) return
+    if (at == null) {return}
     // Each chip serializes to its OWN binding — a value can hold several, and
     // they need not be the same variable — so the lengths are read off the
     // chips themselves rather than assumed equal.
@@ -948,8 +950,8 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
     let len = 0
     let chip = 0
     for (const ch of fieldText(el).slice(0, at)) {
-      if (ch === CHIP_MARK) len += (bindings[chip++] ?? '').length
-      else len += 1
+      if (ch === CHIP_MARK) {len += (bindings[chip++] ?? '').length}
+      else {len += 1}
     }
     caretRef.current = len
   }
@@ -958,7 +960,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
   const wrapRef = useRef<HTMLSpanElement | null>(null)
   const openBig = () => {
     const el = wrapRef.current
-    if (el) setBig(el.getBoundingClientRect())
+    if (el) {setBig(el.getBoundingClientRect())}
   }
 
   return (
@@ -997,15 +999,15 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
         // React CHILD, so its presses capture through here: on a value long enough to
         // open the big editor, choosing a variable was taken as a press on the field —
         // the pick never landed and the big editor opened over it instead.
-        if (disabled || big || expanded || open) return
+        if (disabled || big || expanded || open) {return}
         // The dot and the swatch are their own controls; a press on those means
         // what it has always meant.
         const t = e.target
-        if (t instanceof Element && t.closest('.embed-editor_varconnect-dot, .u-color-swatch, .embed-editor_varpicker, .var-custom')) return
+        if (t instanceof Element && t.closest('.embed-editor_varconnect-dot, .u-color-swatch, .embed-editor_varpicker, .var-custom')) {return}
         // Only when the value has outgrown the field. Putting the caret in a
         // slot showing a third of what is being changed is the worst place in
         // the app to edit from, and it is exactly where a long value lands you.
-        if (!wrapRef.current || !doesNotFit(wrapRef.current, liveValue())) return
+        if (!wrapRef.current || !doesNotFit(wrapRef.current, liveValue())) {return}
         e.preventDefault()
         e.stopPropagation()
         openBig()
@@ -1040,7 +1042,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
             childHandlersRef.current?.onBlur?.(fakeEvent())
             setActive(false)
           }}
-          onChipClick={() => { if (!disabled) setOpen(true) }}
+          onChipClick={() => { if (!disabled) {setOpen(true)} }}
           code={code}
           stepMin={stepMin}
         />
@@ -1099,7 +1101,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
             setBig(null)
             // The same path a picked variable takes — one way in and out of a
             // field, whether the value came from the picker or was typed.
-            if (next !== value) onPick(next)
+            if (next !== value) {onPick(next)}
           }}
         />
       ) : null}

@@ -33,7 +33,7 @@ export default function ProvenanceList({ contributors, prop, onSelect }: {
   onSelect?: (selectorText: string, prop?: string) => void
 }) {
   const nav = useContext(ProvenanceEmbedNav)
-  if (!contributors.length) return null
+  if (!contributors.length) {return null}
   // Emphasize the row you're editing (the picked selector's value); with nothing
   // being edited (e.g. an orange property's popover) fall back to the winner.
   const editingIdx = contributors.findIndex((c) => c.editing)

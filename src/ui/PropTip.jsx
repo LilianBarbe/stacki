@@ -20,7 +20,7 @@ export default function PropTip({ text }) {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       const el = iconRef.current;
-      if (!el) return;
+      if (!el) {return;}
       const r = el.getBoundingClientRect();
       const below = r.top < 120; // not enough room for the bubble above
       setPos({
@@ -43,7 +43,7 @@ export default function PropTip({ text }) {
   useLayoutEffect(() => {
     const tip = tipRef.current;
     const icon = iconRef.current;
-    if (!tip || !icon || !pos || pos.clamped) return;
+    if (!tip || !icon || !pos || pos.clamped) {return;}
     const half = tip.getBoundingClientRect().width / 2;
     const center = pos.left;
     const left = Math.min(Math.max(center, MARGIN + half), window.innerWidth - MARGIN - half);
@@ -56,7 +56,7 @@ export default function PropTip({ text }) {
     setPos({ ...pos, left, arrow, clamped: true });
   }, [pos]);
 
-  if (!text) return null;
+  if (!text) {return null;}
 
   return (
     <>

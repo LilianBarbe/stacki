@@ -61,7 +61,7 @@ function changedRegion(aText, bText) {
   const a = aText.split('\n');
   const b = bText.split('\n');
   let start = 0;
-  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  while (start < a.length && start < b.length && a[start] === b[start]) {start++;}
   let end = 0;
   while (
     end < a.length - start &&
@@ -82,9 +82,9 @@ function formatRegion(region) {
 // hang an extra attribute off.
 function firstElement(nodes) {
   for (const n of nodes || []) {
-    if (n.kind === 'element') return n;
+    if (n.kind === 'element') {return n;}
     const nested = firstElement(n.children);
-    if (nested) return nested;
+    if (nested) {return nested;}
   }
   return null;
 }
@@ -126,11 +126,11 @@ describe('editability matches expectation', () => {
 
 describe('parse -> serialize returns the original bytes', () => {
   for (const { name, source, expect } of fixtures) {
-    if (!expect.editable) continue;
+    if (!expect.editable) {continue;}
 
     test(name, () => {
       const { editable, model } = parsePage(source);
-      if (!editable) return; // reported by the editability suite
+      if (!editable) {return;} // reported by the editability suite
       const output = serializePage(model);
 
       if (expect.identity === 'pass') {
@@ -159,11 +159,11 @@ describe('parse -> serialize returns the original bytes', () => {
 
 describe('serialization is idempotent', () => {
   for (const { name, source, expect } of fixtures) {
-    if (!expect.editable) continue;
+    if (!expect.editable) {continue;}
 
     test(name, () => {
       const first = parsePage(source);
-      if (!first.editable) return;
+      if (!first.editable) {return;}
       const once = serializePage(first.model);
 
       const second = parsePage(once);
@@ -189,17 +189,17 @@ describe('serialization is idempotent', () => {
 
 describe('a single prop edit produces a single-line diff', () => {
   for (const { name, source, expect } of fixtures) {
-    if (!expect.editable) continue;
+    if (!expect.editable) {continue;}
 
     test(name, () => {
       const { editable, model } = parsePage(source);
-      if (!editable) return;
+      if (!editable) {return;}
 
       const baseline = serializePage(model);
 
       const edited = structuredClone(model);
       const target = firstElement(edited.nodes);
-      if (!target) return; // nothing to hang an attribute off
+      if (!target) {return;} // nothing to hang an attribute off
       target.props = { ...(target.props || {}), 'data-probe': { type: 'string', value: '1' } };
 
       const output = serializePage(edited);
@@ -242,7 +242,7 @@ describe('external corpus sweep', () => {
     const walk = (dir) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (entry.isDirectory()) {
-          if (!skipDirs.has(entry.name)) walk(path.join(dir, entry.name));
+          if (!skipDirs.has(entry.name)) {walk(path.join(dir, entry.name));}
         } else if (entry.name.endsWith('.astro')) {
           files.push(path.join(dir, entry.name));
         }
@@ -261,8 +261,8 @@ describe('external corpus sweep', () => {
           stats.notEditable++;
           continue;
         }
-        if (serializePage(model) === source) stats.identical++;
-        else stats.differs++;
+        if (serializePage(model) === source) {stats.identical++;}
+        else {stats.differs++;}
       } catch (err) {
         crashes.push(`${file}: ${err.message}`);
       }

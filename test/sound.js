@@ -20,7 +20,7 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
 // Enough of Web Audio to build one note and see where it went.
@@ -104,7 +104,7 @@ function fakeAudio() {
 
   // --- off until asked for ----------------------------------------------------
   check('silent by default', soundEnabled() === false);
-  for (const f of [0, 0.2, 0.4, 0.6, 0.8, 1]) dragNote(f);
+  for (const f of [0, 0.2, 0.4, 0.6, 0.8, 1]) {dragNote(f);}
   check('a drag makes no sound while it is off', audio.played.length === 0, String(audio.played.length));
   check(
     'and builds no audio at all — no context, no nodes',
@@ -299,7 +299,7 @@ function fakeAudio() {
         'div',
         {
           onClick: (e) => {
-            if (e.target.closest('button')) heard += 1;
+            if (e.target.closest('button')) {heard += 1;}
           },
         },
         React.createElement('button', { id: 'in-panel' }, 'grid'),
@@ -504,7 +504,7 @@ function fakeAudio() {
     path.join(__dirname, '..', 'src', 'style-panel', 'components', 'ColorPicker.tsx'),
     'utf8'
   );
-  check('the colour drag plays the note', /if \(live\) dragNote\(fx, tall \? fy : undefined\)/.test(picker));
+  check('the colour drag plays the note', /if \(live\) \{dragNote\(fx, tall \? fy : undefined\)/.test(picker));
   check('and releasing ends the run', /endDragNotes\(\)/.test(picker));
   // The square is a surface to drag around in; the bars are a few pixels high,
   // where a fraction of the height is noise rather than intent.

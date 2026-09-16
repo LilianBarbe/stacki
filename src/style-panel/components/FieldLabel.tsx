@@ -56,13 +56,13 @@ export default function FieldLabel({ children, active, onReset, resetLabel = 'Re
 
   // Close on outside click / Escape while open.
   useEffect(() => {
-    if (!open) return
+    if (!open) {return}
     const onDown = (event: globalThis.MouseEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return
+      if (rootRef.current?.contains(event.target as Node)) {return}
       setOpen(false)
     }
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') {setOpen(false)}
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -74,7 +74,7 @@ export default function FieldLabel({ children, active, onReset, resetLabel = 'Re
 
   // If the field is cleared elsewhere, drop back to the plain caption.
   useEffect(() => {
-    if (!active) setOpen(false)
+    if (!active) {setOpen(false)}
   }, [active])
 
   // Once open, keep the menu inside the panel. The menu is right-anchored (right:0) to
@@ -87,7 +87,7 @@ export default function FieldLabel({ children, active, onReset, resetLabel = 'Re
   useLayoutEffect(() => {
     const el = menuRef.current
     const root = rootRef.current
-    if (!open || !el || !root) return
+    if (!open || !el || !root) {return}
     const margin = 8
     const bounds = panelBounds(root)
     const rootRect = root.getBoundingClientRect()
@@ -135,7 +135,7 @@ export default function FieldLabel({ children, active, onReset, resetLabel = 'Re
     // preventDefault so this works even when nested in a <label>.
     event.preventDefault()
     hoverTip.hide()
-    if (disabled) return
+    if (disabled) {return}
     if (event.altKey) {
       reset()
       return

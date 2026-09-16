@@ -1,3 +1,5 @@
+// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
+// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties, ReactNode } from 'react'
@@ -42,7 +44,7 @@ type Props = {
 type Display = { present: boolean; isSelected: boolean; overridden: boolean; winnerSelector: string; value: string; important: boolean }
 
 function displayOf(resolved: ResolvedProp | undefined): Display {
-  if (!resolved) return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }
+  if (!resolved) {return { present: false, isSelected: false, overridden: false, winnerSelector: '', value: '', important: false }}
   const isSelected = resolved.source === 'selected'
   const source = isSelected && resolved.selectedValue ? resolved.selectedValue : resolved.winner
   return {
@@ -57,7 +59,7 @@ function displayOf(resolved: ResolvedProp | undefined): Display {
 
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
-  if (match) return { value: input.slice(0, match.index).trim(), important: true }
+  if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
 }
 
@@ -119,7 +121,7 @@ function LivePropField({ prop, label, placeholder, read, busy, setProp, clearPro
   // by every mouse move would never fire mid-drag.
   const liveNow = (text: string) => {
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed) {return}
     const parsed = parseImportant(trimmed)
     liveSetProp(prop, parsed.value, parsed.important)
   }
@@ -159,7 +161,7 @@ function LivePropField({ prop, label, placeholder, read, busy, setProp, clearPro
         onKeyDown={(event) => {
           if (event.key === 'Enter') { commitInPlace(event.currentTarget); return }
           const stepped = handleArrowStep(event)
-          if (!stepped) return
+          if (!stepped) {return}
           event.preventDefault()
           const el = event.currentTarget
           el.value = stepped.text
@@ -265,7 +267,7 @@ function OverflowCustomInput({ value, busy, inputRef, onCommit, onLiveCommit, on
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
   const liveTimer = useRef<number | null>(null)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancelLive = () => { if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null } }
   useEffect(() => cancelLive, [])
   const scheduleLive = (text: string) => {
@@ -273,7 +275,7 @@ function OverflowCustomInput({ value, busy, inputRef, onCommit, onLiveCommit, on
     liveTimer.current = window.setTimeout(() => {
       liveTimer.current = null
       const trimmed = text.trim()
-      if (!trimmed) return
+      if (!trimmed) {return}
       const parsed = parseImportant(trimmed)
       onLiveCommit(parsed.value, parsed.important)
     }, 100)
@@ -292,7 +294,7 @@ function OverflowCustomInput({ value, busy, inputRef, onCommit, onLiveCommit, on
       onChange={(event) => { setDraft(event.target.value); scheduleLive(event.target.value) }}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; cancelLive(); commit() }}
-      onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
       disabled={busy}
       spellCheck={false}
       placeholder={placeholder}
@@ -329,9 +331,9 @@ function OverflowBar({ value, busy, onCommit, onLiveCommit, onClear }: {
   const wantFocus = useRef(false)
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
@@ -345,7 +347,7 @@ function OverflowBar({ value, busy, onCommit, onLiveCommit, onClear }: {
     }
   }, [customMode, busy])
 
-  const pick = (next: string) => { setOpen(false); if (next !== current) onCommit(next, false) }
+  const pick = (next: string) => { setOpen(false); if (next !== current) {onCommit(next, false)} }
   const enterCustom = () => { setOpen(false); wantFocus.current = true; onCommit('unset', false) }
 
   // Delayed hover tooltip, right-anchored with a down-arrow to the hovered segment.
@@ -355,7 +357,7 @@ function OverflowBar({ value, busy, onCommit, onLiveCommit, onClear }: {
   const clearHoverTimer = () => { if (hoverTimer.current != null) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null } }
   useEffect(() => clearHoverTimer, [])
   const startHover = (segValue: string, el: HTMLElement) => {
-    if (!OVERFLOW_TOOLTIPS[segValue]) return
+    if (!OVERFLOW_TOOLTIPS[segValue]) {return}
     clearHoverTimer()
     hoverTimer.current = window.setTimeout(() => {
       hoverTimer.current = null
@@ -479,7 +481,7 @@ function OverflowField({ read, busy, setProp, clearProp, liveSetProp, onProvenan
 
   // Overflow X / Y hide behind a disclosure, opened by default when either is set.
   const [expanded, setExpanded] = useState(x.present || y.present)
-  useEffect(() => { if (x.present || y.present) setExpanded(true) }, [x.present, y.present])
+  useEffect(() => { if (x.present || y.present) {setExpanded(true)} }, [x.present, y.present])
 
   const toggle = (
     <button
@@ -567,9 +569,9 @@ function BoxSizingBar({ value, busy, onCommit, onLiveCommit, onClear }: {
   const wantFocus = useRef(false)
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false) }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    if (!open) {return}
+    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
@@ -583,7 +585,7 @@ function BoxSizingBar({ value, busy, onCommit, onLiveCommit, onClear }: {
     }
   }, [customMode, busy])
 
-  const pick = (next: string) => { setOpen(false); if (next !== current) onCommit(next, false) }
+  const pick = (next: string) => { setOpen(false); if (next !== current) {onCommit(next, false)} }
   const enterCustom = () => { setOpen(false); wantFocus.current = true; onCommit('unset', false) }
 
   // Delayed hover tooltip, right-anchored with a down-arrow to the hovered segment.
@@ -593,7 +595,7 @@ function BoxSizingBar({ value, busy, onCommit, onLiveCommit, onClear }: {
   const clearHoverTimer = () => { if (hoverTimer.current != null) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null } }
   useEffect(() => clearHoverTimer, [])
   const startHover = (segValue: string, el: HTMLElement) => {
-    if (!BOX_TOOLTIPS[segValue]) return
+    if (!BOX_TOOLTIPS[segValue]) {return}
     clearHoverTimer()
     hoverTimer.current = window.setTimeout(() => {
       hoverTimer.current = null
@@ -674,10 +676,10 @@ const RATIO_PRESETS: ReadonlyArray<{ value: string; label: string }> = [
 // Parse an aspect-ratio value into width/height numbers (single number → n/1).
 function parseRatio(value: string): { w: string; h: string } | null {
   const v = value.trim().toLowerCase()
-  if (!v || v === 'auto') return null
+  if (!v || v === 'auto') {return null}
   if (v.includes('/')) {
     const [w, h] = v.split('/').map((part) => part.trim())
-    if (w && /^[\d.]+$/.test(w) && (!h || /^[\d.]+$/.test(h))) return { w, h: h || '1' }
+    if (w && /^[\d.]+$/.test(w) && (!h || /^[\d.]+$/.test(h))) {return { w, h: h || '1' }}
     return null
   }
   return /^[\d.]+$/.test(v) ? { w: v, h: '1' } : null
@@ -688,9 +690,9 @@ function parseRatio(value: string): { w: string; h: string } | null {
 // unset / var(--x) / calc(…) → the plain text field).
 function ratioKeyOf(value: string): string {
   const v = value.trim().toLowerCase()
-  if (!v || v === 'auto') return 'auto'
+  if (!v || v === 'auto') {return 'auto'}
   const parsed = parseRatio(value)
-  if (!parsed) return 'other'
+  if (!parsed) {return 'other'}
   const match = RATIO_PRESETS.find((preset) => preset.value === `${parsed.w} / ${parsed.h}`)
   return match ? match.value : 'custom'
 }
@@ -705,7 +707,7 @@ function RatioNumberInput({ value, busy, ariaLabel, onLive, onCommit }: {
 }) {
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const sanitize = (raw: string) => raw.replace(/[^\d.]/g, '')
   const scrub = useScrub({
     value: draft,
@@ -727,7 +729,7 @@ function RatioNumberInput({ value, busy, ariaLabel, onLive, onCommit }: {
       onKeyDown={(event) => {
         if (event.key === 'Enter') { commitInPlace(event.currentTarget); return }
         const stepped = handleArrowStep(event)
-        if (!stepped) return
+        if (!stepped) {return}
         event.preventDefault()
         const el = event.currentTarget
         el.value = stepped.text
@@ -765,7 +767,7 @@ export function RatioOtherInput({ value, busy, prop, autoFocus = false, onCommit
   const inputRef = useRef<HTMLInputElement>(null)
   const didFocus = useRef(false)
 
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const cancelLive = () => { if (liveTimer.current != null) { window.clearTimeout(liveTimer.current); liveTimer.current = null } }
   useEffect(() => cancelLive, [])
 
@@ -776,7 +778,7 @@ export function RatioOtherInput({ value, busy, prop, autoFocus = false, onCommit
   // field appeared, took the caret, and selected its text, so clicking an
   // element on the canvas left you typing into the style panel.
   useEffect(() => {
-    if (!autoFocus || didFocus.current || busy) return
+    if (!autoFocus || didFocus.current || busy) {return}
     didFocus.current = true
     inputRef.current?.focus()
     inputRef.current?.select()
@@ -787,7 +789,7 @@ export function RatioOtherInput({ value, busy, prop, autoFocus = false, onCommit
     liveTimer.current = window.setTimeout(() => {
       liveTimer.current = null
       const trimmed = text.trim()
-      if (!trimmed) return
+      if (!trimmed) {return}
       const parsed = parseImportant(trimmed)
       onLiveCommit(parsed.value, parsed.important)
     }, 100)
@@ -820,7 +822,7 @@ export function RatioOtherInput({ value, busy, prop, autoFocus = false, onCommit
       onChange={(event) => { setDraft(event.target.value); scheduleLive(event.target.value) }}
       onFocus={() => { focused.current = true }}
       onBlur={() => { focused.current = false; cancelLive(); commit() }}
-      onKeyDown={(event) => { if (event.key === 'Enter') commitInPlace(event.currentTarget) }}
+      onKeyDown={(event) => { if (event.key === 'Enter') {commitInPlace(event.currentTarget)} }}
       disabled={busy}
       spellCheck={false}
       placeholder={placeholder}
@@ -866,7 +868,7 @@ function AspectRatioField({ read, busy, setProp, clearProp, liveSetProp, onProve
       setForced('other')
       askedForOther.current = true
       // Keep an existing free value; otherwise seed with `unset` to type over.
-      if (ratioKeyOf(current) !== 'other') setProp('aspect-ratio', 'unset', false)
+      if (ratioKeyOf(current) !== 'other') {setProp('aspect-ratio', 'unset', false)}
       return
     }
     setForced(null)
@@ -875,8 +877,8 @@ function AspectRatioField({ read, busy, setProp, clearProp, liveSetProp, onProve
 
   const write = (w: string, h: string, live: boolean) => {
     const value = `${w || '0'} / ${h || '0'}`
-    if (live) liveSetProp('aspect-ratio', value, false)
-    else setProp('aspect-ratio', value, false)
+    if (live) {liveSetProp('aspect-ratio', value, false)}
+    else {setProp('aspect-ratio', value, false)}
   }
 
   return (
@@ -956,9 +958,9 @@ const OBJ_POS_PCT = ['0%', '50%', '100%']
 // reads as centered (unlike background-position, which defaults to the top-left).
 function objPosAxis(token: string): number {
   const t = token.trim().toLowerCase()
-  if (t === '' || t === 'center' || t === '50%') return 1
-  if (t === 'left' || t === 'top' || t === '0' || t === '0%' || t === '0px') return 0
-  if (t === 'right' || t === 'bottom' || t === '100%') return 2
+  if (t === '' || t === 'center' || t === '50%') {return 1}
+  if (t === 'left' || t === 'top' || t === '0' || t === '0%' || t === '0px') {return 0}
+  if (t === 'right' || t === 'bottom' || t === '100%') {return 2}
   return -1
 }
 
@@ -980,7 +982,7 @@ function PosInput({ value, busy, label, onLive, onCommit }: {
 }) {
   const [draft, setDraft] = useState(value)
   const focused = useRef(false)
-  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+  useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const isBareNum = (s: string) => /^-?[\d.]+$/.test(s.trim())
   const norm = (t: string) => { const s = t.trim(); return s === '' ? '' : isBareNum(s) ? `${s}%` : s }
   const scrub = useScrub({
@@ -1012,7 +1014,7 @@ function PosInput({ value, busy, label, onLive, onCommit }: {
         onKeyDown={(e) => {
           if (e.key === 'Enter') { commitInPlace(e.currentTarget); return }
           const stepped = handleArrowStep(e)
-          if (!stepped) return
+          if (!stepped) {return}
           e.preventDefault()
           const el = e.currentTarget
           el.value = stepped.text
@@ -1029,12 +1031,12 @@ function PosInput({ value, busy, label, onLive, onCommit }: {
 // editors use; closes on backdrop click or Escape.
 function PositionModal({ onClose, children }: { onClose: () => void; children: ReactNode }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
   return createPortal(
-    <div className="embed-editor_bg-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="embed-editor_bg-modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) {onClose()} }}>
       <div className="embed-editor_bg-modal embed-editor_pos-modal u-surface-surface" role="dialog" aria-modal="true" aria-label="Object position">
         {children}
       </div>
@@ -1081,8 +1083,8 @@ function ImageFitField({ read, busy, setProp, clearProp, liveSetProp, onProvenan
   const activeRow = objPosAxis(py)
 
   const writePos = (value: string, live: boolean) => {
-    if (live) { if (value) liveSetProp('object-position', value, false); return }
-    if (value) setProp('object-position', value, false); else clearProp('object-position')
+    if (live) { if (value) {liveSetProp('object-position', value, false);} return }
+    if (value) {setProp('object-position', value, false);} else {clearProp('object-position')}
   }
 
   return (

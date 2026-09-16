@@ -32,19 +32,19 @@ export default function useListReorder({ count, onMove, disabled = false }) {
     const boxes = rows.current;
     for (let i = 0; i < count; i++) {
       const el = boxes[i];
-      if (!el) continue;
+      if (!el) {continue;}
       const r = el.getBoundingClientRect();
-      if (clientY < r.top + r.height / 2) return i;
+      if (clientY < r.top + r.height / 2) {return i;}
     }
     return count;
   }, [count]);
 
   useEffect(() => {
-    if (start.current === null && from === null) return undefined;
+    if (start.current === null && from === null) {return undefined;}
     const onMoveEvent = (e) => {
       // A few pixels of slop first, so clicking a row still selects it.
       if (from === null) {
-        if (!start.current || Math.abs(e.clientY - start.current.y) < 4) return;
+        if (!start.current || Math.abs(e.clientY - start.current.y) < 4) {return;}
         setFrom(start.current.index);
       }
       e.preventDefault();
@@ -54,10 +54,10 @@ export default function useListReorder({ count, onMove, disabled = false }) {
       const src = from ?? null;
       const dest = src === null ? null : indexAt(e.clientY);
       finish();
-      if (src !== null && dest !== null) onMove(src, dest);
+      if (src !== null && dest !== null) {onMove(src, dest);}
     };
     const onKey = (e) => {
-      if (e.key === 'Escape') finish();
+      if (e.key === 'Escape') {finish();}
     };
     window.addEventListener('pointermove', onMoveEvent);
     window.addEventListener('pointerup', onUp);
@@ -74,7 +74,7 @@ export default function useListReorder({ count, onMove, disabled = false }) {
   // While a row is being dragged the cursor should say so everywhere, not just
   // over the list.
   useEffect(() => {
-    if (from === null) return undefined;
+    if (from === null) {return undefined;}
     const prev = document.body.style.cursor;
     document.body.style.cursor = 'grabbing';
     return () => {
@@ -87,7 +87,7 @@ export default function useListReorder({ count, onMove, disabled = false }) {
       rows.current[index] = el;
     },
     onPointerDown: (e) => {
-      if (disabled || e.button !== 0) return;
+      if (disabled || e.button !== 0) {return;}
       // Buttons and fields inside the row keep their own behaviour — unless they
       // say otherwise. A control marked `data-drag-through` is one that is also
       // the natural place to grab the row: the variable sheet's names are
@@ -97,7 +97,7 @@ export default function useListReorder({ count, onMove, disabled = false }) {
       // only becomes a drag once the pointer moves, and a click that followed a
       // drag is swallowed below.
       const control = e.target instanceof Element ? e.target.closest('button, input, textarea, select, a') : null;
-      if (control && !control.hasAttribute('data-drag-through')) return;
+      if (control && !control.hasAttribute('data-drag-through')) {return;}
       start.current = { index, y: e.clientY };
       setTo(index);
     },
@@ -122,11 +122,11 @@ export default function useListReorder({ count, onMove, disabled = false }) {
   // The insertion line, drawn on the row the item would land above — or below
   // the last row when it goes to the end.
   const rowClass = (index) => {
-    if (from === null || to === null) return '';
+    if (from === null || to === null) {return '';}
     const marks = [];
-    if (to === index) marks.push('drop-before');
-    if (to === count && index === count - 1) marks.push('drop-after');
-    if (from === index) marks.push('is-dragging');
+    if (to === index) {marks.push('drop-before');}
+    if (to === count && index === count - 1) {marks.push('drop-after');}
+    if (from === index) {marks.push('is-dragging');}
     return marks.join(' ');
   };
 
