@@ -254,7 +254,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 14/20 original files converted ⏳
+### src/panels — 15/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -515,6 +515,16 @@ production-build checks pass without warnings in the new modules. Six original
 panels remain; the full gate passes 144/144 commands (97.3s). Continue with
 `PalettePanel.jsx`.
 
+PalettePanel is converted to `PalettePanel.tsx`, with typed creation and usage
+dialogs in `PaletteDialogs.tsx`. Creation availability and usage loading,
+failure, and ready states are discriminated. `paletteModel.ts` validates usage
+files, kinds, counts, totals, duplicates, and bounds. Closing or reopening a
+popup invalidates its older scan even when both scans target the same component.
+Scan contracts now reject negative instance counts. Component creation, folder
+search, popup lifetime, bridge, app-render, contract, and production-build
+checks pass without warnings in the new modules. Five original panels remain;
+the full gate passes 145/145 commands (98.1s). Continue with `PagesPanel.jsx`.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -526,7 +536,8 @@ panels remain; the full gate passes 144/144 commands (97.3s). Continue with
 | `StructurePanel.tsx`                                                                                 | ✅ converted with typed rows, drops, and bounded traversal   |
 | `PreviewPane.tsx`                                                                                    | ✅ converted with parsed frame messages and typed runtime     |
 | `AssetsPanel.tsx`                                                                                    | ✅ converted with bounded listings and typed mutations        |
-| `PalettePanel` 455 · `PagesPanel` 442 · `HistoryPanel` 392 · `WelcomeScreen` 391                     | small                                                        |
+| `PalettePanel.tsx`                                                                                   | ✅ converted with typed creation and usage popup states       |
+| `PagesPanel` 442 · `HistoryPanel` 392 · `WelcomeScreen` 391                                         | small                                                        |
 | `StylePanel.tsx`                                                                                     | ✅ converted with parsed stylesheet inventories              |
 | `CanvasView.tsx`                                                                                     | ✅ converted with typed frame and gesture lifetimes          |
 

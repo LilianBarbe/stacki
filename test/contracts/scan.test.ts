@@ -54,7 +54,15 @@ test('negative space: wrong entry shapes fail with pinned messages', () => {
   );
   assert.throws(
     () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', instances: 1.5 }] }),
-    /instances: expected integer/,
+    /instances: expected nonnegative integer/,
+  );
+  assert.throws(
+    () =>
+      parseScanResult({
+        ...goodScan,
+        components: [{ path: '/x', name: 'X', folder: '', instances: -1 }],
+      }),
+    /instances: expected nonnegative integer/,
   );
   assert.throws(
     () => parseScanResult({ ...goodScan, components: [{ path: '/x', name: 'X', folder: '', slots: [1] }] }),

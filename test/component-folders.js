@@ -152,15 +152,16 @@ const toPosix = (p) => p.split(path.sep).join('/');
   check('a folder that is not on the path finds nothing', found('layout input').length === 0, found('layout input').join());
 
   // The panel and the palette ask the same question of the same list.
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.tsx'), 'utf8');
   check(
     'the components panel searches by that rule too',
-    /rankInsertItems\(components, query\)/.test(panel),
+    /rankInsertItems\(props\.components, query\)/.test(panel),
     'the panel has its own idea of what matches'
   );
+  const model = fs.readFileSync(path.join(__dirname, '..', 'src', 'paletteModel.ts'), 'utf8');
   check(
     'and still groups what comes back by folder',
-    /const key = c\.folder \|\| '';/.test(panel),
+    /const folder = component\.folder;/.test(model),
     'the grouping went with it'
   );
 

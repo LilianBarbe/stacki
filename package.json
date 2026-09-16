@@ -75,6 +75,7 @@
   "test:cmspanelbridge": "node --test test/cms-panel-bridge.test.js",
   "test:previewmessages": "node --test test/preview-messages.test.js",
   "test:assetpanelbridge": "node --test test/asset-panel-bridge.test.js test/asset-panel-lifecycle.test.js",
+  "test:palettemodel": "node --test test/palette-model.test.js test/palette-lifecycle.test.js",
   "test:dropdown": "node test/dropdown.js",
   "test:injectedroutes": "node test/injected-routes.js",
   "test:csscode": "node test/css-code.js",

@@ -471,7 +471,7 @@ const check = (what, condition, detail) => {
   {
     const panelBundle = path.join(buildDir, 'palette-panel.bundle.js');
     await esbuild.build({
-      entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.jsx')],
+      entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'PalettePanel.tsx')],
       outfile: panelBundle,
       bundle: true,
       format: 'cjs',
@@ -503,8 +503,16 @@ const check = (what, condition, detail) => {
     let instancesHere = [];
     let usageAnswer = { files: [] };
     let request = 0;
-    const render = (createFrom) =>
+    const render = (source) =>
       act(async () => {
+        const createFrom = source.name
+          ? {
+              kind: 'ready',
+              label: source.label || 'the selection',
+              props: source.props || [],
+              name: source.name,
+            }
+          : { kind: 'unavailable', reason: source.reason };
         root.render(
           React.createElement(PalettePanel, {
             createRequest: request,

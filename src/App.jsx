@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import WelcomeScreen from './panels/WelcomeScreen.jsx';
 import PagesPanel from './panels/PagesPanel.jsx';
-import PalettePanel from './panels/PalettePanel.jsx';
+import PalettePanel from './panels/PalettePanel';
 import StructurePanel from './panels/StructurePanel';
 import { isInlineRun, noteIndexAbove, noteText, noteValue, selectionAfterDelete } from './treeSelection.js';
 import { canvasClickAction } from './canvasClick.js';
@@ -3195,21 +3195,33 @@ export default function App() {
   // What the Components panel's create button would act on: the name to suggest
   // for the selected element, or why there's nothing to make a component from.
   const createFrom = useMemo(() => {
-    if (!pageState?.editable) {return { reason: 'Open a page to make components from it.' };}
-    if (!selectedNode) {return { reason: 'Select an element on the canvas first.' };}
+    if (!pageState?.editable) {
+      return { kind: 'unavailable', reason: 'Open a page to make components from it.' };
+    }
+    if (!selectedNode) {
+      return { kind: 'unavailable', reason: 'Select an element on the canvas first.' };
+    }
     const node = selectedNode;
     if (node.kind === 'text' || node.kind === 'expr') {
-      return { reason: 'Select the element around this, not the text itself.' };
+      return {
+        kind: 'unavailable',
+        reason: 'Select the element around this, not the text itself.',
+      };
     }
-    if (node.kind === 'frontmatter') {return { reason: 'Select an element on the canvas first.' };}
-    if (node.id === 'layout') {return { reason: 'A layout is already a component of its own.' };}
+    if (node.kind === 'frontmatter') {
+      return { kind: 'unavailable', reason: 'Select an element on the canvas first.' };
+    }
+    if (node.id === 'layout') {
+      return { kind: 'unavailable', reason: 'A layout is already a component of its own.' };
+    }
     if (node.kind !== 'element' && node.kind !== 'component') {
-      return { reason: 'Select an element on the canvas first.' };
+      return { kind: 'unavailable', reason: 'Select an element on the canvas first.' };
     }
     // Its first class is the name it already goes by — `.project-card` is a
     // better guess at a component name than `Div`. The tag is the fallback.
     const first = namesIn(node.props?.class)[0] || namesIn(node.props?.['class:list'])[0] || '';
     return {
+      kind: 'ready',
       name: toComponentName(first) || toComponentName(node.name) || 'Component',
       label: `<${node.name}>`,
       // The page values it reads, which the new component can take as props.

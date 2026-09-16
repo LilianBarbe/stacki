@@ -107,8 +107,8 @@ function parseComponent(input: unknown, where: string): ScanComponent {
     out['isLayout'] = true;
   }
   if (record['instances'] !== undefined) {
-    if (!Number.isSafeInteger(record['instances'])) {
-      fail(where, 'instances: expected integer');
+    if (!Number.isSafeInteger(record['instances']) || Number(record['instances']) < 0) {
+      fail(where, 'instances: expected nonnegative integer');
     }
     out['instances'] = record['instances'];
   }
