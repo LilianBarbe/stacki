@@ -130,7 +130,7 @@ Cleanup owed: `electron/scratch2-7.js` are stray tsc-emitted outputs from the
 cssVars conversion experiments, still tracked in git (198 lines). Delete them
 in a standalone commit; nothing requires them.
 
-### src/ — 37 modules converted
+### src/ — 38 modules converted ✅
 
 `editorTree`, `pagePersistence` (WeakSet acks + drain caps),
 `cleanError`, `branchName`, `loopBindings` (minimal-fidelity LiveNode),
@@ -171,15 +171,19 @@ size/depth bounds, nullable/default/union distinctions, and CMS wrapper and
 expression preservation. The external-project content-fields test still skips
 when its optional fixture is absent; the new fixture-independent suite always runs.
 
-Remaining src leaf: `gitActions` (depends on the confirmation dialog).
+Final root leaf: `gitActions`, with a parsed Git bridge and the `ConfirmDialog`
+UI dependency. The gate passes 129/129 commands (93.7s). Scripted action tests pin
+confirmation order, cancellation, trunk protection, parking/restoration and
+conflict handoff. All scheduled root `.js` leaves are now converted.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
-### src/ui — 32 files, 6,457 lines ⬜
+### src/ui — 1 converted; remaining UI modules ⏳
 
 `Icons` 969, `RichContent` 606, `WelcomeBackground` 433, `ClassInput` 344,
 `ExprInput` 336, `DataPicker` 308, `Dropdown` 303, `FileBrowser` 277,
 `AssetField` 248, `CustomValueEditor` 243, `BindInput` 226, `StyleEditor`
-200, + 20 smaller. None started.
+200, plus smaller controls and hooks. `ConfirmDialog` is converted; the actual
+inventory also includes `sound`, `soundScope`, and the four interaction hooks.
 
 ### src/panels — 20 files, 13,990 lines ⬜
 

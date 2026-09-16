@@ -1,0 +1,173 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode, RefObject } from 'react';
+
+// A confirmation stays inside the app, with action-specific labels. Destructive
+// questions focus Cancel so a stray Return key cannot authorize deletion.
+interface Checkbox {
+  readonly label: ReactNode;
+  readonly hint?: ReactNode;
+  readonly defaultChecked?: boolean;
+}
+interface ConfirmOptions {
+  readonly title?: ReactNode;
+  readonly body?: ReactNode;
+  readonly confirmLabel?: string;
+  readonly cancelLabel?: string;
+  readonly danger?: boolean;
+  readonly checkbox?: Checkbox | null;
+}
+type ConfirmAnswer = boolean | { readonly checked: boolean };
+interface Question {
+  readonly title: ReactNode;
+  readonly body: ReactNode;
+  readonly confirmLabel: string;
+  readonly cancelLabel: string;
+  readonly danger: boolean;
+  readonly checkbox: Checkbox | null;
+  readonly resolve: (answer: ConfirmAnswer) => void;
+}
+let open: ((question: Question) => void) | null = null;
+
+export function confirmDialog({
+  title,
+  body = null,
+  confirmLabel = 'Continue',
+  cancelLabel = 'Cancel',
+  danger = false,
+  checkbox = null,
+}: ConfirmOptions = {}): Promise<ConfirmAnswer> {
+  return new Promise((resolve) => {
+    if (!open) {
+      console.error('confirmDialog: no <ConfirmHost /> is mounted; answering no.');
+      resolve(false);
+      return;
+    }
+    open({ title, body, confirmLabel, cancelLabel, danger, checkbox, resolve });
+  });
+}
+
+/** One host owns the window's single confirmation slot. */
+export function ConfirmHost() {
+  const [ask, setAsk] = useState<Question | null>(null);
+  const [checked, setChecked] = useState(false);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (ask) {
+      setChecked(ask.checkbox?.defaultChecked ?? false);
+    }
+  }, [ask]);
+  useEffect(() => {
+    open = setAsk;
+    return () => {
+      if (open === setAsk) {
+        open = null;
+      }
+    };
+  }, []);
+  useEffect(() => {
+    if (ask) {
+      (ask.danger ? cancelRef.current : confirmRef.current)?.focus();
+    }
+  }, [ask]);
+  const answer = useCallback(
+    (value: boolean) => {
+      if (!ask) {
+        return;
+      }
+      ask.resolve(value && ask.checkbox ? { checked } : value);
+      setAsk(null);
+    },
+    [ask, checked],
+  );
+  useConfirmKeys(ask, answer);
+  if (!ask) {
+    return null;
+  }
+  return (
+    <ConfirmSurface
+      ask={ask}
+      checked={checked}
+      setChecked={setChecked}
+      answer={answer}
+      confirmRef={confirmRef}
+      cancelRef={cancelRef}
+    />
+  );
+}
+
+function useConfirmKeys(ask: Question | null, answer: (value: boolean) => void): void {
+  useEffect(() => {
+    if (!ask) {
+      return undefined;
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        answer(false);
+      } else if (event.key === 'Enter' && !ask.danger) {
+        event.preventDefault();
+        answer(true);
+      }
+    };
+    // Capture keeps the editor from acting on a key intended for the dialog.
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [ask, answer]);
+}
+
+interface SurfaceProps {
+  readonly ask: Question;
+  readonly checked: boolean;
+  readonly setChecked: (checked: boolean) => void;
+  readonly answer: (value: boolean) => void;
+  readonly confirmRef: RefObject<HTMLButtonElement>;
+  readonly cancelRef: RefObject<HTMLButtonElement>;
+}
+function ConfirmSurface({ ask, checked, setChecked, answer, confirmRef, cancelRef }: SurfaceProps) {
+  return (
+    <div
+      className="modal-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          answer(false);
+        }
+      }}
+    >
+      <div className="modal confirm-dialog" role="alertdialog" aria-modal="true">
+        <div className="modal-header">{ask.title}</div>
+        {(ask.body || ask.checkbox) && (
+          <div className="modal-body confirm-body">
+            {ask.body}
+            {ask.checkbox && (
+              <label className="confirm-check">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(event) => setChecked(event.target.checked)}
+                />
+                <span>
+                  {ask.checkbox.label}
+                  {ask.checkbox.hint && <em className="confirm-check-hint">{ask.checkbox.hint}</em>}
+                </span>
+              </label>
+            )}
+          </div>
+        )}
+        <div className="modal-footer">
+          <button ref={cancelRef} onClick={() => answer(false)}>
+            {ask.cancelLabel}
+          </button>
+          <button
+            ref={confirmRef}
+            className={ask.danger ? 'danger' : 'primary'}
+            onClick={() => answer(true)}
+          >
+            {ask.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

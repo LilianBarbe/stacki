@@ -23,6 +23,10 @@ import {
 declare global {
   interface Window {
     avb: {
+      gitMerge(payload: unknown): Promise<unknown>;
+      gitDeleteBranch(payload: unknown): Promise<unknown>;
+      gitPark(payload: unknown): Promise<unknown>;
+      gitUnpark(payload: unknown): Promise<unknown>;
       scanProject(payload: unknown): Promise<unknown>;
       readPage(payload: unknown): Promise<unknown>;
       readSourceText(payload: unknown): Promise<unknown>;
