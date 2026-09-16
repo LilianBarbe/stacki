@@ -420,6 +420,16 @@ reachable old/new dialog displays pass. The full gate passes 138/138 commands
 (106.7s), with zero warnings in the new modules. Continue with GitChip's
 remaining action boundaries and root conversion.
 
+GitChip bridge checkpoint: `gitChipBridge.ts` now parses info, changed-file,
+checkout, commit, initialize, push, publish, and merge-resolution responses.
+Checkout creation and parking use a discriminated mode instead of boolean
+arguments. Payloads are validated before IPC, transport failures are values,
+and malformed replies remain loud. Ten focused bridge/publish checks cover the
+response variants, limits, ordering, and all action payloads. The full gate
+passes 138/138 commands (108.0s), with zero warnings in the new bridge. Wire
+these boundaries into the remaining GitChip actions, then convert and split
+its root.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |

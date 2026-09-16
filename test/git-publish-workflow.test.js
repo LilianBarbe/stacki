@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parseGitCommit, parseGitInfo, parseGitPublish, parseGitSuccess } =
-  require('./renderer-module')('gitPublishBridge.ts');
+  require('./renderer-module')('gitChipBridge.ts');
 const { publishGitProject } = require('./renderer-module')('panels/gitPublishWorkflow.ts');
 
 const cleanInfo = {
