@@ -70,7 +70,7 @@ test('nested repeaters keep image imports and Escape closes only the innermost d
   const imports = [];
   const pickAsset = async (picked) => {
     imports.push(picked);
-    return { __expr: 'newImage', __asset: picked.rel };
+    return { ok: true, value: { __expr: 'newImage', __asset: picked.rel } };
   };
   const render = () =>
     root.render(

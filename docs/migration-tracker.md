@@ -12,7 +12,7 @@ conversion** are complete. `electron/main.ts` now emits the ignored `main.js`
 package entry. The invoke inventory is complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
 **The Electron, root renderer, and UI queues are complete. Continue through
-`src/panels` (PropsPanel, VariablesPanel, and VariablesView are complete; CmsView next), then `src/App.jsx`.**
+`src/panels` (PropsPanel, VariablesPanel, VariablesView, and CmsView are complete; GitChip next), then `src/App.jsx`.**
 
 Main verification: 26 old/new handler and output comparisons matched, including
 byte-identical generated Astro config, preview page, and both API endpoints.
@@ -243,7 +243,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 5/20 original files converted ⏳
+### src/panels — 6/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -367,11 +367,22 @@ paths, dialog state, and failed deletion. The full gate passes 138/138 commands
 (101.3s), with zero warnings in converted modules. Finish CmsView's root and
 its debounced save lifetime.
 
+CmsView is fully converted to `CmsView.tsx`. Each file owns its editor lifetime,
+reader, and writer. Switching files flushes the old file through its original path;
+late reads cannot replace the new selection. Saves and undo restores share one
+write slot, with one pending snapshot, bounded drains, retryable I/O failures,
+and exact wrapper-preserving undo. Unreadable collections cannot be edited.
+Schema operations construct new items and declaration maps. All 48 old/new root
+displays match; new real-render and coordinator tests cover file switches, read
+races, queued edits during undo, failures, bounds, and nested schema changes.
+The full gate passes 138/138 commands (101.9s); new modules typecheck and lint
+without warnings. Fourteen original panels remain; continue with GitChip.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
 | `VariablesView.tsx`                                                                                  | ✅ converted with typed edits, history, and refreshes |
-| `CmsView.jsx`                                                                                        | 1,246                                                        |
+| `CmsView.tsx`                                                                                        | ✅ converted with per-file saves and parsed contracts                                                        |
 | `GitChip.jsx`                                                                                        | 1,044                                                        |
 | `ContentView.jsx`                                                                                    | 1,001                                                        |
 | `StructurePanel.jsx`                                                                                 | 793                                                          |

@@ -131,8 +131,8 @@ check(
 
 const assets = read('src', 'panels', 'AssetsPanel.jsx');
 check('the assets panel records a move', /onRecordUndo\?\.\(\{/.test(assets));
-const cms = read('src', 'panels', 'CmsView.jsx');
-check('and the CMS records a save', /onRecordUndo\(\{/.test(cms));
+const cms = read('src', 'panels', 'cmsWriter.ts');
+check('and the CMS records a save', /this\.options\.record\(\{/.test(cms));
 
 if (failures.length) {
   console.error(`\nundo-reach: ${failures.length} failed, ${checked - failures.length} passed\n`);

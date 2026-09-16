@@ -253,7 +253,7 @@ const SCREENS = [
   );
 }
 {
-  const view = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'CmsView.jsx'), 'utf8');
+  const view = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'CmsView.tsx'), 'utf8');
   const field = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'CmsField.tsx'), 'utf8');
   check(
     'the image field shows the file the name is bound to',
@@ -262,12 +262,12 @@ const SCREENS = [
   );
   check(
     'and picking one goes through the file rather than writing a path',
-    /pickAsset\(picked\)\.then\(onChange\)/.test(field),
+    /if \(result\.ok\) \{\s*onChange\(result\.value\)/.test(field),
     'a picked asset would be written as a path a page cannot follow'
   );
   check(
     'a JSON collection keeps writing paths — it can hold no import',
-    /pickAsset=\{canImport \? pickAsset : undefined\}/.test(view),
+    /pickAsset: model\.rel\.includes\('#'\) \? model\.pickAsset : undefined/.test(view),
     'a JSON file would be handed an identifier'
   );
   const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');

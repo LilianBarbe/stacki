@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import type { Result } from '../../shared/result';
 import type { FieldType } from '../cmsSchema';
 import type { PickedAsset } from '../ui/AssetField';
 import { assert } from '../../shared/assert';
@@ -14,7 +15,7 @@ import useListReorder from '../ui/useListReorder';
 export interface CmsFieldContext {
   readonly projectPath: string;
   readonly baseDir: string;
-  readonly pickAsset?: ((picked: PickedAsset) => Promise<unknown>) | undefined;
+  readonly pickAsset?: ((picked: PickedAsset) => Promise<Result<unknown, string>>) | undefined;
 }
 interface ValueProps extends CmsFieldContext {
   readonly value: unknown;
@@ -201,7 +202,11 @@ function ImageField({ value, onChange, pickAsset, projectPath, baseDir }: ValueP
       onPickEntry={
         pickAsset &&
         ((picked) => {
-          void pickAsset(picked).then(onChange);
+          void pickAsset(picked).then((result) => {
+            if (result.ok) {
+              onChange(result.value);
+            }
+          });
         })
       }
       mediaKind="image"
