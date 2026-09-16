@@ -23,7 +23,10 @@ test('workspace picker supports search, keyboard, refresh and failed switches', 
   const root = createRoot(document.getElementById('root'));
   const first = { path: '/main', projectPath: '/main', name: 'main', branch: 'main', current: true, available: true };
   const second = { path: '/design', projectPath: '/design', name: 'design', branch: 'feature/design', available: true };
-  let rows = [first, second, { path: '/gone', projectPath: '/gone', name: 'gone', available: false }];
+  // '/gone' is still on disk without the project in it; '/pruned' is a
+  // folder git has not been told was deleted.
+  const pruned = { path: '/pruned', projectPath: '/pruned', name: 'pruned', branch: 'agent-task', available: false, prunable: 'gitdir file points to non-existent location' };
+  let rows = [first, second, { path: '/gone', projectPath: '/gone', name: 'gone', available: false }, pruned];
   let fetchError = null;
   let selectError = null;
   let finishSwitch;
@@ -64,7 +67,8 @@ test('workspace picker supports search, keyboard, refresh and failed switches', 
       },
     })));
     await click(trigger());
-    assert.equal(options().length, 3);
+    assert.equal(options().length, 3, 'a worktree whose folder is gone is not offered');
+    assert.doesNotMatch(document.body.textContent, /pruned|agent-task/);
     assert.equal(options()[0].getAttribute('aria-current'), 'true');
     assert.equal(options()[2].disabled, true);
     await click(options()[0]);
