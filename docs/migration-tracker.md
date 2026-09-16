@@ -11,8 +11,8 @@ The `v0.1.26` startup repair, Astro parser conversion, and **Electron main
 conversion** are complete. `electron/main.ts` now emits the ignored `main.js`
 package entry. The invoke inventory is complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
-**Next: remaining renderer leaves, then `src/ui`, then `src/panels` (PropsPanel
-first), and `src/App.jsx` last. The scheduled Electron conversion queue is done.**
+**The Electron and root renderer leaf queues are complete. Continue through
+`src/ui`, then `src/panels` (PropsPanel first), and `src/App.jsx` last.**
 
 Main verification: 26 old/new handler and output comparisons matched, including
 byte-identical generated Astro config, preview page, and both API endpoints.
@@ -177,13 +177,20 @@ confirmation order, cancellation, trunk protection, parking/restoration and
 conflict handoff. All scheduled root `.js` leaves are now converted.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
-### src/ui — 1 converted; remaining UI modules ⏳
+### src/ui — 12 converted, 26 remaining ⏳
 
 `Icons` 969, `RichContent` 606, `WelcomeBackground` 433, `ClassInput` 344,
 `ExprInput` 336, `DataPicker` 308, `Dropdown` 303, `FileBrowser` 277,
 `AssetField` 248, `CustomValueEditor` 243, `BindInput` 226, `StyleEditor`
 200, plus smaller controls and hooks. `ConfirmDialog` is converted; the actual
 inventory also includes `sound`, `soundScope`, and the four interaction hooks.
+
+UI leaf batch: `Icons`, `StackiLogo`, `VariableTypeIcon`, `FileStatus`,
+`SegSwitch`, `AutoTextarea`, `BranchActions`, `soundScope`, `usePopupOpen`,
+`useDismiss`, `chipKeys`. All 196 old/new markup comparisons pass, with vector
+paths byte-identical. The full gate passes 129/129 commands (94.0s). The binding
+suite caught a DOM-realm assumption; chip guards now use the node's own document,
+and all 110 binding checks pass. Popup blur timers are bounded and cancelled on cleanup.
 
 ### src/panels — 20 files, 13,990 lines ⬜
 

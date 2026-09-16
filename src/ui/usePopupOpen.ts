@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 
 // Whether a popup is on screen anywhere.
@@ -21,14 +22,16 @@ const POPUPS = '[role="menu"],[role="dialog"],[role="listbox"]';
  * inside a control. Watching all of <body>'s subtree would mean a callback on
  * every render anywhere in the app.
  */
-export default function usePopupOpen(host) {
+export default function usePopupOpen(host: RefObject<HTMLElement> | null | undefined): boolean {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const look = () => setOpen(!!document.querySelector(POPUPS));
     look();
     const watch = new MutationObserver(look);
     watch.observe(document.body, { childList: true });
-    if (host?.current) {watch.observe(host.current, { childList: true, subtree: true });}
+    if (host?.current) {
+      watch.observe(host.current, { childList: true, subtree: true });
+    }
     return () => watch.disconnect();
   }, [host]);
   return open;

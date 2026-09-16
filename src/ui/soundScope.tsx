@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { createContext, useContext } from 'react';
 
 // Which parts of the app answer with a sound.
@@ -14,7 +15,7 @@ import { createContext, useContext } from 'react';
 const SoundScope = createContext(false);
 
 /** Everything rendered under here may sound, if the setting is on. */
-export function SoundHere({ children }) {
+export function SoundHere({ children }: { readonly children?: ReactNode }) {
   return <SoundScope.Provider value>{children}</SoundScope.Provider>;
 }
 

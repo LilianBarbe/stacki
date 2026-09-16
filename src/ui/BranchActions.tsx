@@ -1,4 +1,11 @@
-import React from 'react';
+interface BranchActionsProps {
+  readonly branch: string;
+  readonly current: string;
+  readonly trunk?: string | null;
+  readonly onMerge?: (branch: string) => void;
+  readonly onDelete?: (branch: string) => void;
+  readonly disabled?: boolean;
+}
 import { MergeIcon, TrashIcon } from './Icons.jsx';
 
 // The merge and delete buttons on a branch row.
@@ -29,7 +36,14 @@ import { MergeIcon, TrashIcon } from './Icons.jsx';
 //           trunk. Git will delete main as readily as anything else the moment
 //           it is merged into where you are, and it is the one branch
 //           everything comes back to.
-export default function BranchActions({ branch, current, trunk, onMerge, onDelete, disabled }) {
+export default function BranchActions({
+  branch,
+  current,
+  trunk,
+  onMerge,
+  onDelete,
+  disabled,
+}: BranchActionsProps) {
   const isCurrent = branch === current;
   const isTrunk = !!trunk && branch === trunk;
 

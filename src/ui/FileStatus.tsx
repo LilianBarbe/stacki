@@ -1,5 +1,3 @@
-import React from 'react';
-
 // What happened to a file, in a word.
 //
 // Git says "M". It also says "A", "D" and "R", and every one of them is
@@ -10,7 +8,7 @@ import React from 'react';
 // The words are short enough to sit where the letter did, so nothing had to
 // grow to make room for being readable.
 
-const WORDS = {
+const WORDS: Readonly<Record<string, { readonly word: string; readonly why: string }>> = {
   A: { word: 'New', why: 'This file is new — it isn’t in the last saved version' },
   M: { word: 'Changed', why: 'This file has changes that aren’t saved yet' },
   D: { word: 'Deleted', why: 'This file has been deleted' },
@@ -26,8 +24,16 @@ const WORDS = {
  * did — "Changed" is a state the working tree is in, but a commit that touched
  * a file did the changing, and "was changed" is what it says.
  */
-export default function FileStatus({ status, inCommit = false }) {
-  if (!status) {return null;}
+export default function FileStatus({
+  status,
+  inCommit = false,
+}: {
+  readonly status?: string | null;
+  readonly inCommit?: boolean;
+}) {
+  if (!status) {
+    return null;
+  }
   const known = WORDS[status];
   // An unrecognised letter keeps the letter. Inventing a word for something
   // git meant differently would be worse than showing what git said.
