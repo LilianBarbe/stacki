@@ -178,7 +178,7 @@ check(
 // At the top. CodeMirror's default is the bottom, which is where a search that
 // has run tends to leave you — the panel lands over the very lines it found.
 for (const [what, file] of [
-  ['the app editor', 'src/ui/CodeEditor.jsx'],
+  ['the app editor', 'src/ui/CodeEditor.tsx'],
   ['the style panel editor', 'src/style-panel/components/CodeEditor.tsx'],
 ]) {
   check(`${what} opens find at the top`, /search\(\{\s*top:\s*true\s*\}\)/.test(read(file)), file);
@@ -195,14 +195,14 @@ check(
 // beats. A theme outranks a base theme by construction — so these two belong in
 // the editors' themes, and a rule in styles.css would be a coin toss.
 for (const [what, file] of [
-  ['the app editor', 'src/ui/CodeEditor.jsx'],
+  ['the app editor', 'src/ui/CodeEditor.tsx'],
   ['the style panel editor', 'src/style-panel/components/CodeEditor.tsx'],
 ]) {
   const src = read(file);
   check(`${what} themes its search matches`, /'\.cm-searchMatch'/.test(src), file);
   check(`${what} marks the current match apart`, /cm-searchMatch-selected/.test(src), file);
 }
-const appTheme = read('src/ui/CodeEditor.jsx');
+const appTheme = read('src/ui/CodeEditor.tsx');
 check(
   'and the current match is a ring, not another wash over the selection',
   /cm-searchMatch-selected[\s\S]{0,220}outline:/.test(appTheme),

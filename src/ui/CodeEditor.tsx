@@ -1,5 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
+import type { MutableRefObject } from 'react';
+import type { LanguageSupport } from '@codemirror/language';
+import { assert } from '../../shared/assert';
 import { Annotation, EditorState, Transaction } from '@codemirror/state';
 import { css } from '@codemirror/lang-css';
 import { javascript } from '@codemirror/lang-javascript';
@@ -14,7 +17,7 @@ import { tags as t } from '@lezer/highlight';
 // Key the component by node id at the call site so switching nodes resets
 // history and selection.
 
-const externalValue = Annotation.define();
+const externalValue = Annotation.define<boolean>();
 
 export const appTheme = EditorView.theme(
   {
@@ -34,9 +37,12 @@ export const appTheme = EditorView.theme(
     // The same selection as the rest of the app. CodeMirror paints its own
     // layer rather than using ::selection, so it has to be told separately or
     // code is the one place a selection looks different.
-    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground':
-      { backgroundColor: 'var(--selection)' },
-    '.cm-content ::selection': { backgroundColor: 'var(--selection)', color: 'var(--selection-text)' },
+    ['&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, ' +
+    '.cm-selectionBackground']: { backgroundColor: 'var(--selection)' },
+    '.cm-content ::selection': {
+      backgroundColor: 'var(--selection)',
+      color: 'var(--selection-text)',
+    },
     '.cm-activeLine': { backgroundColor: 'rgba(255, 255, 255, 0.03)' },
     // Find results. Every hit gets a quiet blue wash; the one you're ON gets
     // amber with an edge, so running through matches is a colour changing
@@ -71,7 +77,7 @@ export const appTheme = EditorView.theme(
     },
     '.cm-tooltip-autocomplete ul li[aria-selected]': { backgroundColor: 'var(--accent)' },
   },
-  { dark: true }
+  { dark: true },
 );
 
 export const appHighlight = syntaxHighlighting(
@@ -100,87 +106,55 @@ export const appHighlight = syntaxHighlighting(
       { tag: [t.list], color: '#89ddff' },
       { tag: [t.processingInstruction], color: '#616161' },
     ],
-    { themeType: 'dark' }
-  )
+    { themeType: 'dark' },
+  ),
 );
 
-export default function CodeEditor({ value, language, onChange, revealLine }) {
-  const hostRef = useRef(null);
-  const viewRef = useRef(null);
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+export interface CodeEditorProps {
+  readonly value?: string | null | undefined;
+  readonly language?: string | undefined;
+  readonly onChange?: ((text: string) => void) | undefined;
+  readonly revealLine?: number | null | undefined;
+}
 
+export default function CodeEditor({ value, language, onChange, revealLine }: CodeEditorProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  // These values change without replacing the editor, preserving history and selection.
+  const latest = useRef({ value, onChange });
+  latest.current = { value, onChange };
   useEffect(() => {
-    const lang =
-      language === 'css'
-        ? css()
-        : language === 'markdown'
-          ? // GFM as the base, and the languages a fenced block is likely to
-            // hold. An .mdx body's imports and JSX read as prose to the
-            // markdown parser — the headings, fences, links and emphasis
-            // around them are what there is to colour, and the alternative
-            // (a JS parser over a document that is mostly prose) colours the
-            // prose wrongly instead.
-            markdown({
-              base: markdownLanguage,
-              codeLanguages: [
-                LanguageDescription.of({ name: 'css', extensions: ['css'], load: async () => css() }),
-                LanguageDescription.of({
-                  name: 'javascript',
-                  alias: ['js', 'jsx', 'ts', 'tsx', 'typescript'],
-                  extensions: ['js', 'ts'],
-                  load: async () => javascript({ typescript: true, jsx: true }),
-                }),
-              ],
-            })
-          : javascript({ typescript: true });
-    const view = new EditorView({
-      parent: hostRef.current,
-      state: EditorState.create({
-        doc: value ?? '',
-        extensions: [
-          basicSetup,
-          // ⌘F opens at the TOP of the editor. The panel takes a couple of rows
-          // wherever it goes; at the bottom it lands over the end of the file,
-          // which is where a search that has run puts you.
-          search({ top: true }),
-          lang,
-          appTheme,
-          appHighlight,
-          EditorView.updateListener.of((u) => {
-            if (u.docChanged && !u.transactions.some((tr) => tr.annotation(externalValue))) {
-              onChangeRef.current?.(u.state.doc.toString());
-            }
-          }),
-        ],
-      }),
-    });
+    const parent = hostRef.current;
+    assert(parent !== null, 'CodeEditor: mounted host exists');
+    assert(viewRef.current === null, 'CodeEditor: only one editor owns the host');
+    const view = codeEditorCreate(parent, language, latest);
     viewRef.current = view;
     return () => {
       view.destroy();
       viewRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
 
-  // Apply external value changes (file reloads, undo from app level).
+  // External reloads and app undo must not echo as user edits or enter local history.
   useEffect(() => {
     const view = viewRef.current;
-    if (!view) {return;}
-    const cur = view.state.doc.toString();
-    if ((value ?? '') !== cur) {
+    if (!view) {
+      return;
+    }
+    const current = view.state.doc.toString();
+    if ((value ?? '') !== current) {
       view.dispatch({
-        changes: { from: 0, to: cur.length, insert: value ?? '' },
+        changes: { from: 0, to: current.length, insert: value ?? '' },
         annotations: [externalValue.of(true), Transaction.addToHistory.of(false)],
       });
     }
   }, [value]);
-
-  // Open on a particular line — the declaration you asked to edit, rather than
-  // the top of a file you then have to search.
   useEffect(() => {
     const view = viewRef.current;
-    if (!view || !revealLine) {return;}
+    if (!view || !revealLine) {
+      return;
+    }
+    assert(Number.isSafeInteger(revealLine), 'CodeEditor: reveal line is a safe integer');
     const line = view.state.doc.line(Math.max(1, Math.min(revealLine, view.state.doc.lines)));
     view.dispatch({
       selection: { anchor: line.from },
@@ -188,6 +162,55 @@ export default function CodeEditor({ value, language, onChange, revealLine }) {
     });
     view.focus();
   }, [revealLine, language]);
-
   return <div ref={hostRef} className="cm-host" />;
+}
+
+function codeEditorCreate(
+  parent: HTMLDivElement,
+  language: string | undefined,
+  latest: MutableRefObject<Pick<CodeEditorProps, 'value' | 'onChange'>>,
+): EditorView {
+  return new EditorView({
+    parent,
+    state: EditorState.create({
+      doc: latest.current.value ?? '',
+      extensions: [
+        basicSetup,
+        // Search stays above the document so it cannot cover the final match.
+        search({ top: true }),
+        codeEditorLanguage(language),
+        appTheme,
+        appHighlight,
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            if (!update.transactions.some((transaction) => transaction.annotation(externalValue))) {
+              latest.current.onChange?.(update.state.doc.toString());
+            }
+          }
+        }),
+      ],
+    }),
+  });
+}
+
+function codeEditorLanguage(language: string | undefined): LanguageSupport {
+  if (language === 'css') {
+    return css();
+  }
+  if (language === 'markdown') {
+    // MDX is mostly prose: highlight headings and fences instead of parsing it all as JS.
+    return markdown({
+      base: markdownLanguage,
+      codeLanguages: [
+        LanguageDescription.of({ name: 'css', extensions: ['css'], load: async () => css() }),
+        LanguageDescription.of({
+          name: 'javascript',
+          alias: ['js', 'jsx', 'ts', 'tsx', 'typescript'],
+          extensions: ['js', 'ts'],
+          load: async () => javascript({ typescript: true, jsx: true }),
+        }),
+      ],
+    });
+  }
+  return javascript({ typescript: true });
 }

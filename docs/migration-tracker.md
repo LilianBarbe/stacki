@@ -177,7 +177,7 @@ confirmation order, cancellation, trunk protection, parking/restoration and
 conflict handoff. All scheduled root `.js` leaves are now converted.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
-### src/ui — 19 converted, 19 remaining ⏳
+### src/ui — 25 converted, 13 remaining ⏳
 
 `Icons` 969, `RichContent` 606, `WelcomeBackground` 433, `ClassInput` 344,
 `ExprInput` 336, `DataPicker` 308, `Dropdown` 303, `FileBrowser` 277,
@@ -199,6 +199,12 @@ regression test pins drag-listener installation with a stable move callback;
 pointer sessions flush final coordinates and clean up on cancellation/unmount.
 Audio voices are capped at 32, with capacity released when each voice ends.
 Converted modules have no lint warnings and meet the function/column limits.
+
+UI editor/menu batch: `Code`, `CodeEditor`, `CodeWindow`, `MoreMenu`,
+`FluidBadge`, and `PageSwitcher`. All 25 old/new markup/language comparisons
+pass; the full gate passes 130/130 commands (93.6s). The code-search suite now
+reads the renamed source. Editor instances preserve history across callback
+updates; floating-window pointer sessions release listeners on unmount.
 
 ### src/panels — 20 files, 13,990 lines ⬜
 
