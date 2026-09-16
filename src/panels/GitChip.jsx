@@ -77,16 +77,26 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
       .catch(() => setChanged([]));
   }, [picking, open, project.path, info?.dirty, info?.head]);
 
-  const act = async (fn, successMsg, label = 'Working…') => {
+  // `rewritesTree` — whether this action changes the files on disk.
+  //
+  // It used to be assumed of everything that came through here, and it is not
+  // true of all of them: deleting a branch, committing and pushing leave the
+  // working tree exactly as it was. Reloading after those is not merely
+  // wasted work — the reload re-reads the open file, drops the page's undo
+  // history and remounts every preview iframe, so a branch you deleted took
+  // the canvas down with it. The History panel's delete never did this (see
+  // onDeleteBranch in App.jsx, which only refreshes git), and one button
+  // behaving differently in two places is how the difference stayed hidden.
+  const act = async (fn, successMsg, label = 'Working…', { rewritesTree = true } = {}) => {
     setBusy(label);
     setError(null);
     try {
       await flushSave();
       await fn();
       await refresh();
-      // Checkout/pull rewrite the working tree — re-read what's open so the
-      // editor and preview show the branch that's actually checked out.
-      if (onWorktreeChanged) await onWorktreeChanged();
+      // Checkout/merge/pull rewrite the working tree — re-read what's open so
+      // the editor and preview show the branch that's actually checked out.
+      if (rewritesTree && onWorktreeChanged) await onWorktreeChanged();
       if (successMsg) showToast(successMsg, 'success');
     } catch (err) {
       const msg = cleanError(err);
@@ -191,7 +201,8 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
       projectPath: project.path,
       branch,
       parked: (info.parked || []).includes(branch),
-      run: (fn, label) => act(fn, null, label),
+      // A deleted branch is a ref that is gone. Nothing on disk moved.
+      run: (fn, label) => act(fn, null, label, { rewritesTree: false }),
       showToast,
     });
 
@@ -245,7 +256,8 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
           act(
             () => window.avb.gitInit(project.path),
             'Initialized git repository',
-            'Initializing…'
+            'Initializing…',
+            { rewritesTree: false } // creates .git; the project's files are untouched
           )
         }
       >
@@ -265,7 +277,10 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
     act(
       () => window.avb.gitCommit({ projectPath: project.path, message, paths }),
       paths ? `Saved ${paths.length} file${paths.length === 1 ? '' : 's'}` : 'Changes committed',
-      'Committing…'
+      'Committing…',
+      // A commit records what is already on disk. Saving your work is no
+      // reason to lose the undo history of the page you saved.
+      { rewritesTree: false }
     ).then(() => {
       setPicked(null);
       setPicking(false);
@@ -459,7 +474,8 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
                       () =>
                         window.avb.gitPush({ projectPath: project.path, branch: info.branch }),
                       `Pushed ${info.branch} to origin`,
-                      'Pushing…'
+                      'Pushing…',
+                      { rewritesTree: false } // sends commits; touches nothing here
                     )
                   }
                 >
