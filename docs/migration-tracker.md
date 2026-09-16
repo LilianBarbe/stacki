@@ -177,7 +177,7 @@ confirmation order, cancellation, trunk protection, parking/restoration and
 conflict handoff. All scheduled root `.js` leaves are now converted.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
-### src/ui — 25 converted, 13 remaining ⏳
+### src/ui — 28 converted, 10 remaining ⏳
 
 `Icons` 969, `RichContent` 606, `WelcomeBackground` 433, `ClassInput` 344,
 `ExprInput` 336, `DataPicker` 308, `Dropdown` 303, `FileBrowser` 277,
@@ -205,6 +205,12 @@ UI editor/menu batch: `Code`, `CodeEditor`, `CodeWindow`, `MoreMenu`,
 pass; the full gate passes 130/130 commands (93.6s). The code-search suite now
 reads the renamed source. Editor instances preserve history across callback
 updates; floating-window pointer sessions release listeners on unmount.
+
+UI value/file batch: `StyleEditor`, `CustomValueEditor`, and `FileBrowser`.
+All 96 old/new value, ranking, and tree comparisons pass; the full gate passes
+130/130 commands (96.7s). File trees use bounded iterative construction and
+traversal; tests reject oversized paths, collections, depth, and invalid search
+limits. Custom editors retain blur-before-save and portaled-picker focus behavior.
 
 ### src/panels — 20 files, 13,990 lines ⬜
 

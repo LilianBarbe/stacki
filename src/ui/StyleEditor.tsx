@@ -7,7 +7,10 @@ import {
   placeholder as cmPlaceholder,
 } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
 import { StreamLanguage } from '@codemirror/language';
+import type { StringStream } from '@codemirror/language';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { tags as t } from '@lezer/highlight';
 import { appTheme, appHighlight } from './CodeEditor.jsx';
@@ -26,29 +29,18 @@ const styleMode = StreamLanguage.define({
     // One declaration per line, so a new line starts a new property — even
     // when the previous one was left without its semicolon. Values that wrap
     // inside parens (a long gradient) are the exception, hence the depth.
-    if (stream.sol() && state.depth === 0) {state.inValue = false;}
-    if (stream.eatSpace()) {return null;}
-
-    if (stream.match('/*')) {
-      while (!stream.eol()) {
-        if (stream.match('*/')) {break;}
-        stream.next();
-      }
-      return 'comment';
+    if (stream.sol() && state.depth === 0) {
+      state.inValue = false;
     }
-    if (stream.match(/^!\s*important\b/i)) {return 'important';}
+    if (stream.eatSpace()) {
+      return null;
+    }
 
+    const literal = styleLiteral(stream);
+    if (literal !== undefined) {
+      return literal;
+    }
     const ch = stream.peek();
-    if (ch === '"' || ch === "'") {
-      stream.next();
-      let escaped = false;
-      while (!stream.eol()) {
-        const c = stream.next();
-        if (!escaped && c === ch) {break;}
-        escaped = !escaped && c === '\\';
-      }
-      return 'str';
-    }
     if (ch === ':') {
       stream.next();
       state.inValue = true;
@@ -59,10 +51,13 @@ const styleMode = StreamLanguage.define({
       state.inValue = false;
       return 'punct';
     }
-    if (/[(),/]/.test(ch)) {
+    if (/[(),/]/.test(ch ?? '')) {
       stream.next();
-      if (ch === '(') {state.depth++;}
-      else if (ch === ')') {state.depth = Math.max(0, state.depth - 1);}
+      if (ch === '(') {
+        state.depth++;
+      } else if (ch === ')') {
+        state.depth = Math.max(0, state.depth - 1);
+      }
       return 'punct';
     }
     if (ch === '#') {
@@ -71,13 +66,17 @@ const styleMode = StreamLanguage.define({
       return 'num'; // hex color
     }
     // Number with an optional unit (12px, 1.5rem, 50%, -.3em)
-    if (stream.match(/^[-+]?(\d*\.\d+|\d+)(px|r?em|%|vh|vw|vmin|vmax|s|ms|deg|fr|ch|ex|pt|cm|mm|in)?/)) {
+    if (
+      stream.match(/^[-+]?(\d*\.\d+|\d+)(px|r?em|%|vh|vw|vmin|vmax|s|ms|deg|fr|ch|ex|pt|cm|mm|in)?/)
+    ) {
       return 'num';
     }
     // Bare word: a property before the colon, a function if a ( follows,
     // otherwise a keyword value (auto, none, …) or a var()/custom property.
     if (stream.match(/^[-\w\\]+/)) {
-      if (stream.peek() === '(') {return 'fn';}
+      if (stream.peek() === '(') {
+        return 'fn';
+      }
       return state.inValue ? 'val' : 'prop';
     }
     stream.next();
@@ -97,16 +96,19 @@ const styleMode = StreamLanguage.define({
 
 // Splitting on ";" has to skip the ones inside strings and parens — a
 // `background: url("a;b.png")` or a data: URI would otherwise be cut in half.
-export function splitDeclarations(text) {
-  const out = [];
+export function splitDeclarations(text: string): string[] {
+  assert(text.length <= LIMITS.attrCharsMax, 'StyleEditor: style value limit exceeded');
+  const out: string[] = [];
   let buf = '';
   let depth = 0;
-  let quote = null;
+  let quote: string | null = null;
   for (let i = 0; i < text.length; i++) {
-    const c = text[i];
+    const c = text.charAt(i);
     if (quote) {
       buf += c;
-      if (c === quote && text[i - 1] !== '\\') {quote = null;}
+      if (c === quote && text[i - 1] !== '\\') {
+        quote = null;
+      }
       continue;
     }
     if (c === '"' || c === "'") {
@@ -130,7 +132,7 @@ export function splitDeclarations(text) {
 }
 
 // One declaration per line for editing…
-export const expandDeclarations = (value) =>
+export const expandDeclarations = (value: string | null | undefined) =>
   splitDeclarations(value || '')
     .map((d) => d + ';')
     .join('\n');
@@ -138,48 +140,69 @@ export const expandDeclarations = (value) =>
 // …and back onto one line for the attribute itself. Newlines are legal in an
 // HTML attribute, but writing them into the .astro source would spread one
 // attribute across several lines of markup.
-export const collapseDeclarations = (text) => splitDeclarations(text).join('; ') + (splitDeclarations(text).length ? ';' : '');
+export const collapseDeclarations = (text: string): string => {
+  const declarations = splitDeclarations(text);
+  return declarations.join('; ') + (declarations.length ? ';' : '');
+};
+
+interface StyleEditorProps {
+  readonly value?: string | null;
+  readonly onChange?: (value: string) => void;
+  readonly autoFocus?: boolean;
+  readonly placeholder?: string;
+}
 
 // Compact declaration editor: no gutters, no line numbers, no folding — it
 // sits inside a popover a couple of hundred pixels wide.
-export default function StyleEditor({ value, onChange, autoFocus, placeholder = '' }) {
-  const hostRef = useRef(null);
-  const viewRef = useRef(null);
+export default function StyleEditor({
+  value,
+  onChange,
+  autoFocus,
+  placeholder = '',
+}: StyleEditorProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   // Mounted once with the expanded text; from then on the effect below decides
   // when the incoming value is news and when it's this editor's own echo.
-  const [initial] = useState(() => expandDeclarations(value));
+  const [initial] = useState(() => ({ text: expandDeclarations(value), placeholder, autoFocus }));
 
   useEffect(() => {
+    const parent = hostRef.current;
+    assert(parent !== null, 'StyleEditor: mounted host exists');
+    assert(viewRef.current === null, 'StyleEditor: only one editor owns the host');
     const view = new EditorView({
-      parent: hostRef.current,
+      parent,
       state: EditorState.create({
-        doc: initial,
+        doc: initial.text,
         extensions: [
           history(),
           highlightSpecialChars(),
           drawSelection(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           styleMode,
-          cmPlaceholder(placeholder),
+          cmPlaceholder(initial.placeholder),
           appTheme,
           appHighlight,
           EditorView.lineWrapping,
           EditorView.updateListener.of((u) => {
-            if (u.docChanged) {onChangeRef.current?.(u.state.doc.toString());}
+            if (u.docChanged) {
+              onChangeRef.current?.(u.state.doc.toString());
+            }
           }),
         ],
       }),
     });
     viewRef.current = view;
-    if (autoFocus) {view.focus();}
+    if (initial.autoFocus) {
+      view.focus();
+    }
     return () => {
       viewRef.current = null;
       view.destroy();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initial]);
 
   // A change that didn't come from here — Reset, undo, a value written by
   // something else — has to reach the document, or the editor goes on showing
@@ -188,13 +211,48 @@ export default function StyleEditor({ value, onChange, autoFocus, placeholder = 
   // edit straight back is a no-op and typing is never interrupted.
   useEffect(() => {
     const view = viewRef.current;
-    if (!view) {return;}
+    if (!view) {
+      return;
+    }
     const next = value || '';
-    if (collapseDeclarations(view.state.doc.toString()) === next) {return;}
+    if (collapseDeclarations(view.state.doc.toString()) === next) {
+      return;
+    }
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: expandDeclarations(next) },
     });
   }, [value]);
 
   return <div ref={hostRef} className="style-editor" />;
+}
+
+// Each scan advances the stream and stops at its finite line boundary.
+function styleLiteral(stream: StringStream): string | undefined {
+  if (stream.match('/*')) {
+    while (!stream.eol()) {
+      if (stream.match('*/')) {
+        break;
+      }
+      stream.next();
+    }
+    return 'comment';
+  }
+  if (stream.match(/^!\s*important\b/i)) {
+    return 'important';
+  }
+
+  const ch = stream.peek();
+  if (ch === '"' || ch === "'") {
+    stream.next();
+    let escaped = false;
+    while (!stream.eol()) {
+      const c = stream.next();
+      if (!escaped && c === ch) {
+        break;
+      }
+      escaped = !escaped && c === '\\';
+    }
+    return 'str';
+  }
+  return undefined;
 }

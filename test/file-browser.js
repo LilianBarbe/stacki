@@ -39,6 +39,15 @@ const check = (what, condition, detail) => {
   });
   const { fuzzyScore, search, buildTree } = require(bundlePath);
 
+  // Invalid sizes fail before allocating trees or scanning oversized paths.
+  const assert = require('node:assert/strict');
+  assert.throws(() => fuzzyScore('x'.repeat(8193), 'a'), /query limit exceeded/);
+  assert.throws(() => fuzzyScore('a', 'x'.repeat(8193)), /path limit exceeded/);
+  assert.throws(() => buildTree([{ path: 'a/'.repeat(64) + 'file' }]), /depth limit exceeded/);
+  assert.throws(() => buildTree(Array(100001).fill({ path: 'a' })), /file limit exceeded/);
+  assert.throws(() => search([], 'a', -1), /valid result limit/);
+  assert.throws(() => search([], 'a', 1.5), /valid result limit/);
+
   const f = (p, status = null) => ({ path: p, status });
   const project = [
     f('src/pages/index.astro', 'M'),
