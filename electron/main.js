@@ -56,6 +56,7 @@ const { listEntries, writeEntry, countEntries, coveredPaths } = require('./conte
 const { planRename, applyRename } = require('./contentRefs');
 const { mergeBranch, deleteBranch, switchBranch, resolveMerge } = require('./gitBranches');
 const { probeUrl } = require('./devProbe');
+const { mainProjectPath, foldToProjects } = require('./projectRoot');
 const gitHistory = require('./gitHistory');
 const gitSnapshot = require('./gitSnapshot');
 const previewWorktree = require('./previewWorktree');
@@ -1130,10 +1131,14 @@ function writeRecents(list) {
 }
 
 // Remembered projects that are still there to open.
+//
+// Projects, not folders: a workspace — any linked git worktree — is folded back
+// to the repository it is a checkout of, so a project reached through three of
+// them is one entry here (see electron/projectRoot.js).
 function liveRecents() {
-  return readRecents().filter((r) => {
+  return foldToProjects(readRecents(), (projectPath) => {
     try {
-      return fs.existsSync(r.path) && isAstroProject(r.path);
+      return fs.existsSync(projectPath) && isAstroProject(projectPath);
     } catch {
       return false;
     }
@@ -1168,10 +1173,13 @@ function hasDependencies(projectPath) {
 }
 
 ipcMain.handle('recents:add', async (_e, projectPath) => {
-  const list = readRecents().filter((r) => r.path !== projectPath);
+  // What is remembered is the project, so opening a workspace moves the
+  // project's own entry to the front rather than adding a second one beside it.
+  const root = mainProjectPath(projectPath);
+  const list = readRecents().filter((r) => mainProjectPath(r.path) !== root);
   list.unshift({
-    path: projectPath,
-    name: path.basename(projectPath),
+    path: root,
+    name: path.basename(root),
     openedAt: Date.now(),
   });
   writeRecents(list.slice(0, 12));
@@ -1183,9 +1191,17 @@ ipcMain.handle('recents:add', async (_e, projectPath) => {
 });
 
 ipcMain.handle('recents:remove', async (_e, projectPath) => {
-  writeRecents(readRecents().filter((r) => r.path !== projectPath));
+  // The card stands for the project, so removing it takes every folder that was
+  // remembered for it — otherwise the workspaces behind it bring it straight
+  // back on the next launch.
+  const root = mainProjectPath(projectPath);
+  const dropped = [];
+  const kept = [];
+  for (const r of readRecents()) (mainProjectPath(r.path) === root ? dropped : kept).push(r);
+  writeRecents(kept);
   // The picture and the note about when it was taken both go.
-  thumbs.forget(app.getPath('userData'), projectPath);
+  thumbs.forget(app.getPath('userData'), root);
+  for (const r of dropped) thumbs.forget(app.getPath('userData'), r.path);
   buildMenu();
   return { ok: true };
 });
