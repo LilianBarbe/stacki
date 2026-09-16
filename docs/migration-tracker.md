@@ -255,7 +255,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 18/20 original files converted ⏳
+### src/panels — 20/20 original files converted ✅
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -556,6 +556,16 @@ bridge, app-render, boundary, and production-build checks pass without warnings
 in the new modules. Two original panels remain; the full gate passes 148/148
 commands (98.4s). Continue with `TerminalPane.jsx` and `TerminalDock.jsx`.
 
+TerminalPane and TerminalDock are converted to TypeScript. `terminalBridge.ts`
+parses start, resize, close, clipboard, data, exit, and foreground-process
+boundaries, while `terminalRuntime.ts` owns the mutable xterm lifecycle and its
+bounded 10,000-line scrollback. Paste/drop handling is isolated, clipboard
+images stop at 20 MB, tab count stops at 32, and terminal listeners, observers,
+and drag state have explicit owners. Lifecycle tests retain lazy loading,
+scrollback, resize deduplication, and late-reply disposal behavior. The full
+gate passes 149/149 commands (98.9s), with no warnings in the new modules. The
+original panel queue is complete; continue with `src/App.jsx`.
+
 | File                 | Lines                                                        |
 | -------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`     | ✅ converted with typed controls/editors                     |
@@ -571,8 +581,8 @@ commands (98.4s). Continue with `TerminalPane.jsx` and `TerminalDock.jsx`.
 | `PagesPanel.tsx`     | ✅ converted with bounded trees and parsed drag payloads     |
 | `HistoryPanel.tsx`   | ✅ converted with parsed history and stale-reply guards      |
 | `WelcomeScreen.tsx`  | ✅ converted with parsed recents and bounded creation logs   |
-| `TerminalPane` 354   | next                                                         |
-| `TerminalDock` 228   | next                                                         |
+| `TerminalPane.tsx`   | ✅ converted with typed runtime and bounded paste handling   |
+| `TerminalDock.tsx`   | ✅ converted with bounded tabs and parsed process events     |
 | `StylePanel.tsx`     | ✅ converted with parsed stylesheet inventories              |
 | `CanvasView.tsx`     | ✅ converted with typed frame and gesture lifetimes          |
 

@@ -20,7 +20,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 
 // Counts what actually started, the way test/sound.js does: a node built and
@@ -29,9 +31,15 @@ function fakeAudio() {
   const played = [];
   const param = () => ({
     value: 0,
-    setValueAtTime(v) { this.value = v },
-    linearRampToValueAtTime(v) { this.value = v },
-    exponentialRampToValueAtTime(v) { this.value = v },
+    setValueAtTime(v) {
+      this.value = v;
+    },
+    linearRampToValueAtTime(v) {
+      this.value = v;
+    },
+    exponentialRampToValueAtTime(v) {
+      this.value = v;
+    },
   });
   const node = () => ({
     connect() {},
@@ -78,7 +86,7 @@ function fakeAudio() {
     entry,
     `export { default as Dropdown } from ${ui('Dropdown.jsx')};\n` +
       `export { SoundHere } from ${ui('soundScope.jsx')};\n` +
-      `export { setSoundEnabled } from ${ui('sound.js')};\n`
+      `export { setSoundEnabled } from ${ui('sound.js')};\n`,
   );
   const bundle = path.join(buildDir, 'panel-sound.bundle.js');
   await esbuild.build({
@@ -110,7 +118,11 @@ function fakeAudio() {
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
   global.IS_REACT_ACT_ENVIRONMENT = true;
-  dom.window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   global.ResizeObserver = dom.window.ResizeObserver;
   // jsdom has no scrolling, and the menu keeps its highlight in view.
   dom.window.Element.prototype.scrollIntoView = function () {};
@@ -130,7 +142,11 @@ function fakeAudio() {
     const host = document.createElement('div');
     document.getElementById('root').appendChild(host);
     const root = createRoot(host);
-    const field = React.createElement(Dropdown, { value: 'a', options: OPTIONS, onChange: () => {} });
+    const field = React.createElement(Dropdown, {
+      value: 'a',
+      options: OPTIONS,
+      onChange: () => {},
+    });
     await act(async () => {
       root.render(inScope ? React.createElement(SoundHere, null, field) : field);
     });
@@ -154,7 +170,7 @@ function fakeAudio() {
         await new Promise((r) => setTimeout(r, 40));
         await act(async () => {
           trigger().dispatchEvent(
-            new dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })
+            new dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
           );
         });
       },
@@ -164,7 +180,9 @@ function fakeAudio() {
           rows()[i]?.dispatchEvent(new dom.window.MouseEvent('mouseenter', { bubbles: true }));
         });
       },
-      done: async () => { await act(async () => root.unmount()) },
+      done: async () => {
+        await act(async () => root.unmount());
+      },
     };
   };
 
@@ -175,7 +193,11 @@ function fakeAudio() {
     const m = await mount(true);
     await m.open();
     await m.down();
-    check('a menu in a panel is silent while the setting is off', audio.played.length === 0, String(audio.played.length));
+    check(
+      'a menu in a panel is silent while the setting is off',
+      audio.played.length === 0,
+      String(audio.played.length),
+    );
     await m.done();
   }
 
@@ -189,13 +211,17 @@ function fakeAudio() {
     check('the menu opened', m.rows().length === 3, String(m.rows().length));
     check('opening it says nothing', audio.played.length === 0, JSON.stringify(audio.played));
     await m.down();
-    check('moving the highlight sounds a note', audio.played.length === 1, JSON.stringify(audio.played));
+    check(
+      'moving the highlight sounds a note',
+      audio.played.length === 1,
+      JSON.stringify(audio.played),
+    );
     await m.down();
     check('and the next row another', audio.played.length === 2, JSON.stringify(audio.played));
     check(
       'deeper down the list, deeper the note',
       audio.played[1] < audio.played[0],
-      JSON.stringify(audio.played)
+      JSON.stringify(audio.played),
     );
     await m.done();
   }
@@ -210,7 +236,7 @@ function fakeAudio() {
     check(
       'a dropdown outside the panels stays quiet',
       audio.played.length === 0,
-      JSON.stringify(audio.played)
+      JSON.stringify(audio.played),
     );
     await m.done();
   }
@@ -219,16 +245,25 @@ function fakeAudio() {
   const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
   const props = read('src', 'panels', 'PropsPanel.tsx');
   const style = read('src', 'panels', 'StylePanel.tsx');
-  check('the settings panel taps on a button press', /closest\('button'\)/.test(props) && /clickNote\(\)/.test(props));
+  check(
+    'the settings panel taps on a button press',
+    /closest\('button'\)/.test(props) && /clickNote\(\)/.test(props),
+  );
   check('but not on a disabled one', /!button\.disabled/.test(props));
   check('and it is a sound scope', /<SoundHere>/.test(props), 'its dropdowns would be silent');
   check('so is the style panel', /<SoundHere>/.test(style));
-  const scopes = ['App.jsx', 'panels/PagesPanel.tsx', 'panels/TerminalDock.jsx', 'panels/WelcomeScreen.tsx']
-    .filter((f) => /<SoundHere>/.test(read('src', ...f.split('/'))));
+  const scopes = [
+    'App.jsx',
+    'panels/PagesPanel.tsx',
+    'panels/TerminalDock.tsx',
+    'panels/WelcomeScreen.tsx',
+  ].filter((f) => /<SoundHere>/.test(read('src', ...f.split('/'))));
   check('and nothing else is', scopes.length === 0, scopes.join(', '));
 
   if (failures.length) {
-    console.error(`\npanel-sound: ${failures.length} failed, ${checked - failures.length} passed\n`);
+    console.error(
+      `\npanel-sound: ${failures.length} failed, ${checked - failures.length} passed\n`,
+    );
     console.error(failures.join('\n') + '\n');
     process.exit(1);
   }

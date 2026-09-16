@@ -50,7 +50,7 @@ import { hasClass, namesIn, withClass } from './classAttr.js';
 import { toComponentName } from './componentName.js';
 import { resolveInstanceProps } from './instanceProps.js';
 import { propsForExtraction } from './extractProps.js';
-import TerminalDock from './panels/TerminalDock.jsx';
+import TerminalDock from './panels/TerminalDock';
 import { cleanError, stripAnsi } from './cleanError.js';
 import { elementLabel } from './classNames.js';
 import {
