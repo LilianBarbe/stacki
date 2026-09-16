@@ -16,7 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { pathToFileURL } = require('url');
+const loadRenderer = require('./renderer-module.js');
 const { readContentConfig, stopAllServices, validateEntry } = require('../electron/contentConfig.js');
 const { listEntries } = require('../electron/contentEntries.js');
 
@@ -38,9 +38,8 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
     return;
   }
   // The renderer's module, loaded the way the renderer loads it.
-  const { collectionFields, describeField, fieldIssue, editsBetween, memberFor, hintFor } = await import(
-    pathToFileURL(path.join(__dirname, '..', 'src', 'contentSchema.js')).href
-  );
+  const { collectionFields, describeField, fieldIssue, editsBetween, memberFor, hintFor } =
+    loadRenderer('contentSchema.ts');
 
   const config = await readContentConfig(source, { force: true });
   if (config.error) {

@@ -1,0 +1,75 @@
+// Validate project schemas before form construction, then pin the distinctions
+// between missing, nullable, defaulted and union fields. CMS operations must keep
+// wrapper keys and expression metadata while editing nested item collections.
+const assert = require('node:assert/strict');
+const loadRenderer = require('./renderer-module.js');
+const schema = loadRenderer('contentSchema.ts');
+const cms = loadRenderer('cmsSchema.ts');
+const { parseContentSchema } = loadRenderer('contentSchemaBoundary.ts');
+const fixture = {
+  type: 'object', required: ['title', 'choice'],
+  properties: {
+    title: { type: 'string', minLength: 1, default: 'Untitled' },
+    choice: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    count: { type: 'integer', exclusiveMinimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    image: { type: 'string', astroImage: true },
+    items: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' } } } },
+    author: { type: 'string', astroReference: 'authors' },
+    when: { astroDate: true, astroCoerced: true },
+  },
+};
+assert.deepEqual(parseContentSchema(fixture), fixture);
+const fields = schema.collectionFields(fixture).fields;
+assert.equal(fields[0].required, true);
+assert.equal(fields[0].default, 'Untitled');
+assert.equal(fields[1].nullable, true);
+assert.equal(schema.fieldIssue(fields[0], ''), 'Required');
+assert.equal(schema.fieldIssue(fields[1], null), null);
+assert.equal(schema.fieldIssue(fields[2], 0), 'At least 1');
+assert.equal('max' in fields[2].constraints, false);
+assert.equal(fields[3].control, 'image');
+assert.equal(fields[4].item.fields[0].key, 'name');
+assert.equal(fields[5].target, 'authors');
+assert.equal(fields[6].coerced, true);
+const union = schema.collectionFields({ oneOf: [
+  { type: 'object', properties: { kind: { const: 'text' }, body: { type: 'string' } } },
+  { type: 'object', properties: { kind: { const: 'image' }, src: { astroImage: true } } },
+] }).union;
+assert.equal(union.discriminator, 'kind');
+assert.equal(schema.memberFor(union, { kind: 'image' }).value, 'image');
+assert.deepEqual(schema.editsBetween({ a: 1, b: null }, { b: null, c: 2 }), [
+  { path: ['a'], value: undefined }, { path: ['c'], value: 2 },
+]);
+for (const value of [
+  null, [], 42, { type: 42 }, { required: [42] }, { properties: [] },
+  { items: 42 }, { oneOf: [null] }, { $defs: { a: 42 } },
+  { minLength: -1 }, { minItems: 0.5 }, { maximum: Infinity }, { minimum: '3' }, { astroImage: 'yes' },
+  { astroReference: 42 }, { default: Symbol('bad') },
+]) {
+  assert.throws(() => parseContentSchema(value));
+}
+assert.throws(() => parseContentSchema({ type: 'x'.repeat(5 * 1024 * 1024 + 1) }), /limit/);
+assert.throws(() => parseContentSchema({ required: Array(100001).fill('a') }), /limit/);
+let deep = { type: 'string' };
+for (let index = 0; index < 130; index++) { deep = { items: deep }; }
+assert.throws(() => parseContentSchema(deep), /depth limit/);
+
+const raw = { metadata: 'keep', rows: [{ title: 'One', image: { __expr: 'photo', __asset: 'a.png' } }] };
+const collection = cms.collectionOf({ rel: 'data.json', name: 'data.json', dir: '', data: raw });
+assert.equal(collection.raw, raw);
+assert.equal(collection.items, raw.rows);
+assert.equal(cms.inferType(raw.rows[0].image), 'image');
+assert.deepEqual(cms.reassemble(collection, [{ title: 'Two' }]), {
+  metadata: 'keep', rows: [{ title: 'Two' }],
+});
+assert.deepEqual(cms.applyToItems([{ group: [{ name: 'One' }] }], ['group'], cms.renameKey('name', 'title')),
+  [{ group: [{ title: 'One' }] }]);
+assert.deepEqual(cms.duplicateItem({ id: 'one', name: 'One', image: raw.rows[0].image }), {
+  id: 'one-copy', name: 'One copy', image: raw.rows[0].image,
+});
+assert.deepEqual(cms.blankItem([1, 2]), 0);
+assert.deepEqual(cms.fieldsOf([null, 'plain', { title: 'A', count: 1 }]).map((field) => field.type),
+  ['text', 'number']);
+assert.throws(() => cms.applyToItems([], Array(129).fill('x'), cms.dropKey('a')), /depth limit/);
+assert.throws(() => schema.describeField({}, 'test', { depth: -1 }), /nonnegative/);
+console.log('renderer-schema: schema boundaries, field contracts and CMS preservation passed');

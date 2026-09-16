@@ -130,7 +130,7 @@ Cleanup owed: `electron/scratch2-7.js` are stray tsc-emitted outputs from the
 cssVars conversion experiments, still tracked in git (198 lines). Delete them
 in a standalone commit; nothing requires them.
 
-### src/ — 35 modules converted
+### src/ — 37 modules converted
 
 `editorTree`, `pagePersistence` (WeakSet acks + drain caps),
 `cleanError`, `branchName`, `loopBindings` (minimal-fidelity LiveNode),
@@ -164,7 +164,14 @@ and lifecycle tests pass. The full gate passes 127/127 commands (94.7s), with no
 lint warnings in converted modules. Pending iframe queries are capped at 1,024;
 frame replacement cancels them, and malformed replies retain the timeout fallback.
 
-Remaining src leaves (3 top-level `.js`): `contentSchema`, `cmsSchema`, `gitActions`.
+Fifth renderer batch: `contentSchema` and `cmsSchema`, plus typed field
+contracts and a bounded content-schema parser. All 317 old/new comparisons pass;
+the full gate passes 128/128 commands (92.6s). New tests pin invalid schema shapes,
+size/depth bounds, nullable/default/union distinctions, and CMS wrapper and
+expression preservation. The external-project content-fields test still skips
+when its optional fixture is absent; the new fixture-independent suite always runs.
+
+Remaining src leaf: `gitActions` (depends on the confirmation dialog).
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
 ### src/ui — 32 files, 6,457 lines ⬜
