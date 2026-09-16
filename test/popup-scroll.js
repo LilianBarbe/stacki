@@ -153,7 +153,7 @@ const check = (what, condition, detail) => {
     'and its gutter is reserved, so losing the bar costs no layout',
     /scrollbar-gutter:\s*stable/.test(css)
   );
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'StylePanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'StylePanel.tsx'), 'utf8');
   check('the panel asks', /usePopupOpen\(hostRef\)/.test(panel));
   check('and wears the answer', /popupOpen \? 'is-locked' : ''/.test(panel));
 

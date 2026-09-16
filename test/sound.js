@@ -542,7 +542,7 @@ function fakeAudio() {
     'the highlight the menu opens with should not sound'
   );
 
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'StylePanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'StylePanel.tsx'), 'utf8');
   check('the style panel taps on a button press', /closest\('button'\)/.test(panel) && /clickNote\(\)/.test(panel));
   check('but not on a disabled one', /!button\.disabled/.test(panel));
 

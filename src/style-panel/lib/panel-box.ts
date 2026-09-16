@@ -36,7 +36,7 @@ export function panelBounds(anchor: Element): DOMRect {
  * which in moden WAS the panel. Here the panel is a right-hand column, so they
  * have to measure it. An anchor inside another portal (a control in a modal)
  * has no panel ancestor to walk to; the host publishes the panel's box as CSS
- * variables for that case (see StylePanel.jsx).
+ * variables for that case (see StylePanel.tsx).
  */
 export function panelSpan(anchor: Element): { left: number; width: number } {
   const el = panelBox(anchor)

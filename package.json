@@ -77,6 +77,7 @@
   "test:csscode": "node test/css-code.js",
   "test:computedcolor": "node test/computed-color.js",
   "test:styletarget": "node test/style-target.js",
+  "test:stylepanelbridge": "node --test test/style-panel-bridge.test.js",
   "test:thumbs": "electron test/thumbs.js",
   "test:welcome": "node test/welcome.js",
   "test:cssvars": "node test/css-vars.js",

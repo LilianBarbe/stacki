@@ -83,7 +83,7 @@ function lazyPanel(load) {
 }
 
 const PropsPanel = lazyPanel(() => import('./panels/PropsPanel.jsx'));
-const StylePanel = lazyPanel(() => import('./panels/StylePanel.jsx'));
+const StylePanel = lazyPanel(() => import('./panels/StylePanel'));
 const CodeWindow = lazyPanel(() => import('./ui/CodeWindow.jsx'));
 const CmsPanel = lazyPanel(() => import('./panels/CmsPanel.jsx'));
 const CmsView = lazyPanel(() => import('./panels/CmsView.jsx'));

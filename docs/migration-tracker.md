@@ -254,7 +254,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 8/20 original files converted ⏳
+### src/panels — 9/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -458,6 +458,15 @@ malformed nested replies, limits, payloads, and failure channels. The full gate
 passes 140/140 commands (101.5s), and the new modules lint without warnings.
 Twelve original panels remain; continue with `StructurePanel.jsx`.
 
+StylePanel is converted to `StylePanel.tsx`. Its project and Astro stylesheet
+inventories now cross `stylePanelBridge.ts`, which validates paths, sizes, and
+collection bounds while preserving transport failures as values. File loading
+and panel-bound publication have owned hooks, and the host bridge receives a
+typed `Partial<HostState>`. Sound and popup-lock behavior still pass; new tests
+cover both stylesheet endpoints and malformed replies. The full gate passes
+141/141 commands (104.7s), with no warnings in the new modules. Eleven original
+panels remain.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -468,6 +477,7 @@ Twelve original panels remain; continue with `StructurePanel.jsx`.
 | `StructurePanel.jsx`                                                                                 | 793                                                          |
 | `PreviewPane.jsx`                                                                                    | 727                                                          |
 | `AssetsPanel` 473 · `PalettePanel` 455 · `PagesPanel` 442 · `HistoryPanel` 392 · `WelcomeScreen` 391 | small                                                        |
+| `StylePanel.tsx`                                                                                     | ✅ converted with parsed stylesheet inventories              |
 
 ### src/App.jsx — 4,584 lines ⬜ hotspot, last
 
