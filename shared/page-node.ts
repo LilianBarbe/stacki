@@ -7,6 +7,7 @@
 import type { NodeId } from './brand';
 import { toNodeId } from './brand';
 import { LIMITS } from './limits';
+import { parseImportSlots, type ImportSlot } from './frontmatter';
 
 export type Attr =
   | { readonly type: 'string'; readonly value: string }
@@ -68,7 +69,7 @@ export interface MapNode {
   readonly children: readonly PageNode[];
   readonly headSource?: string;
   readonly bare?: boolean;
-  readonly body?: string;
+  readonly body?: readonly string[];
   readonly source?: string;
 }
 
@@ -125,7 +126,7 @@ export interface PageModel {
   readonly extraFrontmatterSpaced: boolean;
   readonly frontmatterLayout: {
     readonly extra: string;
-    readonly slots: readonly unknown[];
+    readonly slots: readonly ImportSlot[];
   };
   readonly hadFrontmatter: boolean;
   readonly trailingBlank: number;
@@ -323,10 +324,17 @@ function parseByKind(
         head: asString(record['head'], `${where}.head`, LIMITS.attrCharsMax),
         children: parseChildren(record['children'], `${where}.children`, depth, context),
       };
-      for (const field of ['headSource', 'body', 'source'] as const) {
+      for (const field of ['headSource', 'source'] as const) {
         if (record[field] !== undefined) {
           out[field] = asString(record[field], `${where}.${field}`, LIMITS.nodeValueCharsMax);
         }
+      }
+      if (record['body'] !== undefined) {
+        const body: unknown = record['body'];
+        if (!Array.isArray(body)) { fail(where, 'body: expected statement array'); }
+        if (body.length > LIMITS.treeNodesMax) { fail(where, 'body: exceeds statement limit'); }
+        out['body'] = body.map((line: unknown, index) =>
+          asString(line, `${where}.body[${index}]`, LIMITS.nodeValueCharsMax));
       }
       if (record['bare'] !== undefined) {
         if (typeof record['bare'] !== 'boolean') {
@@ -434,9 +442,7 @@ function parseImport(input: unknown, where: string): ImportDecl {
   return out as unknown as ImportDecl;
 }
 
-/** Parse a full page model. The frontmatter layout slots keep their raw
- * producer shape for now; tightening them is part of the frontmatter.js
- * conversion. */
+/** Parse a full page model, including the source slots used to preserve imports. */
 export function parsePageModel(input: unknown): PageModel {
   const record = asRecord(input, 'model');
   if (!Array.isArray(record['imports'])) {
@@ -456,7 +462,7 @@ export function parsePageModel(input: unknown): PageModel {
     extraFrontmatterSpaced: record['extraFrontmatterSpaced'] === true,
     frontmatterLayout: {
       extra: asString(layout['extra'], 'model.frontmatterLayout.extra', LIMITS.nodeValueCharsMax),
-      slots: layout['slots'],
+      slots: parseImportSlots(layout['slots']),
     },
     hadFrontmatter: record['hadFrontmatter'] === true,
     nodes: parsePageTree(record['nodes']),
@@ -507,34 +513,40 @@ export function parsePageReadResult(input: unknown): ParsePageResult & { readonl
   return { ...result, source };
 }
 
-/** Invariants beyond the type: ids unique, self-closing only on paired kinds,
- * branch names restricted. Run after parsing a producer's tree; tests pin it. */
-export function assertTreeInvariants(nodes: readonly PageNode[]): void {
+interface TreeInvariantNode {
+  readonly id?: string;
+  readonly kind: string;
+  readonly children?: readonly TreeInvariantNode[] | null;
+}
+
+/** Check the producer's own tree without cloning it or claiming it has already
+ * crossed the wire parser. Iteration makes the depth limit independent of the
+ * JavaScript call stack. The receiver checks the same invariant after parsing. */
+export function assertTreeInvariants(nodes: readonly TreeInvariantNode[]): void {
+  if (nodes.length > LIMITS.treeNodesMax) {
+    throw new Error(`Tree invariant violated: exceeds ${LIMITS.treeNodesMax} nodes`);
+  }
+  const pending = nodes.map((node) => ({ node, depth: 0 }));
   const ids = new Set<string>();
-  let count = 0;
-  const walk = (list: readonly PageNode[]): void => {
-    for (const node of list) {
-      count += 1;
-      if (count > LIMITS.treeNodesMax) {
+  for (let index = 0; index < pending.length; index++) {
+    const entry = pending[index];
+    if (!entry) { throw new Error('Tree invariant violated: missing traversal entry'); }
+    if (entry.depth > LIMITS.treeDepthMax) {
+      throw new Error(`Tree invariant violated: exceeds depth ${LIMITS.treeDepthMax}`);
+    }
+    const { node, depth } = entry;
+    if (typeof node.id !== 'string') {
+      throw new Error('Tree invariant violated: missing id');
+    }
+    if (ids.has(node.id)) {
+      throw new Error(`Tree invariant violated: duplicate id ${node.id}`);
+    }
+    ids.add(node.id);
+    if (node.children) {
+      if (pending.length + node.children.length > LIMITS.treeNodesMax) {
         throw new Error(`Tree invariant violated: exceeds ${LIMITS.treeNodesMax} nodes`);
       }
-      if (ids.has(node.id)) {
-        throw new Error(`Tree invariant violated: duplicate id ${node.id}`);
-      }
-      ids.add(node.id);
-      if (node.kind === 'component' || node.kind === 'element') {
-        if (node.children !== null) {
-          walk(node.children);
-        }
-      } else if (
-        node.kind === 'map' ||
-        node.kind === 'branch' ||
-        node.kind === 'chunk-group' ||
-        node.kind === 'cond'
-      ) {
-        walk(node.children);
-      }
+      for (const child of node.children) { pending.push({ node: child, depth: depth + 1 }); }
     }
-  };
-  walk(nodes);
+  }
 }

@@ -1,8 +1,8 @@
 # Stacki — Codebase Architecture
 
-**Status: living document.** Last updated at commit `4fa3a5d` (branch
-`ts-contracts/phase-0-gate`). Sections marked "migration" describe in-flight
-work; everything else describes the code as it exists.
+**Status: living document.** Migration status updated after the Astro parser
+conversion on `main`, following PR #26 and `v0.1.26`. Sections marked
+"migration" describe in-flight work; see `docs/migration-tracker.md` for verification.
 
 ## What Stacki is
 
@@ -45,7 +45,7 @@ Stacki solves this the way editors with faithful round trips always do: a
 structured tree for the parts the UI edits, plus **raw-text anchors for
 everything else**. Concretely:
 
-- `electron/astroParser.js` (~3.1k lines) parses an `.astro` file into a
+- `electron/astroParser.ts` (emits `astroParser.js`) parses an `.astro` file into a
   `PageNode` tree. Nodes carry their **source ranges** (`.at` offsets), and
   anything not modeled (attributes in unusual order, raw `<script>`, unknown
   constructs) is kept verbatim and re-emitted on write.
@@ -200,7 +200,7 @@ test suites`, exiting non-zero if any non-quarantined suite fails.
 
 ## The TypeScript migration (in progress)
 
-Branch `ts-contracts/phase-0-gate`; plan in `docs/ts-migration-plan.md`.
+Continues on `main` after PR #26; plan in `docs/ts-migration-plan.md`.
 Motivation: the app is built heavily with AI assistance, and plain JS gave
 the model no contract to fulfill — bugs landed at runtime. The migration
 prioritizes **safety, performance, DX** in that order, and is executed
@@ -211,14 +211,14 @@ green at every commit.
   ESLint flat config enforcing the ruleset (no `any`, no unchecked
   assertions, exhaustive switches, ≤70-line functions), a **`@ts-nocheck`
   ratchet** (`scripts/ratchet-check.js`, baseline 44 legacy files — the count
-  may only go down), and ~4,800 mechanical `curly` fixes. One pre-existing
-  broken suite remains quarantined (`varsrowheight`); five healed out of the
-  list during Phase 3. The gate starts green and heals visibly.
+  may only go down), and ~4,800 mechanical `curly` fixes. No suites remain
+  quarantined: `varsrowheight` healed in `v0.1.26`, after five earlier repairs.
+  The latest complete gate passed all 125 test commands.
 - **Phase 1 (done)** — the `shared/` contract layer above, with contract
   tests (round-trip, negative space, invariant violations). Found and fixed a
   real bug: a lone top-level component was not treated as a layout.
 - **Phase 2 (done)** — `shared/` compiles to `shared/dist` (CJS + `.d.ts`;
-  the only runtime artifact); the renderer's `src/bridge.ts` validates at the
+  the Electron runtime artifact; Vite reads the TS sources); the renderer's `src/bridge.ts` validates at the
   boundary; packaging unpacks `shared/dist` for the dev server. A first live
   end-to-end open (a real project, on a user's Windows machine) then exposed a
   wrong wire shape — the scan payload's component schema was contracted as a
@@ -228,12 +228,12 @@ green at every commit.
   Electron modules convert in place with side-by-side tsc emit
   (`electron/tsconfig.json`, plus per-module projects for `morphClient` and
   `preload`, which need DOM libs) so `require` sites never move; renderer
-  modules convert directly (Vite resolves `.js` → `.ts`). Done so far: 30
-  electron modules — all except `astroParser.js` (the flagship, next) and
-  `main.js` (last, with the `shared/ipc.ts` channel inventory) — and 8 src
+  modules convert directly (Vite resolves `.js` → `.ts`). Done so far: 31
+  electron modules, including `astroParser.ts`; `main.js` is next, with the
+  `shared/ipc.ts` channel inventory. Also converted: 8 src
   modules (`editorTree`, `pagePersistence`, `cleanError`, `branchName`,
   `loopBindings`, `bindings`, `arrayValue`, `dataSuggest`). Remaining: the
-  two electron files above, ~30 src leaf libs, the panels, and the four
+  Electron entry point, ~30 src leaf libs, the panels, and the four
   hotspots last (`App.jsx` 4.6k lines, `PropsPanel.jsx` 3.8k,
   `parsePropSchema`, `ClipPath.tsx` 8.8k). Live status:
   `docs/migration-tracker.md`.

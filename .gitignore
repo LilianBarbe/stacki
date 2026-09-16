@@ -48,3 +48,6 @@ electron/morphClient.js
 electron/markdownParser.js
 electron/cssVars.js
 electron/preload.js
+electron/astroParser.js
+electron/astroParser.types.js
+electron/astroParser.validation.js

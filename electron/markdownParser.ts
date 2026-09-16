@@ -34,7 +34,7 @@ import { parseTemplate, serializeNodes } from './astroParser.js';
 // nodes are.
 interface PropValue {
   readonly type: string;
-  readonly value: string;
+  readonly value?: string;
 }
 interface MdNodeLike {
   id?: string;
@@ -42,7 +42,7 @@ interface MdNodeLike {
   name?: string;
   value?: string;
   inner?: string;
-  props?: Record<string, PropValue>;
+  props?: Record<string, PropValue> | undefined;
   children?: MdNodeLike[] | null;
   mdBlanksBefore?: number;
   mdIndent?: string;

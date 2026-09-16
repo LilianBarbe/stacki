@@ -1,18 +1,39 @@
 # Migration Tracker — TypeScript conversion of Stacki
 
-Living status document for the `ts-contracts/phase-0-gate` branch, which is 55
-commits ahead of `main`. Each task here replaces a bullet in
-`docs/ts-migration-plan.md` once its definition of done is met. Run the gate
-(`npm test`) after every conversion, then update the counts below.
+Living status document for the migration, now on `main` after PR #26.
+Each task here replaces a bullet in `docs/ts-migration-plan.md` once its
+definition of done is met. Run the gate (`npm test`) after every conversion,
+then update the counts below.
 
 ## Handoff state (read this first)
 
-Branch `ts-contracts/phase-0-gate`; every conversion below is committed and
-the gate is green. **Next conversion, in order: `electron/astroParser.js`
-(3,158 lines — the flagship, give it its own focused session; delete
-`astroParser.d.ts` on landing), then `electron/main.js` (4,741 — complete the
-`shared/ipc.ts` channel inventory with it). After electron: `src/ui`, then
-`src/panels` (PropsPanel first — convert-then-split), `src/App.jsx` last.**
+The `v0.1.26` renderer startup repair is on `main`. The Astro parser conversion
+is complete: `electron/astroParser.ts` replaces the source `.js` and its seed
+`.d.ts`; the build emits the ignored `.js` in place for existing require sites.
+**Next conversion: `electron/main.js` (4,741 lines), completing the
+`shared/ipc.ts` channel inventory with it. After Electron: remaining renderer
+leaves, `src/ui`, then `src/panels` (PropsPanel first), and `src/App.jsx` last.**
+
+Parser verification: 84 old/new page parses matched, along with plain and marked
+serialization, prop schemas, slots, root tags, and attributes. The full gate
+passed all 125 test commands; the expanded contract suite passes 23 tests.
+The converted parser, types, validation, and new tests have zero lint warnings.
+Run the gate as `env -u ELECTRON_RUN_AS_NODE npm test` if the surrounding shell
+sets that variable: browser probes need Electron's app API, not Node mode.
+
+Conversion details:
+- Node payloads use a discriminated union; legacy serialization inputs are
+  validated without dropping their source-preservation metadata.
+- Shared frontmatter slots are `ImportSlot[]`, with bounds and negative tests.
+  Block-loop `body` is correctly contracted as a statement array, not a string.
+- Template and conditional recursion, tree traversal, and serializer inputs are
+  bounded. A truncated raw closing tag now falls back to code view instead of
+  revisiting the same source offset.
+- Responsibility-sized helpers meet the current AGENTS.md 70-line requirement.
+  This required helper extraction during conversion; public entry points and
+  supported source output remain unchanged.
+- The validator is included in `asarUnpack`; the standalone packaged-parser
+  closure test passes. No dependencies were added.
 
 Field lessons a real project surfaced (a user's Windows machine, 2026-09-15):
 the renderer contract had never run against a real scan payload (every suite
@@ -30,17 +51,17 @@ parity check and `npm test` pass on the commit that lands it.
 ## Phase 0 — Tooling gate ✅
 
 Strict tsconfig, `@ts-nocheck` ratchet (`BASELINE=44`), ESLint flat config,
-~4,800 `curly` fixes, quarantine (`QUARANTINED`: varsrowheight only —
-binding, chipedit, codeeditorlifecycle, codeprop, jsguard healed out of the
-list during Phase 3, verified stable over two consecutive runs each).
+~4,800 `curly` fixes. `QUARANTINED` is empty: varsrowheight was removed by
+`v0.1.26`, after the earlier binding, chipedit, codeeditorlifecycle, codeprop,
+and jsguard repairs.
 
-Gate: `tsc --noEmit` + ESLint + ratchet + 123/124 e2e tests, exit 0.
+Gate: builds + `tsc --noEmit` + ESLint + ratchet + 125/125 test commands, exit 0.
 
 ## Phase 1 — Contract layer (`shared/`) ✅
 
 `brand`, `limits`, `assert`, `result`, `page-node`, `prop-schema`, `scan`,
-`ipc`, `record` (+ `toArray`). 12 contract tests, including a roundtrip
-property test. Also fixed a lone-top-level-component layout bug found by the
+`ipc`, `record` (+ `toArray`). 23 contract tests, including a roundtrip
+property test and parser/import-slot boundary tests. Also fixed a lone-top-level-component layout bug found by the
 contracts.
 
 ## Phase 2 — Boundary wiring ✅
@@ -64,7 +85,7 @@ touching `shared/` wire shapes.
 
 ## Phase 3 — Mechanical conversion (leaf → hotspot) ⏳
 
-### electron/ — 30 modules converted
+### electron/ — 31 modules converted
 
 | Module                                                                                                                      | State                |
 | --------------------------------------------------------------------------------------------------------------------------- | -------------------- |
@@ -90,11 +111,13 @@ touching `shared/` wire shapes.
 | `cssVars` (postcss 8 types; array-collect rule lookups)                                                                     | ✅                   |
 | `preload` (own tsconfig, DOM lib; predicate-narrowed CSSOM; parsed message payloads; Canvas logic + full window.avb bridge) | ✅                   |
 
+`astroParser` is also converted: checked tree/schema types, serializer validation,
+shared import slots, and bounded parsing; its seed declaration is retired.
+
 Remaining electron items (by lines):
 
 | File             | Lines | Notes                                                                                                                                                      |
 | ---------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `astroParser.js` | 3,158 | **Flagship.** Own focused session; delete `astroParser.d.ts` on landing; then tighten `PageModel.frontmatterLayout.slots` from `unknown` to `ImportSlot[]` |
 | `main.js`        | 4,741 | ~111 IPC channels; largest single file; last electron item                                                                                                 |
 
 Cleanup owed: `electron/scratch2-7.js` are stray tsc-emitted outputs from the
@@ -158,7 +181,9 @@ splitting (convert-then-split discipline, one per commit):
 - Parity-check against `git show HEAD:<file>.js` before commit; watch symbol
   identity (DELETE symbols differ per module instance) and
   `JSON.parse`-as-unknown lint errors (use an annotated binding + `toRecord`).
-- Convert-then-split, never in one commit. Large files last.
+- Preserve behavior through parity checks. Large files last. The current
+  AGENTS.md hard function-size limit takes precedence when conversion requires
+  private helper extraction; keep broader architecture changes separate.
 - `electron/tsconfig.json` files list is grown manually per conversion.
 - The `.js` sidecar generated by in-place emit is gitignored; require sites
   stay untouched; dist-layout move deferred.
@@ -199,8 +224,10 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 123/124, exit 0. Failed exactly: varsrowheight —
-  the only suite left in `QUARANTINED` (scripts/run-tests.js).
+- Gate green at last run: 125/125, exit 0. No quarantined tests remain.
+  The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
+- Contract suite: 23/23. Full-repository lint has 177 existing warnings and no
+  errors; the converted parser and its new supporting files have no warnings.
 - Healed out of quarantine during Phase 3 (verified two consecutive direct
   runs each, then removed per the gate's own heal report): binding, chipedit,
   codeeditorlifecycle, codeprop, jsguard.

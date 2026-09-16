@@ -1,5 +1,5 @@
 {
-  "//": "Converted electron sources emit their .js side-by-side, in place: the require sites \u2014 tests, main.js, electron-builder \u2014 keep working untouched, and the emitted file is gitignored. When every electron file has converted, the whole process moves to a dist layout in one step. Strict flags mirror the root; verbatimModuleSyntax is off only here because the emit target is CommonJS.",
+  "//": "Emit beside TypeScript to preserve require paths; Electron needs CommonJS output.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "CommonJS",
@@ -57,6 +57,7 @@
     "formats/yaml.ts",
     "formats/frontmatter.ts",
     "formats/json.ts",
-    "formats/toml.ts"
+    "formats/toml.ts",
+    "astroParser.ts"
   ]
 }
