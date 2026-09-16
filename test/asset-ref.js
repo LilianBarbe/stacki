@@ -254,14 +254,15 @@ const SCREENS = [
 }
 {
   const view = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'CmsView.jsx'), 'utf8');
+  const field = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'CmsField.tsx'), 'utf8');
   check(
     'the image field shows the file the name is bound to',
-    /srcRel=\{ref \? ref\.__asset : undefined\}/.test(view),
+    /srcRel=\{reference\}/.test(field),
     'the card would show the word instead of the picture'
   );
   check(
     'and picking one goes through the file rather than writing a path',
-    /onPickEntry=\{pickAsset && \(\(picked\) => pickAsset\(picked\)\.then\(onChange\)\)\}/.test(view),
+    /pickAsset\(picked\)\.then\(onChange\)/.test(field),
     'a picked asset would be written as a path a page cannot follow'
   );
   check(

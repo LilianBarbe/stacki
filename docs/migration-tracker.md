@@ -348,6 +348,14 @@ lifetimes. All 32 old/new root displays match, 171 sheet interactions pass, and
 the full gate passes 138/138 commands (101.3s). Converted modules have zero lint
 warnings. Fifteen original panels remain; continue with CmsView.
 
+CmsView field checkpoint: `CmsField.tsx` types scalar controls, nested groups,
+repeaters, and dialogs with exhaustive field dispatch and bounded text, lists,
+and nesting. Nested repeaters now retain the image-import callback; reordering
+keeps an open dialog attached to its entry. Tests cover those paths, focused
+input preservation, Escape handling, and bounds. All 40 old/new field displays
+match. The full gate passes 138/138 commands (101.2s); the new module has zero
+lint warnings. Continue with CmsView settings, metadata, and its save coordinator.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
