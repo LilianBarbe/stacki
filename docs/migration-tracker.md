@@ -243,7 +243,16 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 20 files, 13,990 lines ⬜
+### src/panels — 2/20 original files converted ⏳
+
+PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
+and drag state use discriminated unions; field updates construct readonly values.
+Input and serialized output share the attribute-size bound. All 71 interaction
+checks pass, alongside 11 old/new markup comparisons and two size assertions.
+The gate passes 133/133 commands (96.6s); both new modules have zero lint warnings.
+The live Electron 33.4.11 / Astro 5.13.10 lifecycle and built welcome-screen check
+also passed after the final UI batch. Continue with PropsPanel's schema boundary
+and panel conversion; the remaining 18 original panel files are still pending.
 
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -318,7 +327,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 133/133, exit 0. No quarantined tests remain.
+- Gate green at last run: 133/133 (96.6s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.
