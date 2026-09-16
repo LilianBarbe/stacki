@@ -21,6 +21,7 @@ import { mergeBranchAction, deleteBranchAction } from './gitActions.js';
 import LeftRail from './ui/LeftRail.jsx';
 import CodeWindow from './ui/CodeWindow.jsx';
 import PageSwitcher from './ui/PageSwitcher.jsx';
+import WorkspaceSwitcher from './ui/WorkspaceSwitcher.jsx';
 import DynamicPicker from './ui/DynamicPicker.jsx';
 import {
   ASTRO_ASSETS,
@@ -981,15 +982,8 @@ export default function App() {
       window.avb.addRecent(projectPath);
       const result = await rescan(projectPath);
 
-      const hasDeps = await window.avb.hasNodeModules(projectPath);
-      if (!hasDeps) {
-        try {
-          await window.avb.installDeps(projectPath);
-        } catch (err) {
-          showToast(cleanError(err), 'error');
-        }
-        setBusy(null);
-      }
+      // dev:start owns dependency setup, including joining a workspace's
+      // background preparation. A failed install is reported once there.
       startPreview(projectPath);
       window.avb.watchProject(projectPath);
 
@@ -1042,9 +1036,9 @@ export default function App() {
     }
   }, []);
 
-  // Leaving a project. Main lets go of everything the project had running and
+  // Leaving a project. Main releases the editor session and
   // starts the window over — forty pieces of state, an undo stack, a canvas
-  // holding a page, a watcher and a dev server all belong to the project that
+  // holding a page and a watcher all belong to the project that
   // was open, and a fresh renderer is the only way to be certain none of it is
   // still here when the next one opens. `next` is the project to open after,
   // which main holds for the window that comes back: a choice made before a
@@ -4407,7 +4401,7 @@ export default function App() {
         </Suspense>
       ) : null}
       <div className="titlebar">
-        <span className="app-title">{project.name}</span>
+        <WorkspaceSwitcher project={project} onSelect={leaveProject} />
         <span className="spacer" />
         {editStack.length > 1 ? (
           <button
@@ -4674,6 +4668,7 @@ export default function App() {
             {leftTab === 'history' && (
               <HistoryPanel
                 project={project}
+                onOpenWorkspace={leaveProject}
                 gitInfo={gitInfo}
                 previewRef={previewRef}
                 onRefreshGit={refreshGit}
@@ -5133,7 +5128,11 @@ export default function App() {
           onClose={() => setTermOpen(false)}
           devLogRef={devLogRef}
           devStatus={devStatus}
-          onRestartDev={() => startPreview(project.path)}
+          onRestartDev={async () => {
+            setDevStatus('starting');
+            await window.avb.stopDevServer();
+            await startPreview(project.path);
+          }}
         />
       </ErrorBoundary>
 
@@ -5207,4 +5206,3 @@ function BusyOverlay({ message }) {
 function Toast({ toast }) {
   return <div className={`toast ${toast.kind}`}>{toast.msg}</div>;
 }
-

@@ -58,6 +58,9 @@ const { mergeBranch, deleteBranch, switchBranch, resolveMerge } = require('./git
 const { probeUrl } = require('./devProbe');
 const { mainProjectPath, foldToProjects } = require('./projectRoot');
 const gitHistory = require('./gitHistory');
+const { listWorkspaces } = require('./gitWorkspaces');
+const { createDependencySetup } = require('./dependencySetup');
+const { createDevServerPool } = require('./devServerPool');
 const gitSnapshot = require('./gitSnapshot');
 const previewWorktree = require('./previewWorktree');
 const { registerTerminalHandlers, cleanupTerminals } = require('./terminal');
@@ -66,7 +69,12 @@ let acp = null; // the agent panel's host, once the IPC is registered
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
-let devServer = null; // {proc, url, projectPath}
+const devServers = createDevServerPool({
+  start: doDevStart,
+  stop: stopServerProcess,
+  alive: serverAlive,
+  notify: send,
+});
 
 // --- Dev reload ------------------------------------------------------------
 // Only the renderer hot-reloads on its own (Vite). preload.js is re-read from
@@ -96,8 +104,7 @@ function relaunchApp() {
   // app.exit skips before-quit, so take the Astro dev server down by hand —
   // otherwise it keeps the port and the next process adopts a server still
   // running the previously generated config.
-  stopDevServer();
-  app.exit(RELAUNCH_CODE);
+  void stopAllDevServers().finally(() => app.exit(RELAUNCH_CODE));
 }
 
 const isWin = process.platform === 'win32';
@@ -433,14 +440,16 @@ app.whenReady().then(() => {
   });
 });
 
-// Everything a project had running, let go of. The window reloads after this,
-// which is the only way to be sure nothing of the last project is still being
-// held — a page half-loaded, an undo stack, a watcher, a shell — and none of
-// this survives the reload on its own: a pty outlives the window that opened
-// it, and the dev server outlives everything.
+// Reset the editor when switching projects, but retain its Astro process so
+// returning to that workspace reuses the same port and compiled modules.
 ipcMain.handle('project:close', async (_e, next) => {
+  // Validate before teardown: a worktree may have disappeared since the picker opened.
+  if (typeof next === 'string' && next && !isAstroProject(next)) {
+    throw new Error('This folder is no longer an available Astro project. Refresh the workspace list and try again.');
+  }
   pendingProject = typeof next === 'string' && next ? next : null;
-  stopDevServer();
+  if (pendingProject) devServers.detach();
+  else await stopAllDevServers();
   stopAllServices();
   stopAllPreviews();
   cleanupTerminals();
@@ -467,7 +476,7 @@ app.on('window-all-closed', () => {
   // it as one killed the dev server (and, off macOS, quit) in the middle of
   // taking a picture.
   if (mainWindow && !mainWindow.isDestroyed()) return;
-  stopDevServer();
+  void stopAllDevServers();
   // The pty ids are keyed to the window that opened them, so a surviving shell
   // could never be reached again — and on macOS the app stays running.
   cleanupTerminals();
@@ -475,7 +484,15 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => stopDevServer());
+let devServersStoppedForQuit = false;
+app.on('before-quit', (event) => {
+  if (devServersStoppedForQuit) return;
+  event.preventDefault();
+  void stopAllDevServers().finally(() => {
+    devServersStoppedForQuit = true;
+    app.quit();
+  });
+});
 // Reading a project's content config leaves a process behind holding its
 // schemas; they go when the app does.
 app.on('before-quit', () => stopAllServices());
@@ -587,7 +604,8 @@ async function promptToInstallDownloadedUpdate(version) {
   });
 
   if (response === 0) {
-    stopDevServer();
+    await stopAllDevServers();
+    devServersStoppedForQuit = true;
     autoUpdater.quitAndInstall();
   }
 }
@@ -919,7 +937,8 @@ function run(cmd, args, cwd, opts = {}) {
   // after the first call (memoized).
   ensureToolPath();
   return new Promise((resolve, reject) => {
-    const options = { cwd, timeout: opts.timeout || 60000, ...opts };
+    const { lowPriority, ...runOptions } = opts;
+    const options = { cwd, timeout: opts.timeout || 60000, ...runOptions };
     // git is translated, and this app reads what git says.
     //
     // gitBranches.js recognises a refusal by its words — "would be overwritten",
@@ -936,7 +955,7 @@ function run(cmd, args, cwd, opts = {}) {
     // is set to, this one call is not subject to it. Only the messages are
     // affected — paths and commit text are bytes git passes through either way.
     options.env = { ...(opts.env || process.env), LC_ALL: 'C' };
-    execFile(cmd, args, options, (err, stdout, stderr) => {
+    const child = execFile(cmd, args, options, (err, stdout, stderr) => {
       if (err) {
         err.stdout = stdout;
         err.stderr = stderr;
@@ -945,6 +964,14 @@ function run(cmd, args, cwd, opts = {}) {
         resolve({ stdout: stdout.toString(), stderr: stderr.toString() });
       }
     });
+    if (lowPriority && child.pid) {
+      try {
+        const os = require('os');
+        os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+      } catch {
+        // Some hosts deny priority changes; installation must still work.
+      }
+    }
   });
 }
 
@@ -1032,8 +1059,8 @@ function readTrailingSlash(projectPath) {
   // one running — an adopted external server never loads the marker config,
   // and a file left behind by an earlier run would answer for a config that
   // has since changed.
-  const ours =
-    devServer && devServer.projectPath === projectPath && !devServer.external;
+  const server = devServers.get(projectPath);
+  const ours = server && !server.external;
   try {
     if (!ours) throw new Error('no server of ours');
     const resolved = JSON.parse(
@@ -1168,8 +1195,8 @@ ipcMain.handle('recents:list', async () => {
 // Astro has to be installed for a page to be rendered at all; without it the
 // card can only offer to open the project.
 function hasDependencies(projectPath) {
-  const binName = isWin ? 'astro.cmd' : 'astro';
-  return fs.existsSync(path.join(projectPath, 'node_modules', '.bin', binName));
+  // Do not start a thumbnail server against a half-finished preparation.
+  return dependencySetup.status(projectPath).state === 'ready';
 }
 
 ipcMain.handle('recents:add', async (_e, projectPath) => {
@@ -1233,8 +1260,9 @@ async function captureThumb(projectPath) {
 
 async function doCaptureThumb(projectPath) {
   const userData = app.getPath('userData');
+  const devServer = devServers.get(projectPath);
   // Already running for this project (it is the one that is open) — use it.
-  if (devServer && devServer.projectPath === projectPath && devServer.url) {
+  if (devServer?.url) {
     if (await serverAlive(devServer.url)) {
       return thumbs.capture(userData, projectPath, devServer.url + '/');
     }
@@ -1245,9 +1273,9 @@ async function doCaptureThumb(projectPath) {
   return withTemporaryServer(projectPath, (url) => thumbs.capture(userData, projectPath, url + '/'));
 }
 
-// A dev server for a project that is not open, kept apart from the app's own:
-// `devServer` belongs to the canvas, and a thumbnail must not disturb what the
-// editor is showing. The project's own config is used rather than the app's
+// A temporary server is needed only when no retained workspace server exists.
+// A thumbnail must not disturb what the editor is showing. The project's own
+// config is used rather than the app's
 // generated one — the picture is of the site, not of the canvas.
 async function withTemporaryServer(projectPath, fn) {
   const binName = isWin ? 'astro.cmd' : 'astro';
@@ -1337,7 +1365,7 @@ let thumbTimer = null;
 function scheduleThumb(projectPath, delay) {
   clearTimeout(thumbTimer);
   thumbTimer = setTimeout(() => {
-    if (!devServer || devServer.projectPath !== projectPath) return;
+    if (!devServers.isActive(projectPath) || !devServers.get(projectPath)) return;
     if (!thumbs.isStale(app.getPath('userData'), projectPath)) return;
     captureThumb(projectPath).then((r) => {
       if (r?.ok) send('recents:thumb', { projectPath });
@@ -1386,15 +1414,18 @@ function detectPackageManager(dir) {
   return 'npm';
 }
 
-async function installDependencies(dir) {
+async function runDependencyInstall(dir) {
   ensureToolPath(); // npm/pnpm/yarn are Node shims — same PATH problem as astro
   const pm = detectPackageManager(dir);
-  send('progress', { message: `Installing dependencies (${pm} install)…` });
-  const args = pm === 'npm' ? ['install', '--no-audit', '--no-fund'] : ['install'];
+  const args = pm === 'npm'
+    ? ['install', '--prefer-offline', '--no-audit', '--no-fund', '--maxsockets=4']
+    : ['install'];
   try {
     await run(isWin ? `${pm}.cmd` : pm, args, dir, {
       timeout: 10 * 60 * 1000,
       shell: isWin,
+      lowPriority: true,
+      env: { ...process.env, UV_THREADPOOL_SIZE: '2' },
     });
   } catch (err) {
     if (err.code === 'ENOENT') {
@@ -1403,6 +1434,22 @@ async function installDependencies(dir) {
       );
     }
     throw new Error(`${pm} install failed: ${(err.stderr || err.message || '').slice(-400)}`);
+  }
+}
+
+const dependencySetup = createDependencySetup({
+  install: runDependencyInstall,
+  notify: (state) => send('project:dependencyState', state),
+});
+
+async function installDependencies(dir, isVisible = () => true) {
+  if (dependencySetup.status(dir).state === 'ready') return;
+  const pm = detectPackageManager(dir);
+  if (isVisible()) send('progress', { message: `Preparing dependencies (${pm}) — one installation at a time…` });
+  try {
+    await dependencySetup.ensure(dir);
+  } finally {
+    if (isVisible()) send('progress', { message: null });
   }
 }
 
@@ -1517,7 +1564,7 @@ ipcMain.handle('project:scaffold', async (_e, { dir, name }) => {
 });
 
 ipcMain.handle('project:hasNodeModules', async (_e, projectPath) => {
-  return fs.existsSync(path.join(projectPath, 'node_modules'));
+  return dependencySetup.status(projectPath).state === 'ready';
 });
 
 ipcMain.handle('project:install', async (_e, projectPath) => {
@@ -3213,48 +3260,36 @@ ipcMain.handle('selection:locate', async (_e, { projectPath, key } = {}) => {
 // ---------------------------------------------------------------------------
 
 function stopDevServer() {
-  if (!devServer) return;
-  const { proc, daemon, bin, projectPath } = devServer;
-  devServer = null;
-  // Daemonized servers (Astro >= 7 forks a background process) stop via the CLI.
+  return devServers.stop();
+}
+
+function stopAllDevServers() {
+  clearTimeout(thumbTimer);
+  return devServers.stopAll();
+}
+
+async function stopServerProcess({ proc, daemon, bin, projectPath, external }) {
+  if (external) return;
   if (daemon && bin) {
-    try {
-      const [cmd, argv] = nodeCliCommand(bin, ['dev', 'stop']);
-      execFile(cmd, argv, { cwd: projectPath, timeout: 10000 }, () => {});
-    } catch {
-      /* best effort */
-    }
+    const [cmd, argv] = nodeCliCommand(bin, ['dev', 'stop']);
+    await new Promise((resolve) => execFile(cmd, argv, { cwd: projectPath, timeout: 10000 }, () => resolve()));
     return;
   }
-  // External servers (started by the user, e.g. in a terminal) are never killed.
-  if (!proc) return;
-  try {
-    if (isWin) {
-      spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { shell: true });
-    } else {
-      process.kill(-proc.pid, 'SIGTERM');
-    }
-  } catch {
-    try {
-      proc.kill('SIGTERM');
-    } catch {
-      /* already gone */
-    }
+  if (!proc?.pid) return;
+  if (isWin) {
+    await new Promise((resolve) => execFile('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { timeout: 5000 }, () => resolve()));
+    return;
   }
-}
-
-let devLogBuffer = [];
-
-function pushDevLog(chunk) {
-  devLogBuffer.push(chunk);
-  // Keep roughly the last 200 chunks.
-  if (devLogBuffer.length > 200) devLogBuffer = devLogBuffer.slice(-200);
-  send('dev:log', chunk);
-}
-
-function recentDevLog(maxChars = 1200) {
-  const text = devLogBuffer.join('').replace(/\x1b\[[0-9;]*m/g, '');
-  return text.slice(-maxChars).trim();
+  const kill = (signal) => {
+    try { process.kill(-proc.pid, signal); }
+    catch { try { proc.kill(signal); } catch { /* already gone */ } }
+  };
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  await new Promise((resolve) => {
+    const timer = setTimeout(() => { kill('SIGKILL'); resolve(); }, 2000);
+    proc.once('exit', () => { clearTimeout(timer); resolve(); });
+    kill('SIGTERM');
+  });
 }
 
 function portAnswers(port, host = '127.0.0.1') {
@@ -3611,7 +3646,7 @@ function requireLoads(file) {
   }
 }
 
-function writeMarkerConfig(projectPath) {
+function writeMarkerConfig(projectPath, pushDevLog = () => {}) {
   try {
     const dir = path.join(projectPath, 'node_modules', '.avb');
     fs.mkdirSync(dir, { recursive: true });
@@ -3957,20 +3992,23 @@ export default {
   }
 }
 
-async function spawnDevServer(projectPath, localBin, force, bare) {
+async function spawnDevServer(context, localBin, force, bare) {
+  const { projectPath, pushLog, recentLog } = context;
   const port = await findFreePort(4321);
+  context.assertLive();
   const args = ['dev', '--port', String(port), '--host', '127.0.0.1'];
   // Astro resolves --config against the project root and rejects absolute
   // paths ([ConfigNotFound]), so pass it relative to the spawn cwd.
   // `bare` is the last resort: the project's own config, none of this app's,
   // so a preview still comes up even if what this app generates cannot run.
-  const markerCfg = bare ? null : writeMarkerConfig(projectPath);
+  const markerCfg = bare ? null : writeMarkerConfig(projectPath, pushLog);
   if (markerCfg) args.push('--config', toPosix(path.relative(projectPath, markerCfg)));
   if (force) args.push('--force');
 
   const [cmd, argv] = nodeCliCommand(localBin, args);
   const proc = spawn(cmd, argv, {
     cwd: projectPath,
+    detached: !isWin,
     // Only the Windows .cmd shim needs a shell to run at all. Going through
     // one when we have a real node.exe path would re-split it on spaces —
     // "C:\Program Files\nodejs\node.exe" is the common case.
@@ -3985,30 +4023,34 @@ async function spawnDevServer(projectPath, localBin, force, bare) {
   });
 
   const url = `http://127.0.0.1:${port}`;
-  devServer = { proc, url, projectPath, bin: localBin };
+  const server = { proc, url, projectPath, bin: localBin, bare: !markerCfg };
+  context.attach(server);
 
-  proc.stdout.on('data', (d) => pushDevLog(d.toString()));
-  proc.stderr.on('data', (d) => pushDevLog(d.toString()));
-  proc.on('error', (err) => pushDevLog(`\n[spawn error] ${err.message}\n`));
+  proc.stdout.on('data', (d) => pushLog(d.toString()));
+  proc.stderr.on('data', (d) => pushLog(d.toString()));
+  proc.on('error', (err) => {
+    pushLog(`\n[spawn error] ${err.message}\n`);
+    context.exited(server, null);
+  });
   proc.on('exit', (code) => {
-    if (devServer && devServer.proc === proc) {
+    if (context.server === server) {
       // Astro >= 7 daemonizes: the CLI exits 0 after forking the real server
       // into a background process. That's a success, not a failure.
-      const running = recentDevLog().match(
+      const running = recentLog().match(
         /Dev server running at (https?:\/\/[^\s"\\)]+)/i
       );
       if (code === 0 && running) {
-        devServer = { proc: null, url, projectPath, daemon: true, bin: localBin };
+        server.proc = null;
+        server.daemon = true;
       } else {
-        devServer = null;
-        send('dev:exit', { code, log: recentDevLog() });
+        context.exited(server, code);
       }
     }
   });
 
   // The daemon's own failure reasons only land in `astro dev logs`.
   const failureDetail = async () => {
-    let log = recentDevLog();
+    let log = recentLog();
     try {
       const [logCmd, logArgs] = nodeCliCommand(localBin, ['dev', 'logs']);
       const { stdout } = await new Promise((resolve, reject) =>
@@ -4027,10 +4069,14 @@ async function spawnDevServer(projectPath, localBin, force, bare) {
   // Wait until the port answers so the iframe doesn't load into a dead server.
   const deadline = Date.now() + 60000;
   while (Date.now() < deadline) {
-    if (!devServer) {
+    context.assertLive();
+    if (context.server !== server) {
       throw new Error('Dev server exited before it was ready.\n\n' + (await failureDetail()));
     }
-    if (await portAnswers(port)) return url;
+    if (await portAnswers(port)) {
+      context.assertLive();
+      if (context.server === server) return url;
+    }
     await new Promise((r) => setTimeout(r, 300));
   }
   throw new Error('Astro dev server did not start within 60 seconds.\n\n' + (await failureDetail()));
@@ -4061,46 +4107,17 @@ function readAstroLock(projectPath) {
   return null;
 }
 
-// Serialize dev:start calls — concurrent spawns race Astro's daemon lock and
-// the loser dies with "exited before becoming ready".
-let devStartInFlight = null;
-
-ipcMain.handle('dev:start', (_e, projectPath) => {
-  // Whatever thumbnails were queued for the start screen, this takes priority.
+// One cached server per workspace. The pool joins duplicate requests and
+// serializes cold starts, so simultaneous opens cannot claim the same port.
+ipcMain.handle('dev:start', async (_e, projectPath) => {
   captureEra++;
-  if (devStartInFlight) return devStartInFlight;
-  devStartInFlight = doDevStart(projectPath)
-    // Now that a server has resolved the config, this is the authoritative
-    // answer — the scan before it could only read the config's text.
-    .then((r) => ({ ...r, trailingSlash: readTrailingSlash(projectPath) }))
-    .then((r) => {
-      // The server that just came up can also take the project's picture. A
-      // few seconds in, so it does not compete with the canvas's own first
-      // load for the same server.
-      scheduleThumb(projectPath, 6000);
-      return r;
-    })
-    .finally(() => {
-      devStartInFlight = null;
-    });
-  return devStartInFlight;
+  const result = await devServers.open(projectPath);
+  if (devServers.isActive(projectPath)) scheduleThumb(projectPath, 6000);
+  return { ...result, trailingSlash: readTrailingSlash(projectPath) };
 });
 
-async function doDevStart(projectPath) {
-  if (devServer && devServer.projectPath === projectPath) {
-    // For adopted external servers, make sure it's still alive.
-    if (devServer.external) {
-      if (await serverAlive(devServer.url)) {
-        return { url: devServer.url, external: true };
-      }
-      devServer = null;
-    } else {
-      return { url: devServer.url };
-    }
-  }
-  stopDevServer();
-  devLogBuffer = [];
-
+async function doDevStart(context) {
+  const { projectPath, pushLog, recentLog } = context;
   // Without this the failure is the shim's "env: node: No such file or
   // directory", which reads like a broken project rather than a missing tool.
   if (!resolveNodeBin() && !isWin) {
@@ -4113,13 +4130,20 @@ async function doDevStart(projectPath) {
 
   const binName = isWin ? 'astro.cmd' : 'astro';
   const localBin = path.join(projectPath, 'node_modules', '.bin', binName);
-  if (!fs.existsSync(localBin)) {
+  if (dependencySetup.status(projectPath).state !== 'ready') {
     // Dependencies missing or incomplete — install with the right PM first.
-    await installDependencies(projectPath);
-    send('progress', { message: null });
+    await installDependencies(projectPath, () => devServers.isActive(projectPath));
+    context.assertLive();
     if (!fs.existsSync(localBin)) {
       throw new Error('astro is not installed in this project (no node_modules/.bin/astro after install). Is astro listed in package.json dependencies?');
     }
+  }
+
+  const existingLock = readAstroLock(projectPath);
+  if (existingLock?.url && await serverAlive(existingLock.url)) {
+    context.assertLive();
+    context.attach({ proc: null, url: existingLock.url, projectPath, external: true });
+    return { url: existingLock.url, external: true };
   }
 
   // A lock file means a daemon exists (possibly stale, possibly started
@@ -4130,20 +4154,25 @@ async function doDevStart(projectPath) {
     try {
       // Retry with --force: first-attempt daemon startup can flake (stale
       // daemon state, vite re-optimizing after a config change).
-      return { url: await spawnDevServer(projectPath, localBin, force) };
+      const url = await spawnDevServer(context, localBin, force);
+      return { url, bare: !!context.server?.bare };
     } catch (err) {
       lastErr = err;
       // Another dev server already running for this project?
-      const existing = parseExistingServer(recentDevLog());
+      const existing = parseExistingServer(recentLog());
       if (existing) {
         const alive = await serverAlive(existing);
         if (alive) {
           // Adopt the user's own server instead of fighting it.
-          devServer = { proc: null, url: existing, projectPath, external: true };
+          await context.stop();
+          context.assertLive();
+          context.attach({ proc: null, url: existing, projectPath, external: true });
           return { url: existing, external: true };
         }
       }
-      devLogBuffer = [];
+      await context.stop();
+      context.assertLive();
+      context.log = '';
       await new Promise((r) => setTimeout(r, 800));
     }
   }
@@ -4153,13 +4182,13 @@ async function doDevStart(projectPath) {
   // markers and no live patching — an edit reloads the page, the way it did
   // before any of this — but the canvas is a canvas again.
   try {
-    const url = await spawnDevServer(projectPath, localBin, true, true);
-    pushDevLog(
+    const url = await spawnDevServer(context, localBin, true, true);
+    pushLog(
       '\n[stacki] the preview would not start with this app\'s config, so it is ' +
         'running on the project\'s own. Outlines and live updates are off; the ' +
         'log above says why.\n'
     );
-    if (devServer) devServer.bare = true;
+    if (context.server) context.server.bare = true;
     return { url, bare: true };
   } catch {
     throw lastErr; // report the first failure: it is the one that explains it
@@ -4491,7 +4520,7 @@ ipcMain.handle('src:writeText', async (_e, { projectPath, rel, text }) => {
 });
 
 ipcMain.handle('dev:stop', async () => {
-  stopDevServer();
+  await stopDevServer();
   return { ok: true };
 });
 
@@ -4833,9 +4862,8 @@ async function currentBranch(projectPath) {
 // no click-to-select — it only has to render. That is `bare` on spawnDevServer,
 // which already exists as the primary server's last-resort path.
 //
-// Kept in its own registry rather than generalising `devServer`, whose daemon
-// detection, external-server adoption and log plumbing are all keyed to there
-// being exactly one.
+// Historical snapshots remain separate from live workspace servers: their
+// temporary checkouts can be removed as soon as the history preview closes.
 const previewServers = new Map(); // projectPath -> {proc, url, ref, port}
 
 async function stopPreview(projectPath) {
@@ -4956,9 +4984,25 @@ ipcMain.handle('git:fileAt', async (_e, { projectPath, ref, path: filePath }) =>
   gitHistory.fileAt(git, { projectPath, ref, path: filePath })
 );
 
-ipcMain.handle('git:worktrees', async (_e, { projectPath }) =>
-  gitHistory.worktrees(git, { projectPath })
-);
+ipcMain.handle('git:worktrees', async (_e, { projectPath }) => {
+  const workspaces = await listWorkspaces(git, { projectPath }, isAstroProject);
+  return workspaces.map((w) => ({
+    ...w,
+    dependencies: dependencySetup.status(w.projectPath),
+    preview: devServers.info(w.projectPath),
+  }));
+});
+
+ipcMain.handle('project:prepareWorkspace', async (_e, { projectPath, targetPath }) => {
+  // Re-check membership and availability: the list may have changed since it opened.
+  const workspaces = await listWorkspaces(git, { projectPath }, isAstroProject);
+  const target = workspaces.find((w) => w.projectPath === targetPath && w.available);
+  if (!target) throw new Error('This workspace is no longer available. Refresh the list and try again.');
+  // Return immediately. Progress is delivered separately, without a blocking
+  // overlay and without starting another preview, browser or thumbnail capture.
+  void dependencySetup.ensure(target.projectPath).catch(() => {});
+  return dependencySetup.status(target.projectPath);
+});
 
 // Setting work aside and picking it back up, on their own. The switch has done
 // this internally for a while; a merge that finds unsaved work in its way needs

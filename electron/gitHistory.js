@@ -242,12 +242,12 @@ async function fileAt(git, { projectPath, ref, path: filePath }) {
 
 /** Every worktree of this repository, the main one first. */
 async function worktrees(git, { projectPath }) {
-  const { stdout } = await git(projectPath, ['worktree', 'list', '--porcelain']);
-  // Blank-line-separated records of "key value" lines. `detached` and `bare`
-  // are bare keys with no value; `prunable` carries git's reason as its own.
+  const { stdout } = await git(projectPath, ['worktree', 'list', '--porcelain', '-z']);
+  // NUL-separated records of "key value" lines — NUL keeps spaces, Unicode and
+  // newlines in paths intact. `detached` and `bare` are bare keys with no
+  // value; `prunable` carries git's reason as its own.
   return stdout
-    .split('\n\n')
-    .map((rec) => rec.trim())
+    .split('\0\0')
     .filter(Boolean)
     .map((rec) => {
       const out = {
@@ -258,7 +258,7 @@ async function worktrees(git, { projectPath }) {
         bare: false,
         prunable: false,
       };
-      for (const line of rec.split('\n')) {
+      for (const line of rec.split('\0')) {
         const sp = line.indexOf(' ');
         const key = sp === -1 ? line : line.slice(0, sp);
         const value = sp === -1 ? '' : line.slice(sp + 1);

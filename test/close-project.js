@@ -97,7 +97,10 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
       hasNodeModules: async () => true,
       gitInfo: async () => ({ isRepo: false }),
       gitLog: async () => ({ commits: [], atEnd: true }),
-      gitWorktrees: async () => [],
+      gitWorktrees: async () => [
+        { path: '/projects/next', projectPath: '/projects/next', name: 'next', branch: 'main', current: true, available: true },
+        { path: '/projects/design', projectPath: '/projects/design', name: 'design', branch: 'feature/design', available: true },
+      ],
       gitStatus: async () => [],
       recentProjects: async () => [],
       onCssChanged: () => () => {},
@@ -180,13 +183,36 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
   await fire('openProject');
   check('cancelling the picker leaves the project alone', closed.length === 2, JSON.stringify(closed));
 
+  // The title-bar picker uses the same lifecycle, carrying the destination
+  // across the reload instead of opening it into the previous project's state.
+  await act(async () => {
+    container.querySelector('.workspace-trigger').click();
+    await settle();
+  });
+  await act(async () => {
+    container.querySelector('.workspace-option[aria-current="true"]').click();
+    await settle();
+  });
+  check('choosing the current workspace does not reload', closed.length === 2, JSON.stringify(closed));
+  await act(async () => {
+    container.querySelector('.workspace-trigger').click();
+    await settle();
+  });
+  await act(async () => {
+    [...container.querySelectorAll('.workspace-option')].find((el) => el.textContent.includes('feature/design')).click();
+    await settle();
+  });
+  check('the workspace picker hands over the destination', closed[2] === '/projects/design', JSON.stringify(closed));
+  check('the destination waits for a fresh renderer', !opened.includes('/projects/design'), opened.join());
+
 
   // --- what main does with it -------------------------------------------------------------
   const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
   check('the File menu offers a way in', /label: 'Open Project…'/.test(main), 'no Open Project item');
   check('and a way out', /label: 'Close Project'/.test(main), 'no Close Project item');
   const close = main.slice(main.indexOf("ipcMain.handle('project:close'"), main.indexOf("app.on('window-all-closed'"));
-  check('letting go stops the dev server', /stopDevServer\(\)/.test(close), close.slice(0, 200));
+  check('switching detaches the preview without stopping it', /if \(pendingProject\) devServers\.detach\(\)/.test(close), close.slice(0, 200));
+  check('closing without a next project stops retained servers', /else await stopAllDevServers\(\)/.test(close), close.slice(0, 200));
   check('and the shells, which outlive a window', /cleanupTerminals\(\)/.test(close), close.slice(0, 200));
   check('and the watcher', /watcher\.close\(\)/.test(close), close.slice(0, 200));
   check('and puts the project out of reach', /openProjectRoot = null/.test(close), close.slice(0, 200));
