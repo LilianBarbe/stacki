@@ -281,8 +281,13 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
       : 'Everything pushed';
   const canPush = info.hasUpstream ? info.ahead > 0 : true;
   // Why this name can't be created, or null. Checked against the branches that
-  // exist, so "already taken" is caught here rather than by git.
-  const branchError = branchNameError(newBranch, info.branches || []);
+  // exist, so "already taken" is caught here rather than by git — and against
+  // the ones open in another folder too, which are not rows in this list but
+  // are every bit as taken.
+  const branchError = branchNameError(newBranch, [
+    ...(info.branches || []),
+    ...Object.keys(info.elsewhere || {}),
+  ]);
 
   return (
     <div ref={wrapRef} style={{ position: 'relative' }}>

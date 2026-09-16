@@ -4628,17 +4628,38 @@ ipcMain.handle('git:info', async (_e, projectPath) => {
   } catch {
     info.userEmail = null;
   }
+  // The folders this project is also open in, and the branch each one holds.
+  // Read before the branch list is built, because it is what the branch list
+  // leaves out: see branchesElsewhere in gitHistory.js for why a branch
+  // another folder is sitting on is not a branch this switcher can offer.
+  info.elsewhere = {};
   try {
-    const listed = (await git(projectPath, ['branch', '--format=%(refname:short)'])).stdout
+    const here = (await git(projectPath, ['rev-parse', '--show-toplevel'])).stdout.trim();
+    const trees = await gitHistory.worktrees(git, { projectPath });
+    info.elsewhere = gitHistory.branchesElsewhere(trees, here || projectPath);
+  } catch {
+    /* one folder, and nothing to leave out */
+  }
+  try {
+    const all = (await git(projectPath, ['branch', '--format=%(refname:short)'])).stdout
       .split('\n')
       .map((s) => s.trim())
       .filter(Boolean);
+    // The branch this folder is on stays whatever else is true of it: if the
+    // paths ever failed to match, dropping it would take the checkmark out of
+    // the list the user is standing in.
+    const listed = all.filter((b) => b === info.branch || !info.elsewhere[b]);
     // Git lists branches alphabetically, which puts the trunk wherever its
     // name happens to fall. But the trunk is not one branch among many — it
     // is the one you came from and the one you go back to, so it goes first
-    // and the rest keep the order git gave them.
-    const trunk = ['main', 'master'].find((b) => listed.includes(b));
-    info.branches = trunk ? [trunk, ...listed.filter((b) => b !== trunk)] : listed;
+    // and the rest keep the order git gave them. Named from every branch there
+    // is rather than from the listed ones: main open in another folder is
+    // still the trunk, and the protections that hang off the name have to hold
+    // whether or not it is a row here.
+    const trunk = ['main', 'master'].find((b) => all.includes(b));
+    info.branches = listed.includes(trunk)
+      ? [trunk, ...listed.filter((b) => b !== trunk)]
+      : listed;
     // Named as well as ordered. Git will delete the trunk as readily as any
     // other branch — `git branch -d main` succeeds the moment main is merged
     // into whatever you are standing on — and the branch everything comes back
