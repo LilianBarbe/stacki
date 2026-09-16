@@ -11,8 +11,8 @@ The `v0.1.26` startup repair, Astro parser conversion, and **Electron main
 conversion** are complete. `electron/main.ts` now emits the ignored `main.js`
 package entry. The invoke inventory is complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
-**The Electron and root renderer leaf queues are complete. Continue through
-`src/ui`, then `src/panels` (PropsPanel first), and `src/App.jsx` last.**
+**The Electron, root renderer, and UI queues are complete. Continue through
+`src/panels` (PropsPanel and its list/object dependencies first), then `src/App.jsx`.**
 
 Main verification: 26 old/new handler and output comparisons matched, including
 byte-identical generated Astro config, preview page, and both API endpoints.
@@ -177,7 +177,7 @@ confirmation order, cancellation, trunk protection, parking/restoration and
 conflict handoff. All scheduled root `.js` leaves are now converted.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
-### src/ui — 36 converted, 2 remaining ⏳
+### src/ui — 38 original modules converted ✅
 
 `Icons` 969, `RichContent` 606, `WelcomeBackground` 433, `ClassInput` 344,
 `ExprInput` 336, `DataPicker` 308, `Dropdown` 303, `FileBrowser` 277,
@@ -233,6 +233,15 @@ per-chip replacement, external synchronization, completion scope, and family
 preview/revert behavior retain their existing contracts. No new unchecked types
 or lint warnings were introduced; only `RichContent` and `WelcomeBackground`
 remain in the UI queue.
+
+Final UI batch: `RichContent` and `WelcomeBackground`, plus the inline-content
+model helper. All 22 serialization/shader comparisons pass; 40 simulated pointer
+frames produce byte-identical float fields through injection, decay, and blur.
+Rich-content tests cover invalid shapes, expression expansion, cycles, and depth
+bounds. The full gate passes 133/133 commands (97.1s). The bridge inventory now
+parses exported components with the existing TypeScript dependency, avoiding
+false matches against private hooks; all 415 bridge checks pass. The entire
+original UI queue is converted, with no new unchecked modules.
 
 ### src/panels — 20 files, 13,990 lines ⬜
 
@@ -309,7 +318,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 132/132, exit 0. No quarantined tests remain.
+- Gate green at last run: 133/133, exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.

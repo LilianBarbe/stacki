@@ -146,15 +146,46 @@ const propsDeclared = (base) => {
   for (const ext of ['.jsx', '.tsx', '.js', '.ts', '']) {
     const file = base + ext;
     if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {continue;}
-    const text = stripComments(fs.readFileSync(file, 'utf8'));
-    const m =
-      text.match(/export default function\s+[\w$]*\s*\(\s*\{([\s\S]*?)\}\s*\)/) ||
-      text.match(/function\s+[\w$]+\(\s*\{([\s\S]*?)\}\s*\)\s*\{/);
-    if (!m || m[1].includes('...')) {return null;}
-    return new Set([...m[1].matchAll(/(?:^|,|\s)([a-zA-Z_$][\w$]*)\s*(?=[,:=}]|$)/g)].map((x) => x[1]));
+    // Parse the exported component itself. A regex can drift into a private
+    // hook's destructuring when the component accepts a typed props object.
+    const ts = require('typescript');
+    const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'),
+      ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const declaration = bridgeComponent(ts, source);
+    const binding = declaration?.parameters[0]?.name;
+    if (!binding || !ts.isObjectBindingPattern(binding)) { return null; }
+    if (binding.elements.some((element) => element.dotDotDotToken)) { return null; }
+    return new Set(binding.elements.map((element) =>
+      (element.propertyName || element.name).getText(source)));
   }
   return null;
 };
+
+function bridgeComponent(ts, source) {
+  const direct = source.statements.find((node) => ts.isFunctionDeclaration(node) &&
+    node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword));
+  if (direct) { return direct; }
+  const assignment = source.statements.find((node) => ts.isExportAssignment(node));
+  if (!assignment) { return undefined; }
+  let expression = assignment.expression;
+  if (ts.isIdentifier(expression)) {
+    const name = expression.text;
+    const named = source.statements.find((node) =>
+      ts.isFunctionDeclaration(node) && node.name?.text === name);
+    if (named) { return named; }
+    const variables = source.statements.filter(ts.isVariableStatement)
+      .flatMap((node) => [...node.declarationList.declarations]);
+    expression = variables.find((node) => node.name.getText(source) === name)?.initializer;
+  }
+  // React wrappers take the component as a direct argument; do not inspect
+  // unrelated function bodies for a parameter that happens to look like props.
+  if (expression && ts.isCallExpression(expression)) {
+    expression = expression.arguments.find((node) =>
+      ts.isFunctionExpression(node) || ts.isArrowFunction(node));
+  }
+  return expression && (ts.isFunctionExpression(expression) || ts.isArrowFunction(expression))
+    ? expression : undefined;
+}
 
 let wired = 0;
 for (const file of sources) {
