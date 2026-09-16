@@ -323,6 +323,13 @@ are bounded and disposal cancels the echo frame; regression tests cover stale
 cleanup callbacks and reuse. The full gate passes 138/138 commands (99.8s).
 VariablesView remains JSX; continue with cell/editor hooks and mutation boundaries.
 
+VariablesView cell checkpoint: `VariableCell.tsx` separates empty matrix cells
+from populated editors, fixing conditional hooks when a mode gains or loses a
+value. A real-render regression reuses the same positions through six sparse
+matrix updates and checks draft cleanup. All 12 old/new cell displays match;
+value/name limits are asserted, and the full gate passes 138/138 commands
+(100.0s). Continue with the table controls and stylesheet mutation boundary.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -388,7 +395,7 @@ move-blindness.
 | Task                                                                 | State                        |
 | -------------------------------------------------------------------- | ---------------------------- |
 | Complete `IpcContract` invoke inventory (115 channels) | ✅ with `main.ts` |
-| Fix conditional-hook bugs in PropsPanel / VariablesView              | ⏳ PropsPanel fixed; VariablesView pending    |
+| Fix conditional-hook bugs in PropsPanel / VariablesView              | ✅ PropsPanel and VariablesView cell transitions fixed    |
 | Delete stray `electron/scratch2-7.js` (tracked tsc-emit leftovers)   | ⬜ standalone cleanup commit |
 | `release.sh` → TypeScript (`scripts/*.ts`, per AGENTS §17)           | ⬜                           |
 | Tooling deps declared devDependencies (node_modules-incident repair) | ✅                           |
@@ -396,7 +403,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 138/138 (99.8s), exit 0. No quarantined tests remain.
+- Gate green at last run: 138/138 (100.0s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.
