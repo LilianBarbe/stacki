@@ -56,7 +56,7 @@ const check = (what, condition, detail) => {
   fs.writeFileSync(
     entry,
     `export { default as PagesPanel } from ${JSON.stringify(
-      path.join(__dirname, '..', 'src', 'panels', 'PagesPanel.jsx')
+      path.join(__dirname, '..', 'src', 'panels', 'PagesPanel.tsx')
     )};\n`
   );
   const bundle = path.join(buildDir, 'page-order.bundle.js');

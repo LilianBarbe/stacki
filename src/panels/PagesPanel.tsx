@@ -1,0 +1,362 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import type { WireInjectedRoute } from '../../shared/ipc-results';
+import type { ScanPage, ScanResult } from '../../shared/scan';
+import {
+  buildPageTree,
+  collectPageTreeDirectories,
+  pageDirectory,
+  parsePageDragText,
+  stripPageExtension,
+} from '../pageTree';
+import { comparePageNames, isCollectionRoute } from '../pageOrder';
+import {
+  CollectionIcon,
+  FileIcon,
+  FolderIcon,
+  FolderPlusIcon,
+  PlusIcon,
+  RefreshIcon,
+} from '../ui/Icons';
+import { NewPageModal } from './PageDialogs';
+import { PageTreeView, type PageEditing, type PageTreeActions } from './PageTreeView';
+
+interface PagesPanelProps {
+  readonly scan: Pick<ScanResult, 'pages' | 'pageFolders' | 'layouts'>;
+  readonly currentPage: ScanPage | null;
+  readonly injectedRoutes?: readonly WireInjectedRoute[];
+  readonly onSelectRoute?: (route: WireInjectedRoute) => void;
+  readonly onSelect: (page: ScanPage) => void;
+  readonly onCreate: (name: string, layout: string | null) => void;
+  readonly onDelete: (page: ScanPage) => void;
+  readonly onRescan: () => void;
+  readonly onMovePage: (page: ScanPage, to: string) => void;
+  readonly onCreateFolder: () => Promise<string | null>;
+  readonly onRenameFolder: (from: string, to: string) => void;
+  readonly onDeleteFolder: (rel: string, pageCount: number) => void;
+}
+
+export default function PagesPanel(props: PagesPanelProps) {
+  const [showNew, setShowNew] = useState(false);
+  const [query, setQuery] = useState('');
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+  const [editing, setEditing] = useState<PageEditing>({ kind: 'none' });
+  const [dropDirectory, setDropDirectory] = useState<string | null>(null);
+  const tree = useMemo(
+    () => buildPageTree(props.scan.pages, props.scan.pageFolders),
+    [props.scan.pageFolders, props.scan.pages],
+  );
+  const directories = useMemo(() => collectPageTreeDirectories(tree), [tree]);
+  const searchResults = useMemo(
+    () => pagesForQuery(props.scan.pages, query),
+    [props.scan.pages, query],
+  );
+  const { onCreateFolder } = props;
+
+  useEffect(() => {
+    setCollapsed((previous) => new Set([...previous].filter((rel) => directories.has(rel))));
+    setEditing((previous) => validEditing(previous, props.scan.pages, directories));
+    setDropDirectory((previous) =>
+      previous !== null && directories.has(previous) ? previous : null,
+    );
+  }, [directories, props.scan.pages]);
+
+  const actions = usePageTreeActions(props, setCollapsed, setEditing, setDropDirectory);
+  const openFolder = useCallback(async () => {
+    const rel = await onCreateFolder();
+    if (rel) {
+      setEditing({ kind: 'folder', key: rel });
+    }
+  }, [onCreateFolder]);
+
+  return (
+    <div className="panel-section grow">
+      <PagesHeader
+        rescan={props.onRescan}
+        createFolder={() => void openFolder()}
+        createPage={() => setShowNew(true)}
+      />
+      <div style={{ padding: '0 12px 8px' }}>
+        <input
+          value={query}
+          maxLength={512}
+          placeholder="Search pages and folders"
+          spellCheck={false}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+        />
+      </div>
+      <PageBody
+        {...props}
+        tree={tree}
+        query={query}
+        searchResults={searchResults}
+        collapsed={collapsed}
+        editing={editing}
+        dropDirectory={dropDirectory}
+        actions={actions}
+        clearDrop={() => setDropDirectory(null)}
+      />
+      {showNew && (
+        <NewPageModal
+          layouts={props.scan.layouts}
+          onClose={() => setShowNew(false)}
+          onCreate={(name, layout) => {
+            setShowNew(false);
+            props.onCreate(name, layout);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function usePageTreeActions(
+  props: PagesPanelProps,
+  setCollapsed: React.Dispatch<React.SetStateAction<ReadonlySet<string>>>,
+  setEditing: React.Dispatch<React.SetStateAction<PageEditing>>,
+  setDropDirectory: React.Dispatch<React.SetStateAction<string | null>>,
+): PageTreeActions {
+  const toggleFolder = useCallback(
+    (rel: string) => {
+      setCollapsed((previous) => {
+        const next = new Set(previous);
+        if (next.has(rel)) {
+          next.delete(rel);
+        } else {
+          next.add(rel);
+        }
+        return next;
+      });
+    },
+    [setCollapsed],
+  );
+  const dragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>, rel: string) => {
+      if (event.dataTransfer.types.includes('avb/page')) {
+        event.preventDefault();
+        event.stopPropagation();
+        setDropDirectory(rel);
+      }
+    },
+    [setDropDirectory],
+  );
+  const drop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>, rel: string) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setDropDirectory(null);
+      moveDroppedPage(event, rel, props.scan.pages, props.onMovePage);
+    },
+    [props.onMovePage, props.scan.pages, setDropDirectory],
+  );
+  return {
+    select: props.onSelect,
+    removePage: props.onDelete,
+    movePage: props.onMovePage,
+    removeFolder: props.onDeleteFolder,
+    renameFolder: props.onRenameFolder,
+    setEditing,
+    toggleFolder,
+    dragOver,
+    drop,
+  };
+}
+
+function moveDroppedPage(
+  event: React.DragEvent<HTMLDivElement>,
+  rel: string,
+  pages: readonly ScanPage[],
+  movePage: (page: ScanPage, to: string) => void,
+): void {
+  const payload = parsePageDragText(event.dataTransfer.getData('avb/page'));
+  if (!payload || pageDirectory(payload.name) === rel) {
+    return;
+  }
+  const page = pages.find((item) => item.path === payload.path && item.name === payload.name);
+  const base = page?.name.split('/').at(-1);
+  if (page && base) {
+    movePage(page, rel ? `${rel}/${base}` : base);
+  }
+}
+
+interface PageBodyProps extends PagesPanelProps {
+  readonly tree: ReturnType<typeof buildPageTree>;
+  readonly query: string;
+  readonly searchResults: readonly ScanPage[] | null;
+  readonly collapsed: ReadonlySet<string>;
+  readonly editing: PageEditing;
+  readonly dropDirectory: string | null;
+  readonly actions: PageTreeActions;
+  readonly clearDrop: () => void;
+}
+
+function PageBody(props: PageBodyProps) {
+  return (
+    <div
+      className={`panel-body ${props.dropDirectory === '' ? 'pages-root-drop' : ''}`}
+      onDragLeave={(event) => {
+        if (event.currentTarget === event.target) {
+          props.clearDrop();
+        }
+      }}
+      onDragOver={(event) => props.searchResults === null && props.actions.dragOver(event, '')}
+      onDrop={(event) => props.searchResults === null && props.actions.drop(event, '')}
+    >
+      {props.searchResults ? (
+        <SearchResults
+          pages={props.searchResults}
+          query={props.query}
+          currentPage={props.currentPage}
+          select={props.onSelect}
+        />
+      ) : (
+        <>
+          <PageTreeView
+            node={props.tree}
+            rel=""
+            depth={0}
+            currentPage={props.currentPage}
+            collapsed={props.collapsed}
+            editing={props.editing}
+            dropDirectory={props.dropDirectory}
+            actions={props.actions}
+          />
+          {props.scan.pages.length === 0 &&
+            props.scan.pageFolders.length === 0 &&
+            (props.injectedRoutes?.length ?? 0) === 0 && (
+              <div className="props-empty">No pages yet. Create one with +.</div>
+            )}
+          <InjectedRoutes
+            routes={props.injectedRoutes ?? []}
+            currentPage={props.currentPage}
+            select={props.onSelectRoute}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+function SearchResults({
+  pages,
+  query,
+  currentPage,
+  select,
+}: {
+  readonly pages: readonly ScanPage[];
+  readonly query: string;
+  readonly currentPage: ScanPage | null;
+  readonly select: (page: ScanPage) => void;
+}) {
+  if (pages.length === 0) {
+    return <div className="props-empty">No pages match “{query.trim()}”.</div>;
+  }
+  return pages.map((page) => (
+    <div
+      key={page.path}
+      className={`list-item ${isCollectionRoute(page.name) ? 'collection' : ''} ${
+        currentPage?.path === page.path ? 'active' : ''
+      }`}
+      onClick={() => select(page)}
+    >
+      <span className="icon">
+        {isCollectionRoute(page.name) ? <CollectionIcon size={13} /> : <FileIcon size={13} />}
+      </span>
+      <span className="label">
+        {stripPageExtension(page.name.split('/').at(-1) ?? page.name)}
+        <span className="sub">{page.route}</span>
+      </span>
+    </div>
+  ));
+}
+
+function InjectedRoutes({
+  routes,
+  currentPage,
+  select,
+}: {
+  readonly routes: readonly WireInjectedRoute[];
+  readonly currentPage: ScanPage | null;
+  readonly select: ((route: WireInjectedRoute) => void) | undefined;
+}) {
+  if (routes.length === 0) {
+    return null;
+  }
+  return (
+    <div className="vars-table pages-injected">
+      <h3 className="list-item folder pages-injected-head">
+        <span className="icon">
+          <FolderIcon size={13} />
+        </span>
+        <span className="label">From {routes[0]?.from ?? 'integrations'}</span>
+        <span className="sub">preview only</span>
+      </h3>
+      {routes.map((route) => (
+        <div
+          key={route.route}
+          className={`list-item ${currentPage?.route === route.route ? 'active' : ''}`}
+          style={{ paddingLeft: 22 }}
+          title={`${route.route}${route.entrypoint ? `\n${route.entrypoint}` : ''}`}
+          onClick={() => select?.(route)}
+        >
+          <span className="icon">
+            <FileIcon size={13} />
+          </span>
+          <span className="label">{route.route}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PagesHeader({
+  rescan,
+  createFolder,
+  createPage,
+}: {
+  readonly rescan: () => void;
+  readonly createFolder: () => void;
+  readonly createPage: () => void;
+}) {
+  return (
+    <div className="panel-header">
+      <h2>Pages</h2>
+      <div style={{ display: 'flex', gap: 2 }}>
+        <button className="ghost" title="Rescan project files" onClick={rescan}>
+          <RefreshIcon size={13} />
+        </button>
+        <button className="ghost" title="New folder" onClick={createFolder}>
+          <FolderPlusIcon size={13} />
+        </button>
+        <button className="ghost" title="New page" onClick={createPage}>
+          <PlusIcon size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function pagesForQuery(pages: readonly ScanPage[], query: string): readonly ScanPage[] | null {
+  const clean = query.trim().toLowerCase();
+  if (!clean) {
+    return null;
+  }
+  return pages
+    .filter(
+      (page) => page.name.toLowerCase().includes(clean) || page.route.toLowerCase().includes(clean),
+    )
+    .sort((left, right) => comparePageNames(left.name, right.name));
+}
+
+function validEditing(
+  editing: PageEditing,
+  pages: readonly ScanPage[],
+  directories: ReadonlySet<string>,
+): PageEditing {
+  if (editing.kind === 'page') {
+    return pages.some((page) => page.path === editing.key) ? editing : { kind: 'none' };
+  }
+  if (editing.kind === 'folder') {
+    return directories.has(editing.key) ? editing : { kind: 'none' };
+  }
+  return editing;
+}

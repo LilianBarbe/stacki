@@ -223,7 +223,7 @@ function fakeAudio() {
   check('but not on a disabled one', /!button\.disabled/.test(props));
   check('and it is a sound scope', /<SoundHere>/.test(props), 'its dropdowns would be silent');
   check('so is the style panel', /<SoundHere>/.test(style));
-  const scopes = ['App.jsx', 'panels/PagesPanel.jsx', 'panels/TerminalDock.jsx', 'panels/WelcomeScreen.jsx']
+  const scopes = ['App.jsx', 'panels/PagesPanel.tsx', 'panels/TerminalDock.jsx', 'panels/WelcomeScreen.jsx']
     .filter((f) => /<SoundHere>/.test(read('src', ...f.split('/'))));
   check('and nothing else is', scopes.length === 0, scopes.join(', '));
 

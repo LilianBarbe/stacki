@@ -35,6 +35,7 @@ The live lifecycle integration also passes against Electron 33.4.11 and Astro
 process cleanup, and the built renderer/preload boot.
 
 Main conversion details:
+
 - One shared payload inventory drives main and terminal registration. Preload
   channel/payload types erase at build time, keeping sandboxed preload free of
   additional runtime imports. Renderer result parsers remain at their boundary.
@@ -254,7 +255,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 15/20 original files converted ⏳
+### src/panels — 16/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -525,21 +526,31 @@ search, popup lifetime, bridge, app-render, contract, and production-build
 checks pass without warnings in the new modules. Five original panels remain;
 the full gate passes 145/145 commands (98.1s). Continue with `PagesPanel.jsx`.
 
-| File                                                                                                 | Lines                                                        |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
-| `VariablesView.tsx`                                                                                  | ✅ converted with typed edits, history, and refreshes |
-| `CmsView.tsx`                                                                                        | ✅ converted with per-file saves and parsed contracts                                                        |
-| `GitChip.tsx`                                                                                        | ✅ converted with typed repository states and split dropdown |
-| `ContentView.tsx`                                                                                    | ✅ converted with typed fields, saves, and rename boundaries |
-| `CmsPanel.tsx`                                                                                       | ✅ converted with independent parsed content inventories     |
-| `StructurePanel.tsx`                                                                                 | ✅ converted with typed rows, drops, and bounded traversal   |
-| `PreviewPane.tsx`                                                                                    | ✅ converted with parsed frame messages and typed runtime     |
-| `AssetsPanel.tsx`                                                                                    | ✅ converted with bounded listings and typed mutations        |
-| `PalettePanel.tsx`                                                                                   | ✅ converted with typed creation and usage popup states       |
-| `PagesPanel` 442 · `HistoryPanel` 392 · `WelcomeScreen` 391                                         | small                                                        |
-| `StylePanel.tsx`                                                                                     | ✅ converted with parsed stylesheet inventories              |
-| `CanvasView.tsx`                                                                                     | ✅ converted with typed frame and gesture lifetimes          |
+PagesPanel is converted to `PagesPanel.tsx`, with typed dialogs and recursive
+rows split into focused modules. `pageTree.ts` bounds source depth and iterative
+tree walks, while the drag boundary parses unknown JSON and reconciles it with
+the current trusted scan before App can move a file. Folder UI state is pruned
+after rescans. Page ordering, sound scope, bridge, render, boundary, and
+production-build checks pass without warnings in the new modules. Four original
+panels remain; the full gate passes 146/146 commands (98.0s). Continue with
+`HistoryPanel.jsx`.
+
+| File                                     | Lines                                                        |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| `PropsPanel.tsx`                         | ✅ converted with typed controls/editors                     |
+| `VariablesView.tsx`                      | ✅ converted with typed edits, history, and refreshes        |
+| `CmsView.tsx`                            | ✅ converted with per-file saves and parsed contracts        |
+| `GitChip.tsx`                            | ✅ converted with typed repository states and split dropdown |
+| `ContentView.tsx`                        | ✅ converted with typed fields, saves, and rename boundaries |
+| `CmsPanel.tsx`                           | ✅ converted with independent parsed content inventories     |
+| `StructurePanel.tsx`                     | ✅ converted with typed rows, drops, and bounded traversal   |
+| `PreviewPane.tsx`                        | ✅ converted with parsed frame messages and typed runtime    |
+| `AssetsPanel.tsx`                        | ✅ converted with bounded listings and typed mutations       |
+| `PalettePanel.tsx`                       | ✅ converted with typed creation and usage popup states      |
+| `PagesPanel.tsx`                         | ✅ converted with bounded trees and parsed drag payloads     |
+| `HistoryPanel` 392 · `WelcomeScreen` 391 | small                                                        |
+| `StylePanel.tsx`                         | ✅ converted with parsed stylesheet inventories              |
+| `CanvasView.tsx`                         | ✅ converted with typed frame and gesture lifetimes          |
 
 ### src/App.jsx — 4,584 lines ⬜ hotspot, last
 
@@ -592,14 +603,14 @@ move-blindness.
 
 ## Pending tasks (not file conversions)
 
-| Task                                                                 | State                        |
-| -------------------------------------------------------------------- | ---------------------------- |
-| Complete `IpcContract` invoke inventory (115 channels) | ✅ with `main.ts` |
-| Fix conditional-hook bugs in PropsPanel / VariablesView              | ✅ PropsPanel and VariablesView cell transitions fixed    |
-| Delete stray `electron/scratch2-7.js` (tracked tsc-emit leftovers)   | ✅ standalone cleanup commit |
-| `release.sh` → TypeScript (`scripts/*.ts`, per AGENTS §17)           | ⬜                           |
-| Tooling deps declared devDependencies (node_modules-incident repair) | ✅                           |
-| Node_modules incident recorded under Risks in plan                   | ✅                           |
+| Task                                                                 | State                                                  |
+| -------------------------------------------------------------------- | ------------------------------------------------------ |
+| Complete `IpcContract` invoke inventory (115 channels)               | ✅ with `main.ts`                                      |
+| Fix conditional-hook bugs in PropsPanel / VariablesView              | ✅ PropsPanel and VariablesView cell transitions fixed |
+| Delete stray `electron/scratch2-7.js` (tracked tsc-emit leftovers)   | ✅ standalone cleanup commit                           |
+| `release.sh` → TypeScript (`scripts/*.ts`, per AGENTS §17)           | ⬜                                                     |
+| Tooling deps declared devDependencies (node_modules-incident repair) | ✅                                                     |
+| Node_modules incident recorded under Risks in plan                   | ✅                                                     |
 
 ## Test-suite state
 

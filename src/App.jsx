@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import WelcomeScreen from './panels/WelcomeScreen.jsx';
-import PagesPanel from './panels/PagesPanel.jsx';
+import PagesPanel from './panels/PagesPanel';
 import PalettePanel from './panels/PalettePanel';
 import StructurePanel from './panels/StructurePanel';
 import { isInlineRun, noteIndexAbove, noteText, noteValue, selectionAfterDelete } from './treeSelection.js';
