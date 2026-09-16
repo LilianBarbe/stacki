@@ -12,7 +12,7 @@ conversion** are complete. `electron/main.ts` now emits the ignored `main.js`
 package entry. The invoke inventory is complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
 **The Electron, root renderer, and UI queues are complete. Continue through
-`src/panels` (PropsPanel is complete; variables boundary/panel next), then `src/App.jsx`.**
+`src/panels` (PropsPanel and VariablesPanel are complete; VariablesView next), then `src/App.jsx`.**
 
 Main verification: 26 old/new handler and output comparisons matched, including
 byte-identical generated Astro config, preview page, and both API endpoints.
@@ -243,7 +243,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 3/20 original files converted ⏳
+### src/panels — 4/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -305,6 +305,16 @@ pass. Navigation harnesses now recognize `.tsx` panels, and the bridge inventory
 reads local props interfaces (494 checks). The full gate passes 136/136 commands
 (99.2s), with zero warnings in the new panel modules. Seventeen original panels
 remain; continue with the variables boundary/panel before VariablesView.
+
+Variables rail checkpoint: `VariablesPanel.tsx` uses the parsed `variablesBridge`
+snapshot. Nested files, groups, blocks, columns, rows, and cells share a collection
+budget, with string/source-range checks and retained color/reference metadata.
+A real CSS-parser round trip and malformed-shape tests pass. Refreshes allow one
+request plus one pending read; project changes and unmounts discard stale results.
+Eighteen old/new display comparisons, all 14 rail interaction checks, and the
+watcher/project-switch regression pass. The full gate passes 137/137 commands
+(99.6s). Added PropsPanel assertion tests pin schema, layout, attribute, and child
+limits. Sixteen original panels remain; continue with VariablesView.
 
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -379,7 +389,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 136/136 (99.2s), exit 0. No quarantined tests remain.
+- Gate green at last run: 137/137 (99.6s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.

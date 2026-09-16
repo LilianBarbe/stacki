@@ -108,6 +108,30 @@ const nodes = [
       ),
     /BindField: value limit exceeded/,
   );
+  for (const [patch, message] of [
+    [{ schema: Array(513).fill({ name: 'title', type: 'string' }) }, /schema limit exceeded/],
+    [{ layouts: Array(10001).fill({ name: 'Layout' }) }, /layout limit exceeded/],
+    [
+      {
+        node: {
+          ...nodes[1],
+          props: Object.fromEntries(
+            Array.from({ length: 257 }, (_, index) => [`attr${index}`, { type: 'bare' }]),
+          ),
+        },
+      },
+      /attribute limit exceeded/,
+    ],
+    [{ node: { ...nodes[1], children: Array(20001).fill(nodes[2]) } }, /child limit exceeded/],
+  ]) {
+    assert.throws(
+      () =>
+        renderToStaticMarkup(
+          React.createElement(PropsPanel, { ...props, node: nodes[1], ...patch }),
+        ),
+      message,
+    );
+  }
   dom.window.close();
   console.log(
     'props-selection: 24 node-kind transitions, settings retention and binding bounds passed',

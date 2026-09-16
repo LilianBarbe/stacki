@@ -120,6 +120,7 @@
   "test:spacingpick": "node test/spacing-pick.js",
   "test:rawattrs": "node test/raw-attrs.js",
   "test:richspan": "node test/rich-span.js",
+  "test:variablesboundary": "node test/variables-boundary.js",
   "test:varspanel": "node test/vars-panel.js",
   "test:binding": "node test/binding.js",
   "test:loopsource": "node test/loop-source.js",
