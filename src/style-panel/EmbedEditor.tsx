@@ -34,6 +34,7 @@ import ProvenanceList, { ProvenanceEmbedNav } from './ProvenanceList'
 import VariableConnect from './VariableConnect'
 import { computeRuleModel, type DeclStatus, type MatchedRule, type RuleModel } from './lib/cascade'
 import { groupDeclarations, groupProps } from './lib/sections'
+import { clearPaddingSides, setPaddingDeclaration } from './lib/padding'
 import { selectorToClassTokens, snapshotTokens, tokensToSelector } from './lib/element-tokens'
 import { resolveStyle, indexContexts, contextKeyOf, listMatchedSelectors, NATIVE_ORDER_BASE, selectorKey, selectorsMatch, stateForSelector, STATES, type ChipRole, type ContextInfo, type ContextKey, type MatchedSelector, type ResolvedProp, type ResolvedStyle, type SourceKey, type StateKey, type StyleContext } from './lib/resolved'
 // Whether a class can come OFF the element as written — the same rule the app
@@ -3638,6 +3639,7 @@ export default function EmbedEditor() {
   const onSetProp = useCallback((rule: ParsedRule, prop: string, value: string, important: boolean) => {
     void applyEdit(rule, () => {
       const { rule: editRule } = splitForEdit(rule)
+      if (setPaddingDeclaration(editRule.node, prop, value, important)) return
       const target = lastDeclFor(editRule, prop)
       if (target) { target.value = value; target.important = important; return }
       return addDeclaration(editRule, prop, value, important)
@@ -3647,9 +3649,10 @@ export default function EmbedEditor() {
     const props = Array.isArray(prop) ? prop : [prop]
     void applyEdit(rule, () => {
       const { rule: editRule } = splitForEdit(rule)
+      const clearedPadding = clearPaddingSides(editRule.node, props)
       const targets: Declaration[] = []
       directDecls(editRule.node).forEach((decl) => { if (props.includes(decl.prop)) targets.push(decl) })
-      if (!targets.length) return false
+      if (!targets.length && !clearedPadding) return false
       targets.forEach((decl) => decl.remove())
       removeRuleIfEmpty(editRule)
     })

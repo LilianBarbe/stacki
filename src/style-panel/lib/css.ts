@@ -11,6 +11,7 @@ import { declareLayer } from './layers'
 import type { ParsedDeclaration, ParsedRule, StyleRegion } from './types'
 import { parseSelectorList } from './selectors'
 import { selectorKey } from './resolved'
+import { setPaddingDeclaration } from './padding'
 
 // A direct child rule of `container` whose selector is the SAME target as `selector`
 // (by selectorKey, so `.a.b` === `.b.a`) — used to merge into an existing rule rather
@@ -26,6 +27,7 @@ function findChildRuleBySelector(container: Root | AtRule, selector: string): Ru
 
 // Update the rule's existing declaration for `prop`, or append it — mirrors onSetProp.
 function setDeclOnRule(rule: Rule, prop: string, value: string, important: boolean) {
+  if (setPaddingDeclaration(rule, prop, value, important)) return
   let decl: Declaration | null = null
   rule.walkDecls(prop, (found) => { decl = found })
   if (decl) { (decl as Declaration).value = value; (decl as Declaration).important = important }
@@ -247,6 +249,7 @@ export function appendDecl(node: Rule | AtRule, prop: string, value: string, imp
 /** Set (update-or-append) a DIRECT declaration on a node — scoped so a nested rule's
  *  declaration of the same prop is never mistaken for this node's own. */
 function setDeclDirect(node: Rule | AtRule, prop: string, value: string, important: boolean) {
+  if (setPaddingDeclaration(node, prop, value, important)) return
   const key = prop.trim().toLowerCase()
   const existing = directDecls(node).find((d) => d.prop.trim().toLowerCase() === key)
   if (existing) { existing.value = value; existing.important = important; node.raws.semicolon = true }
