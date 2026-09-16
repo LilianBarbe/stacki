@@ -93,7 +93,7 @@ async function inElectron() {
   // application from issuing unrelated IPC or loading any user project.
   const Module = require('node:module');
   const originalLoad = Module._load;
-  const mainPath = path.join(ROOT, 'electron', 'main.js');
+  const mainPath = path.join(ROOT, 'dist', 'electron', 'main.js');
   function HiddenWindow(options) {
     const win = new BrowserWindow({ ...options, show: false, webPreferences: { sandbox: true } });
     win.loadFile = () => win.loadURL('data:text/html,<title>Stacki lifecycle smoke</title>');
@@ -132,7 +132,7 @@ async function inElectron() {
     return html;
   };
   const say = (message) => fs.writeSync(1, message + '\n');
-  const content = require(path.join(ROOT, 'electron', 'contentConfig.js'));
+  const content = require(path.join(ROOT, 'dist', 'electron', 'contentConfig.js'));
   try {
     const configs = await Promise.all([content.readContentConfig(project), content.readContentConfig(project)]);
     for (const config of configs) {
@@ -169,7 +169,9 @@ async function inElectron() {
     await projectRequire('esbuild').build({
       stdin: { contents: [
         "import { z } from 'astro/zod';",
-        `import { withMetadata, toJsonSchema } from ${JSON.stringify(path.join(ROOT, 'electron', 'content', 'schemaTools.mjs'))};`,
+        `import { withMetadata, toJsonSchema } from ${JSON.stringify(
+          path.join(ROOT, 'dist', 'electron', 'content', 'schemaTools.mjs'),
+        )};`,
         "export const result = toJsonSchema(z.object({ title: z.string().min(3), hero: withMetadata(z.string(), { astroImage: true }), date: z.coerce.date(), flag: z.string().transform(Boolean) }));",
       ].join('\n'), resolveDir: project },
       outfile: schemaBundle, bundle: true, platform: 'node', format: 'esm',
@@ -218,10 +220,12 @@ async function inElectron() {
     await waitForExit([...servers]);
     // Exercise the production bundle and real preload against the isolated
     // empty userData, after project teardown has returned to the welcome screen.
-    const dist = path.join(ROOT, 'dist', 'index.html');
+    const dist = path.join(ROOT, 'dist', 'renderer', 'index.html');
     if (fs.existsSync(dist)) {
       const renderer = new BrowserWindow({ show: false, webPreferences: {
-        preload: path.join(ROOT, 'electron', 'preload.js'), contextIsolation: true, nodeIntegration: false,
+        preload: path.join(ROOT, 'dist', 'electron', 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
       } });
       const preloadErrors = [];
       renderer.webContents.on('preload-error', (_event, _file, error) => preloadErrors.push(error.message));

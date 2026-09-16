@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePage } = require('../electron/astroParser.js');
+const { parsePage } = require('../dist/electron/astroParser.js');
 
 // The shape that made the real SermonSearch subtree disappear into one opaque
 // expression: a conditional returning multiple roots through shorthand Fragment.

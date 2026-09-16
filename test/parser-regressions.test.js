@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parsePage, serializePage, parseAttrs } = require('../electron/astroParser');
-const { decodeEntities, encodeText } = require('../electron/htmlText');
-const { packageOf } = require('../electron/injectedRoutes');
+const { parsePage, serializePage, parseAttrs } = require('../dist/electron/astroParser');
+const { decodeEntities, encodeText } = require('../dist/electron/htmlText');
+const { packageOf } = require('../dist/electron/injectedRoutes');
 
 test('empty frontmatter closes before body text beginning with dashes', () => {
   const source = '---\n---\n--- this belongs to the page\n<p>Text</p>\n';

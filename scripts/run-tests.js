@@ -21,11 +21,23 @@ const env = { ...process.env, PATH: `${path.join(root, 'node_modules', '.bin')}$
 // fast and fail cheap; a broken static check never reaches the test suites.
 // This is the contract gate AI-generated code must satisfy.
 const staticGates = [
-  // Contracts build first: the root typecheck resolves shared/dist/*.d.ts.
+  [
+    'build:clean',
+    [process.execPath, '--experimental-strip-types', path.join(root, 'scripts', 'clean-build.ts')],
+  ],
+  // Contracts build first: the root typecheck resolves dist/shared/*.d.ts.
   ['build:contracts', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('shared', 'tsconfig.json')]],
   ['build:electron', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('electron', 'tsconfig.json')]],
   ['build:morph', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('electron', 'tsconfig.morph.json')]],
   ['build:preload', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join('electron', 'tsconfig.preload.json')]],
+  [
+    'stage:runtime',
+    [
+      process.execPath,
+      '--experimental-strip-types',
+      path.join(root, 'scripts', 'stage-runtime.ts'),
+    ],
+  ],
   ['build:web', [process.execPath, path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build']],
   ['tsc --noEmit', [process.execPath, path.join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '--noEmit']],
   ['eslint', [process.execPath, path.join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), '.']],

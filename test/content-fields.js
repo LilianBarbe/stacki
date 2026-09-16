@@ -17,8 +17,12 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const loadRenderer = require('./renderer-module.js');
-const { readContentConfig, stopAllServices, validateEntry } = require('../electron/contentConfig.js');
-const { listEntries } = require('../electron/contentEntries.js');
+const {
+  readContentConfig,
+  stopAllServices,
+  validateEntry,
+} = require('../dist/electron/contentConfig.js');
+const { listEntries } = require('../dist/electron/contentEntries.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const source = path.resolve(process.argv[2] || process.env.STACKI_CONTENT_FIXTURE || DEFAULT_FIXTURE);

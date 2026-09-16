@@ -26,7 +26,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parsePage, serializePage } = require('../electron/astroParser.js');
+const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
 
 const CORPUS_DIR = path.join(__dirname, 'corpus');
 const expectations = JSON.parse(

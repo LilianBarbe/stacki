@@ -3,18 +3,18 @@
  "productName": "Stacki",
  "version": "0.1.26",
  "description": "Stacki \u2014 a visual builder for Astro projects \u2014 pages, layouts, components, props, live preview, and GitHub publishing.",
- "main": "electron/main.js",
+ "main": "dist/electron/main.js",
  "author": "Timothy Ricks <hello@timothyricks.com>",
  "license": "MIT",
  "scripts": {
   "roundtrip:report": "node scripts/roundtrip-report.js",
   "build:contracts": "tsc -p shared/tsconfig.json",
-  "build:electron": "tsc -p electron/tsconfig.json && tsc -p electron/tsconfig.morph.json && tsc -p electron/tsconfig.preload.json",
+  "build:electron": "tsc -p electron/tsconfig.json && npm run build:renderer-runtime",
   "test:contracts": "npm run build:contracts && node --test 'test/contracts/*.test.ts'",
   "test:roundtrip": "node --test 'test/*.test.js'",
-  "postinstall": "node scripts/fix-node-pty-permissions.js && node scripts/fix-electron-builder-signing.js && npm run build:contracts && npm run build:electron",
-  "dev": "npm run build:contracts && npm run build:electron && concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 node scripts/dev-electron.mjs\"",
-  "build": "npm run build:contracts && npm run build:electron && vite build",
+  "postinstall": "npm run fix:install && npm run build:runtime",
+  "dev": "npm run build:runtime && npm run dev:launch",
+  "build": "npm run build:runtime && vite build",
   "test:propattributes": "node test/prop-attributes.js",
   "test:propsselection": "node test/props-selection.js",
   "test:proprules": "node test/prop-rules.js",
@@ -158,7 +158,20 @@
   "test:buildersigning": "node --test test/builder-signing.test.js",
   "test:vitemodules": "node --experimental-vm-modules --test test/vite-modules.test.ts",
   "performance:report": "node scripts/performance-report.js",
-  "integration:dev": "node test/integration/dev-lifecycle.js"
+  "integration:dev": "node test/integration/dev-lifecycle.js",
+  "build:clean": "node --experimental-strip-types scripts/clean-build.ts",
+  "build:renderer-runtime": "npm run build:morph && npm run build:preload && npm run build:assets",
+  "build:morph": "tsc -p electron/tsconfig.morph.json",
+  "build:preload": "tsc -p electron/tsconfig.preload.json",
+  "build:assets": "node --experimental-strip-types scripts/stage-runtime.ts",
+  "build:runtime": "npm run build:clean && npm run build:contracts && npm run build:electron",
+  "fix:install": "npm run fix:pty && npm run fix:signing",
+  "fix:pty": "node scripts/fix-node-pty-permissions.js",
+  "fix:signing": "node scripts/fix-electron-builder-signing.js",
+  "dev:launch": "concurrently -k \"npm:dev:vite\" \"npm:dev:electron\"",
+  "dev:vite": "vite",
+  "dev:electron": "wait-on tcp:5173 && npm run dev:window",
+  "dev:window": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 node scripts/dev-electron.mjs"
  },
  "dependencies": {
   "@codemirror/autocomplete": "^6.20.3",
@@ -213,8 +226,6 @@
   "productName": "Stacki",
   "afterPack": "./scripts/afterPack.js",
   "files": [
-   "electron/**/*",
-   "shared/dist/**",
    "dist/**/*",
    "scripts/fix-node-pty-permissions.js",
    "scripts/fix-electron-builder-signing.js",
@@ -222,11 +233,11 @@
    "node_modules/node-pty/**/*"
   ],
   "asarUnpack": [
-   "electron/astroParser.js",
-   "electron/astroParser.validation.js",
-   "electron/htmlText.js",
-   "electron/frontmatter.js",
-   "shared/dist/**",
+   "dist/electron/astroParser.js",
+   "dist/electron/astroParser.validation.js",
+   "dist/electron/htmlText.js",
+   "dist/electron/frontmatter.js",
+   "dist/shared/**",
    "**/node_modules/node-pty/**"
   ],
   "npmRebuild": false,
@@ -281,7 +292,7 @@
   }
  },
  "exports": {
-  ".": "./electron/main.js",
-  "./frontmatter": "./electron/frontmatter.js"
+  ".": "./dist/electron/main.js",
+  "./frontmatter": "./dist/electron/frontmatter.js"
  }
 }

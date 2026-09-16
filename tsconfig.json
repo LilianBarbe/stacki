@@ -26,5 +26,5 @@
     "resolveJsonModule": true
   },
   "include": ["src/**/*", "electron/**/*", "scripts/**/*", "test/**/*", "shared/**/*", "vite.config.mjs"],
-  "exclude": ["shared/dist"]
+  "exclude": ["dist"]
 }

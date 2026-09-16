@@ -12,7 +12,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { parsePage, serializePage } = require('../electron/astroParser.js');
+const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
 
 const ROOT = path.join(__dirname, '..');
 const CORPUS_DIR = path.join(ROOT, 'test', 'corpus');

@@ -9,14 +9,14 @@ import {
   serializeNodes,
   serializePage,
   serializePageMarked,
-} from '../../electron/astroParser.js';
+} from '../../dist/electron/astroParser.js';
 import {
   assertTreeInvariants,
   parsePageNode,
   parsePageResult,
-} from '../../shared/dist/page-node.js';
-import { LIMITS } from '../../shared/dist/limits.js';
-import type { ParserNode } from '../../electron/astroParser.types.js';
+} from '../../dist/shared/page-node.js';
+import { LIMITS } from '../../dist/shared/limits.js';
+import type { ParserNode } from '../../dist/electron/astroParser.types.js';
 
 test('block loops and import slots survive the real IPC contract', () => {
   const source = [

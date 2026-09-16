@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import { Buffer } from 'node:buffer';
 import { spawn, type PseudoTerminal, type SpawnOptions } from 'node-pty';
 
-import { toRecord } from '../shared/dist/record.js';
+import { toRecord } from '../shared/record.js';
 
 // Embedded terminal — a real login shell in the open project, hosted by
 // node-pty and rendered by xterm in the bottom dock.

@@ -62,7 +62,10 @@ const check = (what, condition, detail) => {
   // when there is no selection to ask about — which is the variables panel's
   // whole situation.
   {
-    const preload = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
+    const preload = fs.readFileSync(
+      path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
+      'utf8',
+    );
     check(
       'with no element named, the page answers about itself',
       /const host = els\[0\] \|\| document\.documentElement;/.test(preload),

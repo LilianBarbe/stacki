@@ -1,5 +1,5 @@
 {
-  "//": "Emits shared/ to shared/dist as CJS + declarations: Electron main (CJS) requires it, Vite and node --test consume the same artifact. Strict flags mirror the root config.",
+  "//": "Emit CommonJS contracts and declarations to dist/shared for Electron and Node.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "CommonJS",
@@ -19,7 +19,7 @@
     "verbatimModuleSyntax": false,
 
     "declaration": true,
-    "outDir": "dist",
+    "outDir": "../dist/shared",
     "rootDir": ".",
     "skipLibCheck": true,
     "esModuleInterop": true,

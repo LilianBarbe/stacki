@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { toArray } from '../shared/dist/record.js';
+import { toArray } from '../shared/record.js';
 import { parseConflict, renderResolved } from './conflicts.js';
 import type { ConflictPart } from './conflicts.js';
 import { gitErrorDetail, gitErrorFull } from './git.js';

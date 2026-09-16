@@ -15,8 +15,8 @@ import {
   parsePageModel,
   parsePageResult,
   assertTreeInvariants,
-} from '../../shared/dist/page-node.js';
-import { LIMITS } from '../../shared/dist/limits.js';
+} from '../../dist/shared/page-node.js';
+import { LIMITS } from '../../dist/shared/limits.js';
 
 // Helpers return producer-shaped plain data; branding happens in the parser.
 const text = (id: string, value: string): unknown => ({ kind: 'text', id, value });

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { toRecord, toArray } from '../shared/dist/record.js';
+import { toRecord, toArray } from '../shared/record.js';
 import * as frontmatter from './formats/frontmatter.js';
 import * as jsonFormat from './formats/json.js';
 import * as yamlFormat from './formats/yaml.js';

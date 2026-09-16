@@ -6,7 +6,7 @@
 // Never pretty-printed: a record spread over several lines is several broken
 // records.
 
-import { toRecord, toArray } from '../../shared/dist/record.js';
+import { toRecord, toArray } from '../../shared/record.js';
 
 interface LineInfo {
   readonly index: number;

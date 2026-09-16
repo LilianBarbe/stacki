@@ -32,7 +32,7 @@ const check = (what, condition, detail) => {
 };
 const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 
-const PRELOAD = path.join(__dirname, '..', 'electron', 'preload.js');
+const PRELOAD = path.join(__dirname, '..', 'dist', 'electron', 'preload.js');
 
 // Both frames run the same file; the hash is the only thing that tells them
 // apart, so each one gets its own module instance and its own document.

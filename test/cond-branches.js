@@ -40,7 +40,11 @@ const check = (what, condition, detail) => {
   if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { parsePage, serializePage, serializePageMarked } = require('../electron/astroParser.js');
+const {
+  parsePage,
+  serializePage,
+  serializePageMarked,
+} = require('../dist/electron/astroParser.js');
 
 const page = (body) => `---\n---\n<div>\n${body}\n</div>\n`;
 const first = (src) => parsePage(src).model.nodes[0].children.find((n) => n.kind !== 'text');

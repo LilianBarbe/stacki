@@ -3,13 +3,13 @@
 // reject missing fields, invalid offsets, flags, and oversized collections.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFrontmatter } from '../../electron/frontmatter.js';
+import { readFrontmatter } from '../../dist/electron/frontmatter.js';
 import {
   parseImportSlots,
   parseImportSlot,
   parseImportMember,
-} from '../../shared/dist/frontmatter.js';
-import { LIMITS } from '../../shared/dist/limits.js';
+} from '../../dist/shared/frontmatter.js';
+import { LIMITS } from '../../dist/shared/limits.js';
 
 const member = { name: 'Card', path: './Card.astro', quote: '"', at: 0 };
 const slot = {

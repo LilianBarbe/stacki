@@ -12,9 +12,10 @@ export default defineConfig({
     include: ['stacki/frontmatter'],
   },
   build: {
-    outDir: 'dist',
+    outDir: 'dist/renderer',
+    emptyOutDir: true,
     commonjsOptions: {
-      include: [/node_modules/, /electron[\\/]frontmatter\.js$/, /shared[\\/]dist/],
+      include: [/node_modules/, /electron[\\/]frontmatter\.js$/, /dist[\\/]shared/],
     },
   },
 });

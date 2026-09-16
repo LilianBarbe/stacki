@@ -10,7 +10,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const cssVars = require('../electron/cssVars.js');
+const cssVars = require('../dist/electron/cssVars.js');
 
 const failures = [];
 let checked = 0;

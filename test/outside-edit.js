@@ -40,7 +40,7 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   // The real client, in a real document, told by a message rather than by HMR.
   const bundle = path.join(buildDir, 'morph-client.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'electron', 'morphClient.js')],
+    entryPoints: [path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js')],
     outfile: bundle,
     bundle: true,
     format: 'cjs',
@@ -126,8 +126,11 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
   check('and with no frame it says so rather than throwing', tellCanvas({ type: 'avb:patch-now' }) === false);
 
   // --- who says it, and when -----------------------------------------------------
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
-  const watcher = fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+  const watcher = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'projectWatcher.js'),
+    'utf8',
+  );
   check(
     'a change the app did not make is marked as coming from outside',
     /if \(isSelfWrite\(changed\)\) \{\s*return;\s*\}\s*notePageMayHaveChanged\(true\);/.test(watcher),
@@ -150,7 +153,10 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
     /if \(d\?\.external\) \{tellCanvas\(\{ type: 'avb:patch-now' \}\);\}/.test(app),
     'nothing reaches the canvas when the socket is quiet'
   );
-  const morph = fs.readFileSync(path.join(__dirname, '..', 'electron', 'morphClient.js'), 'utf8');
+  const morph = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js'),
+    'utf8',
+  );
   check(
     'and the client still listens to the socket as well',
     /import\.meta\.hot\.on\('avb:page-changed', update\)/.test(morph),

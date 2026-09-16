@@ -26,7 +26,14 @@ const check = (what, condition, detail) => {
   if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { renameVariables, setSectionTitle, removeSection, addSection, moveHeading, readVariables } = require('../electron/cssVars.js');
+const {
+  renameVariables,
+  setSectionTitle,
+  removeSection,
+  addSection,
+  moveHeading,
+  readVariables,
+} = require('../dist/electron/cssVars.js');
 
 // A project of the shape the screenshots came from: a group of sizes, a couple
 // of modes declaring the same names, references from another stylesheet and

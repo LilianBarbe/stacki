@@ -62,7 +62,10 @@ const FOOTER = `
 
     // morphClient is an ES module the dev server serves to the page; the one
     // function under test is lifted out rather than imported.
-    const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'morphClient.js'), 'utf8');
+    const source = fs.readFileSync(
+      path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js'),
+      'utf8',
+    );
     const start = source.indexOf('const isAnchor =');
     const end = source.indexOf('// Never looked inside.');
     const syncAnchors = new Function(
@@ -148,7 +151,7 @@ const FOOTER = `
       return id === 'electron' ? electron : realRequire.apply(this, arguments);
     };
     process.isMainFrame = false;
-    require(path.join(__dirname, '..', 'electron', 'preload.js'));
+    require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
     Module.prototype.require = realRequire;
     await settle(60);
 

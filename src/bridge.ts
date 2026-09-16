@@ -7,7 +7,7 @@ import type { PreloadBridge } from '../shared/preload-api';
 //
 // New and converted code imports from here, not from window.avb.
 
-// Vite consumes the ESM sources; shared/dist is CommonJS for Electron and Node.
+// Vite consumes the ESM sources; dist/shared is CommonJS for Electron and Node.
 import { toProjectPath, toFilePath } from '../shared/brand';
 import { parseScanResult, type ScanResult } from '../shared/scan';
 import { parsePageReadResult, type ParsePageResult } from '../shared/page-node';

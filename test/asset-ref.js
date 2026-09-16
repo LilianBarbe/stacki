@@ -38,8 +38,8 @@ const check = (what, condition, detail) => {
   if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const jc = require('../electron/jsCollections.js');
-const ar = require('../electron/assetRefs.js');
+const jc = require('../dist/electron/jsCollections.js');
+const ar = require('../dist/electron/assetRefs.js');
 
 const SCAN = { requireExport: false, allowPlainLists: true };
 const read = (src) => jc.findCollections(src, SCAN).find((c) => c.name === 'SCREENS');
@@ -270,7 +270,7 @@ const SCREENS = [
     /pickAsset: model\.rel\.includes\('#'\) \? model\.pickAsset : undefined/.test(view),
     'a JSON file would be handed an identifier'
   );
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
   check(
     "a picked public/ file is a URL, not an import",
     /if \(root === 'public'\) \{\s*return \{ value: '\/' \+/.test(main),

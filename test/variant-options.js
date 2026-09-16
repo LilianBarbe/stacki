@@ -113,7 +113,7 @@ const BUTTON = [
   const { createRoot } = require('react-dom/client');
   const { act } = React;
   const PropsPanel = require(bundle).default;
-  const { parsePropSchema } = require('../electron/astroParser.js');
+  const { parsePropSchema } = require('../dist/electron/astroParser.js');
 
   const parsed = parsePropSchema(BUTTON);
   const schema = Array.isArray(parsed) ? parsed : [...parsed.values()];

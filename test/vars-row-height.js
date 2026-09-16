@@ -63,7 +63,7 @@ const STYLESHEET = `:root {
   fs.mkdirSync(path.join(dir, 'src', 'styles'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'src', 'styles', 'tokens.css'), STYLESHEET);
 
-  const cssVars = require('../electron/cssVars.js');
+  const cssVars = require('../dist/electron/cssVars.js');
   const data = cssVars.readVariables(dir);
 
   const esbuild = require('esbuild');

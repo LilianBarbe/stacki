@@ -34,7 +34,7 @@ const check = (what, condition, detail) => {
   if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { parsePage, serializePage, locateSelection } = require('../electron/astroParser.js');
+const { parsePage, serializePage, locateSelection } = require('../dist/electron/astroParser.js');
 
 const os = require('os');
 

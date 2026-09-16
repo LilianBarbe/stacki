@@ -260,7 +260,7 @@ const stacked = (n, a = 0.14) => 1 - (1 - a) ** n;
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false; // the preview frame, not the app's own window
-  require(path.join(__dirname, '..', 'electron', 'preload.js'));
+  require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
   Module.prototype.require = realRequire;
   // The markers are walked when the document is done parsing, which for jsdom
   // is a turn or two after it is handed over.

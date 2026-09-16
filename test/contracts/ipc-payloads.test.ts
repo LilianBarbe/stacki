@@ -7,9 +7,9 @@ import {
   IPC_PAYLOADS,
   parseIpcPayload,
   CLIPBOARD_BYTES_MAX,
-} from '../../shared/dist/ipc-payloads.js';
-import { BOUNDARY_LIMITS, data, object, text, optional } from '../../shared/dist/boundary.js';
-import type { IpcContract } from '../../shared/dist/ipc.js';
+} from '../../dist/shared/ipc-payloads.js';
+import { BOUNDARY_LIMITS, data, object, text, optional } from '../../dist/shared/boundary.js';
+import type { IpcContract } from '../../dist/shared/ipc.js';
 
 const noPayload = new Set([
   'project:pending',

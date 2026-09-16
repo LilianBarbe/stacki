@@ -1,7 +1,7 @@
 // The mutable tree is the existing editor protocol. Keep its mutation local to
 // parser construction and chunk resolution until the planned intent conversion.
 // Kind-specific payloads remain a union so serializers cannot invent a node.
-import type { Attr } from '../shared/dist/page-node.js';
+import type { Attr } from '../shared/page-node.js';
 import type { FrontmatterModel } from './frontmatter.js';
 
 interface NodeMetadata {

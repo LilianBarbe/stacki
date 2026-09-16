@@ -1,5 +1,5 @@
 {
-  "//": "Emit beside TypeScript to preserve require paths; Electron needs CommonJS output.",
+  "//": "Emit the main process and its shared contracts under dist, preserving relative imports.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "CommonJS",
@@ -15,8 +15,9 @@
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
     "verbatimModuleSyntax": false,
-    "outDir": ".",
-    "rootDir": ".",
+    "outDir": "../dist",
+    "rootDir": "..",
+    "declaration": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true

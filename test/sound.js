@@ -517,7 +517,7 @@ function fakeAudio() {
       !/const dragAlpha = useDrag\(.*, true\)/.test(picker)
   );
 
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
   check('the setting is a menu item', /label: 'Interface Sounds'/.test(main));
   check('a checkbox, so it reads as a toggle', /type: 'checkbox'/.test(main));
   check('off unless it has been turned on', /SETTINGS_DEFAULTS = \{ sound: false \}/.test(main));

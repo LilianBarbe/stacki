@@ -9,7 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { openingBounds, MIN_WIDTH, MIN_HEIGHT } = require('../electron/windowBounds.js');
+const { openingBounds, MIN_WIDTH, MIN_HEIGHT } = require('../dist/electron/windowBounds.js');
 
 const failures = [];
 let checked = 0;
@@ -53,7 +53,7 @@ check(
 );
 
 // --- the app opens with them -------------------------------------------------
-const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
 check('the window is opened with these bounds', /\.\.\.bounds,/.test(main), 'the window still opens at its own size');
 check(
   'measured from the display the pointer is on',

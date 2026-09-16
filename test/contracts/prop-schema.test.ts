@@ -7,10 +7,10 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseField, parsePropSchema } from '../../shared/dist/prop-schema.js';
-import { parsePropSchema as parseAstroSchema } from '../../electron/astroParser.js';
-import { parseScanResult } from '../../shared/dist/scan.js';
-import { LIMITS } from '../../shared/dist/limits.js';
+import { parseField, parsePropSchema } from '../../dist/shared/prop-schema.js';
+import { parsePropSchema as parseAstroSchema } from '../../dist/electron/astroParser.js';
+import { parseScanResult } from '../../dist/shared/scan.js';
+import { LIMITS } from '../../dist/shared/limits.js';
 
 const goodSchema = new Map<string, unknown>([
   [

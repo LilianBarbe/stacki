@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { toRecord, toArray } from '../shared/dist/record.js';
+import { toRecord, toArray } from '../shared/record.js';
 
 // Finds the files that import a JSON collection, and rewrites them to stop:
 // `import clients from '../data/clients.json'` becomes `const clients = []`,

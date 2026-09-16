@@ -1,4 +1,4 @@
-import { LIMITS } from '../shared/dist/limits.js';
+import { LIMITS } from '../shared/limits.js';
 // Disk and dev-server data are untrusted, even when a previous app run wrote
 // them. Keep bounds and parsing separate from handlers so failures are testable.
 import {
@@ -13,9 +13,9 @@ import {
   pathText,
   record,
   text,
-} from '../shared/dist/boundary.js';
-import { toArray, toRecord } from '../shared/dist/record.js';
-import type { Data } from '../shared/dist/boundary.js';
+} from '../shared/boundary.js';
+import { toArray, toRecord } from '../shared/record.js';
+import type { Data } from '../shared/boundary.js';
 import type { ContentCollection } from './contentEntries.js';
 import type { MarkdownModel } from './markdownParser.js';
 import { parseSerializeNodes } from './astroParser.validation.js';

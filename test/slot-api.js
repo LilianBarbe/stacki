@@ -29,7 +29,7 @@ const check = (what, condition, detail) => {
   if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { parseSlots, defaultSlotInline } = require('../electron/astroParser.js');
+const { parseSlots, defaultSlotInline } = require('../dist/electron/astroParser.js');
 
 const page = (frontmatter, body) => `---\n${frontmatter}\n---\n${body}\n`;
 const slots = (fm, body) => JSON.stringify(parseSlots(page(fm, body)));

@@ -17,7 +17,7 @@
 
 import * as YAML from 'yaml';
 
-import { toRecord, toArray } from '../../shared/dist/record.js';
+import { toRecord, toArray } from '../../shared/record.js';
 import { transplant } from './transplant.js';
 
 const PARSE_OPTIONS = { keepSourceTokens: true };

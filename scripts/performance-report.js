@@ -21,7 +21,7 @@ function load(source) {
   return { diff, allocation: () => allocated, reset: () => { allocated = 0; } };
 }
 
-const current = load(fs.readFileSync(path.join(root, file), 'utf8'));
+const current = load(fs.readFileSync(path.join(root, 'dist', file), 'utf8'));
 const ref = process.argv[2];
 const before = ref ? load(execFileSync('git', ['show', `${ref}:${file}`], { cwd: root, encoding: 'utf8' })) : null;
 const keys = Array.from({ length: 2000 }, (_, i) => `node:${i}`);

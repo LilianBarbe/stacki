@@ -31,7 +31,7 @@ const check = (what, condition, detail) => {
 };
 
 const ROOT = path.join(__dirname, '..');
-const PRELOAD = path.join(ROOT, 'electron', 'preload.js');
+const PRELOAD = path.join(ROOT, 'dist', 'electron', 'preload.js');
 const SCOPE = 'src/components/Button.astro|';
 const ROOT_PATH = `${SCOPE}0.0.0`;
 

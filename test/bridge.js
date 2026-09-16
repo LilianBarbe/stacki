@@ -57,14 +57,14 @@ for (const file of sources) {
 }
 
 // --- what the preload exposes -----------------------------------------------
-const preload = fs.readFileSync(path.join(root, 'electron', 'preload.js'), 'utf8');
+const preload = fs.readFileSync(path.join(root, 'dist', 'electron', 'preload.js'), 'utf8');
 const exposed = new Set();
 const bridgeStart = preload.indexOf('contextBridge.exposeInMainWorld');
 const bridgeText = preload.slice(bridgeStart);
 for (const m of bridgeText.matchAll(/^\s+([A-Za-z_$][\w$]*)\s*:/gm)) {exposed.add(m[1]);}
 
 // --- what the main process handles ------------------------------------------
-const main = fs.readFileSync(path.join(root, 'electron', 'main.js'), 'utf8');
+const main = fs.readFileSync(path.join(root, 'dist', 'electron', 'main.js'), 'utf8');
 const handled = new Set();
 // A handler counts wherever it is registered, as long as the main process
 // loads the module that registers it — the terminal keeps its own (and its
@@ -72,7 +72,7 @@ const handled = new Set();
 const mainSide = [main];
 for (const m of main.matchAll(/require\(\s*['"]\.\/([\w.-]+?)(?:\.js)?['"]\s*\)/g)) {
   try {
-    mainSide.push(fs.readFileSync(path.join(root, 'electron', `${m[1]}.js`), 'utf8'));
+    mainSide.push(fs.readFileSync(path.join(root, 'dist', 'electron', `${m[1]}.js`), 'utf8'));
   } catch {
     /* not a file of ours */
   }

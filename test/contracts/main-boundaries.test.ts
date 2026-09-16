@@ -8,9 +8,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as net from 'node:net';
 import { mainHarness } from './main-harness.ts';
-import { IPC_PAYLOADS } from '../../shared/dist/ipc-payloads.js';
-import { toRecord } from '../../shared/dist/record.js';
-import { parseMarkdownPage, serializeMarkdownPage } from '../../electron/markdownParser.js';
+import { IPC_PAYLOADS } from '../../dist/shared/ipc-payloads.js';
+import { toRecord } from '../../dist/shared/record.js';
+import { parseMarkdownPage, serializeMarkdownPage } from '../../dist/electron/markdownParser.js';
 import {
   parseMarkdownModel,
   parseContentConfig,
@@ -20,8 +20,8 @@ import {
   parseRecents,
   parseAliases,
   parseAstroLock,
-} from '../../electron/main.validation.js';
-import { directoryBudget, MAIN_LIMITS } from '../../electron/main.bounds.js';
+} from '../../dist/electron/main.validation.js';
+import { directoryBudget, MAIN_LIMITS } from '../../dist/electron/main.bounds.js';
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-main-contract-'));
@@ -43,7 +43,7 @@ function fixture() {
 test('the complete channel inventory matches real main and terminal registration', (context) => {
   const harness = fixture();
   context.after(harness.dispose);
-  const terminal = fs.readFileSync(path.resolve('electron/terminal.js'), 'utf8');
+  const terminal = fs.readFileSync(path.resolve('dist/electron/terminal.js'), 'utf8');
   const terminalChannels = [...terminal.matchAll(/ipcMain\.handle\(['"]([^'"]+)['"]/g)].map(
     (match) => match[1],
   );

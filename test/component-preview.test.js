@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
-const { parsePage } = require('../electron/astroParser.js');
+const { parsePage } = require('../dist/electron/astroParser.js');
 const settle = () => new Promise((resolve) => setTimeout(resolve, 15));
 const deferred = () => {
   let resolve, reject;

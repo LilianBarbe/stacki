@@ -44,7 +44,7 @@ const check = (what, condition, detail) => {
     logLevel: 'silent',
   });
   const { dataTree } = require(out);
-  const { parsePropSchema } = require('../electron/astroParser.js');
+  const { parsePropSchema } = require('../dist/electron/astroParser.js');
 
   const itemOf = (context, name = 'service') =>
     dataTree(context).find((n) => n.path === name) || null;

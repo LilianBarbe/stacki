@@ -1,6 +1,6 @@
 import { createIpcRegistrar } from './ipc.js';
 import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds.js';
-import { definedFields } from '../shared/dist/boundary.js';
+import { definedFields } from '../shared/boundary.js';
 import { gitErrorDetail } from './git.js';
 import { userInfo } from 'os';
 import type {
@@ -10,9 +10,9 @@ import type {
   OpenDialogOptions,
 } from 'electron';
 import type { ChildProcess, ExecFileOptions } from 'child_process';
-import { toRecord, toArray } from '../shared/dist/record.js';
-import { assert } from '../shared/dist/assert.js';
-import type { IpcPayloads } from '../shared/dist/ipc-payloads.js';
+import { toRecord, toArray } from '../shared/record.js';
+import { assert } from '../shared/assert.js';
+import type { IpcPayloads } from '../shared/ipc-payloads.js';
 import type { ParserNode, ParserPageModel, SchemaField } from './astroParser.types.js';
 import { parseSerializePage } from './astroParser.validation.js';
 import { parseMarkdownModel } from './main.validation.js';
@@ -272,7 +272,7 @@ function createWindow() {
   if (process.env['VITE_DEV_SERVER_URL']) {
     mainWindow.loadURL(process.env['VITE_DEV_SERVER_URL']);
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   }
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

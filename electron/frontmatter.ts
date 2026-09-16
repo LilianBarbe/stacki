@@ -2,10 +2,10 @@
 // editable records; their slots retain the code and whitespace between them.
 // No renderer or Node dependencies: this module is also loaded by Astro.
 
-import { assert } from '../shared/dist/assert.js';
+import { assert } from '../shared/assert.js';
 
-import type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/dist/frontmatter.js';
-export type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/dist/frontmatter.js';
+import type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter.js';
+export type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter.js';
 
 export interface FrontmatterModel {
   readonly imports: readonly ImportMember[];

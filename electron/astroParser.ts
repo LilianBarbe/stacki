@@ -19,10 +19,10 @@ import path from 'node:path';
 import { decodeEntities, encodeText } from './htmlText.js';
 import { readFrontmatter, writeFrontmatter } from './frontmatter.js';
 import type { FrontmatterModel, ImportMember } from './frontmatter.js';
-import { assertTreeInvariants } from '../shared/dist/page-node.js';
-import type { Attr } from '../shared/dist/page-node.js';
-import { assert } from '../shared/dist/assert.js';
-import { LIMITS } from '../shared/dist/limits.js';
+import { assertTreeInvariants } from '../shared/page-node.js';
+import type { Attr } from '../shared/page-node.js';
+import { assert } from '../shared/assert.js';
+import { LIMITS } from '../shared/limits.js';
 import type {
   ParserNode,
   MapNode,

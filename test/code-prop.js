@@ -178,7 +178,9 @@ const check = (what, condition, detail) => {
   // destructuring, where there is no type to read, and came back as `other`:
   // no expression, no list control, a page of JSON in a text box.
   {
-    const { parsePropSchema } = require(path.join(__dirname, '..', 'electron', 'astroParser.js'));
+    const { parsePropSchema } = require(
+      path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
+    );
     const withType = (decl) => {
       const src = `---\ninterface Props {\n  ${decl}\n}\nconst { items } = Astro.props;\n---\n<div/>\n`;
       return (parsePropSchema(src).find((p) => p.name === 'items') || {}).type;
@@ -219,7 +221,9 @@ const check = (what, condition, detail) => {
   // a branch offers. A member it cannot read is a prop that branch does not
   // know it has.
   {
-    const { parsePropSchema } = require(path.join(__dirname, '..', 'electron', 'astroParser.js'));
+    const { parsePropSchema } = require(
+      path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'),
+    );
     const src = `---\ntype Props =\n  | { variant: "list"; items: { title: string; text: string }[] }\n  | { variant: "plain"; text: string };\nconst { variant } = Astro.props as Props;\n---\n<div/>\n`;
     const schema = parsePropSchema(src);
     const union = (schema.find((p) => p.unions) || {}).unions || [];

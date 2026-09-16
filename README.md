@@ -99,3 +99,15 @@ self-closing component instances with props. The editor writes that model back
 as clean `.astro` source. Pages containing arbitrary HTML, expressions, or
 nested children fall back to the built-in code editor — nothing is ever
 rewritten destructively.
+
+## Build output
+
+`npm run build` starts from a clean `dist/` directory and writes the Electron
+CommonJS runtime to `dist/electron/`, shared contracts to `dist/shared/`, and
+the Vite renderer to `dist/renderer/`. Content workers and runtime icons are
+copied under `dist/` too. `npm run dev` rebuilds the runtime and serves the
+renderer through Vite. Only `dist/` needs ignoring for compiler output;
+JavaScript files elsewhere in the repository are authored source.
+
+Use `npm run build:clean` to remove generated output. Build before running an
+individual runtime test; `npm test` performs the clean build automatically.

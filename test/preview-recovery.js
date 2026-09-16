@@ -43,7 +43,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   // --- The probe, against a server that really answers ----------------------
   {
-    const { probeUrl } = require('../electron/devProbe.js');
+    const { probeUrl } = require('../dist/electron/devProbe.js');
 
     // Flips between serving a page and serving an error, like a dev server
     // either side of a compile error.
@@ -247,8 +247,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // the rule: every change under src/ says so, before any of the branches that
   // return for the kinds this app does not edit.
   {
-    const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
-    const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8');
+    const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
+    const source = fs.readFileSync(
+      path.join(__dirname, '..', 'dist', 'electron', 'projectWatcher.js'),
+      'utf8',
+    );
     const at = source.indexOf('watchers.push(watch(srcDir');
     const handler = source.slice(at, source.indexOf('const publicDir', at));
     check('the src watcher is still there', at !== -1);

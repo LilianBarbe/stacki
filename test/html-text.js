@@ -26,8 +26,8 @@ const check = (what, condition, detail) => {
   if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { decodeEntities, encodeText } = require('../electron/htmlText.js');
-const { parsePage, serializePage } = require('../electron/astroParser.js');
+const { decodeEntities, encodeText } = require('../dist/electron/htmlText.js');
+const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
 
 // ── Reading ─────────────────────────────────────────────────────────────────
 const reads = (raw, want) =>

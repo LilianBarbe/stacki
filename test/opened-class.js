@@ -29,7 +29,7 @@ const check = (what, condition, detail) => {
   if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const PRELOAD = path.join(__dirname, '..', 'electron', 'preload.js');
+const PRELOAD = path.join(__dirname, '..', 'dist', 'electron', 'preload.js');
 const { JSDOM } = require('jsdom');
 
 const marked = (p, html) => `<!--avb-s:${p}-->${html}<!--avb-e:${p}-->`;

@@ -12,7 +12,7 @@
 // Only the array's own span is replaced on write, so everything around it —
 // imports, comments above the export, other constants — is untouched.
 
-import { toRecord } from '../shared/dist/record.js';
+import { toRecord } from '../shared/record.js';
 
 const ID_KEY = /^[A-Za-z_$][\w$]*$/;
 

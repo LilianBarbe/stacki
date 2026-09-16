@@ -38,7 +38,10 @@ global.document = dom.window.document;
 
 // morphClient is an ES module the dev server serves to the page; the patching
 // half is lifted out rather than imported, as in test/comment-region.js.
-const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'morphClient.js'), 'utf8');
+const source = fs.readFileSync(
+  path.join(__dirname, '..', 'dist', 'electron', 'morphClient.js'),
+  'utf8',
+);
 const start = source.indexOf('const isAnchor =');
 const end = source.indexOf('// A script that CHANGED, or one that is GONE');
 const { patchChildren, findLive } = new Function(

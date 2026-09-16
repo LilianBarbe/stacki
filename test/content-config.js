@@ -32,7 +32,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { readContentConfig, stopAllServices } = require('../electron/contentConfig.js');
+const { readContentConfig, stopAllServices } = require('../dist/electron/contentConfig.js');
 
 const DEFAULT_FIXTURE = path.join(os.homedir(), 'Downloads', 'awesome-client-main');
 const projectPath = path.resolve(

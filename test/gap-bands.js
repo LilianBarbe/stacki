@@ -31,7 +31,7 @@ const check = (what, condition, detail) => {
 // and evaluated — which keeps this honest: an edit to preload changes what
 // runs here.
 function loadGapBandsFor(window) {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'), 'utf8');
   const start = src.indexOf('  const gapBandsFor = (el, cs) => {');
   if (start === -1) {throw new Error('gapBandsFor not found in preload.js — has it been renamed?');}
   // The file is now the tsc emit of preload.ts, which indents every level

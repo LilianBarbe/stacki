@@ -352,7 +352,7 @@ const check = (what, condition, detail) => {
   // The picker edits someone's source file. What matters is that what it adds
   // comes back the same way (the marker included, or cleanup could never find
   // it again) and that removing it leaves the file as it was.
-  const astro = require(path.join(__dirname, '..', 'electron', 'astroParser.js'));
+  const astro = require(path.join(__dirname, '..', 'dist', 'electron', 'astroParser.js'));
   const original = [
     '---',
     'import Layout from "@/layouts/BaseLayout.astro";',

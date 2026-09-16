@@ -34,7 +34,7 @@ const check = (what, condition, detail) => {
 };
 
 const ROOT = path.join(__dirname, '..');
-const ENTRY = path.join('electron', 'astroParser.js');
+const ENTRY = path.join('dist', 'electron', 'astroParser.js');
 
 // Every local file the entry pulls in, transitively. Only relative requires:
 // a bare specifier is a package, which asar handles for the app itself and
@@ -73,7 +73,10 @@ const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 const patterns = pkg.build?.asarUnpack || [];
 const files = [...closureOf(ENTRY)];
 
-check('the parser is what the generated config requires', /astroParser\.js/.test(fs.readFileSync(path.join(ROOT, 'electron', 'main.js'), 'utf8')));
+check(
+  'the parser is what the generated config requires',
+  /astroParser\.js/.test(fs.readFileSync(path.join(ROOT, 'dist', 'electron', 'main.js'), 'utf8')),
+);
 check('and it pulls in more than itself', files.length > 1, files.join(', '));
 for (const rel of files) {
   check(

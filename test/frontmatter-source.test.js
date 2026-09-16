@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { readFrontmatter, writeFrontmatter } = require('../electron/frontmatter');
-const { parsePage, serializePage, serializePageMarked } = require('../electron/astroParser');
+const { readFrontmatter, writeFrontmatter } = require('../dist/electron/frontmatter');
+const { parsePage, serializePage, serializePageMarked } = require('../dist/electron/astroParser');
 
 const SOURCE = `---
 

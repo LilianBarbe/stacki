@@ -28,7 +28,7 @@ const check = (what, condition, detail) => {
   if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
 };
 
-const { createSelfWrites } = require('../electron/selfWrites.js');
+const { createSelfWrites } = require('../dist/electron/selfWrites.js');
 
 // A filesystem that says what the test wants it to say, and a clock the test
 // moves by hand.
@@ -95,11 +95,13 @@ disk.delete(PAGE);
 check('a file that has since gone is not our write either', writes.isEcho(PAGE) === false);
 
 // --- the watcher asks it ---------------------------------------------------------
-const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
 check(
   'the watcher asks about every kind of file it hears about',
   /watchProject\(\{[\s\S]*?isSelfWrite/.test(main) &&
-    /if \(isSelfWrite\(changed\)\) \{\s*return;\s*\}/.test(fs.readFileSync(path.join(__dirname, '..', 'electron', 'projectWatcher.js'), 'utf8')),
+    /if \(isSelfWrite\(changed\)\) \{\s*return;\s*\}/.test(
+      fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'projectWatcher.js'), 'utf8'),
+    ),
   'the watcher must receive the self-write guard before routing events'
 );
 check(

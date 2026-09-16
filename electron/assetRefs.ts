@@ -140,7 +140,7 @@ function importSpecFor({ imports = [], srcRelative, relative }: ImportSpecContex
   return relative;
 }
 
-import { toRecord } from '../shared/dist/record.js';
+import { toRecord } from '../shared/record.js';
 
 // A value the CMS carries as source — `{ __expr: "dailyDevotionals" }` — with
 // the file that name is bound to written beside it, so the field can show the

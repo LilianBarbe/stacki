@@ -114,7 +114,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     return id === 'electron' ? electron : realRequire.apply(this, arguments);
   };
   process.isMainFrame = false; // the preview frame, not the app's own window
-  require(path.join(__dirname, '..', 'electron', 'preload.js'));
+  require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
   Module.prototype.require = realRequire;
   await wait(50);
 

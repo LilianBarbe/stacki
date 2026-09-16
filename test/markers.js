@@ -25,7 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { parsePage, serializePageMarked } = require('../electron/astroParser.js');
+const { parsePage, serializePageMarked } = require('../dist/electron/astroParser.js');
 
 // Markers can't go inside an inline run — each one is written on its own line,
 // and those newlines render as spaces, which moves the words. The nodes in

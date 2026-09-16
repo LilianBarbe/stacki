@@ -20,7 +20,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
-const { mergeBranch, deleteBranch, switchBranch, resolveMerge } = require('../electron/gitBranches.js');
+const {
+  mergeBranch,
+  deleteBranch,
+  switchBranch,
+  resolveMerge,
+} = require('../dist/electron/gitBranches.js');
 
 const failures = [];
 let checked = 0;

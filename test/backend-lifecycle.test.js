@@ -4,10 +4,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
+const { createRequire } = require('node:module');
 const { EventEmitter } = require('node:events');
-const { createSerialQueue } = require('../electron/serialQueue');
-const { watchProject } = require('../electron/projectWatcher');
-const { createSelfWrites } = require('../electron/selfWrites');
+const { createSerialQueue } = require('../dist/electron/serialQueue');
+const { watchProject } = require('../dist/electron/projectWatcher');
+const { createSelfWrites } = require('../dist/electron/selfWrites');
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -50,7 +51,11 @@ function contentHarness(t) {
       return child;
     } },
   };
-  const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'contentConfig.js'), 'utf8');
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'contentConfig.js'),
+    'utf8',
+  );
+  const runtimeRequire = createRequire(path.join(__dirname, '../dist/electron/main.js'));
   const mod = { exports: {} };
   const fn = vm.runInNewContext('(function(require, module, __dirname, exports) {' + source + '\n})', {
     process,
@@ -61,7 +66,12 @@ function contentHarness(t) {
     },
     clearTimeout: (timer) => timers.delete(timer),
   });
-  fn((name) => mocks[name] || require(name), mod, path.join(__dirname, '..', 'electron'), mod.exports);
+  fn(
+    (name) => mocks[name] || runtimeRequire(name),
+    mod,
+    path.join(__dirname, '..', 'dist', 'electron'),
+    mod.exports,
+  );
   t.after(() => {
     mod.exports.stopAllServices();
     assert.equal(timers.size, 0, 'stopping releases every timeout');
@@ -226,7 +236,7 @@ test('closing a project releases retained self-write file contents', () => {
 });
 
 test('dev starts share a result only for the same project and serialize different projects', async () => {
-  const { createKeyedQueue } = require('../electron/serialQueue');
+  const { createKeyedQueue } = require('../dist/electron/serialQueue');
   const queue = createKeyedQueue();
   const release = deferred();
   const started = [];
@@ -242,7 +252,7 @@ test('dev starts share a result only for the same project and serialize differen
 });
 
 test('closing a project cancels active and queued starts without poisoning the next start', async () => {
-  const { createKeyedQueue } = require('../electron/serialQueue');
+  const { createKeyedQueue } = require('../dist/electron/serialQueue');
   const queue = createKeyedQueue();
   const release = deferred();
   const active = queue.run('one', async (assertActive) => { await release.promise; assertActive(); });
@@ -257,12 +267,16 @@ test('closing a project cancels active and queued starts without poisoning the n
 });
 
 function loadThumbs(BrowserWindow) {
-  const source = fs.readFileSync(path.join(__dirname, '..', 'electron', 'thumbs.js'), 'utf8');
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'thumbs.js'),
+    'utf8',
+  );
+  const runtimeRequire = createRequire(path.join(__dirname, '../dist/electron/main.js'));
   const mod = { exports: {} };
   vm.runInNewContext('(function(require, module, exports) {' + source + '\n})', {
     setTimeout: (callback, ms) => setTimeout(callback, Math.min(ms, 5)),
     clearTimeout,
-  })((name) => name === 'electron' ? { BrowserWindow } : require(name), mod, mod.exports);
+  })((name) => name === 'electron' ? { BrowserWindow } : runtimeRequire(name), mod, mod.exports);
   return mod.exports;
 }
 
@@ -350,7 +364,10 @@ test('legacy schema conversion resolves Astro private dependencies without root 
     "exports.zodToJsonSchema = (schema, options) => ({ source: schema.source, strategy: options.effectStrategy });");
   fs.symlinkSync(astro, path.join(modules, 'astro'), process.platform === 'win32' ? 'junction' : 'dir');
   const staged = path.join(staging, 'schemaTools.mjs');
-  fs.copyFileSync(path.join(__dirname, '..', 'electron', 'content', 'schemaTools.mjs'), staged);
+  fs.copyFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'content', 'schemaTools.mjs'),
+    staged,
+  );
   assert.equal(fs.existsSync(path.join(modules, 'zod-to-json-schema')), false);
   const { toJsonSchema } = await import(require('node:url').pathToFileURL(staged).href);
   assert.deepEqual(toJsonSchema({ source: 'private Astro dependency' }), {

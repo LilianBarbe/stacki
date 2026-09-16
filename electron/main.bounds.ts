@@ -2,7 +2,7 @@
 // for large sites while making a pathological project fail near its cause.
 import * as fs from 'fs';
 import * as path from 'path';
-import { assert } from '../shared/dist/assert.js';
+import { assert } from '../shared/assert.js';
 
 export const MAIN_LIMITS = {
   sourceBytesMax: 10 * 1024 * 1024,

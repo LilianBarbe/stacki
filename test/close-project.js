@@ -182,7 +182,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
 
 
   // --- what main does with it -------------------------------------------------------------
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
   check('the File menu offers a way in', /label: 'Open Project…'/.test(main), 'no Open Project item');
   check('and a way out', /label: 'Close Project'/.test(main), 'no Close Project item');
   const close = main.slice(main.indexOf("ipcMain.handle('project:close'"), main.indexOf("app.on('window-all-closed'"));
@@ -206,7 +206,10 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
     'the next window comes back holding the last project'
   );
 
-  const preload = fs.readFileSync(path.join(__dirname, '..', 'electron', 'preload.js'), 'utf8');
+  const preload = fs.readFileSync(
+    path.join(__dirname, '..', 'dist', 'electron', 'preload.js'),
+    'utf8',
+  );
   check('the app can ask for both', /closeProject: invoke\('project:close'\)/.test(preload) && /pendingProject: invoke\('project:pending'\)/.test(preload), 'the bridge is missing one');
 
   if (failures.length) {

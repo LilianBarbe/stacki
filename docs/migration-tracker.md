@@ -8,11 +8,22 @@ then update the counts below.
 ## Handoff state (read this first)
 
 The `v0.1.26` startup repair, Astro parser conversion, and **Electron main
-conversion** are complete. `electron/main.ts` now emits the ignored `main.js`
-package entry. The invoke inventory is complete: **111 main channels + 4 terminal
+conversion** are complete. `electron/main.ts` now emits `dist/electron/main.js`,
+the package entry. The invoke inventory is complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
 **The Electron, root renderer, and UI queues are complete. Continue through
 `src/panels` (PropsPanel, VariablesPanel, VariablesView, and CmsView are complete; GitChip in progress), then `src/App.jsx`.**
+
+Build-output checkpoint: all generated code now lives under the root `dist/`:
+`dist/electron` for main/preload/preview modules, `dist/shared` for contracts,
+and `dist/renderer` for Vite. Runtime workers and icons are staged there too.
+Builds start clean; package entries, unpacked-parser paths, tests, and development
+scripts use the new layout. Removed per-file ignore rules and the last tracked
+compiler artifact (`electron/git.js`). New layout regressions pass; contracts
+now total 159 tests. The full gate passes 138/138 commands (102.8s), the real
+Electron/Astro lifecycle passes, and an unsigned macOS arm64 package contains the
+complete runtime with a working unpacked parser. Resume GitChip's publish flow;
+the panel counts below are unchanged.
 
 Main verification: 26 old/new handler and output comparisons matched, including
 byte-identical generated Astro config, preview page, and both API endpoints.
@@ -47,7 +58,7 @@ stubs `window.avb`), and the first live run exposed a wrong wire shape —
 fixed in b94457c, see Phase 2. The repo runs end-to-end against a real Astro
 site after that fix. The packaged `Stacki.exe` on that machine is a stale
 snapshot (old contract baked into its `dist/`); test from the repo with
-`npm run dev` / `npm start`, which rebuild `shared/dist` first.
+`npm run dev` / `npm start`, which rebuild `dist/shared` first.
 
 Legend: ✅ done · ⏳ in progress · ⬜ pending — no item is "done" until its
 parity check and `npm test` pass on the commit that lands it.
@@ -72,7 +83,7 @@ contracts.
 
 ## Phase 2 — Boundary wiring ✅
 
-`shared/dist` CJS + d.ts emit; `src/bridge.ts` (typed, validating renderer
+`dist/shared` CJS + d.ts emit; `src/bridge.ts` (typed, validating renderer
 bridge); rescan/save drain caps; `assertTreeInvariants`; packaging asarUnpack;
 `electron/astroParser.d.ts` and `electron/contentEntries.d.ts` seed contracts;
 `electron/git.ts` extraction (with gitBranches).

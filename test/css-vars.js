@@ -24,7 +24,7 @@ const {
   readDeclarations,
   groupRules,
   labelForRule,
-} = require('../electron/cssVars.js');
+} = require('../dist/electron/cssVars.js');
 
 const DEFAULT = path.join(os.homedir(), 'Documents', 'Projects', 'lumos-framework');
 const source = path.resolve(process.argv[2] || process.env.STACKI_CSS_FIXTURE || DEFAULT);

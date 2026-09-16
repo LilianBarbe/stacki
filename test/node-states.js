@@ -66,7 +66,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
       return id === 'electron' ? electron : realRequire.apply(this, arguments);
     };
     process.isMainFrame = false;
-    require(path.join(__dirname, '..', 'electron', 'preload.js'));
+    require(path.join(__dirname, '..', 'dist', 'electron', 'preload.js'));
     Module.prototype.require = realRequire;
     await settle(60);
 

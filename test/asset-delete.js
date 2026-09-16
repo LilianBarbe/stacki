@@ -183,7 +183,7 @@ const check = (what, condition, detail) => {
   check('picking hides the menus', tiles().every((t) => !t.querySelector('.asset-tile-menu')), container.innerHTML.slice(0, 200));
 
   // --- the file goes somewhere it can be got back from --------------------------------
-  const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
+  const main = fs.readFileSync(path.join(__dirname, '..', 'dist', 'electron', 'main.js'), 'utf8');
   const handler = main.slice(main.indexOf("ipcMain.handle('assets:delete'"), main.indexOf("// Text assets (css/js"));
   check('deleting sends the file to the bin', /shell\.trashItem\(abs\)/.test(handler), handler.slice(0, 300));
   check('never unlinks it outright', !/unlinkSync|rmSync/.test(handler), handler.slice(0, 300));

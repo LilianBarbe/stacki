@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { readVariables } = require('../electron/cssVars.js');
+const { readVariables } = require('../dist/electron/cssVars.js');
 const { parseCSSVariables, readCSSVariables, VARIABLES_LIMITS } =
   require('./renderer-module')('variablesBridge.ts');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-variable-boundary-'));

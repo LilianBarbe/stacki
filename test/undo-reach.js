@@ -34,8 +34,8 @@ const check = (what, condition, detail) => {
 
 const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
 const app = read('src', 'App.jsx');
-const preload = read('electron', 'preload.js');
-const main = read('electron', 'main.js');
+const preload = read('dist', 'electron', 'preload.js');
+const main = read('dist', 'electron', 'main.js');
 
 // The handler, from the line that registers it to the one that registers redo.
 const undoHandler = app.slice(

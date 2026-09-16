@@ -29,7 +29,7 @@ const check = (what, condition, detail) => {
 (async () => {
   // --- The file keeps them ---------------------------------------------------
   {
-    const { parsePage, serializePage } = require('../electron/astroParser.js');
+    const { parsePage, serializePage } = require('../dist/electron/astroParser.js');
     const findRaw = (nodes) => {
       for (const n of nodes || []) {
         if (n.kind === 'raw') {return n;}

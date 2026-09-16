@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 
-import { toRecord } from '../shared/dist/record.js';
+import { toRecord } from '../shared/record.js';
 
 // Starting a site from a starter.
 //

@@ -10,7 +10,7 @@ const { JSDOM } = require('jsdom');
 const load = require('./renderer-module');
 const { parseMergeResult, parseConflictPart } = load('gitBridge.ts');
 const { initialConflictPicks, choicesForSend, conflictHunks } = load('panels/gitConflictModel.ts');
-const { parseConflict } = require('../electron/conflicts.js');
+const { parseConflict } = require('../dist/electron/conflicts.js');
 const clash = { kind: 'clash', ours: 'ours', theirs: 'theirs', changedBy: 'both' };
 const file = (parts) => ({ path: 'a.astro', ours: 'ours', theirs: 'theirs', parts });
 const conflict = (files) => ({ ok: false, conflicted: true, from: 'main', branch: 'topic', files });

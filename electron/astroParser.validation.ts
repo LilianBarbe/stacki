@@ -1,9 +1,9 @@
 // The serializer also receives legacy renderer and Markdown objects. Validate
 // their wire shape once here; keep original nodes so source spelling survives.
-import { toArray, toRecord } from '../shared/dist/record.js';
-import { LIMITS } from '../shared/dist/limits.js';
-import { parseImportMember, parseImportSlots } from '../shared/dist/frontmatter.js';
-import type { ImportMember } from '../shared/dist/frontmatter.js';
+import { toArray, toRecord } from '../shared/record.js';
+import { LIMITS } from '../shared/limits.js';
+import { parseImportMember, parseImportSlots } from '../shared/frontmatter.js';
+import type { ImportMember } from '../shared/frontmatter.js';
 import type { ParserNode, ParserPageModel } from './astroParser.types.js';
 
 const NODE_VARIANT_FIELDS: Readonly<Record<string, readonly string[]>> = {

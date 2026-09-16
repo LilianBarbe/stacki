@@ -14,7 +14,7 @@
 
 import * as TOML from 'smol-toml';
 
-import { toRecord } from '../../shared/dist/record.js';
+import { toRecord } from '../../shared/record.js';
 
 const parseData = (text: string): unknown => TOML.parse(text);
 
