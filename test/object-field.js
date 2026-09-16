@@ -173,7 +173,7 @@ const check = (what, condition, detail) => {
   check('the field beside it survives the change', /Ministry Area/.test(wrote[wrote.length - 1] || ''), wrote[wrote.length - 1]);
 
   // --- the panel reaches for it --------------------------------------------------
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'), 'utf8');
   check(
     'a code prop holding an object gets the fields',
     /type === 'code' && !showExpr && str && objectFields\(str\)/.test(panel),

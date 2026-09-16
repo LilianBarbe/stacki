@@ -282,6 +282,13 @@ merge, append, and oversized-input behavior. Twelve old/new literal comparisons
 and 17 rendered comparisons match. The gate passes 136/136 commands (102.5s).
 Continue with `PropField`, asset resolution, and the remaining panel dispatcher.
 
+PropsPanel control checkpoint: `PropField.tsx` owns the typed field dispatcher,
+number bounds, reset menus, and imported-asset picker. Asset import resolution
+parses bridge responses, including path bounds; transport failures remain values.
+All 600 old/new control, helper, and rendered comparisons match. The gate passes
+136/136 commands (101.5s), with zero lint warnings in the converted modules.
+Continue with the remaining PropsPanel editors and root dispatcher.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.jsx`                                                                                     | 3,819 — hotspot, convert-then-split, no split in same commit |
@@ -355,7 +362,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 136/136 (102.5s), exit 0. No quarantined tests remain.
+- Gate green at last run: 136/136 (101.5s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.

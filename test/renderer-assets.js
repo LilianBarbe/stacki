@@ -2,7 +2,8 @@
 // rendering. Scripted preload calls distinguish disk failures from contract bugs.
 const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module');
-const { parseAssetEntry, parseAssetEntries, listAssetEntries } = loadRenderer('assetBridge.ts');
+const { parseAssetEntry, parseAssetEntries, listAssetEntries, resolveAssetImport } =
+  loadRenderer('assetBridge.ts');
 const file = {
   rel: 'public/a.png',
   name: 'a.png',
@@ -54,6 +55,28 @@ assert.throws(() => parseAssetEntries({ entries: null }), /Expected array/);
   assert.deepEqual(await listAssetEntries('/p'), { ok: false, error: 'disk unavailable' });
   window.avb.listAssets = async () => ({ entries: [null] });
   await assert.rejects(() => listAssetEntries('/p'), /Expected object/);
+  const request = ['/p', '/p/src/pages/index.astro', '../assets/hero.png'];
+  window.avb.resolveSourcePath = async (payload) => {
+    assert.deepEqual(payload, { projectPath: request[0], fromFile: request[1], spec: request[2] });
+    return { ok: true, rel: 'src/assets/hero.png' };
+  };
+  assert.deepEqual(await resolveAssetImport(...request), { ok: true, rel: 'src/assets/hero.png' });
+  window.avb.resolveSourcePath = async () => ({ ok: false });
+  assert.deepEqual(await resolveAssetImport(...request), { ok: false });
+  window.avb.resolveSourcePath = async () => {
+    throw new Error('unavailable');
+  };
+  assert.deepEqual(await resolveAssetImport(...request), { ok: false });
+  for (const response of [
+    null,
+    {},
+    { ok: true, rel: 0 },
+    { ok: true, rel: 'x'.repeat(32769) },
+    { ok: true, rel: 'bad\0path' },
+  ]) {
+    window.avb.resolveSourcePath = async () => response;
+    await assert.rejects(() => resolveAssetImport(...request));
+  }
   console.log('renderer-assets: parser bounds and operating-failure checks passed');
 })().catch((error) => {
   console.error(error);

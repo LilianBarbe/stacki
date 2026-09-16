@@ -368,7 +368,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- and the field it belongs to ----------------------------------------------------------
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'), 'utf8');
+  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropField.tsx'), 'utf8');
   check(
     'an array prop shows the list rather than a code field',
     /if \(type === 'code' && !showExpr && \(value === undefined \|\| arrayItems\(str\)\)\)/.test(panel),
@@ -376,15 +376,15 @@ const check = (what, condition, detail) => {
   );
   check(
     'a list is something the control can write, so `{}` is a toggle and not the only way',
-    /if \(field\.type === 'code'\) \{return arrayItems\(src\) === null;\}/.test(panel),
+    /if \(field\.type === 'code'\) \{\s*return arrayItems\(src\) === null;\s*\}/.test(panel),
     'an array would always open as an expression'
   );
   check(
     'and the way back keeps the value',
-    /if \(field\.type === 'code' && arrayItems\(src\)\) \{return \{ type: 'expr', value: src \};\}/.test(panel),
+    /if \(field\.type === 'code' && arrayItems\(src\)\) \{\s*return \{ type: 'expr', value: src \};\s*\}/.test(panel),
     'coming back from the code editor would drop the prop'
   );
-  check('the toggle calls it a list', /field\.type === 'code'\) \{return 'list'/.test(panel));
+  check('the toggle calls it a list', /field\.type === 'code'\) \{\s*return 'list'/.test(panel));
 
   // Alone in the box, the button's own top rule would double the box's edge.
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');

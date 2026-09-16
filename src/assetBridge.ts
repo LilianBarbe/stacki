@@ -1,3 +1,6 @@
+import { parseResolvePathResult } from '../shared/ipc';
+import type { ResolvePathResult } from '../shared/ipc';
+import { toProjectPath, toFilePath } from '../shared/brand';
 // Asset cards only consume the entry list. Parse every entry before a path or
 // dimension reaches a DOM attribute; unrelated result metadata stays opaque.
 import { boolean, count, list, object, optional, pathText, record, text } from '../shared/boundary';
@@ -35,4 +38,25 @@ export async function listAssetEntries(
 
 export function onAssetEntriesChanged(callback: () => void): () => void {
   return window.avb.onAssetsChanged(callback);
+}
+
+// Transport failures mean an unavailable preview; a malformed result remains a contract bug.
+export async function resolveAssetImport(
+  projectPath: string,
+  fromFile: string,
+  spec: string,
+): Promise<ResolvePathResult> {
+  const payload = {
+    projectPath: toProjectPath(projectPath),
+    fromFile: toFilePath(fromFile),
+    spec: pathText(spec),
+  };
+  let response: unknown;
+  try {
+    response = await window.avb.resolveSourcePath(payload);
+  } catch {
+    return { ok: false };
+  }
+  const result = parseResolvePathResult(response);
+  return result.ok ? { ok: true, rel: pathText(result.rel) } : result;
 }
