@@ -1,3 +1,29 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
+import { treeBudget, type TreeView } from './treeView';
+interface FrontmatterPage {
+  readonly nodes: readonly TreeView[];
+  readonly extraFrontmatter?: string;
+}
+interface Statement {
+  readonly name: string;
+  readonly statement: string;
+}
+interface NeededImport {
+  readonly name: string;
+  readonly path: string;
+}
+interface FrontmatterRequest {
+  readonly names?: Iterable<string> | null;
+  readonly frontmatter?: string;
+  readonly imports?: readonly NeededImport[];
+  readonly has?: (name: string) => boolean;
+}
+interface NeededFrontmatter {
+  readonly imports: readonly NeededImport[];
+  readonly statements: readonly Statement[];
+}
+
 // The frontmatter a piece of markup depends on, and what happens to it when
 // the markup moves.
 //
@@ -22,12 +48,59 @@ import { findDeclaration, findImportOf, parseDeclarations } from './dataSuggest.
 
 // Words that are the language rather than something the page declared.
 const KEYWORDS = new Set([
-  'true', 'false', 'null', 'undefined', 'new', 'typeof', 'instanceof', 'in', 'of',
-  'await', 'async', 'function', 'return', 'if', 'else', 'for', 'while', 'do',
-  'const', 'let', 'var', 'class', 'extends', 'import', 'from', 'export', 'default',
-  'this', 'void', 'delete', 'yield', 'try', 'catch', 'finally', 'throw', 'switch',
-  'case', 'break', 'continue', 'Astro', 'Math', 'JSON', 'Object', 'Array', 'String',
-  'Number', 'Boolean', 'Date', 'Promise', 'Map', 'Set', 'console', 'globalThis',
+  'true',
+  'false',
+  'null',
+  'undefined',
+  'new',
+  'typeof',
+  'instanceof',
+  'in',
+  'of',
+  'await',
+  'async',
+  'function',
+  'return',
+  'if',
+  'else',
+  'for',
+  'while',
+  'do',
+  'const',
+  'let',
+  'var',
+  'class',
+  'extends',
+  'import',
+  'from',
+  'export',
+  'default',
+  'this',
+  'void',
+  'delete',
+  'yield',
+  'try',
+  'catch',
+  'finally',
+  'throw',
+  'switch',
+  'case',
+  'break',
+  'continue',
+  'Astro',
+  'Math',
+  'JSON',
+  'Object',
+  'Array',
+  'String',
+  'Number',
+  'Boolean',
+  'Date',
+  'Promise',
+  'Map',
+  'Set',
+  'console',
+  'globalThis',
 ]);
 
 // Strings are text, not names. A template is both: the words between the holes
@@ -36,14 +109,16 @@ const KEYWORDS = new Set([
 // template can hold a string that holds a backtick, and a pattern that gets
 // that wrong turns prose into identifiers — `Since` in `\`Since ${year}\`` was
 // read as a name the page might declare.
-function blankStrings(code) {
+function blankStrings(code: string): string {
   let out = '';
   for (let i = 0; i < code.length; i++) {
     const ch = code[i];
     if (ch === '"' || ch === "'") {
       const quote = ch;
       i++;
-      while (i < code.length && code[i] !== quote) {i += code[i] === '\\' ? 2 : 1;}
+      while (i < code.length && code[i] !== quote) {
+        i += code[i] === '\\' ? 2 : 1;
+      }
       out += ' ';
       continue;
     }
@@ -52,8 +127,13 @@ function blankStrings(code) {
       let depth = 0;
       while (i < code.length) {
         const c = code[i];
-        if (c === '\\') { i += 2; continue }
-        if (depth === 0 && c === '`') {break;}
+        if (c === '\\') {
+          i += 2;
+          continue;
+        }
+        if (depth === 0 && c === '`') {
+          break;
+        }
         if (c === '$' && code[i + 1] === '{') {
           depth++;
           out += ' ';
@@ -61,7 +141,12 @@ function blankStrings(code) {
           continue;
         }
         if (depth > 0) {
-          if (c === '}') { depth--; out += ' '; i++; continue }
+          if (c === '}') {
+            depth--;
+            out += ' ';
+            i++;
+            continue;
+          }
           // Inside a hole: code, kept as it is.
           out += c;
           i++;
@@ -78,25 +163,31 @@ function blankStrings(code) {
 }
 
 /** Every identifier a piece of code reads, ignoring strings and property names. */
-export function identifiersIn(code) {
+export function identifiersIn(code: unknown): Set<string> {
   const text = blankStrings(
     String(code || '')
       .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1 '),
   );
-  const out = new Set();
+  const out = new Set<string>();
   const re = /(\.?)\b([A-Za-z_$][\w$]*)\b(\s*:)?/g;
   let m;
   while ((m = re.exec(text)) !== null) {
     const [, dot, name, colon] = m;
-    if (dot) {continue;} // a property of something else, not a name of its own
+    if (dot) {
+      continue;
+    } // a property of something else, not a name of its own
     if (colon && !/\?\s*$/.test(text.slice(0, m.index))) {
       // `key: value` in an object literal — the key is not a reference. A
       // ternary's `:` is, which is what the lookbehind is checking for.
       const before = text.slice(0, m.index);
-      if (/[{,]\s*$/.test(before)) {continue;}
+      if (/[{,]\s*$/.test(before)) {
+        continue;
+      }
     }
-    if (KEYWORDS.has(name)) {continue;}
+    if (name === undefined || KEYWORDS.has(name)) {
+      continue;
+    }
     out.add(name);
   }
   return out;
@@ -107,41 +198,67 @@ export function identifiersIn(code) {
  * the code attached to it — prop expressions, loop heads, conditions, `{expr}`
  * nodes.
  */
-export function namesUsedIn(nodes) {
-  const out = new Set();
-  const walk = (list) => {
+export function namesUsedIn(nodes: readonly TreeView[] | null | undefined): Set<string> {
+  const out = new Set<string>();
+  const visit = treeBudget();
+  const walk = (list: readonly TreeView[] | null | undefined, depth: number): void => {
     for (const node of list || []) {
+      visit(depth);
       // A component is named by being rendered.
-      if (node.kind === 'component' && node.name) {out.add(node.name);}
-      if (node.kind === 'expr' || node.kind === 'raw-line') {
-        for (const n of identifiersIn(node.value)) {out.add(n);}
+      if (node.kind === 'component' && node.name) {
+        out.add(node.name);
       }
-      if (node.kind === 'map') {for (const n of identifiersIn(node.head)) {out.add(n);}}
-      if (node.kind === 'cond') {for (const n of identifiersIn(node.test)) {out.add(n);}}
-      if (Array.isArray(node.body)) {for (const line of node.body) {for (const n of identifiersIn(line)) {out.add(n);}}}
-      for (const value of Object.values(node.props || {})) {
-        if (value && (value.type === 'expr' || value.type === 'spread')) {
-          for (const n of identifiersIn(value.value)) {out.add(n);}
+      if (node.kind === 'expr' || node.kind === 'raw-line') {
+        for (const n of identifiersIn(node.value)) {
+          out.add(n);
         }
       }
-      if (Array.isArray(node.children)) {walk(node.children);}
+      if (node.kind === 'map') {
+        for (const n of identifiersIn(node.head)) {
+          out.add(n);
+        }
+      }
+      if (node.kind === 'cond') {
+        for (const n of identifiersIn(node.test)) {
+          out.add(n);
+        }
+      }
+      if (node.body !== undefined) {
+        for (const line of node.body) {
+          for (const n of identifiersIn(line)) {
+            out.add(n);
+          }
+        }
+      }
+      for (const value of Object.values(node.props || {})) {
+        if (value && (value.type === 'expr' || value.type === 'spread')) {
+          for (const n of identifiersIn(value.value)) {
+            out.add(n);
+          }
+        }
+      }
+      if (node.children != null) {
+        walk(node.children, depth + 1);
+      }
     }
   };
-  walk(nodes);
+  walk(nodes, 0);
   return out;
 }
 
 /** The same, for a whole page: its markup plus its own frontmatter code. */
-function namesUsedByPage(model) {
+function namesUsedByPage(model: FrontmatterPage): Set<string> {
   const out = namesUsedIn(model.nodes);
-  for (const n of identifiersIn(model.extraFrontmatter || '')) {out.add(n);}
+  for (const n of identifiersIn(model.extraFrontmatter || '')) {
+    out.add(n);
+  }
   return out;
 }
 
 // A declaration that is safe to consider removing. Exported ones are the page's
 // interface to Astro — `getStaticPaths`, `prerender` — and belong to nobody
 // here. A destructure is not matched by the reader at all.
-const EXPORTED_RE = (name) =>
+const EXPORTED_RE = (name: string): RegExp =>
   new RegExp(`(^|\\n)[ \\t]*export\\s+(const|let|var)\\s+${name.replace(/\$/g, '\\$')}\\b`);
 
 /**
@@ -152,10 +269,12 @@ const EXPORTED_RE = (name) =>
  * another declaration: `const posts = …` feeding `const featured = posts[0]`
  * keeps `posts` even when the markup only names `featured`.
  */
-export function unusedDeclarations(model) {
+export function unusedDeclarations(model: FrontmatterPage): readonly Statement[] {
   const code = String(model.extraFrontmatter || '');
   const declared = parseDeclarations(code);
-  if (!declared.size) {return [];}
+  if (!declared.size) {
+    return [];
+  }
   const fromMarkup = namesUsedIn(model.nodes);
   const out = [];
   // Read against the frontmatter with the candidate taken out, so a declaration
@@ -165,19 +284,31 @@ export function unusedDeclarations(model) {
   // thing and cannot loop.
   let rest = code;
   let changed = true;
-  const gone = new Set();
+  const gone = new Set<string>();
+  let passes = 0;
   while (changed) {
+    assert(++passes <= declared.size + 1, 'Declaration removal must make progress');
     changed = false;
     for (const [name] of parseDeclarations(rest)) {
-      if (gone.has(name)) {continue;}
-      if (EXPORTED_RE(name).test(rest)) {continue;}
-      if (fromMarkup.has(name)) {continue;}
+      if (gone.has(name)) {
+        continue;
+      }
+      if (EXPORTED_RE(name).test(rest)) {
+        continue;
+      }
+      if (fromMarkup.has(name)) {
+        continue;
+      }
       const found = findDeclaration(rest, name);
-      if (!found) {continue;}
+      if (!found) {
+        continue;
+      }
       const without = rest.slice(0, found.start) + rest.slice(found.end);
       // Anywhere else in the frontmatter — including inside a string, which is
       // where a name in a template can hide.
-      if (new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(without)) {continue;}
+      if (new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(without)) {
+        continue;
+      }
       out.push({ name, statement: found.statement });
       gone.add(name);
       rest = without;
@@ -188,11 +319,13 @@ export function unusedDeclarations(model) {
 }
 
 /** A frontmatter with those declarations taken out, and the gap closed up. */
-export function withoutDeclarations(code, names) {
+export function withoutDeclarations(code: unknown, names: readonly string[]): string {
   let out = String(code || '');
   for (const name of names) {
     const found = findDeclaration(out, name);
-    if (!found) {continue;}
+    if (!found) {
+      continue;
+    }
     const before = out.slice(0, found.start);
     const after = out.slice(found.end);
     // The line the statement sat on goes with it, rather than leaving a blank
@@ -210,30 +343,48 @@ export function withoutDeclarations(code, names) {
  * `has` says what the page being pasted into already has — a name it already
  * knows is its own, and is left alone rather than overwritten.
  */
-export function neededFrontmatter({ names, frontmatter, imports, has }) {
+export function neededFrontmatter({
+  names,
+  frontmatter,
+  imports,
+  has,
+}: FrontmatterRequest): NeededFrontmatter {
   const known = has || (() => false);
   const code = String(frontmatter || '');
   const declared = parseDeclarations(code);
-  const wantedImports = [];
-  const statements = [];
-  const seen = new Set();
+  const wantedImports: NeededImport[] = [];
+  const statements: Statement[] = [];
+  const seen = new Set<string>();
   const queue = [...(names || [])];
   while (queue.length) {
+    assert(seen.size <= LIMITS.scanEntriesMax, 'Frontmatter dependencies exceed limit');
+    assert(queue.length <= LIMITS.scanEntriesMax, 'Frontmatter queue exceeds limit');
     const name = queue.shift();
-    if (!name || seen.has(name)) {continue;}
-    seen.add(name);
-    if (known(name)) {continue;}
-    const imported = (imports || []).find((i) => i.name === name) || findImportOf(code, name);
-    if (imported) {
-      wantedImports.push({ name, path: imported.path || imported.spec });
+    if (!name || seen.has(name)) {
       continue;
     }
-    if (!declared.has(name)) {continue;}
+    seen.add(name);
+    if (known(name)) {
+      continue;
+    }
+    const imported = (imports || []).find((i) => i.name === name) || findImportOf(code, name);
+    if (imported) {
+      const path = 'path' in imported ? imported.path : imported.spec;
+      wantedImports.push({ name, path });
+      continue;
+    }
+    if (!declared.has(name)) {
+      continue;
+    }
     const found = findDeclaration(code, name);
-    if (!found) {continue;}
+    if (!found) {
+      continue;
+    }
     statements.push({ name, statement: found.statement });
     // What that declaration reads in turn.
-    for (const n of identifiersIn(found.value)) {queue.push(n);}
+    for (const n of identifiersIn(found.value)) {
+      queue.push(n);
+    }
   }
   // In the order the file wrote them, so what arrives reads like what was left
   // behind rather than like a list of dependencies.
@@ -242,9 +393,14 @@ export function neededFrontmatter({ names, frontmatter, imports, has }) {
 }
 
 /** The frontmatter with those statements added at the end. */
-export function withStatements(code, statements) {
+export function withStatements(
+  code: unknown,
+  statements: readonly Statement[] | null | undefined,
+): string {
   const lines = (statements || []).map((s) => s.statement).filter(Boolean);
-  if (!lines.length) {return String(code || '');}
+  if (!lines.length) {
+    return String(code || '');
+  }
   const base = String(code || '').replace(/\s*$/, '');
   return base ? `${base}\n${lines.join('\n')}` : lines.join('\n');
 }

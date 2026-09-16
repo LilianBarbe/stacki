@@ -1,3 +1,22 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
+import { parseCanvasReply, type CanvasAnswer } from './canvasReply';
+export const CANVAS_LIMITS = { pendingMax: 1024 } as const;
+interface QueryMessage {
+  readonly type: 'avb:query';
+  readonly id: number;
+  readonly path: string;
+  readonly selectors: readonly string[];
+  readonly compute: readonly string[];
+  readonly props: readonly string[];
+}
+interface PendingQuery {
+  readonly resolve: (answer: CanvasAnswer | null) => void;
+  readonly timer: ReturnType<typeof setTimeout>;
+  readonly message: QueryMessage;
+  held: boolean;
+}
+
 // Asking the rendered page what it actually is.
 //
 // The style panel's own matcher walks the app's source tree, which cannot see
@@ -11,15 +30,15 @@
 // through `queryCanvas`. Everything degrades to the source matcher when the
 // preview isn't up (no dev server, an errored page, a frame still loading).
 
-let frame = null; // the design canvas's contentWindow
+let frame: Pick<Window, 'postMessage'> | null = null; // the design canvas's contentWindow
 let nextId = 1;
-const pending = new Map(); // id -> {resolve, timer, message, held}
+const pending = new Map<number, PendingQuery>(); // id -> {resolve, timer, message, held}
 
 // How long to wait for the frame. Long enough for a busy page, short enough
 // that a dead frame doesn't stall the panel behind it.
 const TIMEOUT_MS = 1500;
 
-const send = (entry) => {
+const send = (entry: PendingQuery): boolean => {
   try {
     frame?.postMessage(entry.message, '*');
     return true;
@@ -28,8 +47,10 @@ const send = (entry) => {
   }
 };
 
-export function setCanvasFrame(win) {
-  if (frame === win) {return;}
+export function setCanvasFrame(win: Pick<Window, 'postMessage'> | null | undefined): void {
+  if (frame === win) {
+    return;
+  }
   frame = win || null;
   // A new document can't answer questions the old one was asked.
   for (const [, entry] of pending) {
@@ -39,12 +60,12 @@ export function setCanvasFrame(win) {
   pending.clear();
 }
 
-export function hasCanvas() {
+export function hasCanvas(): boolean {
   return !!frame;
 }
 
 /** Say something to the canvas that needs no answer. */
-export function tellCanvas(message) {
+export function tellCanvas(message: unknown): boolean {
   try {
     frame?.postMessage(message, '*');
     return !!frame;
@@ -57,15 +78,33 @@ export function tellCanvas(message) {
 // it, what `compute` values resolve to on it, and its computed style for `props`.
 // Resolves null when the canvas can't answer — the caller then falls back rather
 // than treating silence as "no".
-export function queryCanvas(path, selectors = [], compute = [], props = []) {
-  if (!frame || typeof path !== 'string') {return Promise.resolve(null);}
+export function queryCanvas(
+  path: string,
+  selectors: readonly string[] = [],
+  compute: readonly string[] = [],
+  props: readonly string[] = [],
+): Promise<CanvasAnswer | null> {
+  if (!frame || typeof path !== 'string') {
+    return Promise.resolve(null);
+  }
+  if (pending.size >= CANVAS_LIMITS.pendingMax) {
+    return Promise.resolve(null);
+  }
+  assert(Number.isSafeInteger(nextId), 'Canvas query ID must remain a safe integer');
+  assert(path.length <= LIMITS.attrCharsMax, 'Canvas query path exceeds limit');
+  for (const values of [selectors, compute, props]) {
+    assert(values.length <= LIMITS.scanEntriesMax, 'Canvas query list exceeds limit');
+    for (const value of values) {
+      assert(value.length <= LIMITS.attrCharsMax, 'Canvas query value exceeds limit');
+    }
+  }
   const id = nextId++;
-  return new Promise((resolve) => {
+  return new Promise<CanvasAnswer | null>((resolve) => {
     const timer = setTimeout(() => {
       pending.delete(id);
       resolve(null);
     }, TIMEOUT_MS);
-    const entry = {
+    const entry: PendingQuery = {
       resolve,
       timer,
       message: { type: 'avb:query', id, path, selectors, compute, props },
@@ -85,15 +124,24 @@ export function queryCanvas(path, selectors = [], compute = [], props = []) {
 // wasn't ready, and any that were in flight when a reload swallowed them. A
 // re-send carries the original id, so a duplicate answer to one already
 // resolved finds no pending entry and is ignored.
-export function noteCanvasReady() {
-  for (const entry of pending.values()) {send(entry);}
+export function noteCanvasReady(): void {
+  for (const entry of pending.values()) {
+    send(entry);
+  }
 }
 
 // PreviewPane hands replies over; it already owns the message listener and
 // knows which frame they came from.
-export function receiveCanvasReply(data) {
+export function receiveCanvasReply(input: unknown): void {
+  const parsed = parseCanvasReply(input);
+  if (!parsed.ok) {
+    return;
+  }
+  const data = parsed.value;
   const entry = pending.get(data?.id);
-  if (!entry) {return;}
+  if (!entry) {
+    return;
+  }
   // "I don't have that element" from a page that hasn't walked its markers yet
   // means "not yet", and taking it at face value hands the panel a null it then
   // only corrects on its next 1.5s poll. Hold the question instead — the page
@@ -113,6 +161,6 @@ export function receiveCanvasReply(data) {
           computed: data.computed || {},
           computedProps: data.computedProps || {},
         }
-      : null
+      : null,
   );
 }

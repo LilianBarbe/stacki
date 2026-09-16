@@ -15,6 +15,7 @@
   "postinstall": "node scripts/fix-node-pty-permissions.js && node scripts/fix-electron-builder-signing.js && npm run build:contracts && npm run build:electron",
   "dev": "npm run build:contracts && npm run build:electron && concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 node scripts/dev-electron.mjs\"",
   "build": "npm run build:contracts && npm run build:electron && vite build",
+  "test:renderermessages": "node test/renderer-messages.js",
   "test:rendererleaves": "node test/renderer-leaves.js",
   "test:markers": "node test/markers.js && node test/slot-markers.js && node test/slot-api.js && node test/insert-target.js",
   "test:bridge": "node test/bridge.js",

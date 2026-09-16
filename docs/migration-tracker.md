@@ -130,7 +130,7 @@ Cleanup owed: `electron/scratch2-7.js` are stray tsc-emitted outputs from the
 cssVars conversion experiments, still tracked in git (198 lines). Delete them
 in a standalone commit; nothing requires them.
 
-### src/ — 32 modules converted
+### src/ — 35 modules converted
 
 `editorTree`, `pagePersistence` (WeakSet acks + drain caps),
 `cleanError`, `branchName`, `loopBindings` (minimal-fidelity LiveNode),
@@ -157,8 +157,14 @@ and traversal budget. All 70 old/new comparisons passed. The gate passes
 cover cyclic/deep/wide trees and arithmetic nesting limits; Node-only fluid tests
 now bundle renderer TypeScript using the same compiler as the app.
 
-Remaining src leaves (6 top-level `.js`): `contentSchema`, `cmsSchema`,
-`frontmatterMove`, `gitActions`, `canvasQuery`, `previewRecovery`.
+Fourth renderer batch: `frontmatterMove`, `canvasQuery`, `previewRecovery`,
+plus the bounded `canvasReply` parser. Eleven old/new frontmatter comparisons,
+43 frontmatter checks, 30 preview recovery checks, and new iframe-message boundary
+and lifecycle tests pass. The full gate passes 127/127 commands (94.7s), with no
+lint warnings in converted modules. Pending iframe queries are capped at 1,024;
+frame replacement cancels them, and malformed replies retain the timeout fallback.
+
+Remaining src leaves (3 top-level `.js`): `contentSchema`, `cmsSchema`, `gitActions`.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
 ### src/ui — 32 files, 6,457 lines ⬜
