@@ -41,6 +41,7 @@
     "test:gitbranches": "node test/git-branches.js",
     "test:conflicts": "node test/conflicts.js",
     "test:githistory": "node test/git-history.js",
+    "test:brancheselsewhere": "node test/branches-elsewhere.js",
     "test:historypanel": "node test/history-panel.js",
     "test:undoreach": "node test/undo-reach.js",
     "test:filebrowser": "node test/file-browser.js",

@@ -382,7 +382,14 @@ export default function HistoryPanel({
                   <BranchIcon size={12} />
                 </span>
                 <span className="label">{w.branch || 'a single version'}</span>
-                <span className="sub">{w.path.split('/').slice(-1)[0]}</span>
+                {/* A folder that was deleted without git being told is still a
+                    folder holding that branch as far as git is concerned: it
+                    refuses to check it out here until `git worktree prune`
+                    runs, so the branch is missing from the list above and this
+                    is the only place that can say why. */}
+                <span className="sub">
+                  {w.prunable ? 'folder is gone' : w.path.split('/').slice(-1)[0]}
+                </span>
               </div>
             ))}
         </Section>
