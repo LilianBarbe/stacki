@@ -3992,6 +3992,20 @@ export default {
   }
 }
 
+// Astro 7.1+ can run an editor server beside the project's ordinary server.
+// Reusing the latter loses our marker config (and therefore canvas selection).
+function supportsIndependentDevServer(projectPath) {
+  try {
+    const { version } = JSON.parse(fs.readFileSync(
+      path.join(projectPath, 'node_modules', 'astro', 'package.json'), 'utf8'
+    ));
+    const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+    return !!match && (Number(match[1]) > 7 || (Number(match[1]) === 7 && Number(match[2]) >= 1));
+  } catch {
+    return false;
+  }
+}
+
 async function spawnDevServer(context, localBin, force, bare) {
   const { projectPath, pushLog, recentLog } = context;
   const port = await findFreePort(4321);
@@ -4003,7 +4017,11 @@ async function spawnDevServer(context, localBin, force, bare) {
   // so a preview still comes up even if what this app generates cannot run.
   const markerCfg = bare ? null : writeMarkerConfig(projectPath, pushLog);
   if (markerCfg) args.push('--config', toPosix(path.relative(projectPath, markerCfg)));
-  if (force) args.push('--force');
+  // --ignore-lock must never be combined with --force: the former leaves the
+  // other server alone, whereas the latter replaces it. devServerEnv keeps
+  // this process in the foreground, as required by --ignore-lock.
+  if (supportsIndependentDevServer(projectPath)) args.push('--ignore-lock');
+  else if (force) args.push('--force');
 
   const [cmd, argv] = nodeCliCommand(localBin, args);
   const proc = spawn(cmd, argv, {
@@ -4139,7 +4157,8 @@ async function doDevStart(context) {
     }
   }
 
-  const existingLock = readAstroLock(projectPath);
+  const independent = supportsIndependentDevServer(projectPath);
+  const existingLock = independent ? null : readAstroLock(projectPath);
   if (existingLock?.url && await serverAlive(existingLock.url)) {
     context.assertLive();
     context.attach({ proc: null, url: existingLock.url, projectPath, external: true });
@@ -4160,7 +4179,7 @@ async function doDevStart(context) {
       lastErr = err;
       // Another dev server already running for this project?
       const existing = parseExistingServer(recentLog());
-      if (existing) {
+      if (existing && !independent) {
         const alive = await serverAlive(existing);
         if (alive) {
           // Adopt the user's own server instead of fighting it.
