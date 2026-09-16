@@ -430,6 +430,14 @@ passes 138/138 commands (108.0s), with zero warnings in the new bridge. Wire
 these boundaries into the remaining GitChip actions, then convert and split
 its root.
 
+GitChip action-wiring checkpoint: every direct info, status, checkout, commit,
+initialize, push, and merge-resolution call now goes through `gitChipBridge`.
+Selected-file commits and the create/switch/park checkout modes retain their
+original payloads; bridge failures continue through the chip's existing visible
+error path. A source-level regression prevents raw Git IPC from returning to
+the component. The full gate passes 138/138 commands (104.6s). Convert and split
+the remaining JSX root next.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |

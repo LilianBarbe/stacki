@@ -3,6 +3,8 @@
 // checkout mode through a scripted bridge, and separate transport from contract failures.
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const bridge = require('./renderer-module')('gitChipBridge.ts');
 
 const status = {
@@ -125,4 +127,20 @@ test('GitChip transport failures are values and malformed replies throw', async 
     () => bridge.checkoutGitBranch('/project\0bad', 'topic', { kind: 'switch' }),
     /NUL/,
   );
+});
+
+test('GitChip routes every direct Git operation through the parsed bridge', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/panels/GitChip.jsx'), 'utf8');
+  assert.doesNotMatch(source, /window\.avb\.git(?:Info|Status|Checkout|Commit|Init|Push|ResolveMerge)/);
+  for (const operation of [
+    'readGitInfo',
+    'readGitStatus',
+    'checkoutGitBranch',
+    'commitGitChanges',
+    'initializeGit',
+    'pushGitBranch',
+    'resolveGitMerge',
+  ]) {
+    assert.match(source, new RegExp(`\\b${operation}\\(`));
+  }
 });

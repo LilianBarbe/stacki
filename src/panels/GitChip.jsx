@@ -5,20 +5,29 @@ import PublishModal from './PublishModal';
 import { publishGitProject } from './gitPublishWorkflow';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { cleanError } from '../cleanError.js';
-import {
-  BranchIcon,
-  CheckIcon,
-  ExternalIcon,
-  CloseIcon,
-  MergeIcon,
-  TrashIcon,
-} from '../ui/Icons.jsx';
+import { BranchIcon, CheckIcon, ExternalIcon, CloseIcon } from '../ui/Icons.jsx';
 import { branchNameError, sanitizeBranchName } from '../branchName.js';
 import { mergeBranchAction, deleteBranchAction, tidyUp } from '../gitActions.js';
-import Code from '../ui/Code.jsx';
 import FileBrowser from '../ui/FileBrowser.jsx';
 import BranchActions from '../ui/BranchActions.jsx';
 import useDismiss from '../ui/useDismiss.js';
+import {
+  checkoutGitBranch,
+  commitGitChanges,
+  initializeGit,
+  pushGitBranch,
+  readGitInfo,
+  readGitStatus,
+  resolveGitMerge,
+} from '../gitChipBridge';
+
+async function gitValue(pending) {
+  const result = await pending;
+  if (!result.ok) {
+    throw new Error(result.error);
+  }
+  return result.value;
+}
 
 // Branch/status chip in the title bar. Opens a dropdown with branch
 // switching, branch creation, commit + push, and GitHub publishing.
@@ -44,7 +53,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
   const wrapRef = useRef(null);
 
   const refresh = async () => {
-    const result = await window.avb.gitInfo(project.path);
+    const result = await gitValue(readGitInfo(project.path));
     setInfo(result);
     return result;
   };
@@ -70,13 +79,16 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
     if (!picking || !open) {
       return;
     }
-    window.avb
-      .gitStatus({ projectPath: project.path })
+    readGitStatus(project.path)
       .then((f) => {
-        setChanged(f || []);
+        if (!f.ok) {
+          setChanged([]);
+          return;
+        }
+        setChanged(f.value);
         // Everything ticked to begin with, so opening the list and pressing
         // save does what pressing save without opening it would have done.
-        setPicked((cur) => (cur === null ? (f || []).map((x) => x.path) : cur));
+        setPicked((cur) => (cur === null ? f.value.map((x) => x.path) : cur));
       })
       .catch(() => setChanged([]));
   }, [picking, open, project.path, info?.dirty, info?.head]);
@@ -133,7 +145,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
     setOpen(false);
     act(
       async () => {
-        const r = await window.avb.gitCheckout({ projectPath: project.path, branch });
+        const r = await gitValue(checkoutGitBranch(project.path, branch, { kind: 'switch' }));
         if (r?.blocked) {
           // These files differ between the branches, so the work genuinely
           // cannot come along. Now there is something to decide.
@@ -156,24 +168,13 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
     );
   };
 
-  const switchNow = (branch) =>
-    act(
-      () => window.avb.gitCheckout({ projectPath: project.path, branch }),
-      `Switched to ${branch}`,
-      'Switching…',
-    );
-
   // Leave the work where it was written and pick it up again on the way back.
   // No commit, nothing carried onto a branch it does not belong to.
   const parkThenSwitch = (branch) => {
     const from = info.branch;
     return act(
       async () => {
-        const r = await window.avb.gitCheckout({
-          projectPath: project.path,
-          branch,
-          parkFirst: true,
-        });
+        const r = await gitValue(checkoutGitBranch(project.path, branch, { kind: 'park' }));
         // The switch worked; anything else to say is about the changes.
         if (r?.error) {
           showToast(r.error, 'error');
@@ -217,8 +218,8 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
     const from = info.branch;
     return act(
       async () => {
-        await window.avb.gitCommit({ projectPath: project.path, message });
-        await window.avb.gitCheckout({ projectPath: project.path, branch });
+        await gitValue(commitGitChanges(project.path, message));
+        await gitValue(checkoutGitBranch(project.path, branch, { kind: 'switch' }));
       },
       `Committed to ${from}, now on ${branch}`,
       'Committing…',
@@ -257,7 +258,11 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
         className="git-chip"
         disabled={working}
         onClick={() =>
-          act(() => window.avb.gitInit(project.path), 'Initialized git repository', 'Initializing…')
+          act(
+            () => gitValue(initializeGit(project.path)),
+            'Initialized git repository',
+            'Initializing…',
+          )
         }
       >
         {working ? <span className="mini-spinner" /> : <BranchIcon size={12} />}
@@ -274,7 +279,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
     const paths = allPicked ? undefined : picked;
     setCommitMsg('');
     act(
-      () => window.avb.gitCommit({ projectPath: project.path, message, paths }),
+      () => gitValue(commitGitChanges(project.path, message, paths)),
       paths ? `Saved ${paths.length} file${paths.length === 1 ? '' : 's'}` : 'Changes committed',
       'Committing…',
     ).then(() => {
@@ -372,12 +377,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
                   const name = newBranch.trim();
                   setNewBranch('');
                   act(
-                    () =>
-                      window.avb.gitCheckout({
-                        projectPath: project.path,
-                        branch: name,
-                        create: true,
-                      }),
+                    () => gitValue(checkoutGitBranch(project.path, name, { kind: 'create' })),
                     `Created branch ${name}`,
                     'Creating branch…',
                   );
@@ -461,7 +461,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
                   disabled={working || !canPush}
                   onClick={() =>
                     act(
-                      () => window.avb.gitPush({ projectPath: project.path, branch: info.branch }),
+                      () => gitValue(pushGitBranch(project.path, info.branch)),
                       `Pushed ${info.branch} to origin`,
                       'Pushing…',
                     )
@@ -502,11 +502,10 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
           onResolve={async (choices) => {
             const done = await act(
               async () => {
-                const r = await window.avb.gitResolveMerge({
-                  projectPath: project.path,
-                  branch: conflict.branch,
-                  choices,
-                });
+                const r = await gitValue(resolveGitMerge(project.path, conflict.branch, choices));
+                if (!r.ok) {
+                  throw new Error('Merge resolution did not complete');
+                }
                 // The tidy-up was chosen back when the merge was started, before
                 // anyone knew it would clash. It still applies now it is settled.
                 if (conflict.deleteAfter) {
