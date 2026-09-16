@@ -153,7 +153,19 @@ const propsDeclared = (base) => {
       ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const declaration = bridgeComponent(ts, source);
     const binding = declaration?.parameters[0]?.name;
-    if (!binding || !ts.isObjectBindingPattern(binding)) { return null; }
+    if (!binding) { return null; }
+    if (!ts.isObjectBindingPattern(binding)) {
+      // A local props interface is just as explicit as destructuring. Preserve
+      // this boundary check when conversion moves a component to a typed object.
+      const parameterType = declaration.parameters[0].type;
+      if (!parameterType || !ts.isTypeReferenceNode(parameterType)) { return null; }
+      const name = parameterType.typeName.getText(source);
+      const contract = source.statements.find(node => ts.isInterfaceDeclaration(node) &&
+        node.name.text === name);
+      if (!contract || contract.heritageClauses?.length) { return null; }
+      if (contract.members.some(member => !ts.isPropertySignature(member))) { return null; }
+      return new Set(contract.members.map(member => member.name.getText(source)));
+    }
     if (binding.elements.some((element) => element.dotDotDotToken)) { return null; }
     return new Set(binding.elements.map((element) =>
       (element.propertyName || element.name).getText(source)));

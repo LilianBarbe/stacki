@@ -12,7 +12,7 @@ conversion** are complete. `electron/main.ts` now emits the ignored `main.js`
 package entry. The invoke inventory is complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
 **The Electron, root renderer, and UI queues are complete. Continue through
-`src/panels` (PropsPanel and its list/object dependencies first), then `src/App.jsx`.**
+`src/panels` (PropsPanel is complete; variables boundary/panel next), then `src/App.jsx`.**
 
 Main verification: 26 old/new handler and output comparisons matched, including
 byte-identical generated Astro config, preview page, and both API endpoints.
@@ -243,7 +243,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 2/20 original files converted ⏳
+### src/panels — 3/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -296,9 +296,19 @@ The loop suite now exercises the actual helpers, with parser and size-bound test
 All 32 old/new editor comparisons match. The gate passes 136/136 commands
 (102.2s); the new module has no lint warnings. Finish the root panel conversion.
 
+PropsPanel is fully converted to `PropsPanel.tsx`. The root dispatches the shared
+node union exhaustively; element state, content, and settings helpers meet the
+70-line limit. Both remaining asset reads now use parsed responses, with tested
+dimension and path limits. All 50 old/new root comparisons match across node
+kinds and Settings states. Selection transitions, focus, and attribute controls
+pass. Navigation harnesses now recognize `.tsx` panels, and the bridge inventory
+reads local props interfaces (494 checks). The full gate passes 136/136 commands
+(99.2s), with zero warnings in the new panel modules. Seventeen original panels
+remain; continue with the variables boundary/panel before VariablesView.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `PropsPanel.jsx`                                                                                     | 3,819 — hotspot, convert-then-split, no split in same commit |
+| `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
 | `VariablesView.jsx`                                                                                  | 1,418 — holds 15 known conditional-hook bugs (fix them here) |
 | `CmsView.jsx`                                                                                        | 1,246                                                        |
 | `GitChip.jsx`                                                                                        | 1,044                                                        |
@@ -369,7 +379,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 136/136 (102.2s), exit 0. No quarantined tests remain.
+- Gate green at last run: 136/136 (99.2s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.

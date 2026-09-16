@@ -20,8 +20,8 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
     loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' }, logLevel: 'silent',
     plugins: [{ name: 'capture-inspectors', setup(build) {
-      build.onLoad({ filter: /\/src\/panels\/[^/]+\.jsx$/ }, (args) => {
-        const name = path.basename(args.path, '.jsx');
+      build.onLoad({ filter: /\/src\/panels\/[^/]+\.[jt]sx$/ }, (args) => {
+        const name = path.basename(args.path, path.extname(args.path));
         // Keep both preview components real: a mocked pane cannot reveal frame
         // replacement, navigation, or an inspector vanishing beside the frame.
         if (name === 'PreviewPane' || name === 'CanvasView') {return;}

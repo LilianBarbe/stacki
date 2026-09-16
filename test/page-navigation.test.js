@@ -17,8 +17,8 @@ test('out-of-order page reads and external reads cannot replace the current edit
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
     loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' }, logLevel: 'silent',
     plugins: [{ name: 'capture-panels', setup(build) {
-      build.onLoad({ filter: /\/src\/panels\/[^/]+\.jsx$/ }, (args) => {
-        const name = path.basename(args.path, '.jsx');
+      build.onLoad({ filter: /\/src\/panels\/[^/]+\.[jt]sx$/ }, (args) => {
+        const name = path.basename(args.path, path.extname(args.path));
         return { contents: `export const relativeTime = () => ''; export default function Panel(props) { globalThis.__panels[${JSON.stringify(name)}] = props; return null; }`, loader: 'jsx' };
       });
     } }],

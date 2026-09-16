@@ -150,7 +150,8 @@ function useMapModel({ node, onSetText }: MapEditorProps) {
     if (!next.data.trim() || !itemOk || !indexOk) {
       return;
     } // incomplete — don't write broken code
-    const head = `${next.data.trim()}.map((${next.item}${next.index ? `, ${next.index}` : ''}) => (`;
+    const parameters = next.item + (next.index ? `, ${next.index}` : '');
+    const head = `${next.data.trim()}.map((${parameters}) => (`;
     if (head.length > LIMITS.nodeValueCharsMax) {
       return;
     }

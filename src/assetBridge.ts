@@ -60,3 +60,31 @@ export async function resolveAssetImport(
   const result = parseResolvePathResult(response);
   return result.ok ? { ok: true, rel: pathText(result.rel) } : result;
 }
+
+// Image headers encode unsigned 32-bit dimensions; larger values cannot describe a file.
+function imageDimension(input: unknown): number {
+  const value = count(input);
+  if (value === 0 || value > 0xffff_ffff) {
+    throw new Error('AssetDimensions: expected positive 32-bit dimension');
+  }
+  return value;
+}
+const dimensions = object({ w: imageDimension, h: imageDimension });
+export function parseAssetDimensions(input: unknown) {
+  const value = record(input)['dims'];
+  return value === null ? null : dimensions(value);
+}
+
+export async function readAssetDimensions(
+  projectPath: string,
+  rel: string,
+): Promise<Result<ReturnType<typeof parseAssetDimensions>, string>> {
+  const payload = { projectPath: toProjectPath(projectPath), rel: pathText(rel) };
+  let response: unknown;
+  try {
+    response = await window.avb.assetDimensions(payload);
+  } catch (error: unknown) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  return { ok: true, value: parseAssetDimensions(response) };
+}

@@ -2,8 +2,14 @@
 // rendering. Scripted preload calls distinguish disk failures from contract bugs.
 const assert = require('node:assert/strict');
 const loadRenderer = require('./renderer-module');
-const { parseAssetEntry, parseAssetEntries, listAssetEntries, resolveAssetImport } =
-  loadRenderer('assetBridge.ts');
+const {
+  parseAssetEntry,
+  parseAssetEntries,
+  listAssetEntries,
+  resolveAssetImport,
+  parseAssetDimensions,
+  readAssetDimensions,
+} = loadRenderer('assetBridge.ts');
 const file = {
   rel: 'public/a.png',
   name: 'a.png',
@@ -46,6 +52,24 @@ assert.throws(
   /Array exceeds limit/,
 );
 assert.throws(() => parseAssetEntries({ entries: null }), /Expected array/);
+assert.deepEqual(parseAssetDimensions({ dims: { w: 640, h: 480 } }), { w: 640, h: 480 });
+assert.equal(parseAssetDimensions({ dims: null }), null);
+for (const invalid of [
+  null,
+  {},
+  { dims: [] },
+  { dims: { w: 1 } },
+  ...[0, -1, 1.5, NaN, Infinity, '20', 0x1_0000_0000].flatMap((value) => [
+    { dims: { w: value, h: 1 } },
+    { dims: { w: 1, h: value } },
+  ]),
+]) {
+  assert.throws(() => parseAssetDimensions(invalid));
+}
+assert.deepEqual(parseAssetDimensions({ dims: { w: 0xffff_ffff, h: 1 } }), {
+  w: 0xffff_ffff,
+  h: 1,
+});
 (async () => {
   global.window = { avb: { listAssets: async () => ({ entries: [file] }) } };
   assert.deepEqual(await listAssetEntries('/p'), { ok: true, value: [file] });
@@ -77,6 +101,25 @@ assert.throws(() => parseAssetEntries({ entries: null }), /Expected array/);
     window.avb.resolveSourcePath = async () => response;
     await assert.rejects(() => resolveAssetImport(...request));
   }
+  window.avb.assetDimensions = async (payload) => {
+    assert.deepEqual(payload, { projectPath: '/p', rel: 'public/hero.png' });
+    return { dims: { w: 640, h: 480 } };
+  };
+  assert.deepEqual(await readAssetDimensions('/p', 'public/hero.png'), {
+    ok: true,
+    value: { w: 640, h: 480 },
+  });
+  window.avb.assetDimensions = async () => ({ dims: null });
+  assert.deepEqual(await readAssetDimensions('/p', 'public/hero.png'), { ok: true, value: null });
+  window.avb.assetDimensions = async () => {
+    throw new Error('unavailable');
+  };
+  assert.deepEqual(await readAssetDimensions('/p', 'public/hero.png'), {
+    ok: false,
+    error: 'unavailable',
+  });
+  window.avb.assetDimensions = async () => ({ dims: { w: -1, h: 2 } });
+  await assert.rejects(() => readAssetDimensions('/p', 'public/hero.png'));
   console.log('renderer-assets: parser bounds and operating-failure checks passed');
 })().catch((error) => {
   console.error(error);
