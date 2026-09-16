@@ -521,6 +521,16 @@ installs; their cost is amplified through everything built on them.
 
 ## Testing expectations
 
+### Repository contract surface
+
+`shared/` is the only cross-process contract surface. Read
+`docs/contracts.md` before changing page trees, scans, preload methods, IPC
+channels, or renderer bridge modules. Values from IPC, disk, browser messages,
+drag data, and `JSON.parse` stay `unknown` until the matching shared or feature
+boundary parser accepts them. Generated or edited code must pass
+`env -u ELECTRON_RUN_AS_NODE npm test`, which includes strict TypeScript,
+ESLint, production builds, contract tests, and the complete regression suite.
+
 - Type-level behavior is tested too: `expectTypeOf` (vitest) or `tsd` for
   public API types, exhaustiveness helpers, and brand separation.
 - One parse-test per contract: known-good passes; each known-bad shape fails.

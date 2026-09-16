@@ -597,7 +597,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'styles.css'), 'utf8');
     check('padding is pink', /\.spacing-band\.is-padding \{ --band: #ec4899; \}/.test(css));
     check('and margin is blue', /\.spacing-band\.is-margin \{ --band: #3b82f6; \}/.test(css));
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
     check(
       'the panel is wired to the canvas',
       /onSpacingHover=\{setSpacingHover\}/.test(app) && /spacingHover=\{spacingHover\}/.test(app),

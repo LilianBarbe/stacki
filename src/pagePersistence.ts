@@ -10,20 +10,24 @@ interface PageStateHandle {
   readonly dirty?: boolean;
 }
 
-interface CurrentSnapshot {
-  readonly currentPage?: { readonly path?: string } | null;
-  readonly pageState?: PageStateHandle | null;
+interface CurrentSnapshot<State extends PageStateHandle> {
+  readonly currentPage?: { readonly path?: string | undefined } | null;
+  readonly pageState?: State | null;
 }
 
-interface PageSaverDeps {
-  readonly readCurrent: () => CurrentSnapshot;
-  readonly write: (path: string, pageState: PageStateHandle) => Promise<void>;
-  readonly markSaved: (pageState: PageStateHandle) => void;
+interface PageSaverDeps<State extends PageStateHandle> {
+  readonly readCurrent: () => CurrentSnapshot<State>;
+  readonly write: (path: string, pageState: State) => Promise<void>;
+  readonly markSaved: (pageState: State) => void;
 }
 
-export function createPageSaver({ readCurrent, write, markSaved }: PageSaverDeps): () => Promise<void> {
+export function createPageSaver<State extends PageStateHandle>({
+  readCurrent,
+  write,
+  markSaved,
+}: PageSaverDeps<State>): () => Promise<void> {
   let pending: Promise<void> = Promise.resolve();
-  const saved = new WeakSet<PageStateHandle>();
+  const saved = new WeakSet<State>();
   const flush = async (): Promise<void> => {
     const path = readCurrent().currentPage?.path;
     if (!path) {

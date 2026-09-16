@@ -8,6 +8,7 @@
   "license": "MIT",
   "scripts": {
     "roundtrip:report": "node scripts/roundtrip-report.js",
+    "release": "node --experimental-strip-types scripts/release.ts",
     "build:contracts": "tsc -p shared/tsconfig.json",
     "build:electron": "tsc -p electron/tsconfig.json && npm run build:renderer-runtime",
     "test:contracts": "npm run build:contracts && node --test 'test/contracts/*.test.ts'",
@@ -64,6 +65,7 @@
     "test:gitsnapshot": "node test/git-snapshot.js",
     "test:previewworktree": "node test/preview-worktree.js",
     "test:apprenders": "node test/app-renders.js",
+    "test:appbridge": "node --test test/app-bridge.test.js",
     "test:starter": "node test/starter.js",
     "test:content": "node test/content-config.js",
     "test:contentviewboundary": "node --test test/content-view-boundary.test.js",

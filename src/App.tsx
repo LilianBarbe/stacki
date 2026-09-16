@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { SetStateAction } from 'react';
+import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../shared/page-node';
+import type { ScanComponent, ScanPage, ScanResult } from '../shared/scan';
+import type { WireCommitInfo, WireInjectedRoute } from '../shared/ipc-results';
 import WelcomeScreen from './panels/WelcomeScreen';
 import PagesPanel from './panels/PagesPanel';
 import PalettePanel from './panels/PalettePanel';
@@ -10,34 +14,36 @@ import { setSoundEnabled } from './ui/sound.js';
 import { createPreviewWatch } from './previewRecovery.js';
 import { tellCanvas } from './canvasQuery.js';
 import { renameAttr } from './attrOrder.js';
-import { scanProject } from './bridge';
+import { readPage, readSymbol, scanProject } from './bridge';
+import { checkoutGitBranch, readGitInfo } from './gitChipBridge';
 import { LIMITS } from '../shared/limits';
+import { assert } from '../shared/assert';
 import PreviewPane from './panels/PreviewPane';
 import GitChip from './panels/GitChip';
 import HistoryPanel, { relativeTime } from './panels/HistoryPanel';
-import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog.jsx';
+import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog';
 import { mergeBranchAction, deleteBranchAction } from './gitActions.js';
-import LeftRail from './ui/LeftRail.jsx';
-import PageSwitcher from './ui/PageSwitcher.jsx';
-import DynamicPicker from './ui/DynamicPicker.jsx';
+import LeftRail from './ui/LeftRail';
+import PageSwitcher from './ui/PageSwitcher';
+import DynamicPicker from './ui/DynamicPicker';
 import {
   ASTRO_ASSETS,
   ASTRO_ASSETS_MODULE,
   PLACEHOLDER_PROPS,
   astroAsset as astroAssetDef,
 } from './astroAssets.js';
-import InsertSearch from './ui/InsertSearch.jsx';
+import InsertSearch from './ui/InsertSearch';
 import AssetsPanel from './panels/AssetsPanel';
-import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS, canContainTag } from './elementSchemas.js';
+import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS } from './elementSchemas.js';
 import { insertTargetFor as placeInsert } from './insertTarget.js';
-import { isInlineOnly } from './ui/RichContent.jsx';
+import { isInlineOnly } from './ui/RichContent';
 import { onAssetRequest, clearAssetRequest } from './assetPick.js';
 import { isDataBound } from './bindings.js';
 import { thenBranch } from './branches.js';
 import { keepsSlot } from './slotAttr.js';
 import { createFileSaver, createPageSaver, scanContainsFile } from './pagePersistence.js';
-import { ancestorChain, createTreeIndex, findNodeById, findParentList, isDescendantOf, nodeAtPath, pathOfNode } from './editorTree.js';
-import { readFrontmatter, writeFrontmatter } from 'stacki/frontmatter';
+import { ancestorChain, createTreeIndex, isDescendantOf, nodeAtPath, pathOfNode } from './editorTree.js';
+import { readFrontmatter, writeFrontmatter } from '../electron/frontmatter';
 import { renameLoopVar, parseLoopHead, disconnectDependentLoops, loopVarsAt, stripLostBindings } from './loopBindings.js';
 import {
   namesUsedIn,
@@ -71,28 +77,119 @@ import {
   ChevronLeftIcon,
   ElementComponentIcon,
   TerminalIcon,
-} from './ui/Icons.jsx';
+} from './ui/Icons';
+import type { PickedAsset } from './ui/AssetField';
+import type { InlineNode } from './ui/RichContent';
+import type { Rename, TagOption } from './panels/propNodeEditors';
+import type { FieldDefinition, PropValues } from './panels/propRules';
+import type { OverlayInfo } from './panels/PreviewOverlays';
+import type { PreviewCrumb } from './panels/PreviewToolbar';
+import type { AstroAsset } from './astroAssets';
+import type { ComponentCreationSource } from './panels/PaletteDialogs';
+import type { DevDiagnosis } from './panels/DevOffline';
+import type { PreviewDevice } from './panels/PreviewToolbar';
+import type { SpacingHover } from './panels/PreviewOverlays';
+import type { VariableSelection } from './variablesBridge';
+import type { InsertTarget } from './insertTarget';
+import type { InsertItem } from './ui/InsertSearch';
+import { toRecord } from '../shared/record';
+import {
+  cloneEditorModel,
+  findEditorNodeById as findNodeById,
+  findEditorParentList as findParentList,
+  nodeId,
+  toEditorPageState,
+  type AppHistory,
+  type AssetPick,
+  type CodeWindowState,
+  type CollectionSamples,
+  type CurrentPage,
+  type DevStatus,
+  type DynamicEntry,
+  type EditorModel,
+  type EditorNode,
+  type EditorPageState,
+  type GitInfo,
+  type InjectedRoute,
+  type ItemIndexes,
+  type LeftTab,
+  type NodeStates,
+  type NodeClipboard,
+  type OpenFile,
+  type PageSnapshot,
+  type PageStateSnapshot,
+  type PreviewCommitInfo,
+  type ProjectIdentity,
+  type RightTab,
+  type RightTabIndicator,
+  type ScanRequest,
+  type ToastKind,
+  type ToastMessage,
+  type TrailingSlash,
+  type UndoCommand,
+} from './appTypes';
+import {
+  addRecentProject,
+  closeProject,
+  copyEditorSelection,
+  diagnoseProject,
+  createProjectPage,
+  createProjectPageFolder,
+  createProjectComponent,
+  deleteProjectPage,
+  deleteProjectPageFolder,
+  findImportPath,
+  installProjectDependencies,
+  moveProjectPage,
+  onAppProgress,
+  onCmsInventoryChanged,
+  onDevExit,
+  onDevLog,
+  onFilesChanged,
+  onPageMaybeChanged,
+  onSoundSettingChanged,
+  openExternalURL,
+  openProject,
+  pendingProject,
+  previewProjectCommit,
+  probeProjectPreview,
+  projectHasNodeModules,
+  readProjectClasses,
+  readContentCollections,
+  readDynamicPaths,
+  readInjectedRoutes,
+  readProjectAsset,
+  readSampleEntry,
+  readComponentUsage,
+  readAppSettings,
+  rebaseProjectImport,
+  renameProjectPageFolder,
+  resolveProjectImport,
+  restoreProjectFile,
+  restoreProjectVersion,
+  runNativeEdit,
+  startProjectPreview,
+  stopProjectCommitPreview,
+  watchProject,
+  writeProjectFile,
+  writeProjectPage,
+  writeProjectPageRaw,
+  type AppCollection,
+} from './appBridge';
 
-// Optional editors load on first use. Each boundary stays inside its panel so
-// loading one cannot replace the canvas or unmount another editor's state.
-function lazyPanel(load) {
-  const Panel = React.lazy(load);
-  return function DeferredPanel(props) {
-    return <React.Suspense fallback={null}><Panel {...props} /></React.Suspense>;
-  };
-}
-
-const PropsPanel = lazyPanel(() => import('./panels/PropsPanel.jsx'));
-const StylePanel = lazyPanel(() => import('./panels/StylePanel'));
-const CodeWindow = lazyPanel(() => import('./ui/CodeWindow.jsx'));
-const CmsPanel = lazyPanel(() => import('./panels/CmsPanel'));
-const CmsView = lazyPanel(() => import('./panels/CmsView.jsx'));
-const ContentView = lazyPanel(() => import('./panels/ContentView'));
-const VariablesPanel = lazyPanel(() => import('./panels/VariablesPanel.jsx'));
-const VariablesView = lazyPanel(() => import('./panels/VariablesView.jsx'));
+// Optional editors load on first use. App's root suspense boundary keeps each
+// editor mounted after its module arrives, so panel state survives tab changes.
+const PropsPanel = React.lazy(() => import('./panels/PropsPanel'));
+const StylePanel = React.lazy(() => import('./panels/StylePanel'));
+const CodeWindow = React.lazy(() => import('./ui/CodeWindow'));
+const CmsPanel = React.lazy(() => import('./panels/CmsPanel'));
+const CmsView = React.lazy(() => import('./panels/CmsView'));
+const ContentView = React.lazy(() => import('./panels/ContentView'));
+const VariablesPanel = React.lazy(() => import('./panels/VariablesPanel'));
+const VariablesView = React.lazy(() => import('./panels/VariablesView'));
 
 let idCounter = 1000;
-const newId = () => `c${idCounter++}`;
+const newId = () => nodeId(`c${idCounter++}`);
 
 // Placeholder copy for newly inserted text elements, so they're visible on the
 // canvas straight away instead of collapsing to a zero-height box.
@@ -112,6 +209,21 @@ const DEFAULT_TEXT = {
   p: LOREM,
 };
 
+function defaultText(tag: string): string | undefined {
+  switch (tag) {
+    case 'h1':
+    case 'h2':
+    case 'h3':
+    case 'h4':
+    case 'h5':
+    case 'h6':
+    case 'p':
+      return DEFAULT_TEXT[tag];
+    default:
+      return undefined;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tree helpers (model.nodes is a tree of {id, kind, name?, props?, children?})
 // ---------------------------------------------------------------------------
@@ -122,13 +234,15 @@ const DEFAULT_TEXT = {
 // the page's `title`, and in Card.astro it reads nothing at all. Not something
 // to refuse over (the fix is a prop, and only the author knows its name) but
 // very much something to say out loud.
-function usesPageScope(node) {
-  if (!node || typeof node !== 'object') {return false;}
+function usesPageScope(node: PageNode | null | undefined): boolean {
+  if (!node) {return false;}
   if (['expr', 'cond', 'map', 'branch'].includes(node.kind)) {return true;}
-  for (const value of Object.values(node.props || {})) {
+  const props = 'props' in node ? node.props : undefined;
+  for (const value of Object.values(props || {})) {
     if (value && value.type === 'expr') {return true;}
   }
-  return (node.children || []).some(usesPageScope);
+  const children = 'children' in node ? node.children : undefined;
+  return (children || []).some(usesPageScope);
 }
 
 // Loops and conditionals render their children straight through, so a `slot`
@@ -138,7 +252,7 @@ const SLOT_TRANSPARENT = new Set(['map', 'cond', 'branch', 'chunk-group']);
 // The component (or layout) whose slots a node's `slot` attribute names,
 // looking past those pass-through wrappers. Null when the node lands in a
 // plain element or at the page root — nothing there reads a slot name.
-function slotHostOf(model, id) {
+function slotHostOf(model: Pick<PageModel, 'nodes'>, id: string): PairedNode | null {
   const parents = (ancestorChain(model.nodes, id) || []).slice(0, -1);
   const node = parents.reverse().find((parent) => !SLOT_TRANSPARENT.has(parent.kind));
   return node?.kind === 'component' ? node : null;
@@ -148,7 +262,11 @@ function slotHostOf(model, id) {
 // name of its own (`import Layout from '../layouts/BaseLayout.astro'`) — so
 // fall back to the file the import points at. Null means "no definition
 // scanned", which is never the same answer as "has no slots".
-function definitionOf(model, node, insertables) {
+function definitionOf(
+  model: Pick<PageModel, 'imports'>,
+  node: Pick<PairedNode, 'name'>,
+  insertables: readonly ScanComponent[],
+): ScanComponent | null {
   const byName = insertables.find((c) => c.name === node.name);
   if (byName) {return byName;}
   const imp = (model.imports || []).find((i) => i.name === node.name);
@@ -159,10 +277,13 @@ function definitionOf(model, node, insertables) {
 // First element with this tag, depth-first. Used to land the selection on a
 // layout's <body> when it is opened: the html/head wrapper above it is not
 // what anyone came to edit, and <body> is the page's real root.
-function findElementByTag(nodes, tag) {
+function findElementByTag(
+  nodes: readonly PageNode[] | null | undefined,
+  tag: string,
+): PairedNode | null {
   for (const n of nodes || []) {
     if (n.kind === 'element' && String(n.name).toLowerCase() === tag) {return n;}
-    if (Array.isArray(n.children)) {
+    if ('children' in n && Array.isArray(n.children)) {
       const found = findElementByTag(n.children, tag);
       if (found) {return found;}
     }
@@ -173,13 +294,13 @@ function findElementByTag(nodes, tag) {
 // Start a component on its rendered markup, looking through control flow and
 // fragments because those wrappers have no element to style. Layouts keep
 // their <body> selection; files without rendered markup still get a fallback.
-function openingSelection(nodes) {
+function openingSelection(nodes: readonly PageNode[] | null | undefined): PageNode | null {
   const list = Array.isArray(nodes) ? nodes : [];
-  const firstRendered = (children) => {
+  const firstRendered = (children: readonly PageNode[] | null | undefined): PageNode | null => {
     for (const node of children || []) {
       const markup = node.kind === 'element' || node.kind === 'component';
       if (SLOT_TRANSPARENT.has(node.kind) || (markup && ['Fragment', 'slot'].includes(node.name))) {
-        const child = firstRendered(node.children);
+        const child = firstRendered('children' in node ? node.children : undefined);
         if (child) {return child;}
       } else if (markup && !['head', 'script', 'style', 'link', 'meta', 'title', 'base', 'template'].includes(node.name)) {
         return node;
@@ -194,17 +315,17 @@ function openingSelection(nodes) {
 // otherwise the first real node. A doctype line, a leading comment or stray
 // whitespace isn't what the page is about, so those are skipped — but any
 // node beats selecting nothing.
-function outermostNode(nodes) {
-  const list = Array.isArray(nodes) ? nodes : [];
+function outermostNode(nodes: readonly PageNode[] | null | undefined): PageNode | null {
+  const list: readonly PageNode[] = nodes ?? [];
   return list.find((n) => n.kind === 'element' || n.kind === 'component') || list[0] || null;
 }
 
-function collectUsedNames(model) {
-  const used = new Set();
-  const walk = (list) => {
+function collectUsedNames(model: PageModel): Set<string> {
+  const used = new Set<string>();
+  const walk = (list: readonly PageNode[]): void => {
     for (const node of list) {
-      if (node.name) {used.add(node.name);}
-      if (Array.isArray(node.children)) {walk(node.children);}
+      if ('name' in node && node.name) {used.add(node.name);}
+      if ('children' in node && Array.isArray(node.children)) {walk(node.children);}
     }
   };
   walk(model.nodes);
@@ -216,7 +337,7 @@ function collectUsedNames(model) {
 // use of it. Only whole-line `//` comments go: a trailing one can't be told
 // from the `//` inside a URL without really parsing, and cutting a string in
 // half there would hide a reference that is real.
-function stripComments(code) {
+function stripComments(code: string): string {
   return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
 }
 
@@ -231,17 +352,18 @@ function stripComments(code) {
 // a use. Reading them meant a `.Hero` class or a `/* Hero */` note pinned
 // <Hero>'s import in place for good. What those blocks genuinely share comes
 // in through `define:vars`, which is a prop expression and is still read.
-function codeText(model) {
+function codeText(model: PageModel): string {
   const parts = [stripComments(model.extraFrontmatter || '')];
-  const walk = (list) => {
+  const walk = (list: readonly PageNode[]): void => {
     for (const node of list) {
       if (node.kind === 'expr' || node.kind === 'raw-line') {parts.push(node.value || '');}
       if (node.kind === 'map') {parts.push(node.head || '');}
       if (node.kind === 'cond') {parts.push(node.test || '');}
-      for (const v of Object.values(node.props || {})) {
+      const props = 'props' in node ? node.props : undefined;
+      for (const v of Object.values(props || {})) {
         if (v && (v.type === 'expr' || v.type === 'spread')) {parts.push(String(v.value ?? ''));}
       }
-      if (Array.isArray(node.children)) {walk(node.children);}
+      if ('children' in node && Array.isArray(node.children)) {walk(node.children);}
     }
   };
   walk(model.nodes);
@@ -249,20 +371,35 @@ function codeText(model) {
 }
 
 // How long a pending save waits, by urgency. See scheduleSave.
-const SAVE_DELAY = { true: 0, live: 120, false: 300 };
+function saveDelay(urgency: boolean | 'live'): number {
+  if (urgency === true) {
+    return 0;
+  }
+  if (urgency === 'live') {
+    return 120;
+  }
+  return 300;
+}
 
 // A route is stored the way it identifies a page — slashless, so /de/hotel
 // and /de/hotel/ are the same entry however a link was typed. A URL is a
 // different thing: Astro's dev server serves exactly one of those spellings,
 // and answers the other with a 404 help page. So the project's trailingSlash
 // is applied on the way from one to the other, never before.
-function routeToPath(route, trailingSlash) {
+function routeToPath(route: string, trailingSlash: TrailingSlash): string {
   if (!route || route === '/') {return route || '/';}
   // An extension means a file, not a directory-style route: /rss.xml keeps
   // its shape under every setting, which is also how Astro checks it.
   if (trailingSlash === 'always') {return /\.[^/]+$/.test(route) ? route : route + '/';}
   if (trailingSlash === 'never') {return route.replace(/\/$/, '');}
   return route; // 'ignore' — the default, and it serves either
+}
+
+function parseTrailingSlash(value: string): TrailingSlash {
+  if (value === 'always' || value === 'never' || value === 'ignore') {
+    return value;
+  }
+  throw new Error(`Unknown trailing-slash mode: ${value}`);
 }
 
 // Imports the app is willing to remove once nothing refers to them: a
@@ -275,7 +412,7 @@ function routeToPath(route, trailingSlash) {
 const COMPONENT_IMPORT_RE = /\.(astro|jsx|tsx|vue|svelte)$/i;
 const ASSET_IMPORT_RE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 
-function prunableImport(i) {
+function prunableImport(i: ImportDecl): boolean {
   return (
     COMPONENT_IMPORT_RE.test(i.path) ||
     ASSET_IMPORT_RE.test(i.path) ||
@@ -283,7 +420,7 @@ function prunableImport(i) {
   );
 }
 
-function pruneImports(model) {
+function pruneImports(model: EditorModel): void {
   const used = collectUsedNames(model);
   // A name can be referenced as code rather than as a tag — inside a
   // `<Fragment set:html>` chunk, a frontmatter const, a prop expression. The
@@ -291,7 +428,7 @@ function pruneImports(model) {
   // because the cost of a false positive is a stray import and the cost of a
   // false negative is deleting something the page still needs.
   const code = codeText(model);
-  const mentioned = (name) =>
+  const mentioned = (name: string): boolean =>
     new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(code);
   model.imports = model.imports.filter(
     (i) => !prunableImport(i) || used.has(i.name) || mentioned(i.name)
@@ -301,7 +438,11 @@ function pruneImports(model) {
 // Chooses an import path matching the page's existing style: if it already
 // imports via a src alias (e.g. "@/components/X.astro"), reuse that alias
 // root for the new import; otherwise fall back to a relative path.
-function chooseImportPath(model, { relative, srcRelative }) {
+function chooseImportPath(
+  model: Pick<PageModel, 'imports'>,
+  paths: { readonly relative: string; readonly srcRelative: string | null },
+): string {
+  const { relative, srcRelative } = paths;
   if (srcRelative) {
     for (const imp of model.imports) {
       if (imp.path.startsWith('.')) {continue;}
@@ -319,7 +460,7 @@ function chooseImportPath(model, { relative, srcRelative }) {
 // are all text and simple inline tags, or an element still empty and able to
 // hold text. Kept in step with it by hand; the two disagreeing would mean a
 // double-click that focuses a field which isn't there.
-function holdsInlineText(node) {
+function holdsInlineText(node: PageNode | null | undefined): boolean {
   if (!node || node.kind !== 'element') {return false;}
   if (VOID_TAGS.has(String(node.name).toLowerCase())) {return false;}
   const kids = node.children;
@@ -327,112 +468,119 @@ function holdsInlineText(node) {
 }
 
 export default function App() {
-  const [project, setProject] = useState(null); // {path, name}
-  const [scan, setScan] = useState({ pages: [], layouts: [], components: [] });
-  const [projectClasses, setProjectClasses] = useState([]);
-  const [currentPage, setCurrentPage] = useState(null); // active file {path, name, route?, kind}
+  const [project, setProject] = useState<ProjectIdentity | null>(null);
+  const [scan, setScan] = useState<ScanResult>({
+    pages: [],
+    pageFolders: [],
+    layouts: [],
+    components: [],
+  });
+  const [projectClasses, setProjectClasses] = useState<readonly string[]>([]);
+  const [currentPage, setCurrentPage] = useState<CurrentPage | null>(null);
   // Drill-down trail: [page, component, nested component, …]. The last entry
   // is what's on screen; anything before it is what Back/Escape returns to.
-  const [editStack, setEditStack] = useState([]);
-  const [pageState, setPageState] = useState(null); // {editable, model, source, reason}
-  const [selectedId, setSelectedId] = useState(null);
+  const [editStack, setEditStack] = useState<readonly OpenFile[]>([]);
+  const [pageState, setPageState] = useState<EditorPageState | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   // Classes the selected element actually carries on the page, reported by the
   // preview. An expression-valued class attribute (`class:list={[…]}`,
   // `class={x}`) has no readable text in the source, so this is what lets the
   // style panel show the classes this instance resolved to.
-  const [selectedClasses, setSelectedClasses] = useState([]);
+  const [selectedClasses, setSelectedClasses] = useState<readonly string[]>([]);
   // Which selection the classes above describe, and a counter that lets the
   // effect below re-check the moment a report lands rather than on a timer.
-  const classesForRef = useRef(null);
+  const classesForRef = useRef<string | null>(null);
   const [classesTick, setClassesTick] = useState(0);
-  const [hoverNodeId, setHoverNodeId] = useState(null); // navigator row hover
+  const [hoverNodeId, setHoverNodeId] = useState<string | null>(null);
   // Paths the page reports as having actually rendered something. Null until
   // the page has said anything, which is not the same as "nothing rendered".
-  const [renderedPaths, setRenderedPaths] = useState(null);
+  const [renderedPaths, setRenderedPaths] = useState<readonly string[] | null>(null);
   // Nodes the page says are there but taking no part: display:none, and
   // pointer-events:none. Marked in the navigator (see StructurePanel).
-  const [nodeStates, setNodeStates] = useState(null);
+  const [nodeStates, setNodeStates] = useState<NodeStates | null>(null);
   // path -> the classes that node rendered with, for labelling rows whose
   // class is an expression the source can't resolve.
-  const [nodeClasses, setNodeClasses] = useState(null);
-  const [devUrl, setDevUrl] = useState(null);
-  const [trailingSlash, setTrailingSlash] = useState('ignore');
-  const [devStatus, setDevStatus] = useState('off'); // off | starting | on
+  const [nodeClasses, setNodeClasses] = useState<
+    Readonly<Record<string, readonly string[]>> | null
+  >(null);
+  const [devUrl, setDevUrl] = useState<string | null>(null);
+  const [trailingSlash, setTrailingSlash] = useState<TrailingSlash>('ignore');
+  const [devStatus, setDevStatus] = useState<DevStatus>('off');
   const [devLog, setDevLog] = useState('');
-  const [devDiag, setDevDiag] = useState(null); // {kind, nodePath, nodeVersion, …}
-  const [busy, setBusy] = useState(null); // string message
-  const [toast, setToast] = useState(null); // {msg, kind}
+  const [devDiag, setDevDiag] = useState<DevDiagnosis | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   // Concrete paths behind a dynamic route, and which one the canvas is showing.
-  const [dynamicPaths, setDynamicPaths] = useState([]);
+  const [dynamicPaths, setDynamicPaths] = useState<readonly DynamicEntry[]>([]);
   // Routes the dev server serves that aren't files here — pages an integration
   // injected. A project can consist entirely of these (a site whose pages ship
   // in a package), in which case they are the only pages there are to show.
-  const [injectedRoutes, setInjectedRoutes] = useState([]);
+  const [injectedRoutes, setInjectedRoutes] = useState<readonly InjectedRoute[]>([]);
   // One sampled entry per collection the open file reads by name, for the
   // binding picker. Keyed by collection; a name present with a null value has
   // been asked for and has no answer, which stops it being asked again.
-  const [collectionSamples, setCollectionSamples] = useState({});
+  const [collectionSamples, setCollectionSamples] = useState<CollectionSamples>({});
   // Every collection the project has, so data anywhere in the site is
   // reachable from the picker — not only what this page already reads.
-  const [collections, setCollections] = useState([]);
-  const sampleAskedRef = useRef(new Set());
+  const [collections, setCollections] = useState<readonly AppCollection[]>([]);
+  const sampleAskedRef = useRef(new Set<string>());
   const [dynamicIndex, setDynamicIndex] = useState(0);
   // Which item of each loop's list the data picker reads as `service`, `post`,
   // … — keyed by the item's own name. See bindContext below.
-  const [itemIndex, setItemIndex] = useState({});
-  const [dynamicError, setDynamicError] = useState(null);
-  const [leftTab, setLeftTab] = useState('navigator'); // pages | navigator | components | assets | cms | null
-  const [cmsRel, setCmsRel] = useState(null); // JSON file open in the CMS editor
+  const [itemIndex, setItemIndex] = useState<ItemIndexes>({});
+  const [dynamicError, setDynamicError] = useState<string | null>(null);
+  const [leftTab, setLeftTab] = useState<LeftTab>('navigator');
+  const [cmsRel, setCmsRel] = useState<string | null>(null);
   // Content collection open in the schema-driven editor. Only one of the two
   // is ever open: they edit the same kind of thing in two different ways.
-  const [contentName, setContentName] = useState(null);
+  const [contentName, setContentName] = useState<string | null>(null);
   // Which stylesheet group the variables sheet is showing: { file, index }.
-  const [varsGroup, setVarsGroup] = useState(null);
+  const [varsGroup, setVarsGroup] = useState<VariableSelection | null>(null);
   const [cmsTick, setCmsTick] = useState(0); // bumped on save, refreshes counts
   const [cmsSettings, setCmsSettings] = useState(false); // editing that collection's fields
   const [inPreview, setInPreview] = useState(false); // interactive full-site preview
-  const [previewSrc, setPreviewSrc] = useState(null);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   // The path the canvas is on, kept where the preview toggle can read it: it's
   // derived at the bottom of this component (a dynamic page's entry is picked
   // there), long after the callbacks up here are defined.
-  const livePathRef = useRef(null);
+  const livePathRef = useRef<string | null>(null);
   const [termOpen, setTermOpen] = useState(false); // bottom terminal dock
-  const [codeWin, setCodeWin] = useState(null); // {targetId|kind:'file', title, language}
-  const openCodeWindowRef = useRef(null); // latest openCodeWindow, for the Enter shortcut
-  const selectionKeysRef = useRef([]); // node keys ⇧⌘C resolves to file:line
+  const [codeWin, setCodeWin] = useState<CodeWindowState | null>(null);
+  const openCodeWindowRef = useRef<(() => boolean) | null>(null);
+  const selectionKeysRef = useRef<readonly string[]>([]);
   const [fileText, setFileText] = useState(''); // loaded text for kind:'file'
   // Breakpoint lives here, not in PreviewPane: a re-mount of that pane must
   // not silently drop the user out of the view they picked (which would
   // reload every preview iframe and flash the canvas white).
-  const [device, setDevice] = useState('desktop');
+  const [device, setDevice] = useState<PreviewDevice>('desktop');
   // Bumped every time the page itself makes the selection, so the navigator
   // scrolls the row into view — a counter, not the id, so clicking the same
   // element twice still reveals it.
   const [revealTick, setRevealTick] = useState(0);
-  const [rightTab, setRightTab] = useState('style'); // style | settings
+  const [rightTab, setRightTab] = useState<RightTab>('style');
   // ⌘Enter asks the props panel to open Settings and take the caret into the
   // class field — a counter, so pressing it again re-focuses.
   // Git state, read here so the History panel and the title-bar chip cannot
   // disagree about which branch is checked out. The chip still refreshes it on
   // its own schedule; this is the copy the panel reads.
-  const [gitInfo, setGitInfo] = useState(null);
+  const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   // The commit being previewed, or null for the working tree. See phase 4:
   // while this is set the canvas points at a separate server and the editor is
   // read-only.
-  const [previewRef, setPreviewRef] = useState(null);
-  const [previewInfo, setPreviewInfo] = useState(null); // {url, subject, when}
+  const [previewRef, setPreviewRef] = useState<string | null>(null);
+  const [previewInfo, setPreviewInfo] = useState<PreviewCommitInfo | null>(null);
   const [classFocus, setClassFocus] = useState(0);
   const [contentFocus, setContentFocus] = useState(0);
   // Sliding highlight behind the active Style/Settings tab, measured from the
   // buttons so it tracks their real geometry (and any panel resize).
-  const rightTabRefs = useRef({});
-  const [rightTabInd, setRightTabInd] = useState(null);
+  const rightTabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [rightTabInd, setRightTabInd] = useState<RightTabIndicator | null>(null);
   // The asset request a field is waiting on, and the tab to go back to once
   // it's answered — "Choose Image…" borrows the left panel rather than
   // opening a window over the canvas.
-  const [assetPick, setAssetPick] = useState(null);
-  const tabBeforePick = useRef(null);
+  const [assetPick, setAssetPick] = useState<AssetPick | null>(null);
+  const tabBeforePick = useRef<LeftTab>(null);
   // Bumped by ⌘⇧A: the Components panel opens its naming dialog when it changes.
   const [createRequest, setCreateRequest] = useState(0);
 
@@ -446,28 +594,28 @@ export default function App() {
     [scan.components, scan.layouts]
   );
 
-  const saveTimer = useRef(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const devLogRef = useRef('');
-  const pageStateRef = useRef(null);
+  const pageStateRef = useRef<PageStateSnapshot>({ currentPage: null, pageState: null });
   pageStateRef.current = { currentPage, pageState };
-  const selectedIdRef = useRef(null);
+  const selectedIdRef = useRef<string | null>(null);
   selectedIdRef.current = selectedId;
 
   // A report from the canvas about what the selected element's classes really
   // are. It is always about whatever is selected right now — the canvas is
   // asked for the tracked path — so this records which element it answered
   // for, which is what lets the panel tell a fresh answer from a stale one.
-  const receiveClasses = useCallback((list) => {
+  const receiveClasses = useCallback((list: readonly string[]) => {
     classesForRef.current = selectedIdRef.current;
     setSelectedClasses(list);
     setClassesTick((n) => n + 1);
   }, []);
-  const editStackRef = useRef([]);
+  const editStackRef = useRef<readonly OpenFile[]>([]);
   editStackRef.current = editStack;
   const inPreviewRef = useRef(false);
   inPreviewRef.current = inPreview;
-  const previewPathRef = useRef(null);
-  const previewIframeRef = useRef(null);
+  const previewPathRef = useRef<string | null>(null);
+  const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   // ----------------------------------------------------------------
   // Toasts & events
@@ -480,15 +628,14 @@ export default function App() {
   const diagnose = useCallback(() => {
     const p = projectRef.current?.path;
     if (!p) {return;}
-    window.avb
-      .diagnoseDev(p)
+    diagnoseProject(p)
       .then((d) => setDevDiag(d))
       .catch(() => setDevDiag(null));
   }, []);
 
   // `picked` is passed as literal true by the pick itself — the Cancel button
   // hands this its click event, which must not read as a pick.
-  const endAssetPick = useCallback((picked) => {
+  const endAssetPick = useCallback((picked: unknown) => {
     clearAssetRequest();
     setAssetPick(null);
     setLeftTab((t) => {
@@ -524,8 +671,8 @@ export default function App() {
     });
   }, [endAssetPick]);
 
-  const toastTimer = useRef(null);
-  const showToast = useCallback((msg, kind = 'info') => {
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showToast = useCallback((msg: string, kind: ToastKind = 'info') => {
     setToast({ msg, kind });
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 5000);
@@ -533,8 +680,8 @@ export default function App() {
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   useEffect(() => {
-    const offProgress = window.avb.onProgress(({ message }) => setBusy(message || null));
-    const offExit = window.avb.onDevExit(({ log }) => {
+    const offProgress = onAppProgress((message) => setBusy(message));
+    const offExit = onDevExit((log) => {
       setDevStatus('off');
       setDevUrl(null);
       if (log) {
@@ -543,7 +690,7 @@ export default function App() {
       }
       diagnose();
     });
-    const offLog = window.avb.onDevLog((chunk) => {
+    const offLog = onDevLog((chunk) => {
       devLogRef.current = stripAnsi(devLogRef.current + chunk).slice(-4000);
       setDevLog(devLogRef.current);
     });
@@ -577,11 +724,11 @@ export default function App() {
       return undefined;
     }
     const watch = createPreviewWatch({
-      probe: () => window.avb.probeDevPage(devUrl + (livePathRef.current || '/')),
+      probe: () => probeProjectPreview(devUrl + (livePathRef.current || '/')),
       onRecover: () => setRefreshKey((k) => k + 1),
     });
     // Every write the app makes, plus every change made outside it.
-    const offWrite = window.avb.onPageMaybeChanged((d) => {
+    const offWrite = onPageMaybeChanged((event) => {
       watch.poke();
       // A change from outside the app — an editor, a script, a checkout. The
       // canvas normally hears about it over the dev server's HMR socket, and
@@ -589,7 +736,7 @@ export default function App() {
       // that stayed open, a machine that slept) nothing says so: the page just
       // stops updating and the only way to see an edit is the refresh button.
       // The app's own watcher saw this change, so it says it directly too.
-      if (d?.external) {tellCanvas({ type: 'avb:patch-now' });}
+      if (event.external) {tellCanvas({ type: 'avb:patch-now' });}
     });
     return () => {
       offWrite();
@@ -601,8 +748,8 @@ export default function App() {
   // Project lifecycle
   // ----------------------------------------------------------------
 
-  const scanRequestRef = useRef(null);
-  const rescan = useCallback(async (projectPath) => {
+  const scanRequestRef = useRef<ScanRequest | null>(null);
+  const rescan = useCallback(async (projectPath: string): Promise<ScanResult> => {
     // The bridge parses the payload against the scan contract before any of
     // this code sees it.
     let request = { projectPath, promise: scanProject(projectPath), applied: false };
@@ -615,8 +762,8 @@ export default function App() {
       if (chain > LIMITS.rescanChainMax) {
         throw new Error(`rescan chain exceeded ${LIMITS.rescanChainMax} hops for ${projectPath}`);
       }
-      let result;
-      let failure;
+      let result: ScanResult | undefined;
+      let failure: unknown;
       try {
         result = await request.promise;
       } catch (err) {
@@ -629,13 +776,16 @@ export default function App() {
         request = latest;
         continue;
       }
-      if (failure) {throw failure;}
+      if (failure !== undefined) {throw failure;}
+      if (!result) {
+        throw new Error('Project scan completed without a result');
+      }
       if (latest === request && !request.applied) {
         request.applied = true;
         setScan(result);
-        if (result?.trailingSlash) {setTrailingSlash(result.trailingSlash);}
+        if (result.trailingSlash) {setTrailingSlash(parseTrailingSlash(result.trailingSlash));}
         const appliedRequest = request;
-        window.avb.listProjectClasses(projectPath).then((classes) => {
+        readProjectClasses(projectPath).then((classes) => {
           if (scanRequestRef.current === appliedRequest) {setProjectClasses(classes || []);}
         }).catch(() => {});
       }
@@ -644,16 +794,16 @@ export default function App() {
   }, []);
 
   const startPreview = useCallback(
-    async (projectPath) => {
+    async (projectPath: string) => {
       setDevStatus('starting');
       try {
-        const { url, external, trailingSlash: resolved } =
-          await window.avb.startDevServer(projectPath);
+        const started = await startProjectPreview(projectPath);
+        const { url, trailingSlash: resolved } = started;
         setDevUrl(url);
-        if (resolved) {setTrailingSlash(resolved);}
+        if (resolved) {setTrailingSlash(parseTrailingSlash(resolved));}
         setDevStatus('on');
         setDevDiag(null);
-        if (external) {
+        if ('external' in started && started.external) {
           showToast(
             `Reusing the dev server already running for this project (${url}) — canvas outlines need the app's own server, so stop that one to enable them.`,
             'info'
@@ -673,27 +823,27 @@ export default function App() {
   );
 
   const loadProject = useCallback(
-    async (projectPath) => {
-      const name = projectPath.split(/[\\/]/).filter(Boolean).pop();
+    async (projectPath: string) => {
+      const name = projectPath.split(/[\\/]/).filter(Boolean).pop() ?? projectPath;
       setProject({ path: projectPath, name });
       setLeftTab('navigator');
       // Every project opens on desktop — a breakpoint left over from the
       // last project isn't a choice the user made about this one.
       setDevice('desktop');
-      window.avb.addRecent(projectPath);
+      void addRecentProject(projectPath).catch(() => {});
       const result = await rescan(projectPath);
 
-      const hasDeps = await window.avb.hasNodeModules(projectPath);
+      const hasDeps = await projectHasNodeModules(projectPath);
       if (!hasDeps) {
         try {
-          await window.avb.installDeps(projectPath);
+          await installProjectDependencies(projectPath);
         } catch (err) {
           showToast(cleanError(err), 'error');
         }
         setBusy(null);
       }
       startPreview(projectPath);
-      window.avb.watchProject(projectPath);
+      void watchProject(projectPath).catch(() => {});
 
       const first =
         result.pages.find((p) => p.name === 'index.astro') || result.pages[0] || null;
@@ -710,9 +860,13 @@ export default function App() {
   useEffect(() => {
     if (reopenedRef.current || !window.avb.pendingProject) {return;}
     reopenedRef.current = true;
-    window.avb
-      .pendingProject()
-      .then((p) => p && loadProject(p))
+    pendingProject()
+      .then((path) => {
+        if (path) {
+          return loadProject(path);
+        }
+        return undefined;
+      })
       .catch(() => {});
   }, [loadProject]);
 
@@ -721,28 +875,34 @@ export default function App() {
   // Page loading & saving
   // ----------------------------------------------------------------
 
-  const fileSaverRef = useRef(null);
+  const fileSaverRef = useRef<ReturnType<typeof createFileSaver> | null>(null);
   if (!fileSaverRef.current) {
     fileSaverRef.current = createFileSaver({
       onError: (err) => showToast(`Save failed: ${cleanError(err)}`, 'error'),
     });
   }
-  const pageSaverRef = useRef(null);
+  const pageSaverRef = useRef<(() => Promise<void>) | null>(null);
   if (!pageSaverRef.current) {
     pageSaverRef.current = createPageSaver({
       readCurrent: () => pageStateRef.current,
-      write: (pagePath, state) => state.editable
-        ? window.avb.writePage({ pagePath, model: state.model })
-        : window.avb.writePageRaw({ pagePath, source: state.source }),
+      write: async (pagePath, state) => {
+        if (state.editable) {
+          await writeProjectPage(pagePath, state.model);
+        } else {
+          await writeProjectPageRaw(pagePath, state.source);
+        }
+      },
       markSaved: (saved) => setPageState((state) =>
         state === saved ? { ...state, dirty: false } : state
       ),
     });
   }
+  const fileSaver = fileSaverRef.current;
+  const pageSaver = pageSaverRef.current;
   const flushSave = useCallback(() => {
     clearTimeout(saveTimer.current);
-    return Promise.all([pageSaverRef.current(), fileSaverRef.current.flush()]);
-  }, []);
+    return Promise.all([pageSaver(), fileSaver.flush()]);
+  }, [fileSaver, pageSaver]);
 
   // Only the most recent navigation is allowed to install its read result.
   const pageLoadRef = useRef(0);
@@ -755,9 +915,9 @@ export default function App() {
   // which main holds for the window that comes back: a choice made before a
   // reload has to survive it. Anything unsaved goes to disk first.
   const leaveProject = useCallback(
-    async (next = null) => {
+    async (next: string | null = null) => {
       await flushSave();
-      await window.avb.closeProject(next);
+      await closeProject(next);
     },
     [flushSave]
   );
@@ -767,8 +927,8 @@ export default function App() {
       if (projectRef.current) {void leaveProject(null);}
     });
     const offOpen = window.avb.onMenu('openProject', async () => {
-      const picked = await window.avb.openProjectDialog();
-      const next = picked?.projectPath || picked?.path || null;
+      const picked = await openProject();
+      const next = !picked.canceled && 'projectPath' in picked ? picked.projectPath : null;
       if (!next) {return;}
       // Nothing open yet: this IS the welcome screen's own button.
       if (!projectRef.current) {
@@ -787,7 +947,7 @@ export default function App() {
   // `currentPage` is simply whatever is being edited, so saving, undo, the
   // navigator, and the props panel all follow without special cases.
   const openFile = useCallback(
-    async (entry, nextStack) => {
+    async (entry: OpenFile, nextStack: SetStateAction<readonly OpenFile[]> | undefined) => {
       const request = ++pageLoadRef.current;
       try {
         await flushSave();
@@ -797,9 +957,9 @@ export default function App() {
       }
       if (request !== pageLoadRef.current) {return;}
       const beforeRead = pageStateRef.current;
-      let result;
+      let result: EditorPageState;
       try {
-        result = await window.avb.readPage(entry.path);
+        result = toEditorPageState(await readPage(entry.path));
       } catch (err) {
         if (request === pageLoadRef.current) {showToast(`Couldn’t open ${entry.name}: ${cleanError(err)}`, 'error');}
         return;
@@ -817,19 +977,21 @@ export default function App() {
       const latest = pageStateRef.current;
       // Reopening the same file must not replace an edit made during the read
       // with the older snapshot that read returned.
-      if (latest.currentPage?.path === entry.path && latest.pageState && (
-        latest.pageState.model !== beforeRead.pageState?.model ||
-        latest.pageState.source !== beforeRead.pageState?.source ||
-        latest.pageState.editable !== beforeRead.pageState?.editable
-      )) {result = latest.pageState;}
-      const nextState = { ...result, dirty: false };
+      if (
+        latest.currentPage?.path === entry.path &&
+        latest.pageState &&
+        latest.pageState !== beforeRead.pageState
+      ) {
+        result = latest.pageState;
+      }
+      const nextState = result;
       // Publish path, model and stack together. Clearing the model first would
       // unmount the inspector and resize the whole preview during every drill.
       pageStateRef.current = { currentPage: entry, pageState: nextState };
       if (nextStack) {setEditStack(nextStack);}
       setCurrentPage(entry);
       setPageState(nextState);
-      const start = result?.model?.nodes
+      const start = result.editable
         ? entry.kind === 'component'
           ? openingSelection(result.model.nodes)
           : outermostNode(result.model.nodes)
@@ -843,12 +1005,12 @@ export default function App() {
   // What's typed in the URL bar while it's being edited; null means "show the
   // real one". Kept separate so the bar keeps tracking the canvas until you
   // actually start typing.
-  const [urlDraft, setUrlDraft] = useState(null);
+  const [urlDraft, setUrlDraft] = useState<string | null>(null);
 
   const selectPage = useCallback(
-    async (page) => {
+    async (page: ScanResult['pages'][number]) => {
       // Opening a page from the switcher leaves any component drill-down.
-      const entry = { ...page, kind: 'page' };
+      const entry: OpenFile = { ...page, kind: 'page' };
       await openFile(entry, [entry]);
     },
     [openFile]
@@ -858,7 +1020,7 @@ export default function App() {
   // in a dependency — so this points the canvas at it and leaves the editor
   // empty rather than pretending there is a model behind it.
   const selectRoute = useCallback(
-    async (entry) => {
+    async (entry: WireInjectedRoute) => {
       const request = ++pageLoadRef.current;
       await flushSave();
       if (request !== pageLoadRef.current) {return;}
@@ -875,7 +1037,7 @@ export default function App() {
   // nothing about — the model and the canvas showing different pages is the
   // one state the app can't represent.
   const goToUrl = useCallback(
-    (typed) => {
+    (typed: string) => {
       setUrlDraft(null);
       const raw = String(typed || '').trim();
       if (!raw) {return;}
@@ -885,7 +1047,8 @@ export default function App() {
       if (m) {route = m[1] || '/';}
       if (!route.startsWith('/')) {route = '/' + route;}
       route = route.replace(/\?.*$|#.*$/, '');
-      const norm = (r) => (r !== '/' ? r.replace(/\/$/, '') : r);
+      const norm = (value: string): string =>
+        value !== '/' ? value.replace(/\/$/, '') : value;
       const page = (scan.pages || []).find((p) => norm(p.route) === norm(route));
       if (page) {
         selectPage(page);
@@ -910,11 +1073,11 @@ export default function App() {
       pageStateRef.current.currentPage === open && pageStateRef.current.pageState === state;
     if (!proj) {return;}
     const result = await rescan(proj.path);
-    if (!open || !stillCurrent()) {return;}
+    if (!open || open.kind === 'route' || !stillCurrent()) {return;}
     // The open file may not exist on the branch just switched to.
     const stillThere = scanContainsFile(result, open.path);
     if (stillThere) {
-      const fresh = await window.avb.readPage(open.path);
+      const fresh = toEditorPageState(await readPage(open.path));
       if (!stillCurrent()) {return;}
       setPageState({ ...fresh, dirty: false });
       setSelectedId(null);
@@ -922,7 +1085,7 @@ export default function App() {
     } else {
       const next = result.pages[0] || null;
       if (next) {
-        const entry = { ...next, kind: 'page' };
+        const entry: OpenFile = { ...next, kind: 'page' };
         await openFile(entry, [entry]);
       } else {
         setEditStack([]);
@@ -938,13 +1101,15 @@ export default function App() {
   // stack remembers what to come back to (pages and components alike, so
   // nesting works to any depth).
   const openComponent = useCallback(
-    async (name, hostPath, hostOcc = 0, filePath = null) => {
+    async (name: string, hostPath: string | null, hostOcc = 0, filePath: string | null = null) => {
       // A tag is only a local binding — `import Layout from
       // '@/layouts/BaseLayout.astro'` renders as <Layout> — so follow the
       // page's own import first, and fall back to matching by filename.
       const { currentPage: host, pageState: state } = pageStateRef.current;
       const request = pageLoadRef.current;
-      const spec = (state?.model?.imports || []).find((i) => i.name === name)?.path;
+      const spec = (state?.editable ? state.model.imports : []).find(
+        (item) => item.name === name,
+      )?.path;
       let comp = null;
       // A caller that already knows the file means THAT file — the instances
       // popup names a component by where it lives, and two folders can hold
@@ -956,14 +1121,14 @@ export default function App() {
           { name, path: filePath };
       }
       if (!comp && spec && host?.path) {
-        const { path: file } = await window.avb.resolveImport({
-          projectPath: projectRef.current.path,
-          fromFile: host.path,
-          spec,
-        });
+        const projectPath = projectRef.current?.path;
+        if (!projectPath) {return;}
+        const file = await resolveProjectImport(projectPath, host.path, spec);
         if (request !== pageLoadRef.current || pageStateRef.current.currentPage !== host) {return;}
         if (file && /\.astro$/i.test(file)) {
-          comp = { name: file.split('/').pop().replace(/\.astro$/i, ''), path: file };
+          const fileName = file.split('/').pop();
+          assert(fileName !== undefined, 'Resolved component path has a filename');
+          comp = { name: fileName.replace(/\.astro$/i, ''), path: file };
         } else if (file) {
           // A framework island (.jsx/.svelte/…) has no Astro tree to show.
           showToast(`<${name}> is a ${file.split('.').pop()} component — edit it in code.`, 'error');
@@ -999,15 +1164,15 @@ export default function App() {
       const top = stack[stack.length - 1];
       const hostNode = hostPath
         ? nodeAtPath(
-            state?.model?.nodes || [],
-            String(hostPath).split('|').pop().split('.').map(Number)
+            state?.editable ? state.model.nodes : [],
+            (String(hostPath).split('|').at(-1) ?? '').split('.').map(Number)
           )
         : null;
       const focusPath = top?.focusPath ?? hostPath ?? null;
       const nested = top?.focusPath != null;
       const focusOcc = nested ? top.focusOcc ?? 0 : hostOcc;
       const focusWhole = nested ? !!top.focusWhole : hostNode?.id === 'layout';
-      const entry = {
+      const entry: OpenFile = {
         kind: 'component',
         name: comp.name,
         path: comp.path,
@@ -1028,7 +1193,9 @@ export default function App() {
     const stack = editStackRef.current;
     if (stack.length < 2) {return;}
     const next = stack.slice(0, -1);
-    await openFile(next[next.length - 1], next);
+    const parent = next.at(-1);
+    assert(parent, 'Component stack must retain its parent');
+    await openFile(parent, next);
   }, [openFile]);
 
   // ----------------------------------------------------------------
@@ -1051,11 +1218,12 @@ export default function App() {
   // disposable checkout, so anything typed into them would be thrown away the
   // moment the preview ends, with nothing to say it had happened.
   const previewCommit = useCallback(
-    async (commit) => {
+    async (commit: WireCommitInfo) => {
       if (!project) {return;}
+      assert(commit.hash, 'Previewed commit must have a hash');
       setBusy('Getting that version ready…');
       try {
-        const r = await window.avb.previewAtCommit({ projectPath: project.path, ref: commit.hash });
+        const r = await previewProjectCommit(project.path, commit.hash);
         setPreviewRef(commit.hash);
         setPreviewInfo({ url: r.url, subject: commit.subject, when: commit.when });
       } catch (err) {
@@ -1072,7 +1240,7 @@ export default function App() {
   const exitCommitPreview = useCallback(async () => {
     setPreviewRef(null);
     setPreviewInfo(null);
-    if (project) {await window.avb.previewStop({ projectPath: project.path }).catch(() => {});}
+    if (project) {await stopProjectCommitPreview(project.path).catch(() => {});}
   }, [project]);
 
   // Leaving the project (or closing it) must not leave a second server and a
@@ -1080,32 +1248,36 @@ export default function App() {
   useEffect(() => {
     if (!project) {return undefined;}
     return () => {
-      window.avb.previewStop({ projectPath: project.path }).catch(() => {});
+      void stopProjectCommitPreview(project.path).catch(() => {});
     };
   }, [project?.path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshGit = useCallback(async () => {
     if (!project) {return null;}
-    const r = await window.avb.gitInfo(project.path);
-    setGitInfo(r);
-    return r;
-  }, [project]);
+    const result = await readGitInfo(project.path);
+    if (!result.ok) {
+      showToast(result.error, 'error');
+      return null;
+    }
+    setGitInfo(result.value);
+    return result.value;
+  }, [project, showToast]);
 
   useEffect(() => {
     refreshGit();
   }, [refreshGit, refreshKey]);
 
-  const historyRef = useRef({ past: [], future: [], lastPush: 0, lastKey: null });
+  const historyRef = useRef<AppHistory>({ past: [], future: [], lastPush: 0, lastKey: null });
 
-  const snapshotOf = (state) =>
+  const snapshotOf = (state: EditorPageState): PageSnapshot =>
     state.editable
-      ? { kind: 'model', model: structuredClone(state.model) }
+      ? { kind: 'model', model: cloneEditorModel(state.model) }
       : { kind: 'source', source: state.source };
 
   // Records the state *before* a mutation. Consecutive edits with the same
   // coalesceKey within 800 ms collapse into one undo step (typing bursts,
   // dropdown hover-scrubs); structural edits (no key) always get their own.
-  const pushHistory = useCallback((coalesceKey = null) => {
+  const pushHistory = useCallback((coalesceKey: string | null = null) => {
     const state = pageStateRef.current.pageState;
     if (!state) {return;}
     const h = historyRef.current;
@@ -1127,7 +1299,7 @@ export default function App() {
   // the same burst collapse into one step, so a slider drag or a run of live
   // CSS writes is a single ⌘Z — the first one's `undo` (the oldest state) is
   // kept and the newest `redo` replaces the previous.
-  const pushCommand = useCallback((cmd) => {
+  const pushCommand = useCallback((cmd: Omit<UndoCommand, 'kind'>) => {
     const h = historyRef.current;
     const now = Date.now();
     const prev = h.past[h.past.length - 1];
@@ -1139,7 +1311,9 @@ export default function App() {
       prev.coalesceKey === cmd.coalesceKey;
     if (coalesce) {
       prev.redo = cmd.redo;
-      prev.label = cmd.label ?? prev.label;
+      if (cmd.label !== undefined) {
+        prev.label = cmd.label;
+      }
     } else {
       h.past.push({ kind: 'cmd', ...cmd });
       if (h.past.length > 100) {h.past.shift();}
@@ -1148,7 +1322,7 @@ export default function App() {
     h.lastKey = cmd.coalesceKey ?? null;
     h.lastPush = now;
   }, []);
-  const pushCommandRef = useRef(null);
+  const pushCommandRef = useRef<((command: Omit<UndoCommand, 'kind'>) => void) | null>(null);
   pushCommandRef.current = pushCommand;
 
   // Snapshots belong to one page, so they're dropped when that page closes;
@@ -1161,11 +1335,11 @@ export default function App() {
     h.lastPush = 0;
   }, []);
 
-  const applySnapshot = useCallback((entry) => {
+  const applySnapshot = useCallback((entry: PageSnapshot) => {
     setPageState((s) => {
       if (!s) {return s;}
       if (entry.kind === 'model') {
-        return { ...s, editable: true, model: structuredClone(entry.model), dirty: true };
+        return { ...s, editable: true, model: cloneEditorModel(entry.model), dirty: true };
       }
       return { ...s, source: entry.source, dirty: true };
     });
@@ -1178,7 +1352,7 @@ export default function App() {
     scheduleSaveRef.current?.(true);
   }, []);
 
-  const scheduleSaveRef = useRef(null);
+  const scheduleSaveRef = useRef<((urgency?: boolean | 'live') => void) | null>(null);
 
   // Undo and redo rewrite files and the page model under whatever is reading
   // them; bumping this tells the style panel to re-read rather than wait for
@@ -1192,6 +1366,7 @@ export default function App() {
     h.lastKey = null;
     h.lastPush = 0;
     const entry = h.past.pop();
+    if (!entry) {return;}
     if (entry.kind === 'cmd') {
       h.future.push(entry);
       try {
@@ -1214,6 +1389,7 @@ export default function App() {
     h.lastKey = null;
     h.lastPush = 0;
     const entry = h.future.pop();
+    if (!entry) {return;}
     if (entry.kind === 'cmd') {
       h.past.push(entry);
       try {
@@ -1240,13 +1416,13 @@ export default function App() {
   // half a second between the drag and the result. It still coalesces, just
   // over the gap between two ticks rather than the gap between two words.
   const scheduleSave = useCallback(
-    (immediate = false) => {
+    (immediate: boolean | 'live' = false) => {
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(
         () => {
           flushSave().catch((err) => showToast(`Save failed: ${cleanError(err)}`, 'error'));
         },
-        SAVE_DELAY[immediate] ?? 300
+        saveDelay(immediate)
       );
     },
     [flushSave, showToast]
@@ -1254,11 +1430,15 @@ export default function App() {
   scheduleSaveRef.current = scheduleSave;
 
   const mutateModel = useCallback(
-    (fn, immediate = false, coalesceKey = null) => {
+    (
+      fn: (model: EditorModel) => EditorModel,
+      immediate: boolean | 'live' = false,
+      coalesceKey: string | null = null,
+    ) => {
       pushHistory(coalesceKey);
       setPageState((s) => {
         if (!s || !s.editable) {return s;}
-        const model = fn(structuredClone(s.model));
+        const model = fn(cloneEditorModel(s.model));
         return { ...s, model, dirty: true };
       });
       scheduleSave(immediate);
@@ -1267,7 +1447,7 @@ export default function App() {
   );
 
   const setRawSource = useCallback(
-    (source) => {
+    (source: string) => {
       pushHistory('raw-source');
       setPageState((s) => (s ? { ...s, source, dirty: true } : s));
       scheduleSave();
@@ -1281,8 +1461,8 @@ export default function App() {
 
   useEffect(() => {
     let changeVersion = 0;
-    const pendingFiles = new Set();
-    const off = window.avb.onFsChanged(async ({ files }) => {
+    const pendingFiles = new Set<string>();
+    const off = onFilesChanged(async ({ files }) => {
       const proj = projectRef.current;
       if (!proj) {return;}
       for (const file of files) {pendingFiles.add(file);}
@@ -1299,7 +1479,7 @@ export default function App() {
       if (request !== changeVersion) {return;}
 
       const { currentPage: page, pageState: state } = pageStateRef.current;
-      if (!page) { pendingFiles.clear(); return; }
+      if (!page || page.kind === 'route') { pendingFiles.clear(); return; }
       // Chunk .html files feed the open page's Fragment subtrees — treat a
       // change to any of them like a change to the page itself.
       const affectsPage =
@@ -1320,9 +1500,9 @@ export default function App() {
       // edits in flight (their pending save would win anyway).
       if (!state || state.dirty) { pendingFiles.clear(); return; }
 
-      let result;
+      let result: EditorPageState;
       try {
-        result = await window.avb.readPage(page.path);
+        result = toEditorPageState(await readPage(page.path));
       } catch {
         return;
       }
@@ -1345,7 +1525,7 @@ export default function App() {
           nextSelected = null;
         }
       }
-      setPageState({ ...result, dirty: false });
+      setPageState(result);
       setSelectedId(nextSelected);
     });
     return () => { changeVersion++; off(); };
@@ -1355,21 +1535,21 @@ export default function App() {
   // Model operations
   // ----------------------------------------------------------------
 
-  const projectRef = useRef(null);
+  const projectRef = useRef<ProjectIdentity | null>(null);
   projectRef.current = project;
 
-  const resolveImportPath = useCallback(async (targetPath) => {
+  const resolveImportPath = useCallback(async (targetPath: string) => {
     const page = pageStateRef.current.currentPage;
-    return window.avb.importPathFor({
-      pagePath: page.path,
-      targetPath,
-      projectPath: projectRef.current?.path,
-    });
+    const projectPath = projectRef.current?.path;
+    if (!page?.path || !projectPath) {
+      throw new Error('An open project page is required to resolve an import');
+    }
+    return findImportPath(projectPath, page.path, targetPath);
   }, []);
 
   // target: {parentId: string|null, index: number} | null (append at end)
   const addComponent = useCallback(
-    async (componentName, target) => {
+    async (componentName: string, target: InsertTarget | null) => {
       const comp = insertables.find((c) => c.name === componentName);
       const page = pageStateRef.current.currentPage;
       if (!comp || !page) {return;}
@@ -1380,6 +1560,7 @@ export default function App() {
           model.imports.push({
             name: comp.name,
             path: chooseImportPath(model, paths),
+            quote: "'",
           });
         }
         // A component whose default slot sits in a text context arrives with a
@@ -1387,7 +1568,7 @@ export default function App() {
         // canvas to aim at. A wrapper whose slot holds blocks (ButtonWrapper,
         // Section) comes in empty: a stray "Text" there is only ever deleted.
         const takesText = (comp.slots || []).includes('default') && !!comp.slotText;
-        const node = {
+        const node: EditorNode = {
           id,
           kind: 'component',
           name: comp.name,
@@ -1405,7 +1586,7 @@ export default function App() {
   // The page values a subtree reads — the props it would need once it's a file
   // of its own. Asked twice (once to show in the dialog, once to act on) and
   // both times of the live model, so nothing can drift between them.
-  const propsNeededFor = useCallback((model, node) => {
+  const propsNeededFor = useCallback((model: EditorModel, node: EditorNode) => {
     if (!model || !node) {return [];}
     const scope = namesInScope(model.extraFrontmatter || '', model.imports || []);
     for (const v of loopVarsAt(model.nodes, node.id)) {scope.add(v);}
@@ -1417,14 +1598,10 @@ export default function App() {
   // Where a component is used, for the palette's instance count. Asked of the
   // project (not the open file) so it covers pages and components alike; the
   // component's own file is left out — a file is not one of its own users.
-  const componentUsage = useCallback(async (comp) => {
+  const componentUsage = useCallback(async (comp: ScanComponent) => {
     if (!projectRef.current?.path) {return { files: [] };}
     try {
-      return await window.avb.componentUsage({
-        projectPath: projectRef.current.path,
-        name: comp.name,
-        exclude: comp.path,
-      });
+      return await readComponentUsage(projectRef.current.path, comp.name, comp.path);
     } catch (err) {
       // Reported, never swallowed into an empty list: "we couldn't look" and
       // "it isn't used anywhere" are opposite answers, and the second one is
@@ -1436,11 +1613,12 @@ export default function App() {
   // The instances in the file that's already open — those a click can select
   // rather than navigate to.
   const pageInstancesOf = useCallback(
-    (name) => {
-      const model = pageStateRef.current.pageState?.model;
+    (name: string) => {
+      const state = pageStateRef.current.pageState;
+      const model = state?.editable ? state.model : null;
       if (!model) {return [];}
-      const out = [];
-      const walk = (list) => {
+      const out: { readonly id: string }[] = [];
+      const walk = (list: readonly EditorNode[]): void => {
         for (const n of list || []) {
           if (n.kind === 'component' && n.name === name) {out.push({ id: n.id });}
           if (Array.isArray(n.children)) {walk(n.children);}
@@ -1458,19 +1636,22 @@ export default function App() {
   // edit to two files, and the component file is written first: a page that
   // imports a file that isn't there yet is a broken page, however briefly.
   const createComponentFromSelection = useCallback(
-    async (name, { withProps = true } = {}) => {
+    async (name: string, options: { readonly withProps?: boolean } = {}) => {
+      const { withProps = true } = options;
       const page = pageStateRef.current.currentPage;
-      const model = pageStateRef.current.pageState?.model;
+      const state = pageStateRef.current.pageState;
+      const model = state?.editable ? state.model : null;
       const node = model && selectedIdRef.current ? findNodeById(model.nodes, selectedIdRef.current) : null;
-      if (!page || !model || !node) {return;}
+      const projectPath = projectRef.current?.path;
+      if (!page?.path || !model || !node || !projectPath) {return;}
       const props = withProps ? propsNeededFor(model, node) : [];
       let created;
       try {
-        created = await window.avb.createComponent({
-          projectPath: projectRef.current?.path,
+        created = await createProjectComponent({
+          projectPath,
           pagePath: page.path,
           name,
-          nodes: [node],
+          nodes: node,
           imports: model.imports || [],
           props,
         });
@@ -1478,17 +1659,13 @@ export default function App() {
         showToast(cleanError(err), 'error');
         return;
       }
-      const paths = await window.avb.importPathFor({
-        pagePath: page.path,
-        targetPath: created.path,
-        projectPath: projectRef.current?.path,
-      });
+      const paths = await findImportPath(projectPath, page.path, created.path);
       const id = newId();
       mutateModel((m) => {
         const found = findParentList(m, node.id);
         if (!found) {return m;}
         if (!m.imports.some((i) => i.name === name)) {
-          m.imports.push({ name, path: chooseImportPath(m, paths) });
+          m.imports.push({ name, path: chooseImportPath(m, paths), quote: "'" });
         }
         // The instance passes each value straight back in under its own name.
         // That's what reconnects it: `title` meant the page's title where this
@@ -1503,7 +1680,7 @@ export default function App() {
         return m;
       }, true);
       setSelectedId(id);
-      await rescan(projectRef.current.path);
+      await rescan(projectPath);
       // Anything left reading the page's scope can't be reconnected on its own
       // — an expression naming something that isn't a value the page holds, or
       // props turned off. The person who just moved it knows what it needs.
@@ -1520,11 +1697,12 @@ export default function App() {
   );
 
   const moveNode = useCallback(
-    (nodeId, target) => {
+    (nodeId: string, target: InsertTarget | null) => {
       mutateModel((model) => {
         const found = findParentList(model, nodeId);
         if (!found) {return model;}
         const node = found.list[found.index];
+        assert(node, 'Moved node must exist in its parent list');
 
         // Prevent dropping a node into its own subtree.
         if (target?.parentId) {
@@ -1564,12 +1742,14 @@ export default function App() {
 
         // `slot` is a word addressed to the component the node sat inside, and
         // means nothing anywhere else (src/slotAttr.js).
-        const slot = node.props?.slot;
+        const slot = node.props?.['slot'];
         const slotName = slot?.type === 'string' ? slot.value : null;
         if (slotName) {
           const host = slotHostOf(model, nodeId);
           const definition = host ? definitionOf(model, host, insertables) : null;
-          if (!keepsSlot({ slotName, host, definition })) {delete node.props.slot;}
+          if (!keepsSlot({ slotName, host, definition }) && node.props) {
+            delete node.props['slot'];
+          }
         }
 
         // Left a loop? Anything still reading its item would throw.
@@ -1591,10 +1771,10 @@ export default function App() {
   // What the last delete took out of the frontmatter, to say so once the model
   // has settled — a toast raised inside a mutation would fire twice under
   // StrictMode and once per retry.
-  const droppedRef = useRef(null);
+  const droppedRef = useRef<readonly string[] | null>(null);
 
   const removeNode = useCallback(
-    (nodeId) => {
+    (nodeId: string) => {
       const state = pageStateRef.current.pageState;
       const target = state?.editable ? findNodeById(state.model.nodes, nodeId) : null;
       if (target?.kind === 'chunk-group') {
@@ -1647,11 +1827,11 @@ export default function App() {
   // Clipboard: copy / paste / duplicate nodes
   // ----------------------------------------------------------------
 
-  const nodeClipboardRef = useRef(null);
+  const nodeClipboardRef = useRef<NodeClipboard | null>(null);
 
-  const cloneWithNewIds = (node) => {
+  const cloneWithNewIds = (node: EditorNode): EditorNode => {
     const clone = structuredClone(node);
-    const walk = (n) => {
+    const walk = (n: EditorNode): void => {
       n.id = newId();
       if (Array.isArray(n.children)) {n.children.forEach(walk);}
     };
@@ -1660,7 +1840,7 @@ export default function App() {
   };
 
   const copyNode = useCallback(
-    (nodeId) => {
+    (nodeId: string) => {
       const state = pageStateRef.current.pageState;
       if (!state?.editable) {return;}
       const node = findNodeById(state.model.nodes, nodeId);
@@ -1684,7 +1864,7 @@ export default function App() {
   );
 
   const duplicateNode = useCallback(
-    (nodeId) => {
+    (nodeId: string) => {
       const state = pageStateRef.current.pageState;
       if (!state?.editable) {return;}
       const src = findNodeById(state.model.nodes, nodeId);
@@ -1718,14 +1898,14 @@ export default function App() {
     // the code hanging off it — `options={jobs}`, a loop's `posts.map`, a
     // condition's test.
     const names = namesUsedIn([clip.node]);
-    const knows = (nm) =>
+    const knows = (nm: string): boolean =>
       state.model.imports.some((i) => i.name === nm) ||
       new RegExp(`\\b${nm.replace(/\$/g, '\\$')}\\b`).test(state.model.extraFrontmatter || '');
     const missing = [...names].filter((nm) => !knows(nm));
     // A component this project has is imported from where it actually lives,
     // whatever the page it was copied from called it.
-    const resolved = [];
-    const byScan = new Set();
+    const resolved: { readonly name: string; readonly paths: Awaited<ReturnType<typeof findImportPath>> }[] = [];
+    const byScan = new Set<string>();
     for (const nm of missing) {
       const target = insertables.find((c) => c.name === nm);
       if (target) {
@@ -1743,23 +1923,23 @@ export default function App() {
       imports: clip.imports || [],
       has: knows,
     });
-    const carriedImports = [];
+    const carriedImports: ImportDecl[] = [];
     for (const imp of carried.imports) {
       // A relative path means something different from another page's folder.
       const rebased =
         clip.pagePath && String(imp.path || '').startsWith('.')
-          ? await window.avb.rebaseImport({
-              fromPagePath: clip.pagePath,
-              toPagePath: pageStateRef.current.currentPage?.path,
-              spec: imp.path,
-            })
+          ? await rebaseProjectImport(
+              clip.pagePath,
+              pageStateRef.current.currentPage?.path ?? null,
+              imp.path,
+            )
           : { path: imp.path };
-      carriedImports.push({ name: imp.name, path: rebased?.path || imp.path });
+      carriedImports.push({ name: imp.name, path: rebased.path || imp.path, quote: "'" });
     }
 
     const clone = cloneWithNewIds(clip.node);
     const selId = selectedIdRef.current;
-    const acceptsChildren = (n) => {
+    const acceptsChildren = (n: EditorNode): boolean => {
       if (n.id === 'layout') {return true;}
       if (n.kind === 'element') {return !VOID_TAGS.has(String(n.name).toLowerCase());}
       if (n.kind === 'component') {
@@ -1770,7 +1950,11 @@ export default function App() {
     mutateModel((model) => {
       for (const r of resolved) {
         if (!model.imports.some((i) => i.name === r.name)) {
-          model.imports.push({ name: r.name, path: chooseImportPath(model, r.paths) });
+          model.imports.push({
+            name: r.name,
+            path: chooseImportPath(model, r.paths),
+            quote: "'",
+          });
         }
       }
       for (const imp of carriedImports) {
@@ -1829,7 +2013,7 @@ export default function App() {
   // their fingers. Both carry a modifier, so they still work while a text field
   // or the terminal itself has focus — unlike the rail's bare-letter shortcuts.
   useEffect(() => {
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent): void => {
       const mod = e.metaKey || e.ctrlKey;
       const isToggle =
         (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'j') ||
@@ -1850,10 +2034,10 @@ export default function App() {
   // to make a noise on its own.
   useEffect(() => {
     let live = true;
-    window.avb.settings?.().then((s) => {
-      if (live) {setSoundEnabled(!!s?.sound);}
-    });
-    const off = window.avb.onMenu('sound', (on) => setSoundEnabled(!!on));
+    readAppSettings().then((settings) => {
+      if (live) {setSoundEnabled(settings.sound);}
+    }).catch(() => {});
+    const off = onSoundSettingChanged((enabled) => setSoundEnabled(enabled));
     return () => {
       live = false;
       off?.();
@@ -1868,27 +2052,28 @@ export default function App() {
       }
     };
     const offMenu = window.avb.onMenu('insert', openIfEditable);
-    const onMsg = (e) => {
-      if (e.data?.type !== 'avb:shortcut') {return;}
-      if (e.data.name === 'insert') {openIfEditable();}
+    const onMsg = (event: MessageEvent<unknown>): void => {
+      const message = toRecord(event.data);
+      if (message?.['type'] !== 'avb:shortcut') {return;}
+      if (message['name'] === 'insert') {openIfEditable();}
       // Arrow keys pressed while the canvas iframe holds focus: replay them
       // on the app window so tree navigation behaves the same whether the
       // selection was made on the canvas or in the navigator.
-      else if (e.data.name === 'arrow' && e.data.key) {
+      else if (message['name'] === 'arrow' && typeof message['key'] === 'string') {
         window.dispatchEvent(
-          new KeyboardEvent('keydown', { key: e.data.key, bubbles: true, cancelable: true })
+          new KeyboardEvent('keydown', { key: message['key'], bubbles: true, cancelable: true })
         );
       }
       // Delete / ⌘D from the canvas. Replayed on the document rather than
       // handled here so they go through the same guards as a keypress in the
       // app — one definition of what those keys do, and the handler's own
       // "am I typing in a field" check still sees a non-field target.
-      else if (e.data.name === 'key' && e.data.key) {
+      else if (message['name'] === 'key' && typeof message['key'] === 'string') {
         document.dispatchEvent(
           new KeyboardEvent('keydown', {
-            key: e.data.key,
-            metaKey: !!e.data.meta,
-            ctrlKey: !!e.data.meta,
+            key: message['key'],
+            metaKey: message['meta'] === true,
+            ctrlKey: message['meta'] === true,
             bubbles: true,
             cancelable: true,
           })
@@ -1906,12 +2091,13 @@ export default function App() {
   // "why did that land next to the section instead of in it?" answer can be
   // read, and tested, without a running app.
   const insertTargetFor = useCallback(
-    (model, selId, item) => placeInsert(model, selId, item, insertables),
+    (model: EditorModel, selId: string | null, item: InsertItem) =>
+      placeInsert(model, selId, item, insertables),
     [insertables]
   );
 
   const insertItem = useCallback(
-    (item) => {
+    (item: InsertItem) => {
       setInsertOpen(false);
       const state = pageStateRef.current.pageState;
       if (!state?.editable) {return;}
@@ -1934,6 +2120,7 @@ export default function App() {
               imported: item.name,
               path: ASTRO_ASSETS_MODULE,
               named: true,
+              quote: "'",
             });
           }
           insertIntoModel(
@@ -1957,9 +2144,9 @@ export default function App() {
       }
 
       const id = newId();
-      let node = null;
+      let node: EditorNode | null = null;
       if (item.type === 'element') {
-        const placeholder = DEFAULT_TEXT[item.tag];
+        const placeholder = defaultText(item.tag);
         node = {
           id,
           kind: 'element',
@@ -2022,7 +2209,7 @@ export default function App() {
   // field edits live in the same history); Delete/Backspace removes, ⌘C
   // copies, ⌘D duplicates, ⌘V pastes — unless the user is typing in a field.
   useEffect(() => {
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: KeyboardEvent): void => {
       const mod = e.metaKey || e.ctrlKey;
 
       // Undo/redo take priority over native field undo so history stays
@@ -2145,10 +2332,10 @@ export default function App() {
   // paste route to the focused text field when one is active, otherwise to
   // the selected node.
   useEffect(() => {
-    const inEditable = () => {
+    const inEditable = (): boolean => {
       const el = document.activeElement;
       return (
-        el &&
+        el instanceof HTMLElement &&
         (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
       );
     };
@@ -2168,21 +2355,21 @@ export default function App() {
       // undo already does.
       window.avb.onMenu('undo', () => {
         if (inEditable()) {
-          window.avb.nativeUndo?.();
+          runNativeEdit('undo');
           return;
         }
         undo();
       }),
       window.avb.onMenu('redo', () => {
         if (inEditable()) {
-          window.avb.nativeRedo?.();
+          runNativeEdit('redo');
           return;
         }
         redo();
       }),
       window.avb.onMenu('copy', () => {
         if (inEditable() || String(window.getSelection() || '')) {
-          window.avb.nativeCopy();
+          runNativeEdit('copy');
           return;
         }
         const selId = selectedIdRef.current;
@@ -2192,7 +2379,7 @@ export default function App() {
       }),
       window.avb.onMenu('paste', () => {
         if (inEditable()) {
-          window.avb.nativePaste();
+          runNativeEdit('paste');
           return;
         }
         if (nodeClipboardRef.current && pageStateRef.current.pageState?.editable && !cmsOpenRef.current) {
@@ -2205,11 +2392,10 @@ export default function App() {
         // The lines are read off the file on disk, and typing is saved on a
         // 300 ms debounce — land the pending edit first or they're one edit old.
         await flushSave();
-        const res = await window.avb.copySelection({
-          projectPath: projectRef.current?.path,
-          keys: selectionKeysRef.current,
-        });
-        if (res?.ok) {showToast('Selection copied — paste it into your AI chat.');}
+        const projectPath = projectRef.current?.path;
+        if (!projectPath) {return;}
+        const copied = await copyEditorSelection(projectPath, [...selectionKeysRef.current]);
+        if (copied) {showToast('Selection copied — paste it into your AI chat.');}
         else {showToast('Nothing selected to copy.', 'error');}
       }),
     ];
@@ -2239,7 +2425,7 @@ export default function App() {
     setInPreview(false);
     const raw = previewPathRef.current;
     if (!raw) {return;}
-    let p = raw.split('?')[0].split('#')[0];
+    let p = raw.split('?')[0]?.split('#')[0] ?? '';
     if (p.length > 1 && p.endsWith('/')) {p = p.slice(0, -1);}
     const page = scan.pages.find((pg) => pg.route === (p || '/'));
     if (page && page.path !== pageStateRef.current.currentPage?.path) {
@@ -2250,11 +2436,13 @@ export default function App() {
   // Track navigation inside the preview iframe (the preload posts
   // avb:navigated from every loaded frame).
   useEffect(() => {
-    const onMsg = (e) => {
-      if (e.data?.type !== 'avb:navigated' || !inPreviewRef.current) {return;}
+    const onMsg = (e: MessageEvent<unknown>): void => {
+      const message = toRecord(e.data);
+      if (message?.['type'] !== 'avb:navigated' || !inPreviewRef.current) {return;}
       const ifr = previewIframeRef.current;
       if (ifr && e.source === ifr.contentWindow) {
-        previewPathRef.current = e.data.path;
+        const path = message['path'];
+        if (typeof path === 'string') {previewPathRef.current = path;}
       }
     };
     window.addEventListener('message', onMsg);
@@ -2267,7 +2455,7 @@ export default function App() {
     // precedence: it is the one covering everything, so it is the one Escape
     // is about while it is up.
     if (!inPreview && !previewRef) {return undefined;}
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         e.preventDefault();
         if (previewRef) {exitCommitPreview();}
@@ -2281,7 +2469,7 @@ export default function App() {
   // Escape backs out of a drilled-into component, one level at a time.
   useEffect(() => {
     if (inPreview || editStack.length < 2) {return;}
-    const onKey = (e) => {
+    const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') {return;}
       const t = e.target;
       // Let fields, menus, and dialogs consume their own Escape first.
@@ -2308,9 +2496,8 @@ export default function App() {
       return;
     }
     let live = true;
-    window.avb
-      .injectedRoutes({ projectPath: project.path })
-      .then((r) => live && setInjectedRoutes(r?.routes || []))
+    readInjectedRoutes(project.path)
+      .then((routes) => live && setInjectedRoutes(routes))
       .catch(() => live && setInjectedRoutes([]));
     return () => {
       live = false;
@@ -2328,8 +2515,8 @@ export default function App() {
       return undefined;
     }
     let live = true;
-    window.avb
-      .dynamicPaths({ projectPath: project.path, pagePath: entry.path, devUrl })
+    if (!entry.path) {return undefined;}
+    readDynamicPaths(project.path, entry.path, devUrl)
       .then((r) => {
         if (!live) {return;}
         setDynamicPaths(r?.entries || []);
@@ -2346,7 +2533,14 @@ export default function App() {
     // Frontmatter rather than the whole pageState: getStaticPaths lives there,
     // and depending on the model would re-run a collection query on every
     // keystroke in the page body.
-  }, [project, editStack, currentPage, devStatus, devUrl, pageState?.model?.extraFrontmatter]);
+  }, [
+    project,
+    editStack,
+    currentPage,
+    devStatus,
+    devUrl,
+    pageState?.editable ? pageState.model.extraFrontmatter : undefined,
+  ]);
 
   // What one entry of each collection this file reads actually holds — the
   // sample values the binding picker shows beside a field's name. Only the dev
@@ -2359,14 +2553,12 @@ export default function App() {
   useEffect(() => {
     if (!project?.path) {return undefined;}
     let live = true;
-    window.avb
-      .contentCollections?.(project.path)
-      .then((r) => live && setCollections(r?.collections || []))
+    readContentCollections(project.path)
+      .then((value) => live && setCollections(value))
       .catch(() => {});
-    const off = window.avb.onCmsChanged?.(() => {
-      window.avb
-        .contentCollections?.(project.path)
-        .then((r) => live && setCollections(r?.collections || []))
+    const off = onCmsInventoryChanged(() => {
+      readContentCollections(project.path)
+        .then((value) => live && setCollections(value))
         .catch(() => {});
     });
     return () => {
@@ -2376,12 +2568,12 @@ export default function App() {
   }, [project?.path]);
   useEffect(() => {
     if (!devUrl || devStatus !== 'on') {return undefined;}
-    const frontmatter = pageState?.model?.extraFrontmatter || '';
+    const frontmatter = pageState?.editable ? pageState.model.extraFrontmatter : '';
     // The entry on the canvas, which is what a reference in this file resolves
     // AGAINST — this post's author, not the collection's first.
     const props =
       currentPage?.kind === 'component' ? null : dynamicPaths[dynamicIndex]?.props || null;
-    const wanted = [
+    const wanted: { readonly key: string; readonly name: string; readonly id?: string }[] = [
       ...collectionsInScope(frontmatter).map((name) => ({ key: name, name })),
       ...referencesInScope(frontmatter, props).map((r) => ({
         key: r.key,
@@ -2393,9 +2585,9 @@ export default function App() {
     let live = true;
     Promise.all(
       wanted.map((w) =>
-        window.avb
-          .sampleEntry({ devUrl, name: w.name, id: w.id })
-          .then((r) => [w.key, r?.entry || null])
+        readSampleEntry(devUrl, w.name, w.id).then(
+          (entry) => [w.key, entry] as const,
+        )
       )
     )
       .then((pairs) => {
@@ -2406,7 +2598,7 @@ export default function App() {
       live = false;
     };
   }, [
-    pageState?.model?.extraFrontmatter,
+    pageState?.editable ? pageState.model.extraFrontmatter : undefined,
     devUrl,
     devStatus,
     collectionSamples,
@@ -2425,7 +2617,7 @@ export default function App() {
   // under-detects — the wrong answer here is deleting something live. And it
   // waits for a pause in typing, because a half-typed name reads as unused.
   useEffect(() => {
-    const current = pageState?.model;
+    const current = pageState?.editable ? pageState.model : undefined;
     if (!current?.extraFrontmatter?.includes(QUERY_MARK)) {return undefined;}
     const timer = setTimeout(() => {
       const focused = document.activeElement;
@@ -2455,7 +2647,7 @@ export default function App() {
       });
     }, 2000);
     return () => clearTimeout(timer);
-  }, [pageState?.model, mutateModel]);
+  }, [pageState?.editable ? pageState.model : undefined, mutateModel]);
 
   // The welcome screen's thumbnails are taken in the main process now, from
   // the project's home page rendered in a window of its own (see
@@ -2467,7 +2659,7 @@ export default function App() {
   // The comment sitting directly above a node. The navigator folds it into
   // that node's row rather than giving it one of its own, and the props panel
   // edits it there — so a section's label and its note stay together.
-  const commentAbove = (model, nodeId) => {
+  const commentAbove = (model: EditorModel | null, nodeId: string | null): EditorNode | null => {
     if (!model || !nodeId) {return null;}
     const found = findParentList(model, nodeId);
     if (!found || found.index === 0) {return null;}
@@ -2478,7 +2670,7 @@ export default function App() {
   // Write (or clear) that comment. Empty text removes the node entirely, so
   // clearing the field doesn't leave `<!---->` behind.
   const setComment = useCallback(
-    (nodeId, text) => {
+    (nodeId: string, text: string) => {
       mutateModel(
         (model) => {
           const found = findParentList(model, nodeId);
@@ -2496,6 +2688,7 @@ export default function App() {
           // reads — and a note written as a divider keeps its rule, to the
           // same width, so a column of them stays lined up.
           const value = noteValue(existing?.value, body);
+          assert(value !== null, 'A nonempty comment produces a serialized value');
           if (existing) {existing.value = value;}
           else {list.splice(index, 0, { id: newId(), kind: 'comment', value });}
           return model;
@@ -2514,7 +2707,7 @@ export default function App() {
   // element whose class is some other expression is code we would have to
   // understand to extend, so that one is said out loud rather than dropped.
   const addClassToNode = useCallback(
-    (nodeId, className) => {
+    (nodeId: string, className: string) => {
       const clean = String(className || '').trim();
       if (!nodeId || !clean) {return;}
       let refused = false;
@@ -2539,7 +2732,7 @@ export default function App() {
   );
 
   const setProp = useCallback(
-    (nodeId, propName, value, immediate = false) => {
+    (nodeId: string, propName: string, value: Attr | undefined, immediate = false) => {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
@@ -2559,7 +2752,7 @@ export default function App() {
   // Several props in one edit, so picking an image and getting its width and
   // height back is a single undo rather than three.
   const setProps = useCallback(
-    (nodeId, patch, immediate = true) => {
+    (nodeId: string, patch: PropValues, immediate = true) => {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
@@ -2588,20 +2781,18 @@ export default function App() {
   // can't happen. An element gets `hero.src` instead — a plain <img> needs the
   // URL out of the imported object, not the object.
   const setAssetProp = useCallback(
-    async (nodeId, propName, picked) => {
+    async (nodeId: string, propName: string, picked: PickedAsset & { readonly abs?: string }) => {
       const { pageState: state, currentPage: page } = pageStateRef.current;
-      if (!state?.editable || !page || !picked?.rel) {return;}
+      if (!state?.editable || !page?.path || !picked?.rel) {return;}
       const withoutRoot = picked.rel.split('/').slice(1).join('/');
       if (picked.root !== 'src') {
         setProp(nodeId, propName, { type: 'string', value: '/' + withoutRoot }, true);
         return;
       }
-      const abs = picked.abs || `${projectRef.current?.path}/${picked.rel}`;
-      const paths = await window.avb.importPathFor({
-        pagePath: page.path,
-        targetPath: abs,
-        projectPath: projectRef.current?.path,
-      });
+      const projectPath = projectRef.current?.path;
+      if (!projectPath) {return;}
+      const abs = picked.abs || `${projectPath}/${picked.rel}`;
+      const paths = await findImportPath(projectPath, page.path, abs);
       mutateModel((model) => {
         const node = findNodeById(model.nodes, nodeId);
         if (!node) {return model;}
@@ -2610,13 +2801,13 @@ export default function App() {
         // same asset twice under two names is just noise.
         let local = (model.imports || []).find((i) => !i.named && i.path === spec)?.name;
         if (!local) {
-          const base = withoutRoot.split('/').pop().replace(/\.[^.]+$/, '');
+          const base = withoutRoot.split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'asset';
           let candidate = base.replace(/[^A-Za-z0-9_$]/g, '_').replace(/^(\d)/, '_$1') || 'asset';
           const taken = new Set((model.imports || []).map((i) => i.name));
           let n = 2;
           while (taken.has(candidate)) {candidate = `${base}${n++}`;}
           local = candidate;
-          model.imports.push({ name: local, path: spec });
+          model.imports.push({ name: local, path: spec, quote: "'" });
         }
         if (!node.props) {node.props = {};}
         node.props[propName] = {
@@ -2634,7 +2825,7 @@ export default function App() {
 
   // Renames an attribute in place, preserving its value and position.
   const renameProp = useCallback(
-    (nodeId, oldName, newName) => {
+    (nodeId: string, oldName: string, newName: string) => {
       mutateModel((model) => {
         const node = findNodeById(model.nodes, nodeId);
         renameAttr(node, oldName, newName);
@@ -2654,7 +2845,7 @@ export default function App() {
   // capitalised name is only accepted when it names a project component or an
   // existing import. Typing `div` over a component turns it back.
   const changeNodeKind = useCallback(
-    async (nodeId, newTag) => {
+    async (nodeId: string, newTag: string) => {
       const name = String(newTag || '').trim();
       if (!/^[A-Z][\w$]*$/.test(name)) {return false;}
       const state = pageStateRef.current.pageState;
@@ -2668,9 +2859,17 @@ export default function App() {
         const node = findNodeById(model.nodes, nodeId);
         if (!node || node.name === name) {return model;}
         if (!model.imports.some((i) => i.name === name)) {
-          if (paths) {model.imports.push({ name, path: chooseImportPath(model, paths) });}
+          if (paths) {
+            model.imports.push({ name, path: chooseImportPath(model, paths), quote: "'" });
+          }
           else if (asset) {
-            model.imports.push({ name, imported: name, path: ASTRO_ASSETS_MODULE, named: true });
+            model.imports.push({
+              name,
+              imported: name,
+              path: ASTRO_ASSETS_MODULE,
+              quote: "'",
+              named: true,
+            });
           }
         }
         // Attributes that belonged to the old element's tag mean nothing to a
@@ -2680,14 +2879,15 @@ export default function App() {
           const oldNames = new Set(getElementSchema(node.name).map((f) => f.name));
           for (const attr of Object.keys(node.props || {})) {
             if (oldNames.has(attr) && !GLOBAL_ATTRS.has(attr) && !/^(data-|aria-)/.test(attr)) {
-              delete node.props[attr];
+              delete node.props?.[attr];
             }
           }
         }
         node.kind = 'component';
         node.name = name;
         delete node.dynamicTag;
-        node.astroAsset = asset || undefined;
+        if (asset) {node.astroAsset = true;}
+        else {delete node.astroAsset;}
         if (node.children === null) {node.children = [];}
         pruneImports(model);
         return model;
@@ -2698,7 +2898,7 @@ export default function App() {
   );
 
   const changeElementTag = useCallback(
-    (nodeId, newTag) => {
+    (nodeId: string, newTag: string) => {
       const tag = String(newTag || '').trim().toLowerCase();
       if (!/^[a-z][a-z0-9-]*$/.test(tag)) {return;}
       mutateModel((model) => {
@@ -2724,7 +2924,7 @@ export default function App() {
             !GLOBAL_ATTRS.has(attr) &&
             !/^(data-|aria-)/.test(attr)
           ) {
-            delete node.props[attr];
+            delete node.props?.[attr];
           }
         }
         node.name = tag;
@@ -2746,7 +2946,12 @@ export default function App() {
   // (the style panel writing a <style> block): waiting 300 ms there just delays the
   // canvas, since the next keystroke it was batching with never comes.
   const setNodeText = useCallback(
-    (nodeId, value, renames, immediate = false) => {
+    (
+      nodeId: string,
+      value: string,
+      renames: readonly Rename[] | undefined = undefined,
+      immediate: boolean | 'live' = false,
+    ) => {
       const renaming = (renames || []).some((r) => r.from && r.to && r.from !== r.to);
       mutateModel(
         (model) => {
@@ -2783,7 +2988,7 @@ export default function App() {
   // The code editor and file writer share the same frontmatter model, so
   // editing code preserves named imports, interleaved statements and spacing.
   const setFrontmatter = useCallback(
-    (code) => {
+    (code: string) => {
       mutateModel(
         (model) => {
           Object.assign(model, readFrontmatter(code));
@@ -2800,7 +3005,7 @@ export default function App() {
   // was in it — it moves to the then branch rather than being deleted — so the
   // button can't quietly throw work away.
   const toggleElseBranch = useCallback(
-    (nodeId, want) => {
+    (nodeId: string, want: boolean) => {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
@@ -2811,9 +3016,13 @@ export default function App() {
             kids[1] = { id: newId(), kind: 'branch', name: 'else', children: [] };
             node.op = '?';
           } else if (!want && kids.length > 1) {
-            const rescued = kids[1].children || [];
+            const elseBranch = kids[1];
+            const thenBranchNode = kids[0];
+            assert(elseBranch !== undefined, 'Else branch exists before removal');
+            assert(thenBranchNode !== undefined, 'Then branch exists before merging');
+            const rescued = elseBranch.children || [];
             kids.length = 1;
-            kids[0].children = [...(kids[0].children || []), ...rescued];
+            thenBranchNode.children = [...(thenBranchNode.children || []), ...rescued];
             node.op = '&&';
           }
           return model;
@@ -2830,7 +3039,7 @@ export default function App() {
   // behind a `{data}` prop — the imports aren't in play there, so they don't
   // need re-extracting.
   const setExtraFrontmatter = useCallback(
-    (code) => {
+    (code: string) => {
       mutateModel(
         (model) => {
           model.extraFrontmatter = code;
@@ -2846,10 +3055,10 @@ export default function App() {
   // Sets the text content of a component (single text child convenience).
   // Where each node's loose text last sat, so emptying the Content field and
   // typing again restores its place rather than appending.
-  const textSlotRef = useRef({});
+  const textSlotRef = useRef<Record<string, number>>({});
 
   const setNodeContent = useCallback(
-    (nodeId, value) => {
+    (nodeId: string, value: string) => {
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
@@ -2864,11 +3073,13 @@ export default function App() {
             textSlotRef.current[nodeId] = at;
             node.children.splice(at, 1);
           } else if (at !== -1) {
-            node.children[at].value = value;
+            const textNode = node.children[at];
+            assert(textNode !== undefined, 'Text child index remains valid');
+            textNode.value = value;
           } else if (value) {
             const back = textSlotRef.current[nodeId];
             const idx =
-              Number.isInteger(back) && back <= node.children.length
+              back !== undefined && Number.isInteger(back) && back <= node.children.length
                 ? back
                 : node.children.length;
             node.children.splice(idx, 0, { id: newId(), kind: 'text', value });
@@ -2885,13 +3096,25 @@ export default function App() {
   // Replaces a node's inline children wholesale (rich Content field edits).
   // Nodes arrive from the editor without ids — assign fresh ones.
   const setNodeInline = useCallback(
-    (nodeId, kids) => {
-      const withIds = (list) =>
-        list.map((n) => ({
-          ...n,
-          id: newId(),
-          ...(Array.isArray(n.children) ? { children: withIds(n.children) } : {}),
-        }));
+    (nodeId: string, kids: readonly InlineNode[]) => {
+      const withIds = (list: readonly InlineNode[]): EditorNode[] =>
+        list.map((node): EditorNode => {
+          if (node.kind === 'text' || node.kind === 'expr') {
+            return { ...node, id: newId() };
+          }
+          const props = Object.fromEntries(
+            Object.entries(node.props ?? {}).filter(
+              (entry): entry is [string, Attr] => entry[1] !== null,
+            ),
+          );
+          return {
+            id: newId(),
+            kind: 'element',
+            name: node.name,
+            props,
+            children: node.children === null ? null : withIds(node.children),
+          };
+        });
       mutateModel(
         (model) => {
           const node = findNodeById(model.nodes, nodeId);
@@ -2910,7 +3133,7 @@ export default function App() {
   // frontmatter, leaving every other key and its formatting alone. The
   // frontmatter text stays the single source of truth — editing it by hand in
   // the frontmatter editor and picking a layout here write to the same place.
-  const withLayoutField = (frontmatter, layoutPath) => {
+  const withLayoutField = (frontmatter: string, layoutPath: string | null): string => {
     const fm = frontmatter ?? '';
     if (/^[ \t]*layout[ \t]*:/m.test(fm)) {
       return layoutPath
@@ -2923,11 +3146,13 @@ export default function App() {
   };
 
   const isMarkdownFormatRef = useRef(false);
-  isMarkdownFormatRef.current = pageState?.model?.format === 'md' || pageState?.model?.format === 'mdx';
+  isMarkdownFormatRef.current =
+    pageState?.editable === true &&
+    (pageState.model.format === 'md' || pageState.model.format === 'mdx');
 
   const layoutSeq = useRef(0);
   const changeLayout = useCallback(
-    async (layoutName) => {
+    async (layoutName: string) => {
       const seq = ++layoutSeq.current;
       // A markdown page has no wrapper node to swap — Astro reads its layout
       // from the `layout:` frontmatter key, as a path relative to the file.
@@ -2953,6 +3178,7 @@ export default function App() {
           const found = findParentList(model, 'layout');
           if (found) {
             const node = found.list[found.index];
+            assert(node !== undefined, 'Layout index identifies a node');
             const kids = Array.isArray(node.children) ? node.children : [];
             found.list.splice(found.index, 1, ...kids);
           }
@@ -2973,13 +3199,20 @@ export default function App() {
         } else {
           // No wrapper yet — wrap the whole page in the new layout.
           model.nodes = [
-            { id: 'layout', kind: 'component', name: layout.name, props: {}, children: model.nodes },
+            {
+              id: nodeId('layout'),
+              kind: 'component',
+              name: layout.name,
+              props: {},
+              children: model.nodes,
+            },
           ];
         }
         if (!model.imports.some((i) => i.name === layout.name)) {
           model.imports.push({
             name: layout.name,
             path: chooseImportPath(model, paths),
+            quote: "'",
           });
         }
         pruneImports(model);
@@ -2994,15 +3227,13 @@ export default function App() {
   // ----------------------------------------------------------------
 
   const createPage = useCallback(
-    async (name, layoutName) => {
+    async (name: string, layoutName: string | null) => {
+      const projectPath = projectRef.current?.path;
+      if (!projectPath) {return;}
       const layout = scan.layouts.find((l) => l.name === layoutName) || null;
       try {
-        const { pagePath } = await window.avb.createPage({
-          projectPath: project.path,
-          name,
-          layout,
-        });
-        const result = await rescan(project.path);
+        const pagePath = await createProjectPage(projectPath, name, layout);
+        const result = await rescan(projectPath);
         const page = result.pages.find((p) => p.path === pagePath);
         if (page) {selectPage(page);}
         showToast(`Created ${name}.astro`, 'success');
@@ -3010,11 +3241,11 @@ export default function App() {
         showToast(cleanError(err), 'error');
       }
     },
-    [project, scan.layouts, rescan, selectPage, showToast]
+    [scan.layouts, rescan, selectPage, showToast]
   );
 
   const deletePage = useCallback(
-    async (page) => {
+    async (page: ScanPage) => {
       if (
         !(await confirmDialog({
           title: `Delete ${page.name}?`,
@@ -3025,8 +3256,10 @@ export default function App() {
       ) {
         return;
       }
-      await window.avb.deletePage(page.path);
-      const result = await rescan(project.path);
+      const projectPath = projectRef.current?.path;
+      if (!projectPath) {return;}
+      await deleteProjectPage(page.path);
+      const result = await rescan(projectPath);
       if (currentPage?.path === page.path) {
         const next = result.pages[0] || null;
         if (next) {selectPage(next);}
@@ -3037,20 +3270,18 @@ export default function App() {
       }
       showToast(`Deleted ${page.name}`, 'success');
     },
-    [project, currentPage, rescan, selectPage, showToast]
+    [currentPage, rescan, selectPage, showToast]
   );
 
   // Moves/renames a page (drag between folders, inline rename). `to` is the
   // new path relative to src/pages including the extension.
   const movePageTo = useCallback(
-    async (page, to) => {
+    async (page: ScanPage, to: string) => {
+      const projectPath = projectRef.current?.path;
+      if (!projectPath) {return;}
       try {
-        const { newPath } = await window.avb.movePage({
-          projectPath: project.path,
-          from: page.path,
-          to,
-        });
-        const result = await rescan(project.path);
+        const newPath = await moveProjectPage(projectPath, page.path, to);
+        const result = await rescan(projectPath);
         if (pageStateRef.current.currentPage?.path === page.path) {
           const np = result.pages.find((p) => p.path === newPath);
           if (np) {selectPage(np);}
@@ -3059,7 +3290,7 @@ export default function App() {
         showToast(cleanError(err), 'error');
       }
     },
-    [project, rescan, selectPage, showToast]
+    [rescan, selectPage, showToast]
   );
 
   // Creates an (empty) folder with a placeholder name; the panel opens an
@@ -3068,21 +3299,25 @@ export default function App() {
     const existing = new Set(scan.pageFolders || []);
     let name = 'new-folder';
     for (let i = 2; existing.has(name); i++) {name = `new-folder-${i}`;}
+    const projectPath = projectRef.current?.path;
+    if (!projectPath) {return null;}
     try {
-      await window.avb.createPageFolder({ projectPath: project.path, dir: name });
-      await rescan(project.path);
+      await createProjectPageFolder(projectPath, name);
+      await rescan(projectPath);
       return name;
     } catch (err) {
       showToast(cleanError(err), 'error');
       return null;
     }
-  }, [project, scan, rescan, showToast]);
+  }, [scan, rescan, showToast]);
 
   const renamePageFolder = useCallback(
-    async (from, to) => {
+    async (from: string, to: string) => {
+      const projectPath = projectRef.current?.path;
+      if (!projectPath) {return;}
       try {
-        await window.avb.renamePageFolder({ projectPath: project.path, from, to });
-        const result = await rescan(project.path);
+        await renameProjectPageFolder(projectPath, from, to);
+        const result = await rescan(projectPath);
         // Re-select the current page if it lived inside the renamed folder.
         const cur = pageStateRef.current.currentPage;
         if (cur && !result.pages.some((p) => p.path === cur.path)) {
@@ -3096,11 +3331,11 @@ export default function App() {
         showToast(cleanError(err), 'error');
       }
     },
-    [project, rescan, selectPage, showToast]
+    [rescan, selectPage, showToast]
   );
 
   const deletePageFolder = useCallback(
-    async (dir, pageCount) => {
+    async (dir: string, pageCount: number) => {
       const inside = pageCount
         ? `the ${pageCount} page${pageCount === 1 ? '' : 's'} inside it and `
         : '';
@@ -3114,9 +3349,11 @@ export default function App() {
       ) {
         return;
       }
+      const projectPath = projectRef.current?.path;
+      if (!projectPath) {return;}
       try {
-        await window.avb.deletePageFolder({ projectPath: project.path, dir });
-        const result = await rescan(project.path);
+        await deleteProjectPageFolder(projectPath, dir);
+        const result = await rescan(projectPath);
         const cur = pageStateRef.current.currentPage;
         if (cur && !result.pages.some((p) => p.path === cur.path)) {
           const next = result.pages[0] || null;
@@ -3130,7 +3367,7 @@ export default function App() {
         showToast(cleanError(err), 'error');
       }
     },
-    [project, rescan, selectPage, showToast]
+    [rescan, selectPage, showToast]
   );
 
   // ----------------------------------------------------------------
@@ -3139,7 +3376,10 @@ export default function App() {
 
   const model = pageState?.editable ? pageState.model : null;
   const tree = useMemo(() => createTreeIndex(model?.nodes), [model?.nodes]);
-  const selectedAncestors = useMemo(() => tree.ancestors(selectedId) || [], [tree, selectedId]);
+  const selectedAncestors = useMemo(
+    () => (selectedId ? tree.ancestors(selectedId) || [] : []),
+    [tree, selectedId],
+  );
 
   // The frontmatter as one editable code block (imports + everything else,
   // matching how the file is serialized).
@@ -3147,13 +3387,12 @@ export default function App() {
 
   // One entry of a collection, asked for when someone opens it in the picker.
   // The ref is what stops a row that has no answer from asking again forever.
-  const requestCollectionSample = (name) => {
+  const requestCollectionSample = (name: string): void => {
     if (!name || !devUrl || devStatus !== 'on') {return;}
     if (sampleAskedRef.current.has(name)) {return;}
     sampleAskedRef.current.add(name);
-    window.avb
-      .sampleEntry({ devUrl, name })
-      .then((r) => setCollectionSamples((prev) => ({ ...prev, [name]: r?.entry || null })))
+    readSampleEntry(devUrl, name)
+      .then((entry) => setCollectionSamples((prev) => ({ ...prev, [name]: entry })))
       .catch(() => {});
   };
 
@@ -3161,7 +3400,7 @@ export default function App() {
   // it is written here, and the binding then names it like any other value.
   // A query already targeting that collection is reused — one page asking the
   // same content twice is a page doing the same work twice.
-  const ensureCollectionQuery = (collection) => {
+  const ensureCollectionQuery = (collection: string): string => {
     const fm = model?.extraFrontmatter || '';
     const existing = queriesInScope(fm).get(collection);
     if (existing) {return existing;}
@@ -3186,7 +3425,7 @@ export default function App() {
     return name;
   };
 
-  const selectedNode =
+  const selectedNode: EditorNode | { readonly id: 'frontmatter'; readonly kind: 'frontmatter'; readonly value: string } | null =
     model && selectedId
       ? selectedId === 'frontmatter'
         ? { id: 'frontmatter', kind: 'frontmatter', value: frontmatterCode }
@@ -3194,7 +3433,7 @@ export default function App() {
       : null;
   // What the Components panel's create button would act on: the name to suggest
   // for the selected element, or why there's nothing to make a component from.
-  const createFrom = useMemo(() => {
+  const createFrom = useMemo<ComponentCreationSource>(() => {
     if (!pageState?.editable) {
       return { kind: 'unavailable', reason: 'Open a page to make components from it.' };
     }
@@ -3219,13 +3458,13 @@ export default function App() {
     }
     // Its first class is the name it already goes by — `.project-card` is a
     // better guess at a component name than `Div`. The tag is the fallback.
-    const first = namesIn(node.props?.class)[0] || namesIn(node.props?.['class:list'])[0] || '';
+    const first = namesIn(node.props?.['class'])[0] || namesIn(node.props?.['class:list'])[0] || '';
     return {
       kind: 'ready',
       name: toComponentName(first) || toComponentName(node.name) || 'Component',
       label: `<${node.name}>`,
       // The page values it reads, which the new component can take as props.
-      props: propsNeededFor(model, node),
+      props: propsNeededFor(pageState.model, node),
     };
   }, [pageState?.editable, selectedNode, model, propsNeededFor]);
 
@@ -3260,23 +3499,27 @@ export default function App() {
       // Read back out of the frontmatter text, not a cached field: editing
       // that text by hand has to move the picker too.
       const m = (model?.extraFrontmatter || '').match(/^[ \t]*layout[ \t]*:[ \t]*(.+?)[ \t]*$/m);
-      const base = m?.[1].replace(/^['"]|['"]$/g, '').split('/').pop()?.replace(/\.astro$/i, '');
+      const base = m?.[1]?.replace(/^['"]|['"]$/g, '').split('/').pop()?.replace(/\.astro$/i, '');
       return base && scan.layouts.some((l) => l.name === base) ? base : '';
     }
     if (!layoutNode) {return '';}
+    if (!model) {return '';}
     const imp = (model.imports || []).find((i) => i.name === layoutNode.name);
     const base = imp?.path.split('/').pop()?.replace(/\.astro$/i, '');
     if (base && scan.layouts.some((l) => l.name === base)) {return base;}
-    return layoutNode.name;
+    return layoutNode.name ?? '';
   })();
   // A component whose Props extends HTMLAttributes<"tag"> also accepts that
   // element's built-in attributes — merge them in after its own props.
-  const schemaFor = (entry) => {
+  const schemaFor = (
+    entry: ScanComponent | AstroAsset | undefined | null,
+  ): readonly FieldDefinition[] => {
     if (!entry) {return [];}
     const own = entry.schema || [];
     const ownNames = new Set(own.map((f) => f.name));
-    const inherited = entry.extendsTag
-      ? getElementSchema(entry.extendsTag).filter((f) => !ownNames.has(f.name))
+    const extendsTag = 'extendsTag' in entry ? entry.extendsTag : undefined;
+    const inherited = extendsTag
+      ? getElementSchema(extendsTag).filter((f) => !ownNames.has(f.name))
       : [];
     // A component that spreads `...rest` passes class straight through to
     // whatever it renders, so styling one is a normal thing to want — give it
@@ -3296,33 +3539,35 @@ export default function App() {
   // but it lives in the global attributes, not in any tag's own schema, so it
   // only appeared once something had already set one. Given first place, right
   // under the tag, on anything that renders an element.
-  const withClassField = (fields) =>
+  const withClassField = (fields: readonly FieldDefinition[]): readonly FieldDefinition[] =>
     fields.some((f) => f.name === 'class')
       ? fields
       : [{ name: 'class', type: 'string', optional: true }, ...fields];
 
-  const selectedSchema =
-    selectedNode && selectedNode.kind !== 'text'
-      ? selectedId === 'layout'
-        ? schemaFor(scan.layouts.find((l) => l.name === currentLayoutName))
-        : selectedNode.kind === 'element'
-          ? withClassField(getElementSchema(selectedNode.name))
-          : selectedNode.dynamicTag
-            ? // `<Tag>` from `const Tag = tag` renders a real element, so it
-              // takes a class the same way one does.
-              withClassField([])
-          : schemaFor(
-              selectedNode.astroAsset
-                ? astroAssetDef(selectedNode.name)
-                : insertables.find((c) => c.name === selectedNode.name)
-            )
-      : [];
+  const selectedSchema: readonly FieldDefinition[] = (() => {
+    if (!selectedNode) {return [];}
+    if (selectedId === 'layout') {
+      return schemaFor(scan.layouts.find((layout) => layout.name === currentLayoutName));
+    }
+    if (selectedNode.kind === 'element') {
+      return withClassField(getElementSchema(selectedNode.name));
+    }
+    if (selectedNode.kind !== 'component') {return [];}
+    if (selectedNode.dynamicTag) {
+      return withClassField([]);
+    }
+    return schemaFor(
+      selectedNode.astroAsset
+        ? astroAssetDef(selectedNode.name)
+        : insertables.find((component) => component.name === selectedNode.name),
+    );
+  })();
 
   // Slots offered by the selected node's parent (the component or layout the
   // node is slotted into) — turns the `slot` attribute into a dropdown.
-  let slotOptions = null;
+  let slotOptions: readonly string[] | null = null;
   if (model && selectedNode && selectedId !== 'layout') {
-    const parent = tree.parent(selectedId);
+    const parent = selectedId ? tree.parent(selectedId) : null;
     if (parent) {
       if (parent.id === 'layout') {
         slotOptions = scan.layouts.find((l) => l.name === currentLayoutName)?.slots || null;
@@ -3354,7 +3599,7 @@ export default function App() {
   // field showing `{heading}` could not say what heading was. The instance
   // says: it is in the file this one was opened from, at the focused path, and
   // the page's own scope is what its expressions come to.
-  const [instanceProps, setInstanceProps] = useState(null);
+  const [instanceProps, setInstanceProps] = useState<Readonly<Record<string, unknown>> | null>(null);
   const focusOf = currentPage?.kind === 'component' ? currentPage.focusPath : null;
   const hostFile = editStack.length > 1 ? editStack[0] : null;
   useEffect(() => {
@@ -3362,10 +3607,10 @@ export default function App() {
     let dropped = false;
     void (async () => {
       try {
-        const read = await window.avb.readPage(hostFile.path);
-        const hostModel = read?.model;
-        if (dropped || !hostModel) {return;}
-        const trail = String(focusOf).split('|').pop().split('.').map(Number);
+        const read = toEditorPageState(await readPage(hostFile.path));
+        if (dropped || !read.editable) {return;}
+        const hostModel = read.model;
+        const trail = (String(focusOf).split('|').pop() ?? '').split('.').map(Number);
         const instance = nodeAtPath(hostModel.nodes, trail);
         if (!instance) { setInstanceProps(null); return }
         // The scope at the instance: the file's frontmatter, and the loops
@@ -3391,18 +3636,18 @@ export default function App() {
   // Link settings (href fields): pages to link to and the ids on this page
   // that anchor links can target.
   const linkContext = useMemo(
-    () => ({ pages: scan.pages, sectionIds: tree.sectionIds }),
-    [scan.pages, tree]
+    () => ({ pages: scan.pages, sectionIds: tree.sectionIds, projectPath: project?.path ?? '' }),
+    [scan.pages, tree, project?.path]
   );
 
   // A class the source can't resolve — `class:list={["button_wrap", …]}` —
   // leaves a node named after its tag, or after a variable in the case of a
   // dynamic `<Tag>`. The page reports what each node rendered with, so the
   // breadcrumb and the canvas chip can say the same thing the navigator does.
-  const liveLabel = (n, fromSource) => {
+  const liveLabel = (n: EditorNode, fromSource: string): string => {
     if (fromSource && fromSource !== n.name) {return fromSource;}
     const live = liveClassesById?.get(n.id);
-    return live?.length ? live[0] : fromSource;
+    return live?.[0] ?? fromSource;
   };
 
   // What the Tag field offers: every HTML tag, the project's components,
@@ -3410,10 +3655,10 @@ export default function App() {
   // is how `<AstroLogo />` from an imported .svg becomes reachable.
   // Each option carries what it is, so the list can wear the same icons the
   // insert palette does — a tag, a component, a layout, one of Astro's.
-  const tagOptions = React.useMemo(() => {
-    const out = [];
-    const seen = new Set();
-    const add = (name, kind) => {
+  const tagOptions = React.useMemo<readonly TagOption[]>(() => {
+    const out: TagOption[] = [];
+    const seen = new Set<string>();
+    const add = (name: string, kind: string): void => {
       if (!name || seen.has(name)) {return;}
       seen.add(name);
       out.push({ name, kind });
@@ -3426,8 +3671,8 @@ export default function App() {
   }, [insertables, model]);
 
   // Breadcrumb trail for the canvas toolbar: page → ancestors → selection.
-  const crumbLabel = (n) => {
-    if (n.id === 'layout') {return currentLayoutName || n.name;}
+  const crumbLabel = (n: EditorNode): string => {
+    if (n.id === 'layout') {return currentLayoutName || n.name || 'layout';}
     switch (n.kind) {
       case 'text':
         return 'text';
@@ -3449,18 +3694,20 @@ export default function App() {
         // none. Reads `class:list` too, so a component's inner elements are
         // named the same way the navigator names them.
         return liveLabel(n, elementLabel(n));
-      default:
+      case 'component':
+      case 'raw-line':
+      case 'chunk-group':
         // `<Tag>` from `const Tag = tag` renders a real element and its name
         // is a variable, so the class it rendered with names it better.
         if (n.dynamicTag) {return liveLabel(n, elementLabel(n));}
-        return n.name;
+        return n.name || n.kind;
     }
   };
   // Floating code window target value: page frontmatter, a raw node's inner
   // content, or a text file from public/ (loaded into fileText).
   const isFileWin = codeWin?.kind === 'file';
   const codeWinNode =
-    codeWin && !isFileWin && codeWin.targetId !== 'frontmatter' && model
+    codeWin && !isFileWin && codeWin.targetId && codeWin.targetId !== 'frontmatter' && model
       ? tree.node(codeWin.targetId)
       : null;
   const codeWinValue = !codeWin
@@ -3471,7 +3718,9 @@ export default function App() {
         ? model
           ? frontmatterCode
           : null
-        : codeWinNode?.inner ?? null;
+        : codeWinNode?.kind === 'raw'
+          ? codeWinNode.inner
+          : null;
 
   // Returns whether the selection actually has a code editor, so the Enter
   // shortcut below knows whether it handled the key.
@@ -3496,9 +3745,11 @@ export default function App() {
 
   // Opens a public/ text file in the floating editor.
   const openAssetFile = useCallback(
-    async ({ rel, name }) => {
+    async ({ rel, name }: { readonly rel: string; readonly name: string }) => {
+      const projectPath = projectRef.current?.path;
+      if (!projectPath) {return;}
       try {
-        const { text } = await window.avb.readAssetText({ projectPath: project.path, rel });
+        const text = await readProjectAsset(projectPath, rel);
         setFileText(text);
         setCodeWin({
           kind: 'file',
@@ -3510,7 +3761,7 @@ export default function App() {
         showToast(cleanError(err), 'error');
       }
     },
-    [project, showToast]
+    [showToast]
   );
 
   // Opens the file an imported symbol is defined in, on its declaration —
@@ -3518,20 +3769,16 @@ export default function App() {
   // declared in this file's own frontmatter never come here: those are edited
   // in place, in the panel (see the props panel's source popup).
   const openSymbolFile = useCallback(
-    async (name) => {
-      if (!project) {return false;}
+    async (name: string) => {
+      const projectPath = projectRef.current?.path;
+      if (!projectPath) {return false;}
       const imp = findImportOf(frontmatterCode, name);
       if (!imp) {return false;}
       const stack = editStackRef.current;
       const fromFile = stack[stack.length - 1]?.path || currentPage?.path;
       if (!fromFile) {return false;}
       try {
-        const r = await window.avb.readSymbolSource({
-          projectPath: project.path,
-          fromFile,
-          spec: imp.spec,
-          name,
-        });
+        const r = await readSymbol(projectPath, fromFile, imp.spec, name);
         if (!r?.ok) {
           showToast(
             r?.reason === 'too-large'
@@ -3556,23 +3803,25 @@ export default function App() {
         return false;
       }
     },
-    [project, frontmatterCode, currentPage, showToast]
+    [frontmatterCode, currentPage, showToast]
   );
 
   // File edits stream to disk (debounced) — the dev server picks them up.
   const setAssetFileText = useCallback(
-    (text) => {
+    (text: string) => {
       setFileText(text);
       if (!codeWin || codeWin.kind !== 'file') {return;}
       const { rel, area } = codeWin;
+      if (!rel) {return;}
       // Source files live anywhere in the project; assets are rooted in public/.
-      const write = area === 'src' ? window.avb.writeSourceText : window.avb.writeAssetText;
-      const projectPath = project.path;
-      fileSaverRef.current.schedule(`${projectPath}|${area || 'public'}|${rel}`, () =>
-        write({ projectPath, rel, text })
+      const projectPath = projectRef.current?.path;
+      const saver = fileSaverRef.current;
+      if (!projectPath || !saver) {return;}
+      saver.schedule(`${projectPath}|${area || 'public'}|${rel}`, () =>
+        writeProjectFile(area ?? 'public', projectPath, rel, text)
       );
     },
-    [codeWin, project, showToast]
+    [codeWin]
   );
 
   // Close the window if its target disappears (page switch, node deleted).
@@ -3582,7 +3831,7 @@ export default function App() {
 
   const editedRel =
     editStack.length > 1 && project?.path
-      ? editStack[editStack.length - 1].path.replace(project.path + '/', '')
+      ? editStack[editStack.length - 1]?.path.replace(project.path + '/', '') ?? null
       : null;
 
   // The reported classes, keyed by node id — same walk as the render report,
@@ -3606,7 +3855,8 @@ export default function App() {
 
   // A marker path may arrive namespaced (src/…/Card.astro|0.1). The index trail
   // after the pipe is what addresses a node in the open file's tree.
-  const trailOf = (p) => String(p).split('|').pop().split('.').map(Number);
+  const trailOf = (path: string): number[] =>
+    (path.split('|').pop() ?? '').split('.').map(Number);
   // An edit renumbers paths, so a report from before it describes nodes that
   // have since moved. Drop it and show nothing until the page has re-rendered
   // and said so again — a marker on the wrong row is worse than none.
@@ -3618,9 +3868,9 @@ export default function App() {
 
   // What the spacing box is pointing at, drawn over the selected element on the
   // canvas — see spacingBands.js.
-  const [spacingHover, setSpacingHover] = useState(null);
+  const [spacingHover, setSpacingHover] = useState<SpacingHover | null>(null);
 
-  const crumbs = [];
+  const crumbs: PreviewCrumb[] = [];
   if (currentPage) {crumbs.push({ id: null, label: currentPage.name.replace(/\.(astro|md)$/i, '') });}
   if (model && selectedId === 'frontmatter') {
     crumbs.push({ id: 'frontmatter', label: 'Frontmatter' });
@@ -3652,7 +3902,7 @@ export default function App() {
   const emptyNodeIds = React.useMemo(() => {
     if (!renderedPaths || !model) {return null;}
     const prefix = editedRel ? `${editedRel}|` : '';
-    const live = new Set();
+    const live = new Set<string>();
     for (const p of renderedPaths) {
       const local = prefix && p.startsWith(prefix) ? p.slice(prefix.length) : p;
       const parts = local.split('.');
@@ -3668,14 +3918,15 @@ export default function App() {
     // marked, and a live child makes its ancestors live. `<Fragment set:html>`
     // has no children to speak up, which is exactly the case where the panel
     // cannot tell — and saying "renders nothing" is the wrong half to guess.
-    const answers = (n) => MARKABLE.has(n.kind) && rendersOwnElement(n);
-    const ids = new Set();
+    const answers = (node: EditorNode): boolean =>
+      MARKABLE.has(node.kind) && rendersOwnElement(node);
+    const ids = new Set<string>();
     // An inline run — words with <a>, <strong>, <span> among them — is written
     // as one line, and markers inside it would render as spaces, so nothing in
     // there carries one. The page therefore says nothing about those nodes,
     // which is not the same as saying they rendered nothing: `unmarked` keeps
     // a link sitting in a sentence from being reported as invisible.
-    const walk = (list, trail, unmarked) => {
+    const walk = (list: readonly EditorNode[], trail: readonly number[], unmarked: boolean): void => {
       list.forEach((n, i) => {
         const t = [...trail, i];
         if (!unmarked && answers(n) && !live.has(t.join('.'))) {ids.add(n.id);}
@@ -3689,12 +3940,13 @@ export default function App() {
   // The reported paths as node ids, so the navigator can mark rows without
   // knowing anything about index paths.
   const stateIds = React.useMemo(() => {
-    const empty = { hidden: new Set(), inert: new Set() };
+    const empty = { hidden: new Set<string>(), inert: new Set<string>() };
     if (!nodeStates || !model) {return empty;}
     const prefix = editedRel ? `${editedRel}|` : '';
-    const local = (p) => (prefix && p.startsWith(prefix) ? p.slice(prefix.length) : p);
-    const ids = (paths) => {
-      const set = new Set();
+    const local = (path: string): string =>
+      prefix && path.startsWith(prefix) ? path.slice(prefix.length) : path;
+    const ids = (paths: readonly string[]): ReadonlySet<string> => {
+      const set = new Set<string>();
       for (const p of paths || []) {
         const id = tree.byPath.get(local(p))?.id;
         if (id) {set.add(id);}
@@ -3704,7 +3956,7 @@ export default function App() {
     return { hidden: ids(nodeStates.hidden), inert: ids(nodeStates.inert) };
   }, [nodeStates, model, editedRel, tree]);
 
-  const pathFor = (id) => {
+  const pathFor = (id: string | null): string | null => {
     if (!model || !id) {return null;}
     const path = tree.path(id);
     if (path === null) {return null;}
@@ -3724,20 +3976,20 @@ export default function App() {
   // say which file it belongs to. The file is the one open at that level of the
   // stack, so it's read from the stack rather than parsed out of the key.
   // Through a ref because the menu handler is bound long before this is in scope.
-  const relOf = (abs) =>
+  const relOf = (abs: string | undefined): string | null =>
     abs && project?.path ? abs.replace(project.path + '/', '') : null;
   const openRel = relOf(currentPage?.path);
-  const leafPath = tree.path(selectedId);
+  const leafPath = selectedId ? tree.path(selectedId) : null;
   selectionKeysRef.current = !openRel
     ? []
     : [
         ...editStack
           .slice(1)
           .map((entry, i) => {
-            const host = relOf(editStack[i].path);
+            const host = relOf(editStack[i]?.path);
             return entry.hostKey && host ? `${host}#${trailOf(entry.hostKey).join('.')}` : null;
           })
-          .filter(Boolean),
+          .filter((key): key is string => key !== null),
         selectedId === 'frontmatter'
           ? `${openRel}#frontmatter`
           : leafPath !== null
@@ -3760,11 +4012,11 @@ export default function App() {
     return () => ro.disconnect();
   }, [rightTab, pageState?.editable]);
 
-  const overlayInfo = (p) => {
+  const overlayInfo = (p: string): OverlayInfo | null => {
     if (!model || !p) {return null;}
     const n = nodeAtPath(model.nodes, trailOf(p));
     if (!n) {return null;}
-    const label = n.id === 'layout' ? currentLayoutName || n.name : crumbLabel(n);
+    const label = n.id === 'layout' ? currentLayoutName || n.name || 'layout' : crumbLabel(n);
     // A dynamic tag renders an element, so it shouldn't wear the component
     // colour on the canvas either.
     const kind =
@@ -3811,7 +4063,7 @@ export default function App() {
   // everything outside the instance being worked on.
   const pageEntry = editStack[0] || currentPage;
   const patternRoute = pageEntry?.route;
-  const focusPath = currentPage?.kind === 'component' ? currentPage.focusPath : null;
+  const focusPath = currentPage?.kind === 'component' ? currentPage.focusPath ?? null : null;
   const focusOcc = currentPage?.kind === 'component' ? currentPage.focusOcc ?? 0 : 0;
   // The focus routes clicks either way; this says whether it also draws.
   const focusWhole = currentPage?.kind === 'component' && !!currentPage.focusWhole;
@@ -3835,7 +4087,7 @@ export default function App() {
     // only be taken on trust. Keyed by the item's own name, so two loops on a
     // page are two places.
     itemIndex,
-    onStepItem: (name, dir, count) =>
+    onStepItem: (name: string, dir: number, count: number) =>
       setItemIndex((cur) => ({
         ...cur,
         [name]: (((cur[name] ?? 0) + dir) % count + count) % count,
@@ -3864,7 +4116,7 @@ export default function App() {
             index: dynamicIndex,
             count: dynamicPaths.length,
             label: dynamicEntry?.label || '',
-            onStep: (dir) =>
+            onStep: (dir: number) =>
               setDynamicIndex(
                 (i) => (i + dir + dynamicPaths.length) % dynamicPaths.length
               ),
@@ -3883,6 +4135,11 @@ export default function App() {
   // The old version is served by its own dev server, on the same route the
   // editor is on, so switching in and out is a like-for-like comparison.
   const oldVersionUrl = previewInfo && pageUrlPath ? previewInfo.url + pageUrlPath : null;
+  const currentScanPage =
+    currentPage?.path === undefined
+      ? null
+      : scan.pages.find((page) => page.path === currentPage.path) ?? null;
+  const repository = gitInfo?.isRepo ? gitInfo : null;
 
   return (
     <div className="app">
@@ -3901,7 +4158,7 @@ export default function App() {
             <span className="page-switch-label">{currentPage?.name}</span>
           </button>
         ) : (
-          <PageSwitcher pages={scan.pages} currentPage={currentPage} onSelect={selectPage} />
+          <PageSwitcher pages={scan.pages} currentPage={currentScanPage} onSelect={selectPage} />
         )}
         <div className="url-group">
           <span
@@ -3966,7 +4223,9 @@ export default function App() {
             className="titlebar-btn"
             title="Open in browser"
             disabled={!liveUrl}
-            onClick={() => window.avb.openExternal(liveUrl)}
+            onClick={() => {
+              if (liveUrl) {void openExternalURL(liveUrl);}
+            }}
           >
             <ExternalIcon size={14} />
           </button>
@@ -4010,7 +4269,7 @@ export default function App() {
             {leftTab === 'pages' && (
               <PagesPanel
                 scan={scan}
-                currentPage={currentPage}
+                currentPage={currentScanPage}
                 injectedRoutes={injectedRoutes}
                 onSelectRoute={selectRoute}
                 onSelect={selectPage}
@@ -4026,14 +4285,18 @@ export default function App() {
             {leftTab === 'navigator' && (
               <StructurePanel
                 pageState={pageState}
-                currentPage={currentPage}
+                currentPage={
+                  currentPage?.kind === 'route'
+                    ? { kind: 'route', route: currentPage.route }
+                    : currentPage
+                }
                 layouts={scan.layouts}
                 currentLayoutName={currentLayoutName}
                 selectedId={selectedId}
-                emptyNodeIds={emptyNodeIds}
+                emptyNodeIds={emptyNodeIds ?? new Set<string>()}
                 hiddenNodeIds={stateIds.hidden}
                 inertNodeIds={stateIds.inert}
-                liveClassesById={liveClassesById}
+                liveClassesById={liveClassesById ?? new Map<string, readonly string[]>()}
                 revealTick={revealTick}
                 onSelect={setSelectedId}
                 onHoverNode={setHoverNodeId}
@@ -4066,8 +4329,8 @@ export default function App() {
                   // into, the same as opening one from the canvas.
                   const page = scan.pages.find((p) => p.path === entry.path);
                   if (page) { void selectPage(page); return }
-                  const name = entry.rel.split('/').pop().replace(/\.astro$/, '');
-                  void openComponent(name, undefined, 0, entry.path);
+                  const name = entry.rel.split('/').pop()?.replace(/\.astro$/, '');
+                  if (name) {void openComponent(name, null, 0, entry.path);}
                 }}
               />
             )}
@@ -4130,13 +4393,10 @@ export default function App() {
                     return;
                   }
                   try {
-                    const r = await window.avb.gitRestoreFile({
-                      projectPath: project.path,
-                      ref: commit.hash,
-                      path: file.path,
-                    });
-                    if (r?.missing) {
-                      showToast(r.message, 'error');
+                    if (!commit.hash) {throw new Error('History commit has no hash');}
+                    const r = await restoreProjectFile(project.path, commit.hash, file.path);
+                    if (r.missing) {
+                      showToast(r.message ?? 'That version no longer contains the file.', 'error');
                       return;
                     }
                     await refreshGit();
@@ -4161,10 +4421,8 @@ export default function App() {
                   }
                   setBusy('Going back…');
                   try {
-                    const r = await window.avb.gitRestoreProject({
-                      projectPath: project.path,
-                      ref: commit.hash,
-                    });
+                    if (!commit.hash) {throw new Error('History commit has no hash');}
+                    const r = await restoreProjectVersion(project.path, commit.hash);
                     await refreshGit();
                     await reloadFromDisk();
                     showToast(
@@ -4184,11 +4442,13 @@ export default function App() {
                   // could not carry the work across. Parking is what the chip's
                   // dialog offers after that, not a thing done pre-emptively.
                   try {
-                    const r = await window.avb.gitCheckout({ projectPath: project.path, branch: b });
-                    if (r?.blocked) {
+                    const result = await checkoutGitBranch(project.path, b, { kind: 'switch' });
+                    if (!result.ok) {throw new Error(result.error);}
+                    const r = result.value;
+                    if (!r.ok) {
                       showToast(
-                        `${gitInfo?.branch} and ${b} have different versions of ` +
-                          `${r.files?.[0] || 'a file'} you have unsaved work in — switch from the branch button to decide what to do with it.`,
+                        `${repository?.branch ?? 'This branch'} and ${b} have different versions of ` +
+                          `${r.files[0] || 'a file'} you have unsaved work in — switch from the branch button to decide what to do with it.`,
                         'error'
                       );
                       return;
@@ -4196,7 +4456,7 @@ export default function App() {
                     await refreshGit();
                     await reloadFromDisk();
                     showToast(
-                      r?.restored ? `Picked your changes back up on ${b}` : `Switched to ${b}`,
+                      r.restored ? `Picked your changes back up on ${b}` : `Switched to ${b}`,
                       'success'
                     );
                   } catch (err) {
@@ -4207,8 +4467,8 @@ export default function App() {
                   mergeBranchAction({
                     projectPath: project.path,
                     branch: b,
-                    into: gitInfo?.branch,
-                    trunk: gitInfo?.trunk,
+                    into: repository?.branch ?? '',
+                    ...(repository?.trunk === undefined ? {} : { trunk: repository.trunk }),
                     run: (fn) =>
                       fn()
                         .then(async () => {
@@ -4223,7 +4483,7 @@ export default function App() {
                     onConflict: (r) =>
                       showToast(
                         `${r.from} and ${r.branch} both changed ` +
-                          `${r.files.length === 1 ? r.files[0].path : `${r.files.length} files`}. ` +
+                          `${r.files.length === 1 ? r.files[0]?.path ?? 'a file' : `${r.files.length} files`}. ` +
                           'Open the branch button to choose which versions to keep.',
                         'info'
                       ),
@@ -4233,7 +4493,7 @@ export default function App() {
                   deleteBranchAction({
                     projectPath: project.path,
                     branch: b,
-                    parked: (gitInfo?.parked || []).includes(b),
+                    parked: (repository?.parked || []).includes(b),
                     run: (fn) =>
                       fn()
                         .then(refreshGit)
@@ -4249,7 +4509,7 @@ export default function App() {
                 showToast={showToast}
                 onOpenFile={openAssetFile}
                 pick={assetPick}
-                onPickCancel={endAssetPick}
+                onPickCancel={() => endAssetPick(false)}
                 onRecordUndo={pushCommand}
               />
             )}
@@ -4283,7 +4543,7 @@ export default function App() {
               // with a path or with null, and null has two causes that want
               // opposite things: a click the open file doesn't own, and a click
               // on something inside it the canvas couldn't name.
-              const reveal = (node) => {
+              const reveal = (node: EditorNode | null) => {
                 if (!node) {return;}
                 setSelectedId(node.id);
                 // Selecting from the canvas jumps to the node in the tree.
@@ -4299,7 +4559,7 @@ export default function App() {
               if (kind === 'nothing') {return;}
               if (kind === 'close') { closeComponent(); return; }
               if (kind === 'layout') { reveal(model && findNodeById(model.nodes, 'layout')); return; }
-              reveal(model && nodeAtPath(model.nodes, trailOf(p)));
+              reveal(model && p ? nodeAtPath(model.nodes, trailOf(p)) : null);
             }}
             onSelectedClasses={receiveClasses}
             onRenderedPaths={setRenderedPaths}
@@ -4311,7 +4571,7 @@ export default function App() {
               // footer) — that markup belongs to the layout, so open the layout,
               // matching what a single click there selects.
               if (!p) {
-                if (layoutNode) {openComponent(layoutNode.name, pathFor('layout'));}
+                if (layoutNode?.name) {openComponent(layoutNode.name, pathFor('layout'));}
                 return;
               }
               const n = model && nodeAtPath(model.nodes, trailOf(p));
@@ -4390,12 +4650,12 @@ export default function App() {
             over that version's page: every outline in the wrong place, and
             every click editing a file that isn't what's on screen. An overlay
             cannot do that, because there is nothing to click. */}
-        {oldVersionUrl && (
+        {oldVersionUrl && previewInfo && (
           <div className="preview-mode old-version">
             <div className="preview-banner">
               <span className="preview-banner-text">
                 You’re looking at <strong>{previewInfo.subject}</strong> — how the site was{' '}
-                {relativeTime(previewInfo.when)}. This is a look, not a place to work.
+                {relativeTime(previewInfo.when ?? '')}. This is a look, not a place to work.
               </span>
               <button className="preview-banner-exit" onClick={exitCommitPreview}>
                 Back to now
@@ -4409,10 +4669,10 @@ export default function App() {
           <div className="panel right">
             <div className="right-tabs">
               {rightTabInd && <span className="right-tabs-indicator" style={rightTabInd} />}
-              {[
+              {([
                 { id: 'style', label: 'Style' },
                 { id: 'settings', label: 'Settings' },
-              ].map((t) => (
+              ] as const).map((t) => (
                 <button
                   key={t.id}
                   ref={(el) => (rightTabRefs.current[t.id] = el)}
@@ -4434,14 +4694,18 @@ export default function App() {
                   // the model this writes into, and mutating nothing would look
                   // like a save. Report it instead — the panel holds the edit
                   // and writes it when the component closes.
-                  const model = pageStateRef.current.pageState?.model;
-                  if (!model || !findNodeById(model.nodes, nodeId)) {return false;}
+                  const state = pageStateRef.current.pageState;
+                  if (!state?.editable || !findNodeById(state.model.nodes, nodeId)) {
+                    return false;
+                  }
                   setNodeText(nodeId, css, undefined, immediate || 'live');
                   return true;
                 }}
                 onSelectNode={setSelectedId}
                 onRecordUndo={pushCommand}
-                onAddClass={(name) => addClassToNode(selectedId, name)}
+                onAddClass={(name) => {
+                  if (selectedId) {addClassToNode(selectedId, name);}
+                }}
                 onSpacingHover={setSpacingHover}
                 pathOf={pathFor}
                 renderedClasses={selectedClasses}
@@ -4477,41 +4741,57 @@ export default function App() {
                 selectedNode?.kind === 'element' ||
                 // A dynamic tag renders a real element, so it takes attributes
                 // even though it has no component file behind it.
-                !!selectedNode?.dynamicTag ||
+                (selectedNode !== null &&
+                  selectedNode.kind !== 'frontmatter' &&
+                  !!selectedNode.dynamicTag) ||
                 (selectedNode?.kind === 'component' &&
                   !!insertables.find((c) => c.name === selectedNode.name)?.hasRest)
               }
               comment={noteText(commentAbove(model, selectedId)?.value)}
-              onSetComment={(text) => setComment(selectedId, text)}
-              onSetProp={(propName, value, immediate) =>
-                setProp(selectedId, propName, value, immediate)
-              }
+              onSetComment={(text) => {
+                if (selectedId) {setComment(selectedId, text);}
+              }}
+              onSetProp={(propName, value, immediate) => {
+                if (selectedId) {setProp(selectedId, propName, value, immediate);}
+              }}
               onSetProps={(nodeId, patch) => setProps(nodeId, patch)}
               onSetAssetProp={(nodeId, propName, picked) =>
                 setAssetProp(nodeId, propName, picked)
               }
-              onRenameProp={(oldName, newName) => renameProp(selectedId, oldName, newName)}
+              onRenameProp={(oldName, newName) => {
+                if (selectedId) {renameProp(selectedId, oldName, newName);}
+              }}
               // A capital is a component name; anything else is a tag. The
               // component path answers whether the name resolves, so the
               // field can put the old value back when it doesn't.
               onChangeTag={(tag) =>
-                /^[A-Z]/.test(tag)
-                  ? changeNodeKind(selectedId, tag)
-                  : changeElementTag(selectedId, tag)
+                selectedId
+                  ? /^[A-Z]/.test(tag)
+                    ? changeNodeKind(selectedId, tag)
+                    : changeElementTag(selectedId, tag)
+                  : undefined
               }
               tagOptions={tagOptions}
               onSetText={(value, renames) =>
                 selectedId === 'frontmatter'
                   ? setFrontmatter(value)
-                  : setNodeText(selectedId, value, renames)
+                  : selectedId
+                    ? setNodeText(selectedId, value, renames)
+                    : undefined
               }
-              onSetContent={(value) => setNodeContent(selectedId, value)}
-              onSetInline={(kids) => setNodeInline(selectedId, kids)}
+              onSetContent={(value) => {
+                if (selectedId) {setNodeContent(selectedId, value);}
+              }}
+              onSetInline={(kids) => {
+                if (selectedId) {setNodeInline(selectedId, kids);}
+              }}
               onOpenCode={openCodeWindow}
               onSetFrontmatter={setExtraFrontmatter}
               frontmatterSource={frontmatterCode}
               onOpenSymbol={openSymbolFile}
-              onToggleElse={(want) => toggleElseBranch(selectedId, want)}
+              onToggleElse={(want) => {
+                if (selectedId) {toggleElseBranch(selectedId, want);}
+              }}
               projectPath={project.path}
               filePath={editStack[editStack.length - 1]?.path || currentPage?.path || null}
             />
@@ -4542,7 +4822,9 @@ export default function App() {
               ? setAssetFileText(value)
               : codeWin.targetId === 'frontmatter'
                 ? setFrontmatter(value)
-                : setNodeText(codeWin.targetId, value)
+                : codeWin.targetId
+                  ? setNodeText(codeWin.targetId, value)
+                  : undefined
           }
           onClose={() => setCodeWin(null)}
         />
@@ -4564,7 +4846,11 @@ export default function App() {
   );
 }
 
-function insertIntoModel(model, node, target) {
+function insertIntoModel(
+  model: EditorModel,
+  node: EditorNode,
+  target: InsertTarget | null,
+): void {
   if (!target || target.parentId == null) {
     const index = target ? Math.min(target.index, model.nodes.length) : model.nodes.length;
     model.nodes.splice(index, 0, node);
@@ -4580,7 +4866,7 @@ function insertIntoModel(model, node, target) {
   parent.children.splice(index, 0, node);
 }
 
-function BusyOverlay({ message }) {
+function BusyOverlay({ message }: { readonly message: string }) {
   return (
     <div className="busy-overlay">
       <div className="spinner" />
@@ -4589,6 +4875,6 @@ function BusyOverlay({ message }) {
   );
 }
 
-function Toast({ toast }) {
+function Toast({ toast }: { readonly toast: ToastMessage }) {
   return <div className={`toast ${toast.kind}`}>{toast.msg}</div>;
 }

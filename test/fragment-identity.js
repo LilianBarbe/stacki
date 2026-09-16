@@ -49,7 +49,7 @@ const check = (what, condition, detail) => {
   check('and nothing at all is nothing', rendersOwnElement(null) === false);
 
   // --- and who asks -----------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check(
     'the app builds its labels through it',
     /classesByNodeId\(nodeClasses, model\.nodes/.test(app),
@@ -57,7 +57,7 @@ const check = (what, condition, detail) => {
   );
   check(
     'and the same question decides what "renders nothing" is a fact about',
-    /const answers = \(n\) => MARKABLE\.has\(n\.kind\) && rendersOwnElement\(n\)/.test(app),
+    /const answers = \(node: EditorNode\): boolean =>\s*MARKABLE\.has\(node\.kind\) && rendersOwnElement\(node\)/.test(app),
     'the two places disagree about what a Fragment renders'
   );
 

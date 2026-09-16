@@ -1,5 +1,5 @@
 {
-  "//": "AGENTS.md mandates this strict flag set. allowJs/checkJs let the unconverted JS tree compile untouched; converted files are renamed to .ts/.tsx and checked. When the migration completes, drop allowJs and add shared/ to include.",
+  "//": "AGENTS.md mandates this strict flag set. Application sources are fully converted; JavaScript test harnesses remain outside the checked program by design.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -18,8 +18,6 @@
 
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "allowJs": true,
-    "checkJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,

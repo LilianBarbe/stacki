@@ -1,7 +1,7 @@
 // Error-message tidying, shared by App and the panels that surface failures.
 //
-// Lives outside App.jsx on purpose: a module that exports both a component and
-// a plain function can't Fast Refresh, so every edit to App.jsx forced Vite
+// Lives outside App.tsx on purpose: a module that exports both a component and
+// a plain function can't Fast Refresh, so every edit to App.tsx forced Vite
 // into a full page reload — which drops the open project and lands you back on
 // the dashboard mid-edit.
 

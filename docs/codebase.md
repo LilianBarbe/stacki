@@ -75,7 +75,7 @@ Four cooperating processes, each with one job:
                │ contextBridge (typed)     │ spawns
 ┌──────────────┴─────────────┐   ┌─────────▼─────────────┐
 │ Renderer (React + Vite)    │   │ astro dev (the user's │
-│  src/App.jsx + panels      │   │ project, its deps)    │
+│  src/App.tsx + panels      │   │ project, its deps)    │
 │  Edits the PageNode model  │   │ Serves the live page  │
 └──────────────┬─────────────┘   └─────────▲─────────────┘
                │ iframe embed + injected   │ HMR on save
@@ -94,7 +94,7 @@ Four cooperating processes, each with one job:
 - **Preload** (`electron/preload.js`): a sandboxed bridge exposing an
   allowlisted `window.avb` API via `contextBridge`. Must stay CommonJS
   (Electron ≥ 33 sandbox requirement).
-- **Renderer** (`src/`, React 19 + Vite, ESM): `App.jsx` (~4.6k lines) is the
+- **Renderer** (`src/`, React 19 + Vite, ESM): `App.tsx` (~4.9k lines) is the
   application shell and owns the page model; `src/panels/` are the side views
   (Structure, Props, Style, Pages, Assets, CMS, Git history, terminal…);
   `src/style-panel/` is the CSS editing surface (mostly TypeScript);
@@ -236,7 +236,7 @@ green at every commit.
   modules (`editorTree`, `pagePersistence`, `cleanError`, `branchName`,
   `loopBindings`, `bindings`, `arrayValue`, `dataSuggest`). Remaining: the
   ~30 src leaf libs, the UI, the panels, and the remaining
-  hotspots last (`App.jsx` 4.6k lines, `PropsPanel.jsx` 3.8k,
+  hotspots last (`App.tsx` 4.9k lines, `PropsPanel.tsx` 3.8k,
   `ClipPath.tsx` 8.8k). Live status:
   `docs/migration-tracker.md`.
 - **Phase 4 (planned)** — `docs/contracts.md` for invariants types can't
@@ -288,7 +288,7 @@ batching/queueing write path (already the right shape).
 | `electron/`         | Main process: IPC registry, parsers, git, watcher, terminal, packaging helpers    |
 | `electron/content/` | Astro content-collection introspection + stubs injected into the dev server       |
 | `electron/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter)               |
-| `src/`              | Renderer: `App.jsx` shell, tree/persistence/binding logic, `bridge.ts`            |
+| `src/`              | Renderer: `App.tsx` shell, tree/persistence/binding logic, `bridge.ts`            |
 | `src/panels/`       | Side panels (Structure, Props, Style, Pages, Assets, CMS, History, Git, terminal) |
 | `src/style-panel/`  | CSS editing surface (TypeScript); `clip-path/`, `lib/`, shared controls           |
 | `src/ui/`           | Shared renderer widgets                                                           |

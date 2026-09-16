@@ -2077,8 +2077,8 @@ contextBridge.exposeInMainWorld('avb', {
   },
 
   // Events
-  onPageMaybeChanged: (cb: () => void) => {
-    const listener = () => cb();
+  onPageMaybeChanged: (cb: (data: unknown) => void) => {
+    const listener = (_event: unknown, data: unknown) => cb(data);
     ipcRenderer.on('page:maybe-changed', listener);
     return () => ipcRenderer.removeListener('page:maybe-changed', listener);
   },

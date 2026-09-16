@@ -668,7 +668,7 @@ const check = (what, condition, detail) => {
     );
 
     // The press itself is bound in the app, which this can only read.
-    const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const appSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
     const binding = appSource.slice(appSource.indexOf("e.key.toLowerCase() === 'a'") - 200, appSource.indexOf("e.key.toLowerCase() === 'a'") + 400);
     check('⌘⇧A is bound', /mod && e\.shiftKey[\s\S]*'a'/.test(binding), binding.slice(0, 120));
     check('to the Components panel', /setLeftTab\('components'\)/.test(binding), binding);

@@ -169,3 +169,51 @@ test('parsePageModel and parsePageResult: the envelope is data, including not-ed
     /exceeds \d+/,
   );
 });
+
+test('parsePageModel preserves Markdown source metadata and rejects malformed metadata', () => {
+  const nodes = Object.assign(
+    [
+      {
+        kind: 'element',
+        id: 'm1',
+        name: 'h1',
+        children: [{ kind: 'text', id: 'm2', value: 'Title', mdSource: 'Title' }],
+        mdBlanksBefore: 1,
+        mdSource: '# Title',
+      },
+    ],
+    { mdTrailingBlanks: 2 },
+  );
+  const model = {
+    format: 'md',
+    imports: [],
+    extraFrontmatter: 'title: Example',
+    frontmatterLang: 'yaml',
+    layoutPath: null,
+    nodes,
+    mdEol: '\n',
+    mdEndsWithNewline: true,
+    mdHasFrontmatter: true,
+  };
+
+  const parsed = parsePageModel(model);
+  assert.equal(parsed.format, 'md');
+  assert.equal(parsed.nodes.mdTrailingBlanks, 2);
+  assert.equal(parsed.nodes[0]?.mdBlanksBefore, 1);
+  assert.equal(parsed.nodes[0]?.mdSource, '# Title');
+  const heading = parsed.nodes[0];
+  assert.ok(heading !== undefined);
+  if (heading.kind !== 'element') {
+    throw new Error('Expected Markdown heading to parse as an element');
+  }
+  assert.equal(heading.children?.[0]?.mdSource, 'Title');
+
+  assert.throws(
+    () => parsePageModel({ ...model, nodes: [{ ...nodes[0], mdBlanksBefore: -1 }] }),
+    /mdBlanksBefore: expected nonnegative integer/,
+  );
+  assert.throws(
+    () => parsePageModel({ ...model, nodes: [{ ...nodes[0], mdNumbers: ['one'] }] }),
+    /mdNumbers\[0\]: expected integer/,
+  );
+});

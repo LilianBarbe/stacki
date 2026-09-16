@@ -136,7 +136,7 @@ export type PreloadBridge = InvokeSurface & {
   readonly onAssetsChanged: (callback: () => void) => () => void;
   readonly onCssChanged: (callback: () => void) => () => void;
   readonly onCmsChanged: (callback: () => void) => () => void;
-  readonly onPageMaybeChanged: (callback: () => void) => () => void;
+  readonly onPageMaybeChanged: (callback: (data: unknown) => void) => () => void;
   readonly onThumbUpdated: (callback: (data: unknown) => void) => () => void;
   readonly onTerminalData: (callback: (data: unknown) => void) => () => void;
   readonly onTerminalExit: (callback: (data: unknown) => void) => () => void;

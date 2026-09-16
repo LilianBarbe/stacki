@@ -157,7 +157,7 @@ const { class: className } = Astro.props;
   check('once', (written.match(/"hero"/g) || []).length === 1, written);
 
   // --- the panel is wired to it ----------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check(
     'the style panel is the one given onAddClass',
     /<StylePanel[\s\S]{0,2000}?onAddClass=/.test(app),

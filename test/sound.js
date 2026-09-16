@@ -546,9 +546,9 @@ function fakeAudio() {
   check('the style panel taps on a button press', /closest\('button'\)/.test(panel) && /clickNote\(\)/.test(panel));
   check('but not on a disabled one', /!button\.disabled/.test(panel));
 
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
-  check('the app reads it on load', /window\.avb\.settings\?\.\(\)/.test(app));
-  check('and follows the menu after that', /onMenu\('sound'/.test(app));
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  check('the app reads it on load', /readAppSettings\(\)\.then/.test(app));
+  check('and follows the menu after that', /onSoundSettingChanged\(/.test(app));
 
   // A burst of synthetic click events cannot allocate unbounded audio nodes.
   for (const voice of audio.voices) { voice.onended?.(); }

@@ -15,7 +15,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   const buildDir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'component-preview');
   fs.mkdirSync(buildDir, { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.jsx')], outfile: path.join(buildDir, 'app.js'),
+    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')], outfile: path.join(buildDir, 'app.js'),
     bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic',
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
     loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' }, logLevel: 'silent',
@@ -49,9 +49,12 @@ test('component navigation keeps the real iframe and inspector mounted while loa
   global.IS_REACT_ACT_ENVIRONMENT = true;
   const page = { name: 'index.astro', path: '/project/src/pages/index.astro', route: '/' };
   const card = { name: 'Card', path: '/project/src/components/Card.astro', folder: '' };
+  const pageSource = "---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>";
+  const cardSource = '<section class="card"><p>Card content</p></section>';
+  const pageRead = (source) => ({ ...parsePage(source), source });
   const states = new Map([
-    [page.path, parsePage("---\nimport Card from '../components/Card.astro';\n---\n<main><Card /></main>")],
-    [card.path, parsePage('<section class="card"><p>Card content</p></section>')],
+    [page.path, pageRead(pageSource)],
+    [card.path, pageRead(cardSource)],
   ]);
   const heldReads = new Map();
   const writes = [];
@@ -67,7 +70,8 @@ test('component navigation keeps the real iframe and inspector mounted while loa
     writePage: async ({ pagePath, model }) => {
       if (writeError) {throw writeError;}
       writes.push({ pagePath, model });
-      states.set(pagePath, { editable: true, model: structuredClone(model) });
+      states.set(pagePath, { editable: true, model: structuredClone(model), source: '' });
+      return { ok: true };
     },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},
@@ -201,7 +205,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
       },
     ];
     for (const fixture of wrappedMarkup) {
-      const parsed = parsePage(fixture.source);
+      const parsed = pageRead(fixture.source);
       assert.equal(parsed.editable, true, `${fixture.label}: fixture remains tree editable`);
       states.set(card.path, parsed);
       await openCard();
@@ -221,7 +225,7 @@ test('component navigation keeps the real iframe and inspector mounted while loa
       { source: '---\nconst render = true;\n---\n{render && (<>Text only</>)}', kind: 'cond' },
       { source: '', kind: null },
     ]) {
-      states.set(card.path, parsePage(fixture.source));
+      states.set(card.path, pageRead(fixture.source));
       await openCard();
       unchanged();
       const selected = __componentPanels.PropsPanel.node;

@@ -7,13 +7,19 @@ then update the counts below.
 
 ## Handoff state (read this first)
 
-The `v0.1.26` startup repair, Astro parser conversion, and **Electron main
-conversion** are complete. `electron/main.ts` now emits `dist/electron/main.js`,
-the package entry. The invoke inventory is complete: **111 main channels + 4 terminal
+The TypeScript source migration is complete. `src/`, `electron/`, and `shared/`
+contain no `.js` or `.jsx` application files; `allowJs` and `checkJs` are gone
+from the root compiler configuration. `electron/main.ts` emits the package entry
+at `dist/electron/main.js`, while Vite emits the renderer under `dist/renderer`.
+The invoke inventory remains complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
-**The Electron, root renderer, and UI queues are complete. Continue through
-`src/panels` (PropsPanel, VariablesPanel, VariablesView, CmsView, and GitChip are
-complete), then `src/App.jsx`.**
+
+`src/App.tsx` is now checked under the strict root configuration. Its IPC calls
+route through `appBridge.ts`, the mutable editor clone is confined to
+`shared/editor-model.ts`, and both Astro and Markdown page models retain their
+source-preservation metadata through the shared boundary. The final gate passes
+150/150 commands in 101.7 seconds. Follow-up hotspot splitting remains listed
+separately because it changes architecture rather than source language.
 
 Build-output checkpoint: all generated code now lives under the root `dist/`:
 `dist/electron` for main/preload/preview modules, `dist/shared` for contracts,
@@ -92,7 +98,7 @@ bridge); rescan/save drain caps; `assertTreeInvariants`; packaging asarUnpack;
 **Field fix (b94457c):** the first end-to-end open of a real project threw
 `ScanResult…: expected Map` — `parseScanResult` routed each component's
 schema into the prop-schema Map builder, but the wire (main.js `safeSchema`
-→ App.jsx `schemaFor`) has always carried an **array of fields**; Maps are
+→ App.tsx `schemaFor`) has always carried an **array of fields**; Maps are
 collapsed to plain objects by IPC serialization, so the Map shape could never
 survive `ipcRenderer.invoke`. Also corrected while there: `renderTag` is
 `rootTag`'s `{tag, prop} | null` object, not `string | null`, and the
@@ -101,7 +107,7 @@ Lesson: the bridge is stubbed in every suite, so renderer-contract ↔ real-
 payload agreement is exercised only by live runs — keep one in the loop when
 touching `shared/` wire shapes.
 
-## Phase 3 — Mechanical conversion (leaf → hotspot) ⏳
+## Phase 3 — Mechanical conversion (leaf → hotspot) ✅
 
 ### electron/ — 38 source modules converted ✅
 
@@ -564,7 +570,7 @@ images stop at 20 MB, tab count stops at 32, and terminal listeners, observers,
 and drag state have explicit owners. Lifecycle tests retain lazy loading,
 scrollback, resize deduplication, and late-reply disposal behavior. The full
 gate passes 149/149 commands (98.9s), with no warnings in the new modules. The
-original panel queue is complete; continue with `src/App.jsx`.
+original panel queue was complete before the final `src/App.tsx` conversion.
 
 | File                 | Lines                                                        |
 | -------------------- | ------------------------------------------------------------ |
@@ -586,7 +592,16 @@ original panel queue is complete; continue with `src/App.jsx`.
 | `StylePanel.tsx`     | ✅ converted with parsed stylesheet inventories              |
 | `CanvasView.tsx`     | ✅ converted with typed frame and gesture lifetimes          |
 
-### src/App.jsx — 4,584 lines ⬜ hotspot, last
+### src/App.tsx — 4,872 lines ✅ converted hotspot
+
+The root renderer is converted with explicit editor, history, project, preview,
+and panel state. `appBridge.ts` parses lifecycle, write, Git, route, content, and
+event replies before App uses them. The conversion also fixed a real preload
+event bug: page-change payloads are forwarded instead of discarded. Markdown
+models now pass the same shared page boundary without losing fence, list,
+indentation, or trailing-blank metadata. `src/main.tsx` validates the root node
+and supplies the Suspense boundary used by lazy panels. Focused App bridge,
+render, navigation, component-preview, and Markdown negative-space tests pass.
 
 ### style-panel — already TypeScript ✅
 
@@ -618,12 +633,11 @@ splitting (convert-then-split discipline, one per commit):
   `parseConflict` 76, contentConfig 1 warning. Warnings are not errors; do not
   refactor to silence them unless the commit is a hotspot split.
 
-## Phase 4 — AI contract docs ⬜
+## Phase 4 — AI contract docs ✅
 
-- `docs/contracts.md`: every contract a generator must satisfy, with the
-  parse-test per contract.
-- `AGENTS.md`: add the contracts section covering `shared/` usage.
-- CI/pre-push hook: run the gate.
+- `docs/contracts.md` records page-tree, IPC, parser, bounds, and gate rules.
+- `AGENTS.md` names `shared/` as the cross-process contract surface.
+- `.github/workflows/check.yml` runs the full gate for main and pull requests.
 
 ## Post-Phase-3 target — Diff-mapping editor core ⬜
 
@@ -642,16 +656,16 @@ move-blindness.
 | Complete `IpcContract` invoke inventory (115 channels)               | ✅ with `main.ts`                                      |
 | Fix conditional-hook bugs in PropsPanel / VariablesView              | ✅ PropsPanel and VariablesView cell transitions fixed |
 | Delete stray `electron/scratch2-7.js` (tracked tsc-emit leftovers)   | ✅ standalone cleanup commit                           |
-| `release.sh` → TypeScript (`scripts/*.ts`, per AGENTS §17)           | ⬜                                                     |
+| `release.sh` → TypeScript (`scripts/*.ts`, per AGENTS §17)           | ✅ `scripts/release.ts`; parsed semver and checked steps |
 | Tooling deps declared devDependencies (node_modules-incident repair) | ✅                                                     |
 | Node_modules incident recorded under Risks in plan                   | ✅                                                     |
 
 ## Test-suite state
 
-- Gate green at last run: 138/138 (101.9s), exit 0. No quarantined tests remain.
+- Gate green at last run: 150/150 (101.7s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
-- Contract suite: 156/156. Full-repository lint has 156 existing warnings and no
-  errors; the converted parser, main, and their new supporting files have no warnings.
+- Contract suite: 160/160. Full-repository lint retains existing warnings and no
+  errors; the new bridge, entry point, editor model, and release script have no warnings.
 - Healed out of quarantine during Phase 3 (verified two consecutive direct
   runs each, then removed per the gate's own heal report): binding, chipedit,
   codeeditorlifecycle, codeprop, jsguard.

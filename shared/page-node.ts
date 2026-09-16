@@ -98,7 +98,25 @@ export interface ChunkGroupNode {
   readonly children: readonly PageNode[];
 }
 
-export type PageNode =
+export interface MarkdownNodeMetadata {
+  readonly mdBlanksBefore?: number;
+  readonly mdIndent?: string;
+  readonly mdFence?: string;
+  readonly mdInfo?: string;
+  readonly mdUnclosed?: boolean;
+  readonly mdRaw?: string;
+  readonly mdGap?: string;
+  readonly mdTrail?: string;
+  readonly mdSetext?: string;
+  readonly mdImage?: boolean;
+  readonly mdNumbers?: readonly number[];
+  readonly mdLoose?: boolean;
+  readonly mdMarker?: string;
+  readonly mdSource?: string;
+  readonly mdEsm?: boolean;
+}
+
+export type PageNode = (
   | PairedNode
   | RawNode
   | ValueNode
@@ -106,7 +124,10 @@ export type PageNode =
   | MapNode
   | CondNode
   | BranchNode
-  | ChunkGroupNode;
+  | ChunkGroupNode
+) & MarkdownNodeMetadata;
+
+export type PageNodeList = readonly PageNode[] & { readonly mdTrailingBlanks?: number };
 
 /** One import declaration in a frontmatter block. */
 export interface ImportDecl {
@@ -116,6 +137,8 @@ export interface ImportDecl {
   readonly named?: boolean;
   readonly imported?: string;
   readonly typeOnly?: boolean;
+  /** Existing imports retain their source slot; new imports have no slot yet. */
+  readonly at?: number;
 }
 
 /** The frontmatter model plus the parsed body tree, as parsePage returns it. */
@@ -130,8 +153,14 @@ export interface PageModel {
   };
   readonly hadFrontmatter: boolean;
   readonly trailingBlank: number;
-  readonly nodes: readonly PageNode[];
+  readonly nodes: PageNodeList;
   readonly bodyStart?: number;
+  readonly format?: 'md' | 'mdx';
+  readonly frontmatterLang?: 'yaml';
+  readonly layoutPath?: string | null;
+  readonly mdEol?: string;
+  readonly mdEndsWithNewline?: boolean;
+  readonly mdHasFrontmatter?: boolean;
 }
 
 export type ParsePageResult =
@@ -209,11 +238,71 @@ function parseProps(input: unknown, where: string): Readonly<Record<string, Attr
   return out;
 }
 
-function parseChildren(input: unknown, where: string, depth: number, context: ParseContext): readonly PageNode[] {
+function parseChildren(
+  input: unknown,
+  where: string,
+  depth: number,
+  context: ParseContext,
+): PageNodeList {
   if (!Array.isArray(input)) {
     fail(where, 'expected children array');
   }
-  return input.map((child, index) => parsePageNode(child, `${where}[${index}]`, depth + 1, context));
+  const nodes = input.map((child, index) =>
+    parsePageNode(child, `${where}[${index}]`, depth + 1, context),
+  );
+  const trailingBlanks = parseMarkdownBlanks(
+    Reflect.get(input, 'mdTrailingBlanks'),
+    `${where}.mdTrailingBlanks`,
+  );
+  return trailingBlanks === undefined
+    ? nodes
+    : Object.assign(nodes, { mdTrailingBlanks: trailingBlanks });
+}
+
+function parseMarkdownBlanks(input: unknown, where: string): number | undefined {
+  if (input === undefined) {return undefined;}
+  if (!Number.isSafeInteger(input) || Number(input) < 0) {
+    fail(where, 'expected nonnegative integer');
+  }
+  if (Number(input) > LIMITS.treeNodesMax) {fail(where, 'exceeds blank-line limit');}
+  return Number(input);
+}
+
+function markdownExtras(record: Record<string, unknown>, where: string): MarkdownNodeMetadata {
+  const out: Record<string, unknown> = {};
+  for (const field of [
+    'mdIndent',
+    'mdFence',
+    'mdInfo',
+    'mdRaw',
+    'mdGap',
+    'mdTrail',
+    'mdSetext',
+    'mdMarker',
+    'mdSource',
+  ] as const) {
+    if (record[field] !== undefined) {
+      out[field] = asString(record[field], `${where}.${field}`, LIMITS.nodeValueCharsMax);
+    }
+  }
+  for (const field of ['mdUnclosed', 'mdImage', 'mdLoose', 'mdEsm'] as const) {
+    if (record[field] !== undefined) {
+      if (typeof record[field] !== 'boolean') {fail(where, `${field}: expected boolean`);}
+      out[field] = record[field];
+    }
+  }
+  const blanks = parseMarkdownBlanks(record['mdBlanksBefore'], `${where}.mdBlanksBefore`);
+  if (blanks !== undefined) {out['mdBlanksBefore'] = blanks;}
+  if (record['mdNumbers'] !== undefined) {
+    if (!Array.isArray(record['mdNumbers'])) {fail(where, 'mdNumbers: expected array');}
+    if (record['mdNumbers'].length > LIMITS.treeNodesMax) {fail(where, 'mdNumbers: exceeds limit');}
+    out['mdNumbers'] = record['mdNumbers'].map((value, index) => {
+      if (!Number.isSafeInteger(value)) {fail(where, `mdNumbers[${index}]: expected integer`);}
+      return Number(value);
+    });
+  }
+  // Every preserved field was validated above; this constructor is the trust boundary.
+  return out as MarkdownNodeMetadata;
 }
 
 // Layout/preservation fields shared by the tag-bearing kinds. Each is
@@ -403,16 +492,24 @@ export function parsePageNode(
   if (context.nodes > LIMITS.treeNodesMax) {
     fail(where, `exceeds ${LIMITS.treeNodesMax} nodes`);
   }
-  return parseByKind(asRecord(input, where), where, depth, context);
+  const record = asRecord(input, where);
+  return { ...parseByKind(record, where, depth, context), ...markdownExtras(record, where) };
 }
 
 /** Parse a whole tree (a page model's nodes array). */
-export function parsePageTree(input: unknown): readonly PageNode[] {
+export function parsePageTree(input: unknown): PageNodeList {
   if (!Array.isArray(input)) {
     fail('tree', 'expected array');
   }
   const context: ParseContext = { nodes: 0 };
-  return input.map((child, index) => parsePageNode(child, `tree[${index}]`, 0, context));
+  const nodes = input.map((child, index) => parsePageNode(child, `tree[${index}]`, 0, context));
+  const trailingBlanks = parseMarkdownBlanks(
+    Reflect.get(input, 'mdTrailingBlanks'),
+    'tree.mdTrailingBlanks',
+  );
+  return trailingBlanks === undefined
+    ? nodes
+    : Object.assign(nodes, { mdTrailingBlanks: trailingBlanks });
 }
 
 function parseImport(input: unknown, where: string): ImportDecl {
@@ -439,12 +536,21 @@ function parseImport(input: unknown, where: string): ImportDecl {
   if (record['imported'] !== undefined) {
     out['imported'] = asString(record['imported'], `${where}.imported`, LIMITS.tagNameCharsMax);
   }
+  if (record['at'] !== undefined) {
+    if (!Number.isSafeInteger(record['at']) || Number(record['at']) < 0) {
+      fail(where, 'at: expected nonnegative integer');
+    }
+    out['at'] = record['at'];
+  }
   return out as unknown as ImportDecl;
 }
 
 /** Parse a full page model, including the source slots used to preserve imports. */
 export function parsePageModel(input: unknown): PageModel {
   const record = asRecord(input, 'model');
+  if (record['format'] === 'md' || record['format'] === 'mdx') {
+    return parseMarkdownPageModel(record);
+  }
   if (!Array.isArray(record['imports'])) {
     fail('model.imports', 'expected array');
   }
@@ -478,6 +584,48 @@ export function parsePageModel(input: unknown): PageModel {
     out['bodyStart'] = record['bodyStart'];
   }
   return out as unknown as PageModel;
+}
+
+function parseMarkdownPageModel(record: Record<string, unknown>): PageModel {
+  const format = record['format'];
+  if (format !== 'md' && format !== 'mdx') {fail('model.format', 'expected Markdown format');}
+  if (!Array.isArray(record['imports'])) {fail('model.imports', 'expected array');}
+  if (record['imports'].length > LIMITS.importsMax) {fail('model.imports', 'exceeds limit');}
+  const imports = record['imports'].map((input, index) => {
+    const value = asRecord(input, `model.imports[${index}]`);
+    return {
+      name: asString(value['name'], `model.imports[${index}].name`, LIMITS.tagNameCharsMax),
+      path: asString(value['path'], `model.imports[${index}].path`, LIMITS.attrCharsMax),
+      quote: "'",
+    };
+  });
+  const layoutPath = record['layoutPath'];
+  if (layoutPath !== null && typeof layoutPath !== 'string') {
+    fail('model.layoutPath', 'expected string or null');
+  }
+  for (const field of ['mdEndsWithNewline', 'mdHasFrontmatter'] as const) {
+    if (typeof record[field] !== 'boolean') {fail(`model.${field}`, 'expected boolean');}
+  }
+  return {
+    imports,
+    frontmatterLead: '',
+    extraFrontmatter: asString(
+      record['extraFrontmatter'],
+      'model.extraFrontmatter',
+      LIMITS.nodeValueCharsMax,
+    ),
+    extraFrontmatterSpaced: true,
+    frontmatterLayout: { extra: '', slots: [] },
+    hadFrontmatter: record['mdHasFrontmatter'] === true,
+    trailingBlank: 0,
+    nodes: parsePageTree(record['nodes']),
+    format,
+    frontmatterLang: 'yaml',
+    layoutPath,
+    mdEol: asString(record['mdEol'], 'model.mdEol', 2),
+    mdEndsWithNewline: record['mdEndsWithNewline'] === true,
+    mdHasFrontmatter: record['mdHasFrontmatter'] === true,
+  };
 }
 
 /** Parse the parsePage result envelope: not-editable is data, not an error. */

@@ -6,13 +6,31 @@ const esbuild = require('esbuild');
 const { JSDOM } = require('jsdom');
 const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { promise, resolve }; };
-const pageState = (id) => ({ editable: true, model: { imports: [], extraFrontmatter: '', nodes: [{ id, kind: 'element', name: 'div', props: {}, children: [] }] } });
+const nodeId = (label) =>
+  `n${Array.from(label).reduce(
+    (hash, character) => (hash * 31 + character.charCodeAt(0)) % 1_000_000_007,
+    7,
+  )}`;
+const pageState = (label) => ({
+  editable: true,
+  source: '',
+  model: {
+    imports: [],
+    frontmatterLead: '',
+    extraFrontmatter: '',
+    extraFrontmatterSpaced: false,
+    frontmatterLayout: { extra: '', slots: [] },
+    hadFrontmatter: false,
+    trailingBlank: 0,
+    nodes: [{ id: nodeId(label), kind: 'element', name: 'div', props: {}, children: [] }],
+  },
+});
 
 test('out-of-order page reads and external reads cannot replace the current edit', async () => {
   const dir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'page-navigation');
   fs.mkdirSync(dir, { recursive: true });
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'App.jsx')], outfile: path.join(dir, 'app.js'),
+    entryPoints: [path.join(__dirname, '..', 'src', 'App.tsx')], outfile: path.join(dir, 'app.js'),
     bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic',
     external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'],
     loader: { '.css': 'empty', '.svg': 'empty', '.png': 'empty' }, logLevel: 'silent',
@@ -54,7 +72,11 @@ test('out-of-order page reads and external reads cannot replace the current edit
     startDevServer: async () => ({ url: 'http://localhost:4321' }),
     listProjectClasses: async () => [],
     readPage: (path) => { const request = deferred(); reads.push({ path, ...request }); return request.promise; },
-    writePage: async (payload) => { if (writeError) {throw writeError;} writes.push(payload); },
+    writePage: async (payload) => {
+      if (writeError) {throw writeError;}
+      writes.push(payload);
+      return { ok: true };
+    },
     onFsChanged: (cb) => { onFsChanged = cb; return () => {}; },
     gitInfo: async () => ({ isRepo: false }),
     onCssChanged: () => () => {},
@@ -70,7 +92,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   await act(async () => { await __panels.WelcomeScreen.onOpen('/project'); await tick(); });
   assert.equal(reads[0].path, pages[0].path);
   await act(async () => { reads[0].resolve(pageState('first')); await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'first');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('first'));
   // Use the actual page switcher callback through the editor's URL input.
   const navigate = async (route) => {
     const input = document.querySelector('.url-bar input, input[spellcheck="false"]');
@@ -87,9 +109,9 @@ test('out-of-order page reads and external reads cannot replace the current edit
   await navigate('/third');
   assert.equal(reads.length, 3);
   await act(async () => { reads[2].resolve(pageState('third')); await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'third');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('third'));
   await act(async () => { reads[1].resolve(pageState('stale-second')); await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'third');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('third'));
   assert.equal(__panels.PropsPanel.filePath, pages[2].path);
   // Two watcher reads overlap: the earlier response must not block the
   // later snapshot merely because it arrived first and changed state identity.
@@ -98,16 +120,16 @@ test('out-of-order page reads and external reads cannot replace the current edit
   await act(async () => { newerReload = onFsChanged({ files: [pages[2].path] }); await tick(); });
   assert.equal(reads.length, 5);
   await act(async () => { reads[3].resolve(pageState('older-disk')); await olderReload; await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'third');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('third'));
   await act(async () => { reads[4].resolve(pageState('latest-disk')); await newerReload; await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'latest-disk');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('latest-disk'));
   // Begin an external reload, then edit while it is waiting on disk.
   let external;
   await act(async () => { external = onFsChanged({ files: [pages[2].path] }); await tick(); });
   assert.equal(reads.length, 6);
   await act(async () => { __panels.PropsPanel.onSetProp('title', { type: 'string', value: 'keep this' }); await tick(); });
   await act(async () => { reads[5].resolve(pageState('stale-disk')); await external; await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'latest-disk');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('latest-disk'));
   assert.equal(__panels.PropsPanel.node.props.title.value, 'keep this');
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
   assert.equal(writes.at(-1).pagePath, pages[2].path);
@@ -120,7 +142,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   await act(async () => { componentReload = onFsChanged({ files: [scan.components[0].path] }); await tick(); });
   assert.equal(reads[7].path, scan.components[0].path, 'an open component is reloaded, not treated as deleted');
   await act(async () => { reads[7].resolve(pageState('card-updated')); await componentReload; await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'card-updated');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('card-updated'));
   assert.equal(__panels.PropsPanel.filePath, scan.components[0].path);
   writeError = new Error('disk full');
   await act(async () => { __panels.PropsPanel.onSetProp('title', { type: 'string', value: 'unsaved card' }); await tick(); });
@@ -133,7 +155,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   await navigate('/second');
   assert.equal(reads[8].path, pages[1].path);
   await act(async () => { reads[8].resolve(pageState('second-retry')); await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'second-retry');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('second-retry'));
   // A relevant page change is followed by an unrelated file change while
   // both scans are pending. The latest scan owns the accumulated paths.
   deferScans = true;
@@ -145,7 +167,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
   await act(async () => { scans[1].resolve(latestScan); await tick(); });
   assert.equal(reads[9].path, pages[1].path, 'the unrelated later event keeps the earlier page change');
   await act(async () => { reads[9].resolve(pageState('after-newest-scan')); await laterScanEvent; await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'after-newest-scan');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('after-newest-scan'));
   // The earlier snapshot says the page was deleted. It must neither replace
   // the panel lists nor clear the recreated page the newer scan already read.
   await act(async () => {
@@ -154,7 +176,7 @@ test('out-of-order page reads and external reads cannot replace the current edit
     await tick();
   });
   assert.equal(__panels.StructurePanel.currentPage.path, pages[1].path);
-  assert.equal(__panels.PropsPanel.node.id, 'after-newest-scan');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('after-newest-scan'));
   assert.deepEqual(__panels.StructurePanel.layouts, latestScan.layouts);
 
   // The same accumulation must span a pending READ, not only its scan.
@@ -165,9 +187,9 @@ test('out-of-order page reads and external reads cannot replace the current edit
   assert.equal(reads[10].path, pages[1].path);
   assert.equal(reads[11].path, pages[1].path);
   await act(async () => { reads[10].resolve(pageState('stale-before-unrelated')); await pendingReadEvent; await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'after-newest-scan');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('after-newest-scan'));
   await act(async () => { reads[11].resolve(pageState('latest-after-unrelated')); await unrelatedEvent; await tick(); });
-  assert.equal(__panels.PropsPanel.node.id, 'latest-after-unrelated');
+  assert.equal(__panels.PropsPanel.node.id, nodeId('latest-after-unrelated'));
   await act(async () => root.unmount());
   dom.window.close();
 });

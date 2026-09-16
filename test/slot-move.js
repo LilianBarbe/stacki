@@ -83,10 +83,10 @@ const check = (what, condition, detail) => {
   );
 
   // --- the move asks -----------------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   const move = app.slice(app.indexOf('const moveNode = useCallback'), app.indexOf('const removeNode = useCallback'));
   check('a move asks about the slot it carries', /keepsSlot\(\{ slotName, host, definition \}\)/.test(move), 'the slot is not reconsidered on a move');
-  check('and drops it when the answer is no', /delete node\.props\.slot/.test(move), 'nothing removes it');
+  check('and drops it when the answer is no', /delete node\.props\['slot'\]/.test(move), 'nothing removes it');
   check(
     'the host is the component it landed in, not the node above it',
     /slotHostOf\(model, nodeId\)/.test(move),

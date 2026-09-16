@@ -93,7 +93,7 @@ const check = (what, condition, detail) => {
   check('and an unmapped click selects the layout that owns it', act(null, page) === 'layout', act(null, page));
 
   // --- the panel asks -----------------------------------------------------------
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check('the canvas handler goes through it', /canvasClickAction\(\{/.test(app));
   check('and passes what the canvas said about the click', /outside: !!info\?\.outside/.test(app));
 

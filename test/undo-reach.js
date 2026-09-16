@@ -3,7 +3,7 @@
 //   node test/undo-reach.js
 //
 // Undo is a menu accelerator, so the key never reaches the page: whatever the
-// handler in App.jsx decides is the only undo there is. It used to decide
+// handler in App.tsx decides is the only undo there is. It used to decide
 //
 //   if (pageStateRef.current.pageState && !cmsOpenRef.current) undo();
 //
@@ -33,7 +33,7 @@ const check = (what, condition, detail) => {
 };
 
 const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
-const app = read('src', 'App.jsx');
+const app = read('src', 'App.tsx');
 const preload = read('dist', 'electron', 'preload.js');
 const main = read('dist', 'electron', 'main.js');
 
@@ -59,12 +59,12 @@ check('and redo', /\bredo\(\);/.test(undoHandler), undoHandler.slice(0, 400));
 
 check(
   'typing gets its own undo back',
-  /if \(inEditable\(\)\) \{\s*window\.avb\.nativeUndo/.test(undoHandler),
+  /if \(inEditable\(\)\) \{\s*runNativeEdit\('undo'\)/.test(undoHandler),
   'a field would lose its undo to the app’s stack'
 );
 check(
   'and its own redo',
-  /if \(inEditable\(\)\) \{\s*window\.avb\.nativeRedo/.test(undoHandler),
+  /if \(inEditable\(\)\) \{\s*runNativeEdit\('redo'\)/.test(undoHandler),
   undoHandler.slice(0, 600)
 );
 // inEditable is what "typing" means here, and it is already used by copy and

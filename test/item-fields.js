@@ -274,7 +274,7 @@ const { posts = [] } = Astro.props;`;
       /className="dp-item-nav" onClick=\{\(e\) => e\.stopPropagation\(\)\}/.test(picker),
       'stepping would choose the item as the binding'
     );
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
     check('the app keeps a place per item name', /itemIndex,\n\s*onStepItem:/.test(app), 'the picker has nothing to step');
     check(
       'and stepping wraps rather than running off either end',

@@ -1,6 +1,6 @@
 # TypeScript migration and contract plan
 
-Status: proposed. Owner: the whole team, eventually. Order matters more than speed.
+Status: completed 2026-09-16. Follow-up hotspot splitting remains architectural work.
 
 ## Why
 
@@ -161,7 +161,7 @@ Exit: contracts compile, parse, and are tested — with no consumer yet.
 - `astroParser.js` returns validated `PageNode` trees; `editorTree.js`
   imports the type and drops its defensive re-checks.
 - `parsePropSchema` output validated as `PropSchema`.
-- Add the unbounded-loop caps found during orientation (`App.jsx` rescan,
+- Add the unbounded-loop caps found during orientation (`App.tsx` rescan,
   `pagePersistence.js` flush) as `LIMITS` entries with assertions.
 
 Exit: every payload crossing process or disk is parsed. This is the moment
@@ -177,8 +177,8 @@ Order by boundary distance, hottest last:
    `dataSuggest`, `bindings`, `arrayValue`.
 3. Electron main handlers + preload (already contract-typed by Phase 2).
 4. React panels and style panel, simplest first.
-5. The four hotspots last and alone, one per commit: `App.jsx` (4.6k lines),
-   `PropsPanel.jsx` (3.8k), `astroParser`'s `parsePropSchema` (334 cx),
+5. The four hotspots last and alone, one per commit: `App.tsx` (4.9k lines),
+   `PropsPanel.tsx` (3.8k), `astroParser`'s `parsePropSchema` (334 cx),
    `ClipPath.tsx` (8.8k lines). Convert types first; split control flow per
    AGENTS.md §11 in follow-up commits.
 
@@ -232,8 +232,9 @@ owed first: the diff-mapping plan's projection concept is `shared/page-node.ts`
 
 ## Definition of done
 
-- [ ] Zero `.js`/`.jsx` in `src/`, `electron/`, `shared/`.
-- [ ] Every boundary input parsed; `LIMITS` enforced and tested.
-- [ ] `tsc --noEmit` + ESLint + tests in `npm test`.
-- [ ] `docs/contracts.md` exists and matches `shared/`.
-- [ ] The four hotspots converted, then split, each with its tests green.
+- [x] Zero `.js`/`.jsx` in `src/`, `electron/`, `shared/`.
+- [x] Every boundary input parsed; `LIMITS` enforced and tested.
+- [x] `tsc --noEmit` + ESLint + tests in `npm test`.
+- [x] `docs/contracts.md` exists and matches `shared/`.
+- [ ] Split the already-TypeScript hotspots under their separate architecture
+      follow-up; conversion and their current tests are complete.

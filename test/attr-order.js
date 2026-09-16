@@ -199,11 +199,11 @@ const INPUT = '<Input variant="first-name" required />';
   check('and renaming to the same name does nothing', renameAttr(node, 'id', 'id') === false, 'it did something');
 }
 
-// The app's rename goes through it — a second copy of the rule in App.jsx would
+// The app's rename goes through it — a second copy of the rule in App.tsx would
 // be a second answer to where a renamed prop lives.
 {
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
-  check('the app renames props through that module', /renameAttr\(node, oldName, newName\)/.test(app), 'App.jsx renames props its own way');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
+  check('the app renames props through that module', /renameAttr\(node, oldName, newName\)/.test(app), 'App.tsx renames props its own way');
 }
 
 // --- what has no order to keep -------------------------------------------------

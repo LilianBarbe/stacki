@@ -21,8 +21,8 @@ interface StylePanelProps {
   readonly onRecordUndo?: HostState['recordUndo'] | undefined;
   readonly onAddClass?: HostState['addClass'] | undefined;
   readonly onSpacingHover?: HostState['onSpacingHover'] | undefined;
-  readonly renderedClasses?: string[] | undefined;
-  readonly projectClasses?: string[] | undefined;
+  readonly renderedClasses?: readonly string[] | undefined;
+  readonly projectClasses?: readonly string[] | undefined;
   readonly historyTick?: number;
   readonly openFilePath?: string | null;
 }
@@ -108,8 +108,8 @@ function hostState(
     recordUndo: props.onRecordUndo ?? null,
     addClass: props.onAddClass ?? null,
     onSpacingHover: props.onSpacingHover ?? null,
-    renderedClasses: props.renderedClasses ?? [],
-    projectClasses: props.projectClasses ?? [],
+    renderedClasses: [...(props.renderedClasses ?? [])],
+    projectClasses: [...(props.projectClasses ?? [])],
     historyTick: props.historyTick ?? 0,
   };
 }

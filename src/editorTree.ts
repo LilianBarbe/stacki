@@ -1,24 +1,33 @@
 // Read-only tree queries. Mutation code uses the live readers; rendering builds
 // one index per immutable model so hovering and selecting never rescan it.
 
-import type { PageNode } from '../shared/page-node';
+import type { Attr, PageNode } from '../shared/page-node';
 
-interface TreeEntry {
-  node: PageNode;
-  list: readonly PageNode[];
+interface TreeNodeLike<Node> {
+  readonly id: string;
+  readonly kind: string;
+  readonly children?: readonly Node[] | null;
+  readonly props?: Readonly<Record<string, Attr>>;
+}
+
+interface TreeEntry<Node extends TreeNodeLike<Node> = PageNode> {
+  node: Node;
+  list: readonly Node[];
   index: number;
-  parent: TreeEntry | null;
+  parent: TreeEntry<Node> | null;
   path?: string;
 }
 
-interface Frame {
-  list: readonly PageNode[];
+interface Frame<Node extends TreeNodeLike<Node> = PageNode> {
+  list: readonly Node[];
   index: number;
-  parent: TreeEntry | null;
+  parent: TreeEntry<Node> | null;
 }
 
-function* entries(nodes: readonly PageNode[] | null | undefined): Generator<TreeEntry> {
-  const stack: Frame[] = [{ list: nodes ?? [], index: 0, parent: null }];
+function* entries<Node extends TreeNodeLike<Node>>(
+  nodes: readonly Node[] | null | undefined,
+): Generator<TreeEntry<Node>> {
+  const stack: Frame<Node>[] = [{ list: nodes ?? [], index: 0, parent: null }];
   while (stack.length) {
     const frame = stack[stack.length - 1];
     if (frame === undefined) {
@@ -33,7 +42,7 @@ function* entries(nodes: readonly PageNode[] | null | undefined): Generator<Tree
     if (node === undefined) {
       continue;
     }
-    const entry: TreeEntry = { node, list: frame.list, index, parent: frame.parent };
+    const entry: TreeEntry<Node> = { node, list: frame.list, index, parent: frame.parent };
     yield entry;
     if ('children' in node && Array.isArray(node.children) && node.children.length) {
       stack.push({ list: node.children, index: 0, parent: entry });
@@ -41,7 +50,10 @@ function* entries(nodes: readonly PageNode[] | null | undefined): Generator<Tree
   }
 }
 
-function findEntry(nodes: readonly PageNode[] | null | undefined, id: string): TreeEntry | null {
+function findEntry<Node extends TreeNodeLike<Node>>(
+  nodes: readonly Node[] | null | undefined,
+  id: string,
+): TreeEntry<Node> | null {
   for (const entry of entries(nodes)) {
     if (entry.node.id === id) {
       return entry;
@@ -50,25 +62,36 @@ function findEntry(nodes: readonly PageNode[] | null | undefined, id: string): T
   return null;
 }
 
-function trailOf<T>(entry: TreeEntry | null, pick: (entry: TreeEntry) => T): T[] | null {
+function trailOf<Node extends TreeNodeLike<Node>, Value>(
+  entry: TreeEntry<Node> | null,
+  pick: (entry: TreeEntry<Node>) => Value,
+): Value[] | null {
   if (!entry) {
     return null;
   }
-  const trail: T[] = [];
-  for (let current: TreeEntry | null = entry; current; current = current.parent) {
+  const trail: Value[] = [];
+  for (let current: TreeEntry<Node> | null = entry; current; current = current.parent) {
     trail.push(pick(current));
   }
   return trail.reverse();
 }
 
-export const findNodeById = (nodes: readonly PageNode[] | null | undefined, id: string): PageNode | null =>
-  findEntry(nodes, id)?.node || null;
-export const findParentNode = (nodes: readonly PageNode[] | null | undefined, id: string): PageNode | null =>
-  findEntry(nodes, id)?.parent?.node || null;
-export const pathOfNode = (nodes: readonly PageNode[] | null | undefined, id: string): number[] | null =>
-  trailOf(findEntry(nodes, id), (entry) => entry.index);
-export const ancestorChain = (nodes: readonly PageNode[] | null | undefined, id: string): PageNode[] | null =>
-  trailOf(findEntry(nodes, id), (entry) => entry.node);
+export const findNodeById = <Node extends TreeNodeLike<Node>>(
+  nodes: readonly Node[] | null | undefined,
+  id: string,
+): Node | null => findEntry(nodes, id)?.node || null;
+export const findParentNode = <Node extends TreeNodeLike<Node>>(
+  nodes: readonly Node[] | null | undefined,
+  id: string,
+): Node | null => findEntry(nodes, id)?.parent?.node || null;
+export const pathOfNode = <Node extends TreeNodeLike<Node>>(
+  nodes: readonly Node[] | null | undefined,
+  id: string,
+): number[] | null => trailOf(findEntry(nodes, id), (entry) => entry.index);
+export const ancestorChain = <Node extends TreeNodeLike<Node>>(
+  nodes: readonly Node[] | null | undefined,
+  id: string,
+): Node[] | null => trailOf(findEntry(nodes, id), (entry) => entry.node);
 
 export function findParentList(
   model: { readonly nodes: readonly PageNode[] },
@@ -83,9 +106,12 @@ export function isDescendantOf(candidateParent: PageNode, id: string): boolean {
   return candidateParent.id === id || !!findNodeById(children, id);
 }
 
-export function nodeAtPath(nodes: readonly PageNode[] | null | undefined, trail: readonly number[]): PageNode | null {
+export function nodeAtPath<Node extends TreeNodeLike<Node>>(
+  nodes: readonly Node[] | null | undefined,
+  trail: readonly number[],
+): Node | null {
   let list = nodes;
-  let node: PageNode | null = null;
+  let node: Node | null = null;
   for (const i of trail) {
     node = list?.[i] ?? null;
     if (!node) {
@@ -96,19 +122,21 @@ export function nodeAtPath(nodes: readonly PageNode[] | null | undefined, trail:
   return node;
 }
 
-interface TreeIndex {
-  readonly byId: Map<string, TreeEntry>;
-  readonly byPath: Map<string, PageNode>;
+interface TreeIndex<Node extends TreeNodeLike<Node> = PageNode> {
+  readonly byId: Map<string, TreeEntry<Node>>;
+  readonly byPath: Map<string, Node>;
   readonly sectionIds: string[];
-  node(id: string): PageNode | null;
-  parent(id: string): PageNode | null;
+  node(id: string): Node | null;
+  parent(id: string): Node | null;
   path(id: string): string | null;
-  ancestors(id: string): PageNode[] | null;
+  ancestors(id: string): Node[] | null;
 }
 
-export function createTreeIndex(nodes: readonly PageNode[]): TreeIndex {
-  const byId = new Map<string, TreeEntry>();
-  const byPath = new Map<string, PageNode>();
+export function createTreeIndex<Node extends TreeNodeLike<Node>>(
+  nodes: readonly Node[] | null | undefined,
+): TreeIndex<Node> {
+  const byId = new Map<string, TreeEntry<Node>>();
+  const byPath = new Map<string, Node>();
   const sectionIds: string[] = [];
   for (const entry of entries(nodes)) {
     entry.path = entry.parent ? `${entry.parent.path}.${entry.index}` : String(entry.index);

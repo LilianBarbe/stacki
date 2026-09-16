@@ -10,7 +10,7 @@ interface InsertItem {
   readonly tag?: string;
   readonly name?: string;
 }
-interface InsertTarget {
+export interface InsertTarget {
   readonly parentId: string | null;
   readonly index: number;
 }
@@ -19,7 +19,7 @@ import { canContainTag, VOID_TAGS } from './elementSchemas.js';
 // Where a new node goes: inside the selection when it accepts children,
 // otherwise right after it; with no selection, at the end of the page.
 //
-// Lives here rather than in App.jsx because the rule is the whole answer to a
+// Lives here rather than in App.tsx because the rule is the whole answer to a
 // question users ask constantly — "why did that land NEXT to the section
 // instead of in it?" — and the answer turns on things no glance at the panel
 // can confirm: what a component renders as, and whether it takes default slot

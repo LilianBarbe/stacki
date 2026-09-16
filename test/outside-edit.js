@@ -147,10 +147,10 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
     'an outside edit batched with an app write loses the flag'
   );
 
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
   check(
     'the app tells the canvas about an outside edit',
-    /if \(d\?\.external\) \{tellCanvas\(\{ type: 'avb:patch-now' \}\);\}/.test(app),
+    /if \(event\.external\) \{tellCanvas\(\{ type: 'avb:patch-now' \}\);\}/.test(app),
     'nothing reaches the canvas when the socket is quiet'
   );
   const morph = fs.readFileSync(

@@ -5,7 +5,7 @@
 declare const brand: unique symbol;
 export type Brand<T, B> = T & { readonly [brand]: B };
 
-/** A page-tree node id: `n<digits>` for parser-assigned ids, plus the two
+/** A page-tree node id: `n<digits>` for Astro nodes, `m<digits>` for Markdown, plus the two
  * well-known ids the app itself assigns — 'layout' (the detected page wrapper)
  * and `chunk<N>` (a serialization chunk group). */
 export type NodeId = Brand<string, 'NodeId'>;
@@ -18,11 +18,13 @@ export type FilePath = Brand<string, 'FilePath'>;
  * scan request can never be pointed at a stray file path. */
 export type ProjectPath = Brand<string, 'ProjectPath'>;
 
-const NODE_ID_RE = /^(?:n\d+|layout|chunk\d+)$/;
+const NODE_ID_RE = /^(?:[nmc]\d+|layout|chunk\d+)$/;
 
 export function toNodeId(value: string): NodeId {
   if (!NODE_ID_RE.test(value)) {
-    throw new Error(`NodeId: expected 'n<N>', 'layout', or 'chunk<N>', got ${JSON.stringify(value)}`);
+    throw new Error(
+      `NodeId: expected 'n<N>', 'm<N>', 'c<N>', 'layout', or 'chunk<N>', got ${JSON.stringify(value)}`,
+    );
   }
   return value as NodeId;
 }

@@ -7,8 +7,10 @@ import { assert } from '../shared/assert.js';
 import type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter.js';
 export type { ImportMember, ImportSlot, FrontmatterLayout } from '../shared/frontmatter.js';
 
-export interface FrontmatterModel {
-  readonly imports: readonly ImportMember[];
+type SerializableImport = Omit<ImportMember, 'at'> & { readonly at?: number };
+
+export interface FrontmatterModel<Import extends SerializableImport = ImportMember> {
+  readonly imports: readonly Import[];
   readonly frontmatterLead: string;
   readonly extraFrontmatter: string;
   readonly extraFrontmatterSpaced: boolean;
@@ -178,19 +180,27 @@ function readFrontmatter(source = ''): FrontmatterModel {
   };
 }
 
-const sameImport = (a: ImportMember, b: ImportMember, specFor?: (imp: ImportMember) => string): boolean =>
+const sameImport = <Import extends SerializableImport>(
+  a: Import,
+  b: SerializableImport,
+  specFor?: (imp: Import) => string,
+): boolean =>
   a.name === b.name && (specFor ? specFor(a) : a.path) === b.path &&
   a.quote === b.quote && !!a.named === !!b.named &&
   a.imported === b.imported && !!a.typeOnly === !!b.typeOnly;
 
-interface ImportGroup {
-  members: ImportMember[];
+interface ImportGroup<Import extends SerializableImport> {
+  members: Import[];
   specifier: string;
 }
 
-function importLines(imports: readonly ImportMember[], specFor?: (imp: ImportMember) => string, tail = ';'): string[] {
-  const groups: ImportGroup[] = [];
-  const named = new Map<string, ImportGroup>();
+function importLines<Import extends SerializableImport>(
+  imports: readonly Import[],
+  specFor?: (imp: Import) => string,
+  tail = ';',
+): string[] {
+  const groups: ImportGroup<Import>[] = [];
+  const named = new Map<string, ImportGroup<Import>>();
   for (const imp of imports) {
     const specifier = specFor ? specFor(imp) : imp.path;
     if (!imp.named) {
@@ -356,7 +366,10 @@ function safeImportOffsets(text: string, offsets: readonly number[]): number[] {
   return safe;
 }
 
-function writeFrontmatter(model: FrontmatterModel, specFor?: (imp: ImportMember) => string): string {
+function writeFrontmatter<Import extends SerializableImport>(
+  model: FrontmatterModel<Import>,
+  specFor?: (imp: Import) => string,
+): string {
   const layout = model.frontmatterLayout;
   if (!layout) {
     const lines: string[] = [];
@@ -372,10 +385,10 @@ function writeFrontmatter(model: FrontmatterModel, specFor?: (imp: ImportMember)
     }
     return lines.join('\n');
   }
-  const groups = new Map<number, ImportMember[]>(layout.slots.map((slot) => [slot.at, []]));
-  const added: ImportMember[] = [];
+  const groups = new Map<number, Import[]>(layout.slots.map((slot) => [slot.at, []]));
+  const added: Import[] = [];
   for (const imp of model.imports || []) {
-    const group = groups.get(imp.at);
+    const group = imp.at === undefined ? undefined : groups.get(imp.at);
     if (group) {
       group.push(imp);
     } else {
@@ -384,7 +397,7 @@ function writeFrontmatter(model: FrontmatterModel, specFor?: (imp: ImportMember)
   }
   // A newly used named export can join its existing declaration. Separate
   // declarations already in the source keep their individual positions.
-  const additions: ImportMember[] = [];
+  const additions: Import[] = [];
   for (const imp of added) {
     const slot = imp.named && layout.slots.find((s) => (groups.get(s.at) ?? []).some((g) => g.named && g.path === imp.path));
     if (slot) {

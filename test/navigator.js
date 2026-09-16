@@ -323,7 +323,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
   // A condition dropped from the palette starts as the one thing it is: a
   // test and what it shows. The else is a switch in the props panel.
   {
-    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
+    const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.tsx'), 'utf8');
     const insert = app.slice(app.indexOf("item.type === 'cond'"), app.indexOf("item.type === 'comment'"));
     check("a new condition is `test && (…)`", /op: '&&'/.test(insert), insert.slice(0, 400));
     check('with one branch in it', (insert.match(/kind: 'branch'/g) || []).length === 1, insert.slice(0, 400));
