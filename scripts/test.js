@@ -24,14 +24,14 @@ const TEST_DIR = path.join(__dirname, '..', 'test');
 
 // A few files need a different launcher than plain `node file`:
 //  - *.test.js are node:test suites and want the test runner's reporter
-//  - thumbs.js exercises Electron's nativeImage, so it needs the real binary
+//  - thumbs.js and canvas-height.js need Electron's real rendering engine
 // Everything else runs as a plain script; the --disable-warning flag keeps
 // the typeless-package.json warning out of a hundred captured outputs.
 function commandFor(file) {
   if (file.endsWith('.test.js')) {
     return [process.execPath, ['--test', path.join('test', file)]];
   }
-  if (file === 'thumbs.js') {
+  if (file === 'thumbs.js' || file === 'canvas-height.js') {
     return [require('electron'), [path.join('test', file)]];
   }
   return [

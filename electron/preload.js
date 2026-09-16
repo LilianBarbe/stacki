@@ -183,118 +183,65 @@ if (!process.isMainFrame) {
     }
   };
 
-  // Canvas frames stretch to the full page height, which would make vh units
-  // (viewport = iframe) track the frame instead of a screen — a 100vh hero
-  // would fill the whole frame and the measured height would chase its own
-  // tail (every breakpoint converging to the same height). The app posts
-  // `avb:set-vh` with the breakpoint's real viewport height; we freeze vh by
-  // copying every rule that uses vh units into an override stylesheet with
-  // `Xvh` → `calc(X * var(--avb-vh))`, where --avb-vh is 1% of that height.
-  const VH_RE = /(-?\d*\.?\d+)(vh|svh|lvh|dvh)\b/g;
-  const FIXED_RE = /position:\s*fixed/g;
+  // Canvas frames stretch to the full page height. Freeze viewport units in
+  // place: an override in <head> loses to styles in <body> and inline styles,
+  // leaving a 100vh hero to grow again every time its frame grows. Editing
+  // CSSOM declarations also preserves source order, layers and media queries.
+  // This only touches the canvas document, never the project's source files.
+  const VH_RE = /(-?\d*\.?\d+)(vh|svh|lvh|dvh)\b/gi;
   let overrideEl = null;
   let rewriteTimer = null;
-
-  // Copies ONLY the declarations that need freezing (vh units, position:
-  // fixed) into the override — never whole rule bodies. Re-asserting entire
-  // rules at the end of the cascade would let base rules beat utility
-  // classes that legitimately override them later in source order.
-  const filterRule = (rule) => {
-    // An @import brings a whole stylesheet in, and its rules hang off
-    // `rule.styleSheet`, not `rule.cssRules` — so a sheet reached this way was
-    // invisible here. That's where a design system's `body { min-height:
-    // 100svh }` usually lives, and leaving it live is what makes a stretched
-    // canvas frame grow without end: svh tracks the frame, body grows, the
-    // page reports a taller height, the frame stretches again.
-    if (rule.type === 3 /* CSSImportRule */ || rule.styleSheet) {
-      // Still loading: nothing to copy yet, and no <head> mutation will
-      // announce it later, so ask for another pass.
-      if (!rule.styleSheet) {
-        importsPending = true;
-        return '';
-      }
-      let inner = '';
-      try {
-        for (const r of rule.styleSheet.cssRules) inner += filterRule(r);
-      } catch {
-        return ''; // cross-origin import — can't read it
-      }
-      if (!inner) return '';
-      // Keep whatever layer it was imported into, or the copy would outrank
-      // (or be outranked by) the original.
-      const layer = /\blayer\(([^)]*)\)/i.exec(rule.cssText || '');
-      return layer ? `@layer ${layer[1].trim()} {\n${inner}}\n` : inner;
-    }
-    const selector = rule.selectorText || rule.keyText;
-    const isStyleRule = !!rule.style && !!selector;
-    if (rule.cssRules && rule.cssRules.length && !isStyleRule) {
-      // Grouping rule (@media, @supports, @layer, @keyframes …) — recurse.
-      let inner = '';
-      for (const r of rule.cssRules) inner += filterRule(r);
-      if (!inner) return '';
-      const head = rule.cssText.slice(0, rule.cssText.indexOf('{'));
-      return head + '{\n' + inner + '}\n';
-    }
-    if (!isStyleRule) return '';
-    // With CSS nesting a style rule is BOTH: it has its own declarations and
-    // it contains rules. Taking the grouping branch above on the strength of
-    // `cssRules` alone skipped everything the rule itself declared — which is
-    // exactly where `body { min-height: 100svh; > main { … } }` hides, and why
-    // a frame with that in its stylesheet grew without end.
-    let nested = '';
-    if (rule.cssRules && rule.cssRules.length) {
-      for (const r of rule.cssRules) nested += filterRule(r);
-    }
-    let decls = '';
-    for (const prop of rule.style) {
-      const val = rule.style.getPropertyValue(prop);
-      const prio = rule.style.getPropertyPriority(prop);
-      VH_RE.lastIndex = 0;
-      const hasVh = VH_RE.test(val);
-      const isFixed = prop === 'position' && /fixed/.test(val);
-      if (!hasVh && !isFixed) continue;
-      VH_RE.lastIndex = 0;
-      // position:fixed anchors to the stretched frame, so it becomes
-      // absolute — headers/overlays sit at their page position instead of
-      // floating mid-frame.
-      const newVal = isFixed
-        ? 'absolute'
-        : val.replace(VH_RE, 'calc($1 * var(--avb-vh, 1$2))');
-      decls += `${prop}: ${newVal}${prio ? ' !important' : ''}; `;
-    }
-    // Nested matches are re-emitted inside their parent, keeping the nesting
-    // (and so the `&` context) they were written with.
-    if (!decls && !nested) return '';
-    return `${selector} { ${decls}${nested ? '\n' + nested : ''}}\n`;
-  };
-
   let importsPending = false;
   let importRetries = 0;
+
+  const freezeDeclarations = (style) => {
+    if (!style) return;
+    for (const prop of Array.from(style)) {
+      const value = style.getPropertyValue(prop);
+      // No vh fallback: subsequent passes must not rewrite our own output.
+      const next = prop === 'position' && value === 'fixed'
+        ? 'absolute'
+        : value.replace(VH_RE, 'calc($1 * var(--avb-vh))');
+      if (next !== value) style.setProperty(prop, next, style.getPropertyPriority(prop));
+    }
+  };
+
+  const freezeRules = (rules) => {
+    for (const rule of rules) {
+      if (rule.type === 3 /* CSSImportRule */) {
+        try {
+          if (rule.styleSheet) freezeRules(rule.styleSheet.cssRules);
+          else importsPending = true;
+        } catch {
+          // Cross-origin imports cannot be read through CSSOM.
+        }
+        continue;
+      }
+      freezeDeclarations(rule.style);
+      // Includes nested style rules and @media/@supports/@layer/@keyframes.
+      if (rule.cssRules) freezeRules(rule.cssRules);
+    }
+  };
+
   const rewriteSheets = () => {
     if (!document.head) return;
     importsPending = false;
-    // Un-stretch html/body so the frame's height comes from content, not
-    // from the (stretched) viewport — kills height:100% feedback.
-    let css = 'html, body { height: auto !important; }\n';
     for (const sheet of document.styleSheets) {
       if (sheet.ownerNode === overrideEl) continue;
-      let rules;
       try {
-        rules = sheet.cssRules;
+        freezeRules(sheet.cssRules);
       } catch {
-        continue; // cross-origin stylesheet — can't read, leave it be
+        // Cross-origin stylesheets cannot be read through CSSOM.
       }
-      for (const rule of rules) css += filterRule(rule);
     }
+    for (const el of document.querySelectorAll('[style]')) freezeDeclarations(el.style);
     if (!overrideEl) {
       overrideEl = document.createElement('style');
       overrideEl.id = 'avb-vh-override';
+      // Un-stretch the roots so height:100% cannot feed back into the frame.
+      overrideEl.textContent = 'html, body { height: auto !important; }';
     }
-    if (overrideEl.textContent !== css) overrideEl.textContent = css;
     if (document.head.lastElementChild !== overrideEl) document.head.appendChild(overrideEl);
-    // An @import that hadn't finished loading has rules we still need, and it
-    // won't touch <head> when it arrives — so nothing else would bring us
-    // back. Try again shortly, a bounded number of times.
     if (importsPending && importRetries < 25) {
       importRetries += 1;
       setTimeout(rewriteSheets, 120);
@@ -1835,7 +1782,7 @@ if (!process.isMainFrame) {
     if (d?.type === 'avb:scroll-to' && typeof d.path === 'string') {
       scrollPathIntoView(d.path, typeof d.occ === 'number' ? d.occ : 0);
     }
-    if (d?.type === 'avb:set-vh' && typeof d.px === 'number') {
+    if (d?.type === 'avb:set-vh' && Number.isFinite(d.px) && d.px > 0) {
       document.documentElement.style.setProperty('--avb-vh', d.px / 100 + 'px');
       if (!frozen) {
         frozen = true;
@@ -1843,12 +1790,21 @@ if (!process.isMainFrame) {
         // Subresources — @import among them — are done by `load`, so take one
         // more pass then even if the retries above have run out.
         window.addEventListener('load', scheduleRewrite);
-        // Vite HMR injects/replaces <style> tags — keep the override current
-        // (and last in the cascade).
-        new MutationObserver(scheduleRewrite).observe(document.head || document.documentElement, {
+        // HMR and page scripts can add styles anywhere, including inline.
+        // Ignore our own unchanged declarations and override stylesheet.
+        new MutationObserver((records) => {
+          if (records.some((record) => record.target !== overrideEl &&
+            !overrideEl?.contains(record.target))) scheduleRewrite();
+        }).observe(document.documentElement, {
           childList: true,
           subtree: true,
+          attributes: true,
+          attributeFilter: ['style', 'href', 'media', 'disabled'],
+          characterData: true,
         });
+        document.addEventListener('load', (e) => {
+          if (e.target.tagName === 'LINK') scheduleRewrite();
+        }, true);
       }
       report();
     }
