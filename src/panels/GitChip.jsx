@@ -1,3 +1,5 @@
+import SwitchBranchModal from './SwitchBranchModal';
+import {repoSlug, webUrl, useGitHubStatus} from './gitPublish';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { cleanError } from '../cleanError.js';
 import { BranchIcon, CheckIcon, ExternalIcon, CloseIcon, MergeIcon, TrashIcon } from '../ui/Icons.jsx';
@@ -7,16 +9,6 @@ import Code from '../ui/Code.jsx';
 import FileBrowser from '../ui/FileBrowser.jsx';
 import BranchActions from '../ui/BranchActions.jsx';
 import useDismiss from '../ui/useDismiss.js';
-
-// owner/repo out of any GitHub remote form (https or ssh), for display.
-const repoSlug = (url) => {
-  const m = String(url || '').match(/github\.com[:/]+([^/]+\/[^/]+?)(?:\.git)?$/i);
-  return m ? m[1] : url;
-};
-const webUrl = (url) => {
-  const slug = repoSlug(url);
-  return slug && slug !== url ? `https://github.com/${slug}` : url;
-};
 
 // Branch/status chip in the title bar. Opens a dropdown with branch
 // switching, branch creation, commit + push, and GitHub publishing.
@@ -540,6 +532,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
 
       {showPublish && (
         <PublishModal
+          projectPath={project.path}
           defaultName={project.name}
           branch={info.branch}
           onClose={() => setShowPublish(false)}
@@ -810,108 +803,17 @@ function MergeConflictModal({ conflict, busy, onCancel, onResolve }) {
   );
 }
 
-// Shown when a branch switch would drag uncommitted work along. Deliberately
-// has no default action: taking changes with you and leaving them behind are
-// both reasonable, and picking one silently is how the edits ended up on the
-// wrong branch in the first place.
-function SwitchBranchModal({ from, to, files, busy, onCancel, onLeaveHere, onCommitFirst }) {
-  const [message, setMessage] = useState('');
-  const working = !!busy;
-  const shown = files.slice(0, 5);
-  const rest = files.length - shown.length;
-
-  return (
-    <div
-      className="modal-overlay"
-      onMouseDown={(e) => e.target === e.currentTarget && !working && onCancel()}
-    >
-      <div className="modal">
-        <div className="modal-header">These changes can’t come with you</div>
-        <div className="modal-body">
-          <div className="hint-text">
-            {from} and {to} have different versions of{' '}
-            {files.length === 1 ? 'this file' : 'these files'}, so your unsaved work can’t
-            follow you across. It can wait here until you come back — no commit needed.
-          </div>
-
-          {shown.length > 0 && (
-            <ul className="dirty-files">
-              {shown.map((f) => (
-                <li key={f}>{f}</li>
-              ))}
-              {rest > 0 && <li className="more">+{rest} more</li>}
-            </ul>
-          )}
-
-          <div>
-            <label>Or commit them first</label>
-            <input
-              autoFocus
-              placeholder={`Update ${from}`}
-              value={message}
-              disabled={working}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !working) {onCommitFirst(message.trim() || `Update ${from}`);}
-              }}
-            />
-          </div>
-
-          {working && (
-            <div className="publish-progress">
-              <span className="mini-spinner" />
-              <span>{busy}</span>
-            </div>
-          )}
-        </div>
-        <div className="modal-footer">
-          <button onClick={onCancel} disabled={working}>
-            Cancel
-          </button>
-          <button
-            onClick={() => onCommitFirst(message.trim() || `Update ${from}`)}
-            disabled={working}
-            title={`Commit to ${from}, then switch`}
-          >
-            Commit first
-          </button>
-          <button
-            className="primary"
-            disabled={working}
-            onClick={onLeaveHere}
-            title={`Set them aside on ${from} and pick them up when you return`}
-          >
-            Leave them on {from}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PublishModal({ defaultName, branch, onClose, onPublish, openExternal }) {
+function PublishModal({ projectPath, defaultName, branch, onClose, onPublish, openExternal }) {
   const [name, setName] = useState(
     defaultName.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
   );
   const [isPrivate, setIsPrivate] = useState(true);
-  const [gh, setGh] = useState(null); // null = still checking
+  const preflight = useGitHubStatus(projectPath);
+  const gh = preflight.kind === 'ready' ? preflight.status : null;
   const [phase, setPhase] = useState('form'); // form | publishing | done
   const [step, setStep] = useState('');
   const [error, setError] = useState(null);
   const [url, setUrl] = useState(null);
-
-  // Preflight, so a missing or logged-out gh is visible before the user
-  // bothers filling anything in.
-  useEffect(() => {
-    let alive = true;
-    window.avb
-      .ghStatus()
-      .then((s) => alive && setGh(s))
-      .catch(() => alive && setGh({ installed: false, authed: false }));
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   const publishing = phase === 'publishing';
   const ready = gh?.installed && gh?.authed;
@@ -992,7 +894,8 @@ function PublishModal({ defaultName, branch, onClose, onPublish, openExternal })
                 Private repository
               </label>
 
-              {gh === null && <div className="hint-text">Checking GitHub CLI…</div>}
+              {preflight.kind === 'loading' && <div className="hint-text">Checking GitHub CLI…</div>}
+              {preflight.kind === 'error' && <div className="error-text">{preflight.error}</div>}
 
               {gh && !gh.installed && (
                 <div className="error-text">

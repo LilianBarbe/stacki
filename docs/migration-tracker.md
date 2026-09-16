@@ -378,6 +378,16 @@ races, queued edits during undo, failures, bounds, and nested schema changes.
 The full gate passes 138/138 commands (101.9s); new modules typecheck and lint
 without warnings. Fourteen original panels remain; continue with GitChip.
 
+GitChip dialog checkpoint: `SwitchBranchModal.tsx` types the dirty-tree decision
+and bounds its file list and commit input. `gitPublish.ts` parses GitHub CLI
+status, owns preflight lifetime, and types remote-link formatting. The publish
+dialog now supplies the project path required by `git:ghStatus`; the missing
+argument previously made a usable CLI appear unavailable. Tests cover each
+status, malformed/bounded data, project changes, transport failure, and unmount.
+All 50 old/new dialog/remote comparisons match. The full gate passes 138/138
+commands (101.8s); new modules lint without warnings. Continue GitChip's merge
+conflict model, publish state, and remaining actions/root.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -451,9 +461,9 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 138/138 (100.5s), exit 0. No quarantined tests remain.
+- Gate green at last run: 138/138 (101.8s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
-- Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
+- Contract suite: 156/156. Full-repository lint has 156 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.
 - Healed out of quarantine during Phase 3 (verified two consecutive direct
   runs each, then removed per the gate's own heal report): binding, chipedit,

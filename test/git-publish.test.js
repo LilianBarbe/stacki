@@ -1,0 +1,141 @@
+// Validate GitHub preflight replies, then mount the actual publish dialog with
+// deferred IPC. The project path must reach the contract, and an obsolete project
+// or unmounted dialog must never receive a stale authentication result.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { buildSync } = require('esbuild');
+const { JSDOM } = require('jsdom');
+const { parseGitHubStatus, readGitHubStatus, repoSlug, webUrl } =
+  require('./renderer-module')('panels/gitPublish.ts');
+
+test('GitHub preflight parses each state and rejects impossible or oversized data', async () => {
+  for (const status of [
+    { installed: false, authed: false },
+    { installed: true, authed: false },
+    { installed: true, authed: true, user: null },
+    { installed: true, authed: true, user: 'user' },
+  ]) {
+    assert.deepEqual(parseGitHubStatus(status), status);
+  }
+  for (const status of [
+    null,
+    {},
+    { installed: false, authed: true },
+    { installed: true, authed: true },
+    { installed: 1, authed: false },
+    { installed: true, authed: true, user: 'x'.repeat(5 * 1024 * 1024 + 1) },
+  ]) {
+    assert.throws(() => parseGitHubStatus(status));
+  }
+  let project;
+  global.window = {
+    avb: {
+      ghStatus: async (value) => {
+        project = value;
+        return { installed: true, authed: true, user: 'person' };
+      },
+    },
+  };
+  assert.equal((await readGitHubStatus('/project')).ok, true);
+  assert.equal(project, '/project');
+  window.avb.ghStatus = async () => {
+    throw new Error('bridge unavailable');
+  };
+  assert.deepEqual(await readGitHubStatus('/project'), { ok: false, error: 'bridge unavailable' });
+  window.avb.ghStatus = async () => ({});
+  await assert.rejects(readGitHubStatus('/project'), /Expected boolean/);
+  await assert.rejects(readGitHubStatus('x'.repeat(32769)), /Path exceeds limit/);
+  assert.equal(repoSlug('git@github.com:owner/repo.git'), 'owner/repo');
+  assert.equal(webUrl('git@github.com:owner/repo.git'), 'https://github.com/owner/repo');
+  assert.equal(webUrl('https://example.com/repo'), 'https://example.com/repo');
+});
+
+test('publish dialog passes its project to preflight and ignores old replies', async () => {
+  const output = path.join(__dirname, '../node_modules/.stacki-test/git-publish.cjs');
+  fs.mkdirSync(path.dirname(output), { recursive: true });
+  const source = fs.readFileSync(path.join(__dirname, '../src/panels/GitChip.jsx'), 'utf8');
+  buildSync({
+    stdin: {
+      contents: source + '\nexport {PublishModal, SwitchBranchModal};',
+      loader: 'jsx',
+      resolveDir: path.join(__dirname, '../src/panels'),
+    },
+    outfile: output,
+    bundle: true,
+    format: 'cjs',
+    platform: 'node',
+    jsx: 'automatic',
+    external: ['react', 'react-dom', 'react/jsx-runtime'],
+    logLevel: 'silent',
+  });
+  const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true });
+  global.window = dom.window;
+  global.document = dom.window.document;
+  global.navigator = dom.window.navigator;
+  global.IS_REACT_ACT_ENVIRONMENT = true;
+  const reads = [];
+  window.avb = {
+    ghStatus: (project) =>
+      new Promise((resolve, reject) => reads.push({ project, resolve, reject })),
+  };
+  const React = require('react');
+  const { act } = React;
+  const { createRoot } = require('react-dom/client');
+  const { PublishModal, SwitchBranchModal } = require(output);
+  const root = createRoot(document.getElementById('root'));
+  const show = (projectPath) =>
+    act(async () =>
+      root.render(
+        React.createElement(PublishModal, {
+          projectPath,
+          defaultName: 'My project',
+          branch: 'main',
+          onClose() {},
+          onPublish() {},
+          openExternal() {},
+        }),
+      ),
+    );
+  try {
+    await show('/first');
+    assert.equal(reads[0].project, '/first');
+    assert.match(document.body.textContent, /Checking GitHub CLI/);
+    await show('/second');
+    assert.equal(reads[1].project, '/second');
+    await act(async () =>
+      reads[1].resolve({ installed: true, authed: true, user: 'current-user' }),
+    );
+    await act(async () => reads[0].resolve({ installed: false, authed: false }));
+    assert.match(document.body.textContent, /current-user/);
+    assert.equal(document.querySelector('.modal-footer .primary').disabled, false);
+    await show('/third');
+    await act(async () => reads[2].reject(new Error('cannot inspect CLI')));
+    assert.match(document.querySelector('.error-text').textContent, /cannot inspect CLI/);
+    assert.equal(document.querySelector('.modal-footer .primary').disabled, true);
+    await show('/fourth');
+    await act(async () => root.unmount());
+    await act(async () => reads[3].resolve({ installed: true, authed: true, user: 'late-user' }));
+    assert.equal(document.getElementById('root').textContent, '');
+    const { renderToStaticMarkup } = require('react-dom/server');
+    assert.throws(
+      () =>
+        renderToStaticMarkup(
+          React.createElement(SwitchBranchModal, {
+            from: 'main',
+            to: 'topic',
+            files: Array(100001).fill('a'),
+            busy: null,
+            onCancel() {},
+            onLeaveHere() {},
+            onCommitFirst() {},
+          }),
+        ),
+      /Branch switch: file limit exceeded/,
+    );
+  } finally {
+    await act(async () => root.unmount());
+    dom.window.close();
+  }
+});
