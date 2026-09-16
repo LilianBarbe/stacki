@@ -1,9 +1,18 @@
 import MergeConflictModal from './MergeConflictModal';
 import SwitchBranchModal from './SwitchBranchModal';
-import {repoSlug, webUrl, useGitHubStatus} from './gitPublish';
+import { repoSlug, webUrl } from './gitPublish';
+import PublishModal from './PublishModal';
+import { publishGitProject } from './gitPublishWorkflow';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { cleanError } from '../cleanError.js';
-import { BranchIcon, CheckIcon, ExternalIcon, CloseIcon, MergeIcon, TrashIcon } from '../ui/Icons.jsx';
+import {
+  BranchIcon,
+  CheckIcon,
+  ExternalIcon,
+  CloseIcon,
+  MergeIcon,
+  TrashIcon,
+} from '../ui/Icons.jsx';
 import { branchNameError, sanitizeBranchName } from '../branchName.js';
 import { mergeBranchAction, deleteBranchAction, tidyUp } from '../gitActions.js';
 import Code from '../ui/Code.jsx';
@@ -52,13 +61,15 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
   useDismiss(
     wrapRef,
     open,
-    useCallback(() => setOpen(false), [])
+    useCallback(() => setOpen(false), []),
   );
 
   // The full list, not the capped summary git:info carries for the chip: a
   // file missing from this list is a file that silently cannot be saved.
   useEffect(() => {
-    if (!picking || !open) {return;}
+    if (!picking || !open) {
+      return;
+    }
     window.avb
       .gitStatus({ projectPath: project.path })
       .then((f) => {
@@ -79,8 +90,12 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
       await refresh();
       // Checkout/pull rewrite the working tree — re-read what's open so the
       // editor and preview show the branch that's actually checked out.
-      if (onWorktreeChanged) {await onWorktreeChanged();}
-      if (successMsg) {showToast(successMsg, 'success');}
+      if (onWorktreeChanged) {
+        await onWorktreeChanged();
+      }
+      if (successMsg) {
+        showToast(successMsg, 'success');
+      }
     } catch (err) {
       const msg = cleanError(err);
       // A failed branch switch leaves you on the branch you were already on,
@@ -111,7 +126,9 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
   // The question only gets put when git refuses, which it does cleanly and
   // without moving HEAD, and only for the files it names.
   const requestSwitch = (branch) => {
-    if (branch === info.branch) {return;}
+    if (branch === info.branch) {
+      return;
+    }
     const wasDirty = info.dirty;
     setOpen(false);
     act(
@@ -124,13 +141,18 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
           setOpen(true);
           return;
         }
-        if (r?.error) {showToast(r.error, 'error');}
-        else if (r?.restored) {showToast(`Picked your changes back up on ${branch}`, 'success');}
-        else if (wasDirty) {showToast(`On ${branch} — your changes came with you`, 'success');}
-        else {showToast(`Switched to ${branch}`, 'success');}
+        if (r?.error) {
+          showToast(r.error, 'error');
+        } else if (r?.restored) {
+          showToast(`Picked your changes back up on ${branch}`, 'success');
+        } else if (wasDirty) {
+          showToast(`On ${branch} — your changes came with you`, 'success');
+        } else {
+          showToast(`Switched to ${branch}`, 'success');
+        }
       },
       null,
-      'Switching…'
+      'Switching…',
     );
   };
 
@@ -138,7 +160,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
     act(
       () => window.avb.gitCheckout({ projectPath: project.path, branch }),
       `Switched to ${branch}`,
-      'Switching…'
+      'Switching…',
     );
 
   // Leave the work where it was written and pick it up again on the way back.
@@ -153,12 +175,15 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
           parkFirst: true,
         });
         // The switch worked; anything else to say is about the changes.
-        if (r?.error) {showToast(r.error, 'error');}
-        else if (r?.restored) {showToast(`Picked your changes back up on ${branch}`, 'success');}
+        if (r?.error) {
+          showToast(r.error, 'error');
+        } else if (r?.restored) {
+          showToast(`Picked your changes back up on ${branch}`, 'success');
+        }
         return r;
       },
       `On ${branch} — your changes are waiting on ${from}`,
-      'Switching…'
+      'Switching…',
     );
   };
 
@@ -196,38 +221,35 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
         await window.avb.gitCheckout({ projectPath: project.path, branch });
       },
       `Committed to ${from}, now on ${branch}`,
-      'Committing…'
+      'Committing…',
     );
   };
 
   // Publishing is driven from the modal so it can show each step and keep the
   // form (and any error) in place instead of closing on a fire-and-forget.
-  const publish = async ({ repoName, isPrivate, onStep }) => {
+  const publish = async (request) => {
     setBusy('Publishing…');
     try {
-      await flushSave();
-      const state = await refresh();
-      if (state.dirty || state.branch === '(no commits yet)') {
-        onStep('Committing changes…');
-        await window.avb.gitCommit({
-          projectPath: project.path,
-          message: 'Initial commit from Stacki',
-        });
+      // App's legacy saver rejects on failed writes. Keep that compatibility
+      // boundary separate so Git response validation never becomes a form error.
+      try {
+        await flushSave();
+      } catch (error) {
+        return { ok: false, error: cleanError(error) };
       }
-      onStep('Creating repository and pushing…');
-      const res = await window.avb.gitPublish({
-        projectPath: project.path,
-        repoName,
-        isPrivate,
-      });
-      await refresh();
-      return res?.url || null;
+      const result = await publishGitProject(project.path, request);
+      if (result.ok) {
+        await refresh();
+      }
+      return result;
     } finally {
       setBusy(null);
     }
   };
 
-  if (!info) {return null;}
+  if (!info) {
+    return null;
+  }
 
   if (!info.isRepo) {
     return (
@@ -235,11 +257,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
         className="git-chip"
         disabled={working}
         onClick={() =>
-          act(
-            () => window.avb.gitInit(project.path),
-            'Initialized git repository',
-            'Initializing…'
-          )
+          act(() => window.avb.gitInit(project.path), 'Initialized git repository', 'Initializing…')
         }
       >
         {working ? <span className="mini-spinner" /> : <BranchIcon size={12} />}
@@ -258,7 +276,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
     act(
       () => window.avb.gitCommit({ projectPath: project.path, message, paths }),
       paths ? `Saved ${paths.length} file${paths.length === 1 ? '' : 's'}` : 'Changes committed',
-      'Committing…'
+      'Committing…',
     ).then(() => {
       setPicked(null);
       setPicking(false);
@@ -361,7 +379,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
                         create: true,
                       }),
                     `Created branch ${name}`,
-                    'Creating branch…'
+                    'Creating branch…',
                   );
                 }
               }}
@@ -377,17 +395,16 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
               value={commitMsg}
               onChange={(e) => setCommitMsg(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && info.dirty && !working) {commit();}
+                if (e.key === 'Enter' && info.dirty && !working) {
+                  commit();
+                }
               }}
             />
             {/* The list is closed by default. Someone who just wants to save
                 everything should never have to look at a file list to do it —
                 that is the whole difference between this and a git client. */}
             {info.dirty && (
-              <button
-                className="git-pick-toggle"
-                onClick={() => setPicking((v) => !v)}
-              >
+              <button className="git-pick-toggle" onClick={() => setPicking((v) => !v)}>
                 {picking ? 'Commit everything instead' : 'Choose what to commit…'}
               </button>
             )}
@@ -444,10 +461,9 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
                   disabled={working || !canPush}
                   onClick={() =>
                     act(
-                      () =>
-                        window.avb.gitPush({ projectPath: project.path, branch: info.branch }),
+                      () => window.avb.gitPush({ projectPath: project.path, branch: info.branch }),
                       `Pushed ${info.branch} to origin`,
-                      'Pushing…'
+                      'Pushing…',
                     )
                   }
                 >
@@ -461,9 +477,7 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
               </>
             ) : (
               <>
-                <div className="hint-text">
-                  This project isn’t on GitHub yet.
-                </div>
+                <div className="hint-text">This project isn’t on GitHub yet.</div>
                 <button
                   className="primary"
                   disabled={working}
@@ -508,9 +522,11 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
                 }
               },
               null,
-              'Merging…'
+              'Merging…',
             );
-            if (done) {setConflict(null);}
+            if (done) {
+              setConflict(null);
+            }
           }}
         />
       )}
@@ -523,10 +539,14 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
           busy={busy}
           onCancel={() => setSwitchTo(null)}
           onLeaveHere={async () => {
-            if (await parkThenSwitch(switchTo.branch)) {setSwitchTo(null);}
+            if (await parkThenSwitch(switchTo.branch)) {
+              setSwitchTo(null);
+            }
           }}
           onCommitFirst={async (message) => {
-            if (await commitThenSwitch(switchTo.branch, message)) {setSwitchTo(null);}
+            if (await commitThenSwitch(switchTo.branch, message)) {
+              setSwitchTo(null);
+            }
           }}
         />
       )}
@@ -541,149 +561,6 @@ export default function GitChip({ project, showToast, flushSave, onWorktreeChang
           openExternal={(u) => window.avb.openExternal(u)}
         />
       )}
-    </div>
-  );
-}
-
-function PublishModal({ projectPath, defaultName, branch, onClose, onPublish, openExternal }) {
-  const [name, setName] = useState(
-    defaultName.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
-  );
-  const [isPrivate, setIsPrivate] = useState(true);
-  const preflight = useGitHubStatus(projectPath);
-  const gh = preflight.kind === 'ready' ? preflight.status : null;
-  const [phase, setPhase] = useState('form'); // form | publishing | done
-  const [step, setStep] = useState('');
-  const [error, setError] = useState(null);
-  const [url, setUrl] = useState(null);
-
-  const publishing = phase === 'publishing';
-  const ready = gh?.installed && gh?.authed;
-
-  const go = async () => {
-    setError(null);
-    setPhase('publishing');
-    setStep('Preparing…');
-    try {
-      const result = await onPublish({
-        repoName: name.trim(),
-        isPrivate,
-        onStep: setStep,
-      });
-      setUrl(result);
-      setPhase('done');
-    } catch (err) {
-      setError(cleanError(err));
-      setPhase('form'); // keep the form filled in so it can be retried
-    }
-  };
-
-  return (
-    <div
-      className="modal-overlay"
-      onMouseDown={(e) => e.target === e.currentTarget && !publishing && onClose()}
-    >
-      <div className="modal">
-        <div className="modal-header">
-          {phase === 'done' ? 'Published to GitHub' : 'Publish to GitHub'}
-        </div>
-
-        {phase === 'done' ? (
-          <>
-            <div className="modal-body">
-              <div className="publish-done">
-                <CheckIcon size={14} />
-                <span>
-                  {name} is on GitHub and <strong>{branch}</strong> has been pushed.
-                </span>
-              </div>
-              {url && (
-                <button className="repo-link" onClick={() => openExternal(url)}>
-                  <span className="repo-slug">{repoSlug(url)}</span>
-                  <ExternalIcon size={11} />
-                </button>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button className="primary" onClick={onClose}>
-                Done
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="modal-body">
-              <div>
-                <label>Repository name</label>
-                <input
-                  autoFocus
-                  value={name}
-                  disabled={publishing}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && name.trim() && ready && !publishing) {go();}
-                  }}
-                />
-              </div>
-
-              <label className="check-row">
-                <input
-                  type="checkbox"
-                  checked={isPrivate}
-                  disabled={publishing}
-                  onChange={(e) => setIsPrivate(e.target.checked)}
-                />
-                Private repository
-              </label>
-
-              {preflight.kind === 'loading' && <div className="hint-text">Checking GitHub CLI…</div>}
-              {preflight.kind === 'error' && <div className="error-text">{preflight.error}</div>}
-
-              {gh && !gh.installed && (
-                <div className="error-text">
-                  GitHub CLI (gh) isn’t installed. Install it from cli.github.com, then run
-                  {' '}<code>gh auth login</code>.
-                </div>
-              )}
-              {gh?.installed && !gh.authed && (
-                <div className="error-text">
-                  GitHub CLI isn’t signed in. Run <code>gh auth login</code> in a terminal,
-                  then reopen this dialog.
-                </div>
-              )}
-              {ready && !publishing && !error && (
-                <div className="hint-text">
-                  Commits any pending changes, creates the repo as{' '}
-                  {isPrivate ? 'private' : 'public'}, and pushes <strong>{branch}</strong>
-                  {gh.user ? ` to ${gh.user}` : ''}.
-                </div>
-              )}
-
-              {publishing && (
-                <div className="publish-progress">
-                  <span className="mini-spinner" />
-                  <span>{step}</span>
-                </div>
-              )}
-
-              {error && <div className="error-text">{error}</div>}
-            </div>
-
-            <div className="modal-footer">
-              <button onClick={onClose} disabled={publishing}>
-                Cancel
-              </button>
-              <button
-                className="primary"
-                disabled={!name.trim() || !ready || publishing}
-                onClick={go}
-              >
-                {publishing ? 'Publishing…' : error ? 'Try again' : 'Publish'}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }

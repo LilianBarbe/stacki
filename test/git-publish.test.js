@@ -55,12 +55,13 @@ test('GitHub preflight parses each state and rejects impossible or oversized dat
 test('publish dialog passes its project to preflight and ignores old replies', async () => {
   const output = path.join(__dirname, '../node_modules/.stacki-test/git-publish.cjs');
   fs.mkdirSync(path.dirname(output), { recursive: true });
-  const source = fs.readFileSync(path.join(__dirname, '../src/panels/GitChip.jsx'), 'utf8');
   buildSync({
     stdin: {
-      contents: source + '\nexport {PublishModal, SwitchBranchModal};',
-      loader: 'jsx',
-      resolveDir: path.join(__dirname, '../src/panels'),
+      contents:
+        "export { default as PublishModal } from '../src/panels/PublishModal.tsx';\n" +
+        "export { default as SwitchBranchModal } from '../src/panels/SwitchBranchModal.tsx';\n",
+      loader: 'js',
+      resolveDir: __dirname,
     },
     outfile: output,
     bundle: true,

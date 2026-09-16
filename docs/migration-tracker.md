@@ -410,6 +410,16 @@ mounted-choice tests pass, alongside 64 conflict and 107 Git branch checks.
 The full gate passes 138/138 commands (101.9s); new renderer modules lint without
 warnings. GitChip's publish state, action boundaries, and root remain to convert.
 
+GitChip publish checkpoint: `PublishModal.tsx` models form, publishing, and done
+as a discriminated union, so an error and a completed URL cannot coexist with
+an in-flight step. Project changes and unmounts discard late progress. The
+publish workflow validates info, commit, and repository replies outside the
+operating-error channel; transport failures stop the next Git operation and
+remain retryable values. Seven focused parser/workflow/lifetime tests and seven
+reachable old/new dialog displays pass. The full gate passes 138/138 commands
+(106.7s), with zero warnings in the new modules. Continue with GitChip's
+remaining action boundaries and root conversion.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
