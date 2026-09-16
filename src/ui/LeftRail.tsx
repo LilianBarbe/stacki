@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   PagePanelIcon,
   NavigatorIcon,
@@ -17,22 +18,33 @@ const TABS = [
   { id: 'cms', title: 'CMS', shortcut: '⌥C', Icon: CmsIcon },
   { id: 'variables', title: 'Variables', shortcut: '⌥V', Icon: VariableIcon },
   { id: 'history', title: 'History', shortcut: '⌥H', Icon: HistoryIcon },
-];
+] as const;
+export type RailTab = (typeof TABS)[number]['id'];
 
 const TOOLTIP_DELAY = 500;
 
 // Webflow-style icon rail. Clicking the active tab collapses the panel.
 // Hovering a button for a moment shows a tooltip with its keyboard shortcut.
-export default function LeftRail({ active, onSelect }) {
-  const [tip, setTip] = useState(null); // {id, left, top}
-  const timerRef = useRef(null);
+export default function LeftRail({
+  active,
+  onSelect,
+}: {
+  readonly active?: RailTab | null;
+  readonly onSelect: (tab: RailTab) => void;
+}) {
+  const [tip, setTip] = useState<{
+    readonly id: RailTab;
+    readonly left: number;
+    readonly top: number;
+  } | null>(null); // {id, left, top}
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const showSoon = (id) => (e) => {
+  const showSoon = (id: RailTab) => (e: MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(
       () => setTip({ id, left: rect.right + 10, top: rect.top + rect.height / 2 }),
-      TOOLTIP_DELAY
+      TOOLTIP_DELAY,
     );
   };
 
@@ -43,43 +55,7 @@ export default function LeftRail({ active, onSelect }) {
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  // P / Z / ⇧A / J / ⌥C / ⌥H toggle the panels (ignored while typing in a field).
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.metaKey || e.ctrlKey) {return;}
-      const t = e.target;
-      if (
-        t instanceof HTMLElement &&
-        (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)
-      ) {
-        return;
-      }
-      if (e.altKey) {
-        // Matched on the physical key: Option rewrites e.key ("ç" for C,
-        // "˙" for H), so e.key would never equal the letter.
-        if (e.code === 'KeyC') {
-          e.preventDefault();
-          onSelect('cms');
-        } else if (e.code === 'KeyH') {
-          e.preventDefault();
-          onSelect('history');
-        }
-        return;
-      }
-      const k = e.key.toLowerCase();
-      let id = null;
-      if (k === 'p' && !e.shiftKey) {id = 'pages';}
-      else if (k === 'z' && !e.shiftKey) {id = 'navigator';}
-      else if (k === 'a' && e.shiftKey) {id = 'components';}
-      else if (k === 'j' && !e.shiftKey) {id = 'assets';}
-      if (id) {
-        e.preventDefault();
-        onSelect(id);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onSelect]);
+  useRailKeys(onSelect);
 
   const tipTab = tip && TABS.find((t) => t.id === tip.id);
 
@@ -99,11 +75,61 @@ export default function LeftRail({ active, onSelect }) {
           <Icon size={20} />
         </button>
       ))}
-      {tipTab && (
+      {tipTab && tip && (
         <div className="rail-tooltip" style={{ left: tip.left, top: tip.top }}>
           {tipTab.title} ({tipTab.shortcut})
         </div>
       )}
     </div>
   );
+}
+
+function useRailKeys(onSelect: (tab: RailTab) => void): void {
+  // P / Z / ⇧A / J / ⌥C / ⌥H toggle the panels (ignored while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.ctrlKey) {
+        return;
+      }
+      const t = e.target;
+      if (
+        t instanceof HTMLElement &&
+        (t.tagName === 'INPUT' ||
+          t.tagName === 'TEXTAREA' ||
+          t.tagName === 'SELECT' ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.altKey) {
+        // Matched on the physical key: Option rewrites e.key ("ç" for C,
+        // "˙" for H), so e.key would never equal the letter.
+        if (e.code === 'KeyC') {
+          e.preventDefault();
+          onSelect('cms');
+        } else if (e.code === 'KeyH') {
+          e.preventDefault();
+          onSelect('history');
+        }
+        return;
+      }
+      const k = e.key.toLowerCase();
+      let id: RailTab | null = null;
+      if (k === 'p' && !e.shiftKey) {
+        id = 'pages';
+      } else if (k === 'z' && !e.shiftKey) {
+        id = 'navigator';
+      } else if (k === 'a' && e.shiftKey) {
+        id = 'components';
+      } else if (k === 'j' && !e.shiftKey) {
+        id = 'assets';
+      }
+      if (id) {
+        e.preventDefault();
+        onSelect(id);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onSelect]);
 }

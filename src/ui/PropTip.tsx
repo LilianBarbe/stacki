@@ -1,4 +1,20 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { CSSProperties, RefObject } from 'react';
+interface TipPosition {
+  readonly left: number;
+  readonly top: number;
+  readonly below: boolean;
+  readonly arrow?: number;
+  readonly clamped?: boolean;
+}
+interface TipSurfaceProps {
+  readonly text: string;
+  readonly pos: TipPosition | null;
+  readonly iconRef: RefObject<HTMLSpanElement>;
+  readonly tipRef: RefObject<HTMLDivElement>;
+  readonly show: () => void;
+  readonly hide: () => void;
+}
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HelpCircleIcon } from './Icons.jsx';
 
 const DELAY = 120;
@@ -8,11 +24,11 @@ const MARGIN = 8; // keep the bubble this far from the window's edges
 // comment written above it in the component's `interface Props`. The bubble is
 // position:fixed so it escapes the panel's scroll box, and flips below the icon
 // when there isn't room above.
-export default function PropTip({ text }) {
-  const [pos, setPos] = useState(null); // {left, top, below, arrow}
-  const iconRef = useRef(null);
-  const tipRef = useRef(null);
-  const timerRef = useRef(null);
+export default function PropTip({ text }: { readonly text?: string | null }) {
+  const [pos, setPos] = useState<TipPosition | null>(null); // {left, top, below, arrow}
+  const iconRef = useRef<HTMLSpanElement>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
@@ -20,7 +36,9 @@ export default function PropTip({ text }) {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       const el = iconRef.current;
-      if (!el) {return;}
+      if (!el) {
+        return;
+      }
       const r = el.getBoundingClientRect();
       const below = r.top < 120; // not enough room for the bubble above
       setPos({
@@ -43,7 +61,9 @@ export default function PropTip({ text }) {
   useLayoutEffect(() => {
     const tip = tipRef.current;
     const icon = iconRef.current;
-    if (!tip || !icon || !pos || pos.clamped) {return;}
+    if (!tip || !icon || !pos || pos.clamped) {
+      return;
+    }
     const half = tip.getBoundingClientRect().width / 2;
     const center = pos.left;
     const left = Math.min(Math.max(center, MARGIN + half), window.innerWidth - MARGIN - half);
@@ -56,8 +76,20 @@ export default function PropTip({ text }) {
     setPos({ ...pos, left, arrow, clamped: true });
   }, [pos]);
 
-  if (!text) {return null;}
+  if (!text) {
+    return null;
+  }
 
+  return (
+    <TipSurface text={text} pos={pos} iconRef={iconRef} tipRef={tipRef} show={show} hide={hide} />
+  );
+}
+function TipSurface({ text, pos, iconRef, tipRef, show, hide }: TipSurfaceProps) {
+  const style: CSSProperties & { readonly '--tip-arrow': string } = {
+    left: pos?.left,
+    top: pos?.top,
+    '--tip-arrow': `${pos?.arrow || 0}px`,
+  };
   return (
     <>
       <span
@@ -76,11 +108,7 @@ export default function PropTip({ text }) {
         <HelpCircleIcon size={13} />
       </span>
       {pos && (
-        <div
-          ref={tipRef}
-          className={`prop-tip ${pos.below ? 'below' : ''}`}
-          style={{ left: pos.left, top: pos.top, '--tip-arrow': `${pos.arrow || 0}px` }}
-        >
+        <div ref={tipRef} className={`prop-tip ${pos.below ? 'below' : ''}`} style={style}>
           {text}
         </div>
       )}

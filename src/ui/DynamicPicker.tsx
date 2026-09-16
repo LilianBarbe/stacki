@@ -1,4 +1,10 @@
-import React from 'react';
+interface DynamicPickerProps {
+  readonly entries: readonly { readonly label: string }[];
+  readonly index: number;
+  readonly onPick: (index: number) => void;
+  readonly error?: string | null;
+  readonly pattern: string;
+}
 import Dropdown from './Dropdown.jsx';
 import { FileIcon } from './Icons.jsx';
 
@@ -18,7 +24,13 @@ import { FileIcon } from './Icons.jsx';
 //
 // Live preview is off. Each option is a full page navigation, so skimming the
 // list would reload the canvas once per hover.
-export default function DynamicPicker({ entries, index, onPick, error, pattern }) {
+export default function DynamicPicker({
+  entries,
+  index,
+  onPick,
+  error,
+  pattern,
+}: DynamicPickerProps) {
   if (error) {
     return (
       <span className="route-chip is-error" title={error}>
@@ -47,7 +59,7 @@ export default function DynamicPicker({ entries, index, onPick, error, pattern }
           label: e.label,
           icon: <FileIcon size={12} />,
         }))}
-        onChange={(v) => onPick(Number(v))}
+        onChange={(v: string) => onPick(Number(v))}
         livePreview={false}
         searchable
         searchPlaceholder="Search entries…"

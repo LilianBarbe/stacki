@@ -177,7 +177,7 @@ confirmation order, cancellation, trunk protection, parking/restoration and
 conflict handoff. All scheduled root `.js` leaves are now converted.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
-### src/ui — 12 converted, 26 remaining ⏳
+### src/ui — 19 converted, 19 remaining ⏳
 
 `Icons` 969, `RichContent` 606, `WelcomeBackground` 433, `ClassInput` 344,
 `ExprInput` 336, `DataPicker` 308, `Dropdown` 303, `FileBrowser` 277,
@@ -191,6 +191,14 @@ UI leaf batch: `Icons`, `StackiLogo`, `VariableTypeIcon`, `FileStatus`,
 paths byte-identical. The full gate passes 129/129 commands (94.0s). The binding
 suite caught a DOM-realm assumption; chip guards now use the node's own document,
 and all 110 binding checks pass. Popup blur timers are bounded and cancelled on cleanup.
+
+UI interaction batch: `Dropdown`, `DynamicPicker`, `LeftRail`, `PropTip`,
+`sound`, `useListReorder`, and `usePointerDrag`. All 130 gate commands pass
+(96.7s), including dropdown, binding, sound, and drag behavior checks. A focused
+regression test pins drag-listener installation with a stable move callback;
+pointer sessions flush final coordinates and clean up on cancellation/unmount.
+Audio voices are capped at 32, with capacity released when each voice ends.
+Converted modules have no lint warnings and meet the function/column limits.
 
 ### src/panels — 20 files, 13,990 lines ⬜
 
@@ -267,7 +275,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 125/125, exit 0. No quarantined tests remain.
+- Gate green at last run: 130/130, exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.

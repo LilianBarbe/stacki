@@ -26,6 +26,7 @@ const check = (what, condition, detail) => {
 // Enough of Web Audio to build one note and see where it went.
 function fakeAudio() {
   const played = [];
+  const voices = [];
   const tones = [];
   let lastFilter = null;
   let lastGain = null;
@@ -57,6 +58,7 @@ function fakeAudio() {
     createOscillator() {
       nodes.oscillators += 1;
       const osc = node('oscillator');
+      voices.push(osc);
       // Recorded when the note is actually started, so a node that is built and
       // never played doesn't count as a sound. The filter and envelope built
       // just before it are this note's, so the whole sound is captured.
@@ -78,7 +80,7 @@ function fakeAudio() {
     }
     resume() {}
   }
-  return { Ctx, played, tones, nodes };
+  return { Ctx, played, tones, nodes, voices };
 }
 
 (async () => {
@@ -547,6 +549,16 @@ function fakeAudio() {
   const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'App.jsx'), 'utf8');
   check('the app reads it on load', /window\.avb\.settings\?\.\(\)/.test(app));
   check('and follows the menu after that', /onMenu\('sound'/.test(app));
+
+  // A burst of synthetic click events cannot allocate unbounded audio nodes.
+  for (const voice of audio.voices) { voice.onended?.(); }
+  setSoundEnabled(true);
+  const beforeBurst = audio.nodes.oscillators;
+  for (let index = 0; index < 100; index++) { clickNote(); }
+  check('overlapping voices are capped', audio.nodes.oscillators - beforeBurst === 32);
+  audio.voices.at(-1).onended();
+  clickNote();
+  check('an ending voice releases capacity', audio.nodes.oscillators - beforeBurst === 33);
 
   if (failures.length) {
     console.error(`\nsound: ${failures.length} failed, ${checked - failures.length} passed\n`);
