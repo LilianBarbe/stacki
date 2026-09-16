@@ -6,6 +6,7 @@
 // so switching selector/context/state just re-derives — no re-scan.
 
 import { compareCascade } from './cascade'
+import { spacingSides } from './padding'
 import type { RuleModel } from './cascade'
 import { canonicalCompound, compareSpecificity, normalizePseudoElement } from './selectors'
 import type { BreakpointId, ParsedRule, Specificity } from './types'
@@ -422,10 +423,19 @@ export function resolveStyle(
         selectorsMatch(sel.text, activeSelector)))
     if (isSelected && !selectedRule) selectedRule = matched.rule
 
-    // One contributor per (rule, prop) — the last decl wins within a rule.
+    // Project box shorthands into the sides read by the spacing controls before
+    // resolving the cascade. Keep the authored shorthand too so it can still be
+    // edited/cleared as a whole, without rewriting the source on selection.
     const lastByProp = new Map<string, { value: string; important: boolean }>()
+    const add = (prop: string, value: string, important: boolean) => {
+      if (lastByProp.get(prop)?.important && !important) return
+      lastByProp.set(prop, { value, important })
+    }
     for (const decl of matched.rule.declarations) {
-      lastByProp.set(decl.prop, { value: decl.value, important: decl.important })
+      add(decl.prop, decl.value, decl.important)
+      for (const [prop, value] of Object.entries(spacingSides(decl.prop, decl.value))) {
+        add(prop, value, decl.important)
+      }
     }
     lastByProp.forEach((decl, prop) => {
       const list = byProp.get(prop) ?? []
