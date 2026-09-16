@@ -144,7 +144,7 @@ const check = (what, condition, detail) => {
   }
 
   // --- the palette asks for this ----------------------------------------------------------
-  const palette = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'InsertSearch.jsx'), 'utf8');
+  const palette = fs.readFileSync(path.join(__dirname, '..', 'src', 'ui', 'InsertSearch.tsx'), 'utf8');
   check('the palette ranks through it', /rankInsertItems\(items, query\)/.test(palette), 'the palette scores its own way again');
   check(
     'and hands it the query untrimmed, because the space means something',

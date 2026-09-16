@@ -1,0 +1,469 @@
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
+import {
+  ChevronRightIcon,
+  ChevronLeftIcon,
+  CheckIcon,
+  CodeIcon,
+  SearchIcon,
+  PencilIcon,
+} from './Icons.jsx';
+
+// The data behind the page, as something you can look through rather than
+// something you have to already know. Every row is a value that is in scope
+// here, with what it currently holds beside it — so choosing what a prop is
+// bound to is reading a list of real content, not writing `post.data.pubDate`
+// from memory.
+//
+// The tree comes from dataTree(); this only decides what is open, what a
+// search matches, and what a click means.
+
+// Every ancestor of a path, so opening the picker on an existing binding shows
+// it rather than making you find it: `post.data.title` opens post and post.data.
+function ancestorsOf(path: string | null | undefined): string[] {
+  const out: string[] = [];
+  const src = path || '';
+  assert(src.length <= LIMITS.attrCharsMax, 'DataPicker: binding path limit exceeded');
+  let acc = '';
+  for (const part of src.split('.')) {
+    // Array steps ride along with the name they belong to: `posts[0]` is one
+    // step down from `posts`, not two.
+    const m = part.match(/^([^[]*)((\[\d+\])*)$/);
+    acc = acc ? `${acc}.${m ? (m[1] ?? '') : part}` : m ? (m[1] ?? '') : part;
+    if (acc !== src) {
+      out.push(acc);
+    }
+    for (const idx of (m?.[2] || '').match(/\[\d+\]/g) || []) {
+      acc += idx;
+      if (acc !== src) {
+        out.push(acc);
+      }
+    }
+  }
+  return out;
+}
+
+function flatten(nodes: readonly PickerNode[]): PickerNode[] {
+  const pending = nodes.map((node) => ({ node, depth: 0 })).reverse();
+  const out: PickerNode[] = [];
+  assert(pending.length <= LIMITS.treeNodesMax, 'DataPicker: node limit exceeded');
+  for (let visited = 0; pending.length; visited++) {
+    assert(visited < LIMITS.treeNodesMax, 'DataPicker: node limit exceeded');
+    const next = pending.pop();
+    assert(next !== undefined, 'DataPicker: queued node exists');
+    assert(next.depth <= LIMITS.treeDepthMax, 'DataPicker: depth limit exceeded');
+    out.push(next.node);
+    const children = next.node.children ?? [];
+    assert(
+      out.length + pending.length + children.length <= LIMITS.treeNodesMax,
+      'DataPicker: node limit exceeded',
+    );
+    for (let index = children.length - 1; index >= 0; index--) {
+      const node = children[index];
+      assert(node !== undefined, 'DataPicker: child exists');
+      pending.push({ node, depth: next.depth + 1 });
+    }
+  }
+  return out;
+}
+
+const SECTION_LABEL: Readonly<Record<string, string>> = {
+  collections: 'Collections in this project',
+};
+
+// A field can be bound to something this entry doesn't have — an optional
+// field left unset, or data the app can't see the shape of. The path is still
+// what the chip says, so it is shown where it belongs and marked, rather than
+// leaving the picker looking like it doesn't know what the chip points at.
+function withCurrent(tree: readonly PickerNode[], current: string | null | undefined) {
+  const flat = flatten(tree);
+  if (!current) {
+    return tree;
+  }
+  if (flat.some((n) => n.path === current)) {
+    return tree;
+  }
+  let anchor = null;
+  for (const p of ancestorsOf(current)) {
+    const found = flat.find((n) => n.path === p);
+    if (found) {
+      anchor = found;
+    }
+  }
+  const missing: PickerNode = {
+    path: current,
+    key: anchor ? current.slice(anchor.path.length).replace(/^\./, '') : current,
+    kind: 'not in this entry',
+    preview: '',
+    children: null,
+    missing: true,
+  };
+  if (!anchor) {
+    return [...(tree || []), missing];
+  }
+  // The bounded flatten above proves the graft traverses at most 64 nested levels.
+  const anchorPath = anchor.path;
+  const graft = (nodes: readonly PickerNode[]): readonly PickerNode[] =>
+    nodes.map((n) =>
+      n.path === anchorPath
+        ? { ...n, children: [...(n.children || []), missing] }
+        : n.children
+          ? { ...n, children: graft(n.children) }
+          : n,
+    );
+  return graft(tree || []);
+}
+
+interface Navigation {
+  readonly index: number;
+  readonly count: number;
+}
+interface Entries extends Navigation {
+  readonly label: string;
+  readonly onStep: (step: -1 | 1) => void;
+}
+export interface PickerNode {
+  readonly path: string;
+  readonly key: string;
+  readonly kind: string;
+  readonly preview: string;
+  readonly children: readonly PickerNode[] | null;
+  readonly section?: string;
+  readonly nav?: Navigation;
+  readonly query?: { readonly collection: string; readonly name: string };
+  readonly lazy?: boolean;
+  readonly pickable?: boolean;
+  readonly missing?: boolean;
+}
+export interface DataPickerProps {
+  readonly tree?: readonly PickerNode[] | null;
+  readonly current?: string | null;
+  readonly entries?: Entries | null;
+  readonly onStepItem?: (path: string, step: -1 | 1, count: number) => void;
+  readonly onPick: (path: string, query: PickerNode['query'] | null) => void;
+  readonly onExpand?: (node: PickerNode) => void;
+  readonly onWrite?: () => void;
+  readonly onEdit?: (() => void) | null;
+  readonly editLabel?: string;
+  readonly footer?: boolean;
+}
+
+export default function DataPicker(props: DataPickerProps) {
+  const { entries, onStepItem, onPick, onWrite, onEdit, editLabel = 'Edit', footer = true } = props;
+  const state = useDataPicker(props);
+  const { query, setQuery, searchRef, listRef, matches, tree } = state;
+  return (
+    <div className="data-picker">
+      {/* Which entry the values below are FROM. A dynamic route stands for
+          many, and the one on the canvas is the one being read here — so
+          stepping through them previews the page against other content and
+          re-reads this list against it at the same time. */}
+      {entries && entries.count > 1 && <EntryNavigation entries={entries} />}
+      <div className="dp-search">
+        <SearchIcon size={12} />
+        <input
+          ref={searchRef}
+          value={query}
+          placeholder="Search data…"
+          spellCheck={false}
+          autoFocus
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+      <div className="dp-list" ref={listRef}>
+        {/* A search flattens the tree: what you want is the row, not where it
+            sits, and full paths say where that is anyway. */}
+        {matches ? (
+          matches.map((node) => (
+            <DataRow
+              key={node.path}
+              node={node}
+              depth={0}
+              showPath
+              root={null}
+              state={state}
+              onPick={onPick}
+              onStepItem={onStepItem}
+            />
+          ))
+        ) : (
+          <DataRoots nodes={tree} state={state} onPick={onPick} onStepItem={onStepItem} />
+        )}
+        {((matches && !matches.length) || (!matches && !(tree || []).length)) && (
+          <div className="dp-empty">
+            {matches
+              ? 'Nothing matches'
+              : 'No data in scope here — add a prop to this file, or a const to its frontmatter.'}
+          </div>
+        )}
+      </div>
+      {/* Above "Write an expression…", because it is about the thing already
+          bound rather than about replacing it. Only ever rendered for a picker
+          opened on a specific chip — the field's own handle opens this on
+          nothing in particular, and there is no "the" value to edit then. */}
+      {onEdit && (
+        <div className="dp-foot" onMouseDown={(e) => e.preventDefault()} onClick={onEdit}>
+          <PencilIcon size={11} />
+          {editLabel}
+        </div>
+      )}
+      {footer && (
+        <div className="dp-foot" onMouseDown={(e) => e.preventDefault()} onClick={onWrite}>
+          <CodeIcon size={11} />
+          Write an expression…
+        </div>
+      )}
+    </div>
+  );
+}
+
+function useDataPicker({ tree: rawTree, current, onExpand }: DataPickerProps) {
+  const [query, setQuery] = useState('');
+  const tree = useMemo(() => withCurrent(rawTree ?? [], current), [rawTree, current]);
+  const [open, setOpen] = useState(() => {
+    const start = new Set(ancestorsOf(current));
+    // Nothing bound yet: open the first root that holds anything, so the panel
+    // opens on data rather than on a list of closed names.
+    if (!start.size) {
+      const first = (tree || []).find((n) => n.children?.length);
+      if (first) {
+        start.add(first.path);
+      }
+    }
+    return start;
+  });
+  const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLDivElement>(null);
+
+  // Open ON what the field is already bound to: the ancestors are expanded
+  // above, and the row itself is brought into view here. A path four levels
+  // down is otherwise below the fold, which reads as the picker not knowing
+  // what the chip was pointing at.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const row = selectedRef.current;
+    if (!list || !row) {
+      return;
+    }
+    const lr = list.getBoundingClientRect();
+    const rr = row.getBoundingClientRect();
+    if (rr.top >= lr.top && rr.bottom <= lr.bottom) {
+      return;
+    } // already in view
+    list.scrollTop += rr.top - lr.top - (lr.height - rr.height) / 2;
+  }, [current]);
+
+  const q = query.trim().toLowerCase();
+  const matches = useMemo(() => {
+    if (!q) {
+      return null;
+    }
+    return flatten(tree || []).filter(
+      (n) => n.path.toLowerCase().includes(q) || String(n.preview).toLowerCase().includes(q),
+    );
+  }, [q, tree]);
+
+  const toggle = (node: PickerNode) => {
+    // A collection nobody has looked at yet has no rows until it is asked for.
+    if (node.lazy && !node.children?.length) {
+      onExpand?.(node);
+    }
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(node.path)) {
+        next.delete(node.path);
+      } else {
+        next.add(node.path);
+      }
+      return next;
+    });
+  };
+
+  return { query, setQuery, tree, open, searchRef, listRef, selectedRef, matches, toggle, current };
+}
+
+type PickerState = ReturnType<typeof useDataPicker>;
+interface RowProps {
+  readonly node: PickerNode;
+  readonly depth: number;
+  readonly showPath: boolean;
+  readonly root: PickerNode | null;
+  readonly state: PickerState;
+  readonly onPick: DataPickerProps['onPick'];
+  readonly onStepItem: DataPickerProps['onStepItem'];
+}
+function DataRow({ node: n, depth, showPath, root, state, onPick, onStepItem }: RowProps) {
+  assert(depth <= LIMITS.treeDepthMax, 'DataPicker: render depth limit exceeded');
+  const { open, current, selectedRef, toggle } = state;
+  const expandable = !!n.children?.length || n.lazy;
+  const isOpen = open.has(n.path);
+  const from = root || n;
+  const isCurrent = n.path === current;
+  return (
+    <React.Fragment key={n.path}>
+      <div
+        ref={isCurrent ? selectedRef : undefined}
+        className={`dp-row ${isCurrent ? 'selected' : ''} ${
+          n.pickable === false ? 'path-only' : ''
+        } ${n.missing ? 'missing' : ''}`}
+        style={{ paddingLeft: 6 + depth * 13 }}
+        title={`${n.path}${n.kind ? ` — ${n.kind}` : ''}`}
+        onMouseDown={(e) => e.preventDefault()}
+        // The root carries what has to happen before this path means
+        // anything — a collection the page doesn't read yet needs its query
+        // written first.
+        onClick={() =>
+          // A row kept only so a list beneath it can be reached opens
+          // instead of being chosen — there is no looping over an object.
+          n.pickable === false ? toggle(n) : onPick(n.path, from.query || null)
+        }
+      >
+        <span
+          className={`dp-twist ${expandable ? '' : 'hidden'} ${isOpen ? 'open' : ''}`}
+          onClick={
+            expandable
+              ? (event) => {
+                  event.stopPropagation();
+                  toggle(n);
+                }
+              : undefined
+          }
+        >
+          <ChevronRightIcon size={10} />
+        </span>
+        <span className="dp-key">{showPath ? n.path : n.key}</span>
+        {isCurrent && <CheckIcon size={11} className="dp-check" />}
+        {/* A loop hands its item one entry of a list, and the list has more
+              than one. These say which one is being read, and move it — so the
+              fields below are this service's, not always the first one's. The
+              row itself still picks the item, so the arrows stop the click. */}
+        {n.nav && onStepItem ? (
+          <ItemNavigation path={n.path} nav={n.nav} onStepItem={onStepItem} />
+        ) : null}
+        <span className={`dp-val ${n.preview ? '' : 'kind'}`}>{n.preview || n.kind}</span>
+      </div>
+      {isOpen &&
+        (n.children?.length ? (
+          n.children.map((child) => (
+            <DataRow
+              key={child.path}
+              node={child}
+              depth={depth + 1}
+              showPath={false}
+              root={from}
+              state={state}
+              onPick={onPick}
+              onStepItem={onStepItem}
+            />
+          ))
+        ) : n.lazy ? (
+          <div className="dp-loading" style={{ paddingLeft: 19 + depth * 13 }}>
+            Reading one entry…
+          </div>
+        ) : null)}
+    </React.Fragment>
+  );
+}
+function ItemNavigation({
+  path,
+  nav,
+  onStepItem,
+}: {
+  readonly path: string;
+  readonly nav: Navigation;
+  readonly onStepItem: (path: string, step: -1 | 1, count: number) => void;
+}) {
+  return (
+    <span className="dp-item-nav" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className="dp-step"
+        title="Previous item"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => onStepItem(path, -1, nav.count)}
+      >
+        <ChevronLeftIcon size={11} />
+      </button>
+      <span className="dp-item-count">
+        {nav.index + 1}/{nav.count}
+      </span>
+      <button
+        type="button"
+        className="dp-step"
+        title="Next item"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => onStepItem(path, 1, nav.count)}
+      >
+        <ChevronRightIcon size={11} />
+      </button>
+    </span>
+  );
+}
+// Roots in order, with a heading wherever the section changes — the
+// collections at the foot are a different kind of thing from what is already
+// in scope, and reading as one list would hide that.
+function DataRoots({
+  nodes,
+  state,
+  onPick,
+  onStepItem,
+}: {
+  readonly nodes: readonly PickerNode[];
+  readonly state: PickerState;
+  readonly onPick: DataPickerProps['onPick'];
+  readonly onStepItem: DataPickerProps['onStepItem'];
+}) {
+  let section: string | null = null;
+  return (nodes || []).map((n) => {
+    const head = n.section && n.section !== section ? SECTION_LABEL[n.section] : null;
+    section = n.section || section;
+    return (
+      <React.Fragment key={`s:${n.path}`}>
+        {head && <div className="dp-section">{head}</div>}
+        {
+          <DataRow
+            node={n}
+            depth={0}
+            showPath={false}
+            root={null}
+            state={state}
+            onPick={onPick}
+            onStepItem={onStepItem}
+          />
+        }
+      </React.Fragment>
+    );
+  });
+}
+function EntryNavigation({ entries }: { readonly entries: Entries }) {
+  return (
+    <div className="dp-entry">
+      <button
+        type="button"
+        className="dp-step"
+        title="Previous entry"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => entries.onStep(-1)}
+      >
+        <ChevronLeftIcon size={12} />
+      </button>
+      <span className="dp-entry-label" title={entries.label}>
+        {entries.label}
+      </span>
+      <span className="dp-entry-count">
+        {entries.index + 1}/{entries.count}
+      </span>
+      <button
+        type="button"
+        className="dp-step"
+        title="Next entry"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => entries.onStep(1)}
+      >
+        <ChevronRightIcon size={12} />
+      </button>
+    </div>
+  );
+}

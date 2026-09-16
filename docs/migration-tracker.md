@@ -177,7 +177,7 @@ confirmation order, cancellation, trunk protection, parking/restoration and
 conflict handoff. All scheduled root `.js` leaves are now converted.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
-### src/ui — 31 converted, 7 remaining ⏳
+### src/ui — 33 converted, 5 remaining ⏳
 
 `Icons` 969, `RichContent` 606, `WelcomeBackground` 433, `ClassInput` 344,
 `ExprInput` 336, `DataPicker` 308, `Dropdown` 303, `FileBrowser` 277,
@@ -219,6 +219,12 @@ while malformed responses remain loud contract errors. Refresh bursts coalesce,
 font previews and fallback attempts are capped, and stale project reads are ignored.
 A type-only shared preload surface now checks every exposed method against the
 invoke payload inventory; renderer responses remain unknown until parsed.
+
+UI picker batch: `DataPicker` and `InsertSearch`. Nine old/new rendered
+comparisons pass; the full gate passes 132/132 commands (95.4s). Picker trees,
+binding paths, and component lists have tested bounds, including cycles and deep
+nesting. Existing binding, item-field, and ranking tests remain green; their
+source-reading checks now follow the renamed modules.
 
 ### src/panels — 20 files, 13,990 lines ⬜
 
@@ -295,7 +301,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 131/131, exit 0. No quarantined tests remain.
+- Gate green at last run: 132/132, exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.
