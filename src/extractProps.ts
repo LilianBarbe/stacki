@@ -1,3 +1,4 @@
+import { treeBudget, type TreeView } from './treeView';
 // What a piece of a page reads from around it.
 //
 // Markup pulled out into a component leaves its scope behind. `{title}` in a
@@ -19,26 +20,38 @@ import { parseDeclarations, scopeChips } from './dataSuggest.js';
 // this module stands alone; a loop head the app can't model contributes no
 // bindings, which is the safe way to be wrong (a prop too many, never one too
 // few).
-function loopHead(head) {
+function loopHead(head: unknown) {
   const m = String(head || '').match(
-    /^([\s\S]*?)\.map\(\s*\(\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)\s*=>\s*\($/
+    /^([\s\S]*?)\.map\(\s*\(\s*([A-Za-z_$][\w$]*)\s*(?:,\s*([A-Za-z_$][\w$]*)\s*)?\)\s*=>\s*\($/,
   );
-  return m ? { data: m[1].trim(), item: m[2], index: m[3] || '' } : null;
+  return m?.[1] !== undefined && m[2] !== undefined
+    ? { data: m[1].trim(), item: m[2], index: m[3] || '' }
+    : null;
 }
 
 /** Every expression a node states in its OWN scope (its children may differ). */
-function expressionsOf(node) {
+function expressionsOf(node: TreeView): readonly string[] {
   const out = [];
   for (const value of Object.values(node.props || {})) {
-    if (value?.type === 'expr') {out.push(String(value.value ?? ''));}
+    if (value?.type === 'expr') {
+      out.push(String(value.value ?? ''));
+    }
   }
-  if (node.kind === 'expr') {out.push(String(node.value ?? ''));}
-  if (node.kind === 'cond') {out.push(String(node.test ?? ''));}
+  if (node.kind === 'expr') {
+    out.push(String(node.value ?? ''));
+  }
+  if (node.kind === 'cond') {
+    out.push(String(node.test ?? ''));
+  }
   // A loop's data is read outside the loop; its body runs inside it.
-  if (node.kind === 'map') {out.push(loopHead(node.head)?.data ?? String(node.head ?? ''));}
+  if (node.kind === 'map') {
+    out.push(loopHead(node.head)?.data ?? String(node.head ?? ''));
+  }
   // `Some {count} words` — the holes in a text run are expressions too.
   if (node.kind === 'text' && String(node.value ?? '').includes('{')) {
-    for (const m of String(node.value).matchAll(/\{([^{}]*)\}/g)) {out.push(m[1]);}
+    for (const m of String(node.value).matchAll(/\{([^{}]*)\}/g)) {
+      out.push(m[1] ?? '');
+    }
   }
   return out;
 }
@@ -51,45 +64,64 @@ function expressionsOf(node) {
  * `scope` is what the page has at that point: its frontmatter declarations,
  * its imports, and the item of any loop the piece sits inside.
  */
-export function propsForExtraction(node, scope) {
+export function propsForExtraction(
+  node: TreeView | null | undefined,
+  scope: Iterable<string> | null | undefined,
+): readonly string[] {
   const inScope = scope instanceof Set ? new Set(scope) : new Set(scope || []);
-  if (!inScope.size || !node) {return [];}
-  const found = [];
-  const take = (text, shadowed) => {
+  if (!inScope.size || !node) {
+    return [];
+  }
+  const found: string[] = [];
+  const visit = treeBudget();
+  const take = (text: string, shadowed: ReadonlySet<string>): void => {
     for (const chip of scopeChips(text, inScope)) {
-      const root = chip.path.split('.')[0];
-      if (shadowed.has(root) || found.includes(root)) {continue;}
+      const root = chip.path.split('.')[0] ?? '';
+      if (shadowed.has(root) || found.includes(root)) {
+        continue;
+      }
       found.push(root);
     }
   };
 
-  const walk = (n, shadowed) => {
-    if (!n || typeof n !== 'object') {return;}
-    for (const text of expressionsOf(n)) {take(text, shadowed);}
+  const walk = (n: TreeView, shadowed: ReadonlySet<string>, depth: number): void => {
+    visit(depth);
+    if (!n || typeof n !== 'object') {
+      return;
+    }
+    for (const text of expressionsOf(n)) {
+      take(text, shadowed);
+    }
     let inner = shadowed;
     if (n.kind === 'map') {
       // The item and index belong to this loop, and so does anything its body
       // declares — all of it travels with the markup.
       const head = loopHead(n.head);
-      const bound = [head?.item, head?.index].filter(Boolean);
-      const body = Array.isArray(n.body) ? n.body.join('\n') : '';
+      const bound = [head?.item, head?.index].filter((name): name is string => !!name);
+      const body = n.body?.join('\n') ?? '';
       const declared = body ? [...parseDeclarations(body).keys()] : [];
       // A loop's own body lines read from OUTSIDE it (that's how it gets data).
-      for (const line of Array.isArray(n.body) ? n.body : []) {
+      for (const line of n.body ?? []) {
         take(line, new Set([...shadowed, ...bound]));
       }
-      if (bound.length || declared.length) {inner = new Set([...shadowed, ...bound, ...declared]);}
+      if (bound.length || declared.length) {
+        inner = new Set([...shadowed, ...bound, ...declared]);
+      }
     }
-    for (const child of n.children || []) {walk(child, inner);}
+    for (const child of n.children || []) {
+      walk(child, inner, depth + 1);
+    }
   };
 
-  walk(node, new Set());
+  walk(node, new Set(), 0);
   return found;
 }
 
 /** The frontmatter line a component with these props opens with. */
-export function propsDestructure(props) {
+export function propsDestructure(props: readonly string[] | null | undefined): string {
   const names = (props || []).filter(Boolean);
-  if (!names.length) {return '';}
+  if (!names.length) {
+    return '';
+  }
   return `const { ${names.join(', ')} } = Astro.props;`;
 }

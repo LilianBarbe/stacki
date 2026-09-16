@@ -1,3 +1,4 @@
+import { treeBudget, type TreeView } from './treeView';
 // Whether a node puts an element of its OWN on the page.
 //
 // `<Fragment>` and `<slot>` do not. They render what is inside them and nothing
@@ -17,8 +18,10 @@
 // component's own root shown as a page element wrapping the component.
 
 /** @param {{name?: string}|null|undefined} node */
-export function rendersOwnElement(node) {
-  if (!node) {return false;}
+export function rendersOwnElement(node: { readonly name?: string } | null | undefined): boolean {
+  if (!node) {
+    return false;
+  }
   return node.name !== 'Fragment' && node.name !== 'slot';
 }
 
@@ -29,16 +32,26 @@ export function rendersOwnElement(node) {
  * `classesByPath` is what the page reported; `prefix` is the open component's
  * namespace, or '' for a page.
  */
-export function liveClassesById(classesByPath, nodes, prefix = '') {
-  const byId = new Map();
-  const walk = (list, trail) => {
+export function liveClassesById(
+  classesByPath: Readonly<Record<string, readonly string[]>>,
+  nodes: readonly TreeView[] | null | undefined,
+  prefix = '',
+): ReadonlyMap<string, readonly string[]> {
+  const byId = new Map<string, readonly string[]>();
+  const visit = treeBudget();
+  const walk = (list: readonly TreeView[] | null | undefined, trail: readonly number[]): void => {
     (list || []).forEach((node, i) => {
+      visit(trail.length);
       const t = [...trail, i];
       const hit = classesByPath[prefix + t.join('.')];
       // Only for a node that put an element of its own there: what the page
       // reports for a Fragment is whatever the Fragment holds.
-      if (hit && hit.length && rendersOwnElement(node)) {byId.set(node.id, hit);}
-      if (Array.isArray(node.children)) {walk(node.children, t);}
+      if (hit && hit.length && rendersOwnElement(node)) {
+        byId.set(node.id, hit);
+      }
+      if (node.children != null) {
+        walk(node.children, t);
+      }
     });
   };
   walk(nodes, []);

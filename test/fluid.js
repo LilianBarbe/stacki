@@ -11,8 +11,7 @@
 // The numbers are read out of the expression rather than from input fields, so
 // this covers the ways a clamp() can be written as well as the maths.
 
-const path = require('path');
-const { pathToFileURL } = require('url');
+const loadRenderer = require('./renderer-module.js');
 
 const failures = [];
 let checked = 0;
@@ -22,9 +21,7 @@ const check = (what, condition, detail) => {
 };
 
 (async () => {
-  const { fluidCheck, resolveValue } = await import(
-    pathToFileURL(path.join(__dirname, '..', 'src', 'fluid.js')).href
-  );
+  const { fluidCheck, resolveValue } = loadRenderer('fluid.ts');
 
   // The shape the framework writes: sizes in px, divided by 16 into rem, scaled
   // between two viewport widths.

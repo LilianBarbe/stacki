@@ -75,6 +75,23 @@ try {
   const item = { type: 'text/plain', kind: 'string', getAsFile: () => null };
   assert.deepEqual(decideTerminalPaste([item], 'hello', null, false), { kind: 'text' });
   assert.throws(() => decideTerminalPaste(Array(10_001).fill(item), '', null, false), /item count/);
+  const { findWithParent, isInlineRun } = load('treeSelection');
+  const cycle = { id: 'cycle', kind: 'element', name: 'span', children: [] };
+  cycle.children.push(cycle);
+  assert.throws(() => findWithParent([cycle], 'missing'), /Tree traversal exceeds depth limit/);
+  assert.throws(() => isInlineRun([cycle]), /Tree traversal exceeds depth limit/);
+  const leaf = { id: 'text', kind: 'text', value: 'hello' };
+  assert.equal(isInlineRun(Array(20_000).fill(leaf)), true);
+  assert.throws(() => isInlineRun(Array(20_001).fill(leaf)), /Tree traversal exceeds node limit/);
+  const { liveClassesById } = load('liveClasses');
+  assert.throws(() => liveClassesById({}, [cycle]), /Tree traversal exceeds depth limit/);
+  const { propsForExtraction } = load('extractProps');
+  assert.throws(() => propsForExtraction(cycle, ['title']), /Tree traversal exceeds depth limit/);
+  const { evaluate } = load('fluid');
+  assert.equal(evaluate('(2rem + 16px) * 2', 0), 6);
+  assert.equal(evaluate('('.repeat(66) + '1' + ')'.repeat(66), 0), null);
+  assert.equal(evaluate('1'.repeat(1_000_001), 0), null);
+
   console.log('renderer-leaves: state replacement, cancellation, metadata and limits passed');
 } finally {
   fs.rmSync(directory, { recursive: true, force: true });

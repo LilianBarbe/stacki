@@ -1,13 +1,15 @@
+import { assert } from '../shared/assert';
+import { treeBudget, type TreeView } from './treeView';
 // Tree questions the navigator and the editor both ask, kept apart from both
 // so they can be reasoned about (and tested) on their own: which nodes get a
 // row, and where the selection goes when one of them is deleted.
 
 // Children the Content field fully covers: plain text and simple {expr}
 // interpolations (single braces, no JSX). These get no navigator rows.
-export function isContentOnlyChild(c) {
+export function isContentOnlyChild(c: TreeView): boolean {
   return (
     c.kind === 'text' ||
-    (c.kind === 'expr' && /^\{[^{}]*\}$/.test(c.value) && !c.value.includes('<'))
+    (c.kind === 'expr' && /^\{[^{}]*\}$/.test(c.value ?? '') && !(c.value ?? '').includes('<'))
   );
 }
 
@@ -21,15 +23,30 @@ export function isContentOnlyChild(c) {
  * `else` holding `{heading}` drew as an empty row, with the value it renders
  * reachable from nowhere at all. Same for a condition and a loop.
  */
-export function hidesChildRows(node, kids) {
+export function hidesChildRows(
+  node: TreeView | null | undefined,
+  kids: readonly TreeView[],
+): boolean {
   const covered = node?.kind === 'element' || node?.kind === 'component';
   return covered && kids.length > 0 && kids.every(isContentOnlyChild);
 }
 
 // Tags the serializer keeps on one line with the words around them.
 const INLINE_TAGS = new Set([
-  'strong', 'em', 'b', 'i', 'sup', 'sub', 'code', 'a', 'span', 'br',
-  'small', 'mark', 'u', 's',
+  'strong',
+  'em',
+  'b',
+  'i',
+  'sup',
+  'sub',
+  'code',
+  'a',
+  'span',
+  'br',
+  'small',
+  'mark',
+  'u',
+  's',
 ]);
 
 // Whether a child list is written out as a single inline run. The serializer
@@ -38,36 +55,77 @@ const INLINE_TAGS = new Set([
 // is in there, and "this rendered nothing" is a question that can't be asked
 // of it. Mirrors isInlineRun in the parser; the two have to agree, or a node
 // nobody ever marked reads as a node that produced nothing.
-export function isInlineRun(nodes) {
-  return (
-    Array.isArray(nodes) &&
-    nodes.length > 0 &&
-    nodes.every(
-      (n) =>
-        isContentOnlyChild(n) ||
-        (n.kind === 'element' &&
-          INLINE_TAGS.has(String(n.name).toLowerCase()) &&
-          (n.children === null || n.children.length === 0 || isInlineRun(n.children)))
-    )
-  );
+export function isInlineRun(nodes: readonly TreeView[] | null | undefined): boolean {
+  return isInlineRunWalk(nodes, 0, treeBudget());
+}
+
+function isInlineRunWalk(
+  nodes: readonly TreeView[] | null | undefined,
+  depth: number,
+  visit: (depth: number) => void,
+): boolean {
+  if (!nodes?.length) {
+    return false;
+  }
+  return nodes.every((node) => {
+    visit(depth);
+    if (isContentOnlyChild(node)) {
+      return true;
+    }
+    if (node.kind !== 'element') {
+      return false;
+    }
+    if (!INLINE_TAGS.has(String(node.name).toLowerCase())) {
+      return false;
+    }
+    if (!node.children?.length) {
+      return true;
+    }
+    return isInlineRunWalk(node.children, depth + 1, visit);
+  });
 }
 
 // The comment sitting directly above `index` in its own sibling list — the
 // note the navigator folds into that node's row. Moves and deletes carry it
 // along: the two read as one row, so leaving it behind would silently re-attach
 // someone else's note to whatever ends up next.
-export function noteIndexAbove(list, index) {
+export function noteIndexAbove(list: readonly TreeView[], index: number): number {
   const prev = index > 0 ? list[index - 1] : null;
   return prev && prev.kind === 'comment' ? index - 1 : -1;
 }
 
 // Node plus the list it sits in and the node holding that list.
-export function findWithParent(nodes, id, parent = null) {
+export function findWithParent(
+  nodes: readonly TreeView[],
+  id: string,
+  parent: TreeView | null = null,
+): FoundNode | null {
+  return findWithParentWalk(nodes, id, parent, 0, treeBudget());
+}
+
+interface FoundNode {
+  readonly node: TreeView;
+  readonly parent: TreeView | null;
+  readonly siblings: readonly TreeView[];
+  readonly index: number;
+}
+function findWithParentWalk(
+  nodes: readonly TreeView[],
+  id: string,
+  parent: TreeView | null,
+  depth: number,
+  visit: (depth: number) => void,
+): FoundNode | null {
   for (const [i, n] of nodes.entries()) {
-    if (n.id === id) {return { node: n, parent, siblings: nodes, index: i };}
-    if (Array.isArray(n.children)) {
-      const found = findWithParent(n.children, id, n);
-      if (found) {return found;}
+    visit(depth);
+    if (n.id === id) {
+      return { node: n, parent, siblings: nodes, index: i };
+    }
+    if (n.children != null) {
+      const found = findWithParentWalk(n.children, id, n, depth + 1, visit);
+      if (found) {
+        return found;
+      }
     }
   }
   return null;
@@ -79,30 +137,53 @@ export function findWithParent(nodes, id, parent = null) {
 // the list carries on downward from the hole. Reckoned in navigator rows, not
 // raw nodes: a comment folded into the row beneath it isn't somewhere the
 // selection can go.
-export function selectionAfterDelete(model, nodeId) {
+export function selectionAfterDelete(
+  model: { readonly nodes: readonly TreeView[] },
+  nodeId: string,
+): string | null {
   const found = findWithParent(model.nodes, nodeId);
-  if (!found) {return null;}
+  if (!found) {
+    return null;
+  }
   const { parent, siblings, index } = found;
   const gone = new Set([index]);
   const noteAt = noteIndexAbove(siblings, index); // the node's own note goes too
-  if (noteAt !== -1) {gone.add(noteAt);}
+  if (noteAt !== -1) {
+    gone.add(noteAt);
+  }
   const rest = siblings.filter((_, i) => !gone.has(i));
-  if (!rest.length) {return parent ? parent.id : null;}
+  if (!rest.length) {
+    return parent ? parent.id : null;
+  }
   // Children that are all text or simple {expr} render no rows at all, so the
   // nearest thing to select is what held them.
-  if (rest.every(isContentOnlyChild)) {return parent ? parent.id : null;}
+  if (rest.every(isContentOnlyChild)) {
+    return parent ? parent.id : null;
+  }
   // Where the hole is, in the surviving list.
   const at = siblings.slice(0, index).filter((_, i) => !gone.has(i)).length;
   // Rows the selection can't land on: a comment folded into the row beneath
   // it, and the text and {expr} the Content field covers — including the
   // spaces that hold an inline run apart, which are text nodes like any other.
-  const folded = (i) =>
-    isContentOnlyChild(rest[i]) ||
-    (rest[i].kind === 'comment' &&
-      rest[i + 1] &&
-      (rest[i + 1].kind === 'element' || rest[i + 1].kind === 'component'));
-  for (let i = at; i < rest.length; i++) {if (!folded(i)) {return rest[i].id;}}
-  for (let i = at - 1; i >= 0; i--) {if (!folded(i)) {return rest[i].id;}}
+  const folded = (i: number): boolean => {
+    const node = rest[i];
+    assert(node !== undefined, 'Selection index must name a surviving node');
+    return (
+      isContentOnlyChild(node) ||
+      (node.kind === 'comment' &&
+        (rest[i + 1]?.kind === 'element' || rest[i + 1]?.kind === 'component'))
+    );
+  };
+  for (let i = at; i < rest.length; i++) {
+    if (!folded(i)) {
+      return rest[i]?.id ?? null;
+    }
+  }
+  for (let i = at - 1; i >= 0; i--) {
+    if (!folded(i)) {
+      return rest[i]?.id ?? null;
+    }
+  }
   return parent ? parent.id : null;
 }
 
@@ -116,7 +197,7 @@ export function selectionAfterDelete(model, nodeId) {
 const RULE = /^\s*([-=*_])\1{2,}\s*/;
 const RULE_END = /\s*([-=*_])\1{2,}\s*$/;
 
-export function noteText(raw) {
+export function noteText(raw: unknown): string {
   const full = String(raw ?? '').trim();
   const label = full.replace(RULE, '').replace(RULE_END, '').trim();
   // A rule with no label is decoration rather than a note. Shown as it is,
@@ -125,13 +206,18 @@ export function noteText(raw) {
   return label || full;
 }
 
-export function noteValue(previous, text) {
+export function noteValue(previous: unknown, text: unknown): string | null {
   const body = String(text ?? '').trim();
-  if (!body) {return null;} // the caller removes the node
+  if (!body) {
+    return null;
+  } // the caller removes the node
   const full = String(previous ?? '').trim();
   const lead = full.match(RULE);
-  if (!lead) {return ` ${body} `;}
+  if (!lead) {
+    return ` ${body} `;
+  }
   const rule = lead[1];
+  assert(rule !== undefined, 'Divider pattern must capture its character');
   const width = Math.max(3, full.length - body.length - 1);
   return ` ${rule.repeat(width)} ${body} `;
 }

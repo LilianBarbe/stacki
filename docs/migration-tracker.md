@@ -130,7 +130,7 @@ Cleanup owed: `electron/scratch2-7.js` are stray tsc-emitted outputs from the
 cssVars conversion experiments, still tracked in git (198 lines). Delete them
 in a standalone commit; nothing requires them.
 
-### src/ — 26 modules converted
+### src/ — 32 modules converted
 
 `editorTree`, `pagePersistence` (WeakSet acks + drain caps),
 `cleanError`, `branchName`, `loopBindings` (minimal-fidelity LiveNode),
@@ -150,9 +150,15 @@ All 164 old/new comparisons passed. The expanded gate passes 126/126 commands
 (97.3s); the new renderer-leaves suite pins cancellation, listener replacement,
 metadata identity, and boundary limits. Converted files have no lint warnings.
 
-Remaining src leaves (12 top-level `.js`): `contentSchema`, `cmsSchema`,
-`frontmatterMove`, `gitActions`, `fluid`, `treeSelection`, `canvasQuery`,
-`instanceProps`, `insertTarget`, `previewRecovery`, `extractProps`, `liveClasses`.
+Third renderer batch: `treeSelection`, `liveClasses`, `extractProps`,
+`instanceProps`, `insertTarget`, `fluid`, plus the shared `treeView` projection
+and traversal budget. All 70 old/new comparisons passed. The gate passes
+126/126 commands (94.6s), with no warnings in converted files. Regression tests
+cover cyclic/deep/wide trees and arithmetic nesting limits; Node-only fluid tests
+now bundle renderer TypeScript using the same compiler as the app.
+
+Remaining src leaves (6 top-level `.js`): `contentSchema`, `cmsSchema`,
+`frontmatterMove`, `gitActions`, `canvasQuery`, `previewRecovery`.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
 ### src/ui — 32 files, 6,457 lines ⬜

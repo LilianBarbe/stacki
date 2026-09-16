@@ -1,3 +1,6 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
+
 // Fluid type, and whether a reader can enlarge it.
 //
 // This lives with the panel rather than with the file reader because it has to
@@ -9,15 +12,24 @@
 // A value with its variables substituted, following references until nothing
 // is left to follow. `overrides` is what is being typed right now, which is not
 // yet what the file says.
-export function resolveValue(value, values, overrides, depth = 0) {
-  if (depth > 8) {return value;}
+export function resolveValue(
+  value: string,
+  values?: Readonly<Record<string, string>>,
+  overrides?: Readonly<Record<string, string>>,
+  depth = 0,
+): string {
+  if (depth > 8) {
+    return value;
+  }
   const next = String(value).replace(
     /var\(\s*(--[\w-]+)\s*(?:,([^()]*(?:\([^()]*\)[^()]*)*))?\)/g,
-    (whole, name, fallback) => {
+    (whole: string, name: string, fallback: string | undefined): string => {
       const found = overrides?.[name] ?? values?.[name];
-      if (found !== undefined) {return found;}
+      if (found !== undefined) {
+        return found;
+      }
       return fallback !== undefined ? fallback.trim() : whole;
-    }
+    },
   );
   return next === String(value) ? next : resolveValue(next, values, overrides, depth + 1);
 }
@@ -44,15 +56,17 @@ export function resolveValue(value, values, overrides, depth = 0) {
 // variables, which is resolved first.
 
 // Splits `a, b, c` at the top level, ignoring commas inside nested parentheses.
-export function splitArgs(text) {
+export function splitArgs(text: string): readonly string[] {
   const out = [];
   let depth = 0;
   let start = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (ch === '(') {depth++;}
-    else if (ch === ')') {depth--;}
-    else if (ch === ',' && depth === 0) {
+    if (ch === '(') {
+      depth++;
+    } else if (ch === ')') {
+      depth--;
+    } else if (ch === ',' && depth === 0) {
       out.push(text.slice(start, i));
       start = i + 1;
     }
@@ -64,70 +78,109 @@ export function splitArgs(text) {
 // Arithmetic, in rem, with `vw` left as a symbol so the linear term can be read
 // off. Anything it does not understand — a nested function, a unit that depends
 // on context — makes the whole reading fail rather than a wrong number.
-export function evaluate(text, vw) {
-  let at = 0;
-  const src = String(text);
-  const skip = () => {
-    while (at < src.length && /\s/.test(src[at])) {at++;}
-  };
-  const expression = () => {
-    let value = term();
-    for (;;) {
-      skip();
-      const op = src[at];
-      if (op !== '+' && op !== '-') {return value;}
-      at++;
-      const right = term();
-      if (right === null || value === null) {return null;}
-      value = op === '+' ? value + right : value - right;
+export function evaluate(text: unknown, viewportWidth: number): number | null {
+  const source = String(text);
+  if (source.length > LIMITS.nodeValueCharsMax) {
+    return null;
+  }
+  return new ArithmeticReader(source, viewportWidth).read();
+}
+
+// Only this reader mutates the cursor. Every operator consumes a character;
+// nested parentheses and unary minus share the same explicit depth budget.
+class ArithmeticReader {
+  private position = 0;
+  constructor(
+    private readonly source: string,
+    private readonly viewportWidth: number,
+  ) {}
+
+  read(): number | null {
+    const value = this.expression(0);
+    this.skip();
+    return this.position === this.source.length ? value : null;
+  }
+
+  private skip(): void {
+    while (this.position < this.source.length && /\s/.test(this.source.charAt(this.position))) {
+      this.position++;
     }
-  };
-  const term = () => {
-    let value = factor();
-    for (;;) {
-      skip();
-      const op = src[at];
-      if (op !== '*' && op !== '/') {return value;}
-      at++;
-      const right = factor();
-      if (right === null || value === null) {return null;}
-      value = op === '*' ? value * right : value / right;
+  }
+
+  private expression(depth: number): number | null {
+    let value = this.term(depth);
+    for (let count = 0; count <= this.source.length; count++) {
+      this.skip();
+      const operator = this.source[this.position];
+      if (operator !== '+' && operator !== '-') {
+        return value;
+      }
+      this.position++;
+      const right = this.term(depth);
+      if (right === null || value === null) {
+        return null;
+      }
+      value = operator === '+' ? value + right : value - right;
     }
-  };
-  const factor = () => {
-    skip();
-    if (src[at] === '(') {
-      at++;
-      const value = expression();
-      skip();
-      if (src[at] !== ')') {return null;}
-      at++;
+    assert(false, 'Arithmetic expression must consume input');
+  }
+
+  private term(depth: number): number | null {
+    let value = this.factor(depth);
+    for (let count = 0; count <= this.source.length; count++) {
+      this.skip();
+      const operator = this.source[this.position];
+      if (operator !== '*' && operator !== '/') {
+        return value;
+      }
+      this.position++;
+      const right = this.factor(depth);
+      if (right === null || value === null) {
+        return null;
+      }
+      value = operator === '*' ? value * right : value / right;
+    }
+    assert(false, 'Arithmetic term must consume input');
+  }
+
+  private factor(depth: number): number | null {
+    if (depth > LIMITS.treeDepthMax) {
+      return null;
+    }
+    this.skip();
+    if (this.source[this.position] === '(') {
+      this.position++;
+      const value = this.expression(depth + 1);
+      this.skip();
+      if (this.source[this.position] !== ')') {
+        return null;
+      }
+      this.position++;
       return value;
     }
-    if (src[at] === '-') {
-      at++;
-      const value = factor();
+    if (this.source[this.position] === '-') {
+      this.position++;
+      const value = this.factor(depth + 1);
       return value === null ? null : -value;
     }
-    const match = /^([0-9]*\.?[0-9]+)(px|rem|em|vw|vh|%)?/.exec(src.slice(at));
-    if (!match) {return null;}
-    at += match[0].length;
-    const n = parseFloat(match[1]);
+    const match = /^([0-9]*\.?[0-9]+)(px|rem|em|vw|vh|%)?/.exec(this.source.slice(this.position));
+    if (!match?.[1]) {
+      return null;
+    }
+    this.position += match[0].length;
+    const number = parseFloat(match[1]);
     switch (match[2]) {
       case undefined:
       case 'rem':
-        return n;
+        return number;
       case 'px':
-        return n / 16;
+        return number / 16;
       case 'vw':
-        return n * vw;
+        return number * this.viewportWidth;
       default:
-        return null; // em, vh, % — not something this can reason about
+        return null;
     }
-  };
-  const value = expression();
-  skip();
-  return at === src.length ? value : null;
+  }
 }
 
 export const FLUID_LINK =
@@ -138,12 +191,16 @@ export const FLUID_LINK =
  * vw }, or null when the value is not one. `resolved` is the value with its
  * variables already substituted — the check is on numbers, never on names.
  */
-export function fluidCheck(resolved) {
+export function fluidCheck(resolved: unknown) {
   const text = String(resolved || '').trim();
   const match = /^clamp\(([\s\S]*)\)$/i.exec(text);
-  if (!match) {return null;}
-  const args = splitArgs(match[1]);
-  if (args.length !== 3) {return null;}
+  if (!match) {
+    return null;
+  }
+  const args = splitArgs(match[1] ?? '');
+  if (args.length !== 3) {
+    return null;
+  }
 
   const min = evaluate(args[0], 0);
   const max = evaluate(args[2], 0);
@@ -151,10 +208,17 @@ export function fluidCheck(resolved) {
   // viewport at all is the rem part, and the step to one vw is the coefficient.
   const base = evaluate(args[1], 0);
   const atOne = evaluate(args[1], 1);
-  if ([min, max, base, atOne].some((n) => n === null || !Number.isFinite(n))) {return null;}
+  if ([min, max, base, atOne].some((n) => n === null || !Number.isFinite(n))) {
+    return null;
+  }
+  if (min === null || max === null || base === null || atOne === null) {
+    return null;
+  }
   const vw = atOne - base;
   // No viewport term is a clamp, but not a fluid one — nothing here applies.
-  if (vw === 0) {return null;}
+  if (vw === 0) {
+    return null;
+  }
 
   // Inverted values (a max below the min) are read the way they render, or the
   // ratio test passes on a value that fails it in the other direction.
@@ -171,4 +235,3 @@ export function fluidCheck(resolved) {
     link: FLUID_LINK,
   };
 }
-
