@@ -399,7 +399,7 @@ const check = (what, condition, detail) => {
 
   // The field really draws them, and pressing one repoints that hole alone.
   const panel = require('fs').readFileSync(
-    require('path').join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'),
+    require('path').join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'),
     'utf8'
   );
   // The holes are half of it now: the field also chips a value the code names
@@ -413,7 +413,7 @@ const check = (what, condition, detail) => {
   );
   check(
     'with the press surviving its own mousedown',
-    /closest\?\.\('\.expr-chip, \.cm-chip'\)/.test(panel)
+    /closest\('\.expr-chip, \.cm-chip'\)/.test(panel)
   );
 
   // ── A chip that writes a tail ─────────────────────────────────────────────
@@ -517,12 +517,12 @@ const check = (what, condition, detail) => {
   // field puts this one away rather than leaving two pickers open at once.
   check(
     'the picker marks the current value by what the chip means',
-    /current=\{menu\.chip\?\.path \?\? \(menu\.chip \? chipPath\(menu\.chip\)/.test(panel),
+    /current=\{menu\.chip \? chipPath\(menu\.chip\)/.test(panel),
     'the picker is reading the chip\'s written text again'
   );
   check(
     'a chip in another field closes this one',
-    /const chip = e\.target\.closest\?\.\('\.expr-chip, \.cm-chip'\)[\s\S]{0,120}wrapRef\.current\?\.contains\(chip\)/.test(panel),
+    /const chip = eventElement\(e\.target\)\?\.closest\('\.expr-chip, \.cm-chip'\)[\s\S]{0,120}wrapRef\.current\?\.contains\(chip\)/.test(panel),
     'any chip anywhere keeps this picker open'
   );
 

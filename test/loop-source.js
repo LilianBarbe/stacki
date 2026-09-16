@@ -56,7 +56,8 @@ function withSource(value, path) {
   const source = require('fs').readFileSync(
     path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'),
     'utf8'
-  );
+  ) + require('fs').readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'), 'utf8');
   check('the panel still derives the source the same way', source.includes('function sourceChip('));
   check('and still swaps it in place', source.includes('function withSource('));
   check(

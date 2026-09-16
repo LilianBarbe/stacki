@@ -1,3 +1,4 @@
+import type { Attr } from '../shared/page-node';
 // Whether a node renders data rather than fixed markup — an expression prop
 // (`href={service.link}`), an `{expr}` child, or text with an interpolation
 // in it. Only the node's own props and its direct children count: a section
@@ -304,7 +305,7 @@ export function partsFromValue(value: ValueLike | null | undefined): Part[] | nu
 export function valueFromParts(
   parts: readonly Part[] | null | undefined,
   { numeric, mode }: { readonly numeric?: boolean; readonly mode?: string } = {},
-): ValueLike | undefined {
+): Extract<Attr, { readonly type: 'string' | 'expr' }> | undefined {
   const clean = (parts ?? []).filter((p) =>
     p.expr !== undefined ? String(p.expr).trim() !== '' : p.text !== '',
   );

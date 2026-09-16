@@ -230,7 +230,7 @@ const check = (what, condition, detail) => {
 
   // --- the rule, where it lives ---------------------------------------------------
   const panel = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'),
+    path.join(__dirname, '..', 'src', 'panels', 'propBindings.tsx'),
     'utf8'
   );
   check(

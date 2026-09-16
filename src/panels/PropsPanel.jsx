@@ -1,3 +1,6 @@
+import { referencedName, SourceEditButton, ExprValueField, ConditionField, BindHandle,
+  FieldDataPicker, BindField, ValueCodeEditor } from './propBindings';
+export { BindField } from './propBindings';
 import { createPropRules } from './propRules';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
@@ -18,26 +21,19 @@ import { SoundHere } from '../ui/soundScope.jsx';
 import StyleEditor, { collapseDeclarations } from '../ui/StyleEditor.jsx';
 import ExprInput from '../ui/ExprInput.jsx';
 import RichContent, { isInlineOnly } from '../ui/RichContent.jsx';
-import { checkStatement } from '../jsCheck.js';
 import AssetField from '../ui/AssetField.jsx';
 import { looksLikeAssetPath, mediaKindFor } from '../ui/AssetThumb.jsx';
 import {
   dataTree,
-  findDeclaration,
   findImportOf,
   listsOnly,
   scopeChips,
   scopeCompletions,
 } from '../dataSuggest.js';
 import LinkField from '../ui/LinkField.jsx';
-import DataPicker from '../ui/DataPicker.jsx';
-import BindInput from '../ui/BindInput.jsx';
 import {
   partsFromValue,
-  resolvePick,
-  templateHoles,
   valueFromParts,
-  valueModeOf,
 } from '../bindings.js';
 import {
 
@@ -61,8 +57,6 @@ import {
   LayoutIcon,
   BranchIcon,
   CornerIcon,
-  PencilIcon,
-  CloseIcon,
 } from '../ui/Icons.jsx';
 
 // Edits the props of the selected node. Fields come from the component's
@@ -124,6 +118,8 @@ export default function PropsPanel({
   projectPath,
   filePath,
 }) {
+  // Held values belong to the panel, including while a non-element is selected.
+  const stashRef = useRef(new Map());
   // What an expression field here can name — this file's props, its frontmatter
   // values, the item of any loop around the selection. Offered as you type, so a
   // name doesn't have to be remembered (or spelled right) to be used.
@@ -410,6 +406,84 @@ export default function PropsPanel({
     );
   }
 
+  return <ElementPropsPanel {...{
+    node,
+    focusClass,
+    focusContent,
+    isLayout,
+    layouts,
+    currentLayoutName,
+    onChangeLayout,
+    schema,
+    slotOptions,
+    takesSlotText,
+    tagOptions,
+    projectClasses,
+    allowAttrs,
+    comment,
+    onSetComment,
+    loopContext,
+    bindContext,
+    linkContext,
+    onSetProp,
+    onSetProps,
+    onSetAssetProp,
+    onRenameProp,
+    onChangeTag,
+    onSetText,
+    onSetContent,
+    onSetInline,
+    onOpenCode,
+    onSetFrontmatter,
+    frontmatterSource,
+    onOpenSymbol,
+    onToggleElse,
+    projectPath,
+    filePath,
+    dataCtx: buildDataCtx(),
+    stashRef
+  }} />;
+}
+
+// Element hooks have a stable lifetime across ordinary selections. Other node
+// kinds mount their own editors, so selecting text cannot change this hook order.
+function ElementPropsPanel({
+  node,
+  focusClass,
+  focusContent,
+  isLayout,
+  layouts,
+  currentLayoutName,
+  onChangeLayout,
+  schema,
+  slotOptions,
+  takesSlotText,
+  tagOptions,
+  projectClasses,
+  allowAttrs,
+  comment,
+  onSetComment,
+  loopContext,
+  bindContext,
+  linkContext,
+  onSetProp,
+  onSetProps,
+  onSetAssetProp,
+  onRenameProp,
+  onChangeTag,
+  onSetText,
+  onSetContent,
+  onSetInline,
+  onOpenCode,
+  onSetFrontmatter,
+  frontmatterSource,
+  onOpenSymbol,
+  onToggleElse,
+  projectPath,
+  filePath,
+  dataCtx,
+  stashRef
+}) {
   const schemaNames = new Set(schema.map((s) => s.name));
 
   // The slot field renders in one stable spot whether or not the attribute
@@ -462,7 +536,6 @@ export default function PropsPanel({
 
   // Where a prop's {expression} can be pointing, and how to write that source
   // back — lets an expression field edit the declaration behind it.
-  const dataCtx = buildDataCtx();
 
   // Astro's <Image> (and any component that forwards to it) rejects a public/
   // path with no width and height — "MissingImageDimension" takes the page
@@ -538,7 +611,6 @@ export default function PropsPanel({
   // Values a discriminant switch took away, per node, kept only while the
   // panel is up: flicking variant → full-width → constrained should hand
   // `sizes` back, but reopening the project shouldn't resurrect it.
-  const stashRef = useRef(new Map());
   const { appliesNow, branchDefault, narrowOptions, cascade } = createPropRules(
     schema, node.props || {},
   );
@@ -1986,67 +2058,18 @@ function TagField({ tag, options, onChangeTag }) {
 // `rotatingWords` and `site.nav.items`. Anything with a call, an operator or
 // a literal in it isn't a plain reference to one declaration, so it has no
 // source to open.
-function referencedName(expr) {
-  const m = String(expr ?? '')
-    .trim()
-    .match(/^([A-Za-z_$][\w$]*)(?:\s*\.\s*[A-Za-z_$][\w$]*)*$/);
-  return m ? m[1] : '';
-}
+
 
 // Where the data behind an expression can be edited from here: 'local' when
 // this file's frontmatter declares it (edited in place), 'file' when it's
 // imported (opens the file that defines it), null when neither.
-function symbolTarget(name, dataCtx) {
-  if (!name || !dataCtx) {return null;}
-  if (dataCtx.onSetFrontmatter && findDeclaration(dataCtx.frontmatter || '', name)) {return 'local';}
-  if (dataCtx.onOpenSymbol && findImportOf(dataCtx.imports || '', name)) {return 'file';}
-  return null;
-}
+
 
 // The pencil beside a field bound to data: it opens whatever defines that
 // data. A `const` in this file opens inline, right under the field; anything
 // imported opens its own file, on the line that declares it. Renders nothing
 // when the value doesn't name something we can find.
-function SourceEditButton({ name, dataCtx, anchorRef, className = 'attr-asset-toggle' }) {
-  const [pos, setPos] = useState(null);
-  const target = symbolTarget(name, dataCtx);
-  if (!target) {return null;}
 
-  const open = () => {
-    if (target === 'file') {
-      dataCtx.onOpenSymbol(name);
-      return;
-    }
-    const r = anchorRef?.current?.getBoundingClientRect();
-    const width = Math.max(r?.width ?? 240, 260);
-    setPos({
-      top: Math.min((r?.bottom ?? 200) + 6, Math.max(60, window.innerHeight - 240)),
-      left: Math.min(r?.left ?? 0, window.innerWidth - width - 12),
-      width,
-    });
-  };
-
-  return (
-    <>
-      <button
-        className={`${className} ${pos ? 'on' : ''}`}
-        title={target === 'file' ? `Open where ${name} is defined` : `Edit ${name}`}
-        onClick={() => (pos ? setPos(null) : open())}
-      >
-        <PencilIcon size={12} />
-      </button>
-      {pos && (
-        <VarSourceEditor
-          pos={pos}
-          name={name}
-          code={dataCtx.frontmatter || ''}
-          onChangeCode={dataCtx.onSetFrontmatter}
-          onClose={() => setPos(null)}
-        />
-      )}
-    </>
-  );
-}
 
 // Files an import can name that are pictures rather than code.
 const MEDIA_IMPORT_RE =
@@ -2110,27 +2133,7 @@ function AssetImportField({ binding, name, assetCtx, onChange }) {
 // pencil goes straight to it. Changing the three words in `const
 // rotatingWords = […]` is part of the same thought as pointing the prop at
 // it, and shouldn't mean hunting for the file.
-function ExprValueField({ value, placeholder, dataCtx, onChange }) {
-  const wrapRef = useRef(null);
-  const name = referencedName(value);
 
-  return (
-    <div className="prop-expr-row" ref={wrapRef}>
-      <ExprInput
-        value={value}
-        syncValue={value}
-        // Empty when nothing is known, like every other field. The old
-        // generic "expression" described the input format, not the fallback,
-        // and in a column of placeholders that all name real values it read as
-        // if the value itself were the word.
-        placeholder={placeholder || ''}
-        onChange={(v) => onChange({ type: 'expr', value: v })}
-        onCommit={(v) => v !== value && onChange({ type: 'expr', value: v }, true)}
-      />
-      <SourceEditButton name={name} dataCtx={dataCtx} anchorRef={wrapRef} />
-    </div>
-  );
-}
 
 // The condition an `if` renders on, as the values it names rather than as a line
 // of text: each one in scope is a purple chip, pressing one opens the list to swap
@@ -2140,63 +2143,7 @@ function ExprValueField({ value, placeholder, dataCtx, onChange }) {
 // node kind above this one — a hook in that body runs for some selections and not
 // others, which is what "Rendered fewer hooks than expected" means. A child's hooks
 // are its own, so nothing above it has to change.
-function ConditionField({ test, scope, chipsOf, bindCtx, onSetText }) {
-  const [pick, setPick] = useState(null); // {chip, pos}
-  const apiRef = useRef(null);
-  const wrapRef = useRef(null);
 
-  const open = (chip) => {
-    const r = wrapRef.current?.getBoundingClientRect();
-    if (!r) {return;}
-    setPick({
-      chip: chip || null,
-      pos: {
-        left: r.left,
-        top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
-        width: Math.max(r.width, 240),
-      },
-    });
-  };
-
-  return (
-    <>
-      <div className="props-cond-field attr-value-field" ref={wrapRef}>
-        <ExprInput
-          value={test}
-          syncValue={test}
-          placeholder="e.g. logo.src"
-          completions={scope}
-          apiRef={apiRef}
-          // The values a condition names, drawn as the same purple chips the rest
-          // of the panel shows data in — and pressing one opens the list to swap
-          // it, rather than retyping a name inside a boolean.
-          chipsOf={chipsOf}
-          onChipClick={(chip) => open(chip)}
-          onCommit={(v) => v.trim() && v !== test && onSetText(v.trim())}
-        />
-        {/* And the way a new one gets in: the same purple dot every bindable field
-            has, inserting at the caret. */}
-        <BindHandle active={!!pick} onOpen={() => (pick ? setPick(null) : open(null))} />
-      </div>
-      {pick ? (
-        <FieldDataPicker
-          pos={pick.pos}
-          bindCtx={bindCtx}
-          current={pick.chip?.path ?? null}
-          onPick={(path) => {
-            const chip = pick.chip;
-            setPick(null);
-            const next = chip
-              ? apiRef.current?.replaceRange(chip.from, chip.to, path)
-              : apiRef.current?.insert(path);
-            if (next != null) {onSetText(next);}
-          }}
-          onClose={() => setPick(null)}
-        />
-      ) : null}
-    </>
-  );
-}
 
 // The way data gets into a field: nothing until the field is hovered, then a
 // small purple dot on its top-left corner — the same purple a binding is shown
@@ -2204,73 +2151,11 @@ function ConditionField({ test, scope, chipsOf, bindCtx, onSetText }) {
 // grows it into a +, which is the click. A button that sat there permanently
 // would be chrome on every field in the panel, for something most fields never
 // need.
-function BindHandle({ active, onOpen }) {
-  return (
-    <button
-      type="button"
-      className={`bind-handle${active ? ' on' : ''}`}
-      title="Insert data — a component prop, a CMS field"
-      aria-label="Insert data"
-      onClick={(e) => onOpen(e.currentTarget.closest('.props-field'))}
-    >
-      <span className="bind-dot" />
-      <PlusIcon size={10} className="bind-plus" />
-    </button>
-  );
-}
+
 
 // The picker, over a field. Positioned against whatever the handle belongs to
 // rather than against the handle itself, so it lines up with the field's edge.
-function FieldDataPicker({ pos, bindCtx, current, tree, onPick, onWrite, onClose }) {
-  const pick = (path, query) => onPick(resolvePick(path, query, bindCtx));
-  useEffect(() => {
-    const close = (e) => {
-      // The thing that opened it is not "outside": letting the mousedown close
-      // it would leave the click that follows to open it straight back up.
-      //
-      // A chip is in that list because it opens the picker ON MOUSEDOWN — the
-      // caret must not land inside a name — and React flushes this effect
-      // synchronously for a discrete event, so the listener below is live
-      // while the very mousedown that opened the picker is still on its way up
-      // to document. Without the chip here, pressing it opened the picker and
-      // closed it again before the button came back up, which looked like a
-      // chip that did nothing at all. Clicking it again still closes, through
-      // the same toggle that opened it.
-      if (e.target.closest?.('.bind-menu, .bind-handle, .dd-source, .cm-chip')) {return;}
-      onClose();
-    };
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    const onScroll = (e) => {
-      if (e.target?.closest?.('.bind-menu')) {return;}
-      onClose();
-    };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onClose);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', onClose);
-    };
-  }, [onClose]);
 
-  return (
-    <div className="dd-popup bind-menu" style={{ left: pos.left, top: pos.top, width: pos.width }}>
-      <DataPicker
-        tree={tree || dataTree(bindCtx || {})}
-        current={current}
-        entries={bindCtx?.entryNav}
-        onStepItem={bindCtx?.onStepItem}
-        onPick={pick}
-        onExpand={(node) => node.query && bindCtx?.onNeedSample?.(node.query.collection)}
-        onWrite={onWrite}
-        footer={!!onWrite}
-      />
-    </div>
-  );
-}
 
 // A prop's value, edited as what it IS: text with the data in it shown as
 // chips. `Posted ` · [post.data.pubDate] reads as one field rather than as a
@@ -2281,23 +2166,13 @@ function FieldDataPicker({ pos, bindCtx, current, tree, onPick, onWrite, onClose
 // chips-and-text field are DOM nodes carrying it in an attribute, and the holes
 // in the code editor are `{from, to, path}` objects. Both name a value, and
 // that name is what the picker's Edit row goes and opens.
-function chipExpr(chip) {
-  if (!chip) {return '';}
-  if (typeof chip.path === 'string') {return chip.path;}
-  if (typeof chip.getAttribute === 'function') {return chip.getAttribute('data-expr') || '';}
-  return '';
-}
+
 
 // What the chip STANDS FOR, which is not always what it writes: a chip reached
 // through a `?` (`featured` · "?" · `.data.title`) writes the tail and means the
 // whole path. The picker marks the current value by this, so opening that chip
 // shows `title` ticked rather than nothing at all.
-function chipPath(chip) {
-  if (chip && typeof chip.getAttribute === 'function') {
-    return chip.getAttribute('data-full') || chip.getAttribute('data-expr') || '';
-  }
-  return chipExpr(chip);
-}
+
 
 // Clicking a chip repoints it — or, through the same menu, opens whatever
 // defines it. The pencil that used to sit beside the field could only ever mean
@@ -2305,240 +2180,7 @@ function chipPath(chip) {
 // for the first; per chip, the question has an answer every time.
 // The braces button drops a new chip in at the caret. All of it opens the same
 // picker, which is where the data itself is.
-export function BindField({ value, field, placeholder, bindCtx, dataCtx, apiRef, onChange }) {
-  const wrapRef = useRef(null);
-  const inputRef = useRef(null);
-  const [menu, setMenu] = useState(null); // {left, top, width, chip}
-  // Editing a `const` from this file happens right under the field, the way the
-  // pencil used to open it — it is the menu that asks for it now.
-  const [src, setSrc] = useState(null); // {name, top, left, width}
-  // The code editor, so a chip pressed inside it can be repointed in place.
-  const exprApiRef = useRef(null);
-  const [raw, setRaw] = useState(false);
-  // What the code editor draws as chips: every `${…}` hole naming a path, plus
-  // every value in scope the code names outright.
-  const scopeNames = new Set(scopeCompletions(bindCtx || {}).map((c) => c.label.split('.')[0]));
-  const codeChips = (text) => {
-    const holes = templateHoles(text);
-    const taken = (from, to) => holes.some((h) => from < h.to && to > h.from);
-    return [...holes, ...scopeChips(text, scopeNames).filter((c) => !taken(c.from, c.to))].sort(
-      (a, b) => a.from - b.from,
-    );
-  };
-  // Typing must not move the field out from under the caret: an expression
-  // half-way to becoming a call reads as code the moment the bracket lands,
-  // and swapping in the code editor mid-word would take the text with it.
-  const [editing, setEditing] = useState(false);
-  const parts = partsFromValue(value);
-  const expr = value?.type === 'expr' ? String(value.value ?? '').trim() : '';
-  // Code no field of chips and text can hold keeps the code editor.
-  const showInput = !raw && (parts !== null || editing);
-  // What the parts mean when they are written back — content, or an
-  // expression with data in it. The value decides, so a field never changes
-  // the meaning of what it was opened on.
-  const mode = valueModeOf(value);
-  // Written as an expression rather than as text. Booleans and numbers are the
-  // obvious ones — `cols={3}` — and a prop that takes an array or an object is
-  // the same thing: typing `["Designer", "Developer"]` into it has to write
-  // `options={["Designer", "Developer"]}`, not `options="[\"Designer\", …]"`,
-  // which is a string the component then calls .map on. It also cost the field
-  // its own editor: a string is text, so the panel showed the array in a plain
-  // box with no highlighting, and there was no way to type one that stayed code.
-  const numeric =
-    field?.type === 'number' ||
-    field?.type === 'boolean' ||
-    field?.type === 'code' ||
-    (field?.type === 'enum' && field?.numeric);
 
-  const open = (chip) => {
-    const r = wrapRef.current?.getBoundingClientRect();
-    if (!r) {return;}
-    setMenu({
-      left: r.left,
-      // Below the field, or above it when the field sits near the bottom of
-      // the panel — the popup is fixed, so it would otherwise run off-screen.
-      top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
-      width: Math.max(r.width, 240),
-      chip: chip || null,
-    });
-  };
-
-  // What the menu's Edit row does, for the chip it was opened on. Null when the
-  // menu wasn't opened on a chip, or when nothing in reach defines that name —
-  // and then the row isn't drawn at all, rather than drawn and inert.
-  const editName = referencedName(chipExpr(menu?.chip));
-  const editTarget = symbolTarget(editName, dataCtx);
-  const editChip = () => {
-    setMenu(null);
-    if (editTarget === 'file') {
-      dataCtx.onOpenSymbol(editName);
-      return;
-    }
-    const r = wrapRef.current?.getBoundingClientRect();
-    const width = Math.max(r?.width ?? 240, 260);
-    setSrc({
-      name: editName,
-      top: Math.min((r?.bottom ?? 200) + 6, Math.max(60, window.innerHeight - 240)),
-      left: Math.min(r?.left ?? 0, window.innerWidth - width - 12),
-      width,
-    });
-  };
-
-  const pick = (rawPath, query) => {
-    const chip = menu?.chip;
-    const path = resolvePick(rawPath, query, bindCtx);
-    setMenu(null);
-    if (!showInput) {
-      // A hole in the code was pressed: repoint THAT hole and leave the program
-      // around it alone. Replacing the whole expression — which is what a pick
-      // used to do, since the code editor holds one — would throw away the
-      // ternary the hole was written inside.
-      if (chip && typeof chip.from === 'number') {
-        const next = exprApiRef.current?.replaceRange(chip.from, chip.to, `\${${path}}`);
-        if (next != null) {onChange({ type: 'expr', value: next }, true);}
-        return;
-      }
-      // The code editor holds one expression, so a pick replaces it.
-      setRaw(false);
-      onChange({ type: 'expr', value: path }, true);
-      return;
-    }
-    if (chip) {inputRef.current?.replace(chip, path);}
-    else {inputRef.current?.insert(path);}
-  };
-
-  useEffect(() => {
-    if (!menu) {return undefined;}
-    const close = (e) => {
-      if (e.target.closest?.('.bind-menu, .bind-pick')) {return;}
-      // `.cm-chip` for the same reason as the rest: a chip opens this picker on
-      // mousedown, and this listener is live before that mousedown has finished
-      // reaching document — so a chip missing from the list opens the picker and
-      // closes it in the one press. Only a chip in THIS field, though: pressing
-      // one somewhere else is how you move on, and leaving both open left two
-      // pickers over the panel, one of them about a value nobody was looking at.
-      const chip = e.target.closest?.('.expr-chip, .cm-chip');
-      if (chip && wrapRef.current?.contains(chip)) {return;}
-      setMenu(null);
-    };
-    const onKey = (e) => e.key === 'Escape' && setMenu(null);
-    const onScroll = (e) => {
-      // The list scrolls inside itself; the panel behind it moves the field
-      // out from under it, so that one closes it.
-      if (e.target?.closest?.('.bind-menu')) {return;}
-      setMenu(null);
-    };
-    const onResize = () => setMenu(null);
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onResize);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', onKey);
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', onResize);
-    };
-  }, [menu]);
-
-  const list = menu && (
-    <div
-      className="dd-popup bind-menu"
-      style={{ left: menu.left, top: menu.top, width: menu.width }}
-    >
-      {/* Built on every render rather than captured when the popup opened:
-          stepping to another entry from inside it changes what the data IS,
-          and a snapshot would go on showing the entry you stepped away from. */}
-      <DataPicker
-        tree={dataTree(bindCtx || {})}
-        current={menu.chip?.path ?? (menu.chip ? chipPath(menu.chip) : showInput ? null : expr)}
-        entries={bindCtx?.entryNav}
-        onStepItem={bindCtx?.onStepItem}
-        onPick={pick}
-        onExpand={(node) => node.query && bindCtx?.onNeedSample?.(node.query.collection)}
-        onEdit={editTarget ? editChip : undefined}
-        editLabel={editTarget === 'file' ? `Open where ${editName} is defined` : `Edit ${editName}`}
-        onWrite={() => {
-          setMenu(null);
-          setRaw(true);
-        }}
-      />
-    </div>
-  );
-
-  const srcEditor = src && (
-    <VarSourceEditor
-      pos={src}
-      name={src.name}
-      code={dataCtx?.frontmatter || ''}
-      onChangeCode={dataCtx?.onSetFrontmatter}
-      onClose={() => setSrc(null)}
-    />
-  );
-
-  // The field's handle inserts through here, so one picker serves both the
-  // chip already in the field and the next one. Null while the code editor is
-  // up: that holds one expression, so a pick replaces it instead.
-  useEffect(() => {
-    if (!apiRef) {return undefined;}
-    apiRef.current = showInput ? { insert: (path) => inputRef.current?.insert(path) } : null;
-    return () => {
-      apiRef.current = null;
-    };
-  });
-
-  if (showInput) {
-    return (
-      <div className="prop-expr-row bind-row" ref={wrapRef}>
-        <BindInput
-          ref={inputRef}
-          parts={parts}
-          placeholder={placeholder || 'Type, or insert data'}
-          // A code prop's parts join as code: text beside a chip is an
-          // expression with a value in it, not a sentence with one quoted into
-          // it, so `[...items, other]` stays what was typed.
-          onChange={(next) =>
-            onChange(valueFromParts(next, { numeric, mode: field?.type === 'code' ? 'code' : mode }))
-          }
-          onChipClick={(chip) => open(chip)}
-          onFocus={() => setEditing(true)}
-          onBlur={() => setEditing(false)}
-        />
-        {list}
-        {srcEditor}
-      </div>
-    );
-  }
-
-  return (
-    <div className="prop-expr-row" ref={wrapRef}>
-      {/* Code, with the data in it still shown as data: an expression this
-          field can't hold as chips and text — a ternary, a template, a call —
-          keeps the editor, and every `${…}` hole naming a plain path is drawn
-          as a chip inside it. Pressing one repoints that hole and leaves the
-          program around it exactly as written. */}
-      <ExprInput
-        value={expr}
-        syncValue={expr}
-        placeholder={placeholder || ''}
-        apiRef={exprApiRef}
-        // Both kinds of data in one field: a `${…}` hole in a template, and a
-        // value named outright — `variantClasses` in a class list is as much a
-        // binding as `${post.title}` in a sentence, and only one of them used to
-        // look like one.
-        chipsOf={codeChips}
-        onChipClick={(hit) => open(hit)}
-        // Code keeps its shape: wrapping an array across the panel's width throws
-        // away the indentation that says what belongs to what. It scrolls instead.
-        wrap={false}
-        onChange={(v) => onChange({ type: 'expr', value: v })}
-        onCommit={(v) => v !== expr && onChange({ type: 'expr', value: v }, true)}
-      />
-      {list}
-      {srcEditor}
-    </div>
-  );
-}
 
 // Edits one declaration's source in place: the statement is spliced back into
 // the frontmatter on every keystroke, so the canvas updates as you type, the
@@ -2548,204 +2190,9 @@ export function BindField({ value, field, placeholder, bindCtx, dataCtx, apiRef,
 // usually is — so `=` opens this, the same key the style panel's fields use for the
 // same thing. It edits the value as TEXT, braces and all, because that is what the
 // attribute editor round-trips.
-function ValueCodeEditor({ pos, name, value, scope, chipsOf, bindCtx, onChange, onClose }) {
-  const ref = useRef(null);
-  const apiRef = useRef(null);
-  const [pick, setPick] = useState(null); // {chip, pos}
-  useEffect(() => {
-    const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {onClose();}
-    };
-    const onKey = (e) => { if (e.key === 'Escape') {onClose();} };
-    document.addEventListener('pointerdown', onDown, true);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('pointerdown', onDown, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  }, [onClose]);
 
-  return (
-    <div
-      ref={ref}
-      className="attr-editor var-src"
-      style={{ top: pos.top, left: pos.left, width: pos.width }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
-      }}
-    >
-      <div className="var-src-head">
-        <CodeIcon size={12} />
-        <span className="var-src-name">{name}</span>
-        <span style={{ flex: 1 }} />
-        <button className="ghost" title="Close" onClick={onClose}>
-          <CloseIcon size={12} />
-        </button>
-      </div>
-      <ExprInput
-        multiline
-        autoFocus
-        // Code opened to be read keeps its shape: the indentation says what is
-        // nested in what, and wrapping every long line throws that away.
-        wrap={false}
-        className="var-src-code"
-        value={value}
-        syncValue={value}
-        completions={scope}
-        apiRef={apiRef}
-        chipsOf={chipsOf}
-        onChipClick={(chip) => {
-          const r = ref.current?.getBoundingClientRect();
-          if (!r) {return;}
-          setPick({
-            chip: chip || null,
-            pos: {
-              left: r.left,
-              top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
-              width: Math.max(r.width, 240),
-            },
-          });
-        }}
-        onChange={onChange}
-      />
-      {pick ? (
-        <FieldDataPicker
-          pos={pick.pos}
-          bindCtx={bindCtx}
-          current={pick.chip?.path ?? null}
-          onPick={(path) => {
-            const chip = pick.chip;
-            setPick(null);
-            const next = chip
-              ? apiRef.current?.replaceRange(chip.from, chip.to, path)
-              : apiRef.current?.insert(path);
-            if (next != null) {onChange(next);}
-          }}
-          onClose={() => setPick(null)}
-        />
-      ) : null}
-    </div>
-  );
-}
 
-function VarSourceEditor({ pos, name, code, onChangeCode, onClose }) {
-  const ref = useRef(null);
-  const codeRef = useRef(code);
-  codeRef.current = code;
-  const [draft, setDraft] = useState(() => findDeclaration(code, name)?.statement ?? '');
-  // What is wrong with the draft, once there has been a reason to say. Empty
-  // until the first commit: a statement is unfinished for most of the time it
-  // takes to type one, and going red at every keystroke would be nagging about
-  // a mistake that hasn't been made yet.
-  const [error, setError] = useState('');
-  const rangeRef = useRef(null);
 
-  const apply = (text) => {
-    const src = codeRef.current;
-    // Re-locate on every write: the surrounding code can shift under us (an
-    // undo, an edit elsewhere). Renaming the variable inside this editor is
-    // the one case the lookup can't follow — fall back to where we last wrote.
-    const found = findDeclaration(src, name);
-    const range = found ? { start: found.start, end: found.end } : rangeRef.current;
-    if (!range) {return;}
-    rangeRef.current = { start: range.start, end: range.start + text.length };
-    onChangeCode(src.slice(0, range.start) + text + src.slice(range.end));
-  };
-
-  // Nothing is written while typing. This is code being spliced into a file the
-  // site is compiled from, so every keystroke used to be compiled — and the
-  // half-finished shape of a statement is a build error, which replaced the
-  // preview with a stack trace you then had to wait out. It goes in when you
-  // leave the field, and only if it parses.
-  const commit = (text) => {
-    if (text === draft && error) {return false;}
-    const verdict = checkStatement(text);
-    if (!verdict.ok) {
-      setError(verdict.message);
-      return false;
-    }
-    setError('');
-    if (text !== (findDeclaration(codeRef.current, name)?.statement ?? '')) {apply(text);}
-    return true;
-  };
-
-  // Capture phase: what's inside is CodeMirror and what's around it is the
-  // panel's own pointer/key handling, either of which can stop an event before
-  // a bubbling listener on the document would see it.
-  useEffect(() => {
-    const onDown = (e) => {
-      if (!ref.current || ref.current.contains(e.target)) {return;}
-      // A press outside commits, the way leaving any field does — and if that
-      // fails, the popup stays up holding the message. Closing on the press
-      // that produced the error would be showing it to nobody. Escape and the
-      // × still close, so this is a reason to stay, not a trap.
-      if (commit(draftRef.current)) {onClose();}
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') {onClose();}
-    };
-    document.addEventListener('pointerdown', onDown, true);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('pointerdown', onDown, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  });
-
-  // Read by the document listener above, which is registered once per render
-  // and must not close over a stale draft.
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-
-  // Outside edits (undo) reach the editor as a changed statement; our own
-  // writes come back identical, so typing isn't fought.
-  const external = findDeclaration(code, name)?.statement;
-
-  return (
-    <div
-      ref={ref}
-      className="attr-editor var-src"
-      style={{ top: pos.top, left: pos.left, width: pos.width }}
-      // Escape typed inside the code editor closes the popup, independently of
-      // the document listener above.
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.stopPropagation();
-          onClose();
-        }
-      }}
-    >
-      <div className="var-src-head">
-        <CodeIcon size={12} />
-        <span className="var-src-name">{name}</span>
-        <span style={{ flex: 1 }} />
-        <button className="ghost" title="Close" onClick={onClose}>
-          <CloseIcon size={12} />
-        </button>
-      </div>
-      <ExprInput
-        multiline
-        autoFocus
-        className="var-src-code"
-        value={draft}
-        syncValue={external ?? draft}
-        invalid={!!error}
-        onChange={(text) => {
-          setDraft(text);
-          // Only once it has already gone red: then it is a correction being
-          // watched for, not a running commentary on an unfinished line.
-          if (error) {setError(checkStatement(text).ok ? '' : error);}
-        }}
-        onCommit={commit}
-      />
-      {error ? (
-        <div className="var-src-error" role="alert">
-          {error}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 // Whether a prop name says "this holds a file". Read as words, so the LAST one
 // decides: `image` and `ogImage` are pictures, `imageAlt` and `imageClass` are

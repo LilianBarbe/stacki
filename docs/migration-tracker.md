@@ -264,6 +264,16 @@ The full gate passes 134/134 commands (98.0s). PropsPanel itself is still JSX;
 continue its binding/editor extraction and fix its conditional hook order as
 part of that conversion.
 
+PropsPanel binding checkpoint: `propBindings.tsx` owns typed chip/value/source
+editors and picker lifetimes, with helpers inside the 70-line limit and zero lint
+warnings. The existing `BindField` export is preserved. `valueFromParts` now
+advertises its actual string/expression output type. Element hooks mount in a
+separate component; the panel owns restoration state across all node kinds.
+A real-render regression covers 24 selection transitions and Settings retention.
+All 17 old/new markup comparisons match; binding/chip/source/loop interaction
+checks pass, and the full gate passes 135/135 commands (99.9s). Continue with the
+attribute editors and the remaining PropsPanel body; it is not yet fully typed.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.jsx`                                                                                     | 3,819 — hotspot, convert-then-split, no split in same commit |
@@ -329,7 +339,7 @@ move-blindness.
 | Task                                                                 | State                        |
 | -------------------------------------------------------------------- | ---------------------------- |
 | Complete `IpcContract` invoke inventory (115 channels) | ✅ with `main.ts` |
-| Fix 15 conditional-hook bugs in PropsPanel / VariablesView           | ⬜ with those conversions    |
+| Fix conditional-hook bugs in PropsPanel / VariablesView              | ⏳ PropsPanel fixed; VariablesView pending    |
 | Delete stray `electron/scratch2-7.js` (tracked tsc-emit leftovers)   | ⬜ standalone cleanup commit |
 | `release.sh` → TypeScript (`scripts/*.ts`, per AGENTS §17)           | ⬜                           |
 | Tooling deps declared devDependencies (node_modules-incident repair) | ✅                           |
@@ -337,7 +347,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 134/134 (98.0s), exit 0. No quarantined tests remain.
+- Gate green at last run: 135/135 (99.9s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.
