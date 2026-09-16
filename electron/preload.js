@@ -1898,6 +1898,12 @@ contextBridge.exposeInMainWorld('avb', {
   createStarter: invoke('project:createStarter'),
   hasNodeModules: invoke('project:hasNodeModules'),
   installDeps: invoke('project:install'),
+  prepareWorkspace: invoke('project:prepareWorkspace'),
+  onDependencyState: (cb) => {
+    const handler = (_e, state) => cb(state);
+    ipcRenderer.on('project:dependencyState', handler);
+    return () => ipcRenderer.removeListener('project:dependencyState', handler);
+  },
   scanProject: invoke('project:scan'),
   listProjectClasses: invoke('project:classes'),
   watchProject: invoke('watch:start'),

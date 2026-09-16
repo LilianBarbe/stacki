@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import FileBrowser from '../ui/FileBrowser.jsx';
 import FileStatus from '../ui/FileStatus.jsx';
 import BranchActions from '../ui/BranchActions.jsx';
@@ -122,6 +122,7 @@ export default function HistoryPanel({
   onRestoreFile,
   onRestoreProject,
   onOpenFile,
+  onOpenWorkspace,
   onSwitchBranch,
   onMergeBranch,
   onDeleteBranch,
@@ -133,6 +134,8 @@ export default function HistoryPanel({
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(null); // hash of the open commit
   const [worktrees, setWorktrees] = useState([]);
+  const [openingWorkspace, setOpeningWorkspace] = useState(false);
+  const workspacePending = useRef(false);
   const [allFiles, setAllFiles] = useState([]);
   const [open, setOpen] = useState({ timeline: true, files: false, branches: false, worktrees: false });
 
@@ -377,13 +380,32 @@ export default function HistoryPanel({
           </p>
           {worktrees.length > 1 &&
             worktrees.map((w) => (
-              <div className="list-item" key={w.path} title={w.path}>
+              <button
+                className={`list-item history-workspace ${w.current ? 'active' : ''}`}
+                key={w.path}
+                title={w.available === false ? `${w.path} — Project unavailable` : w.path}
+                aria-current={w.current ? 'true' : undefined}
+                disabled={openingWorkspace || w.available === false || !onOpenWorkspace}
+                onClick={async () => {
+                  if (w.current || workspacePending.current) return;
+                  workspacePending.current = true;
+                  setOpeningWorkspace(true);
+                  try {
+                    await onOpenWorkspace(w.projectPath || w.path);
+                  } catch (err) {
+                    showToast(String(err?.message || err), 'error');
+                  } finally {
+                    workspacePending.current = false;
+                    setOpeningWorkspace(false);
+                  }
+                }}
+              >
                 <span className="icon" style={{ width: 14 }}>
-                  <BranchIcon size={12} />
+                  {w.current ? <CheckIcon size={12} /> : <BranchIcon size={12} />}
                 </span>
                 <span className="label">{w.branch || 'a single version'}</span>
-                <span className="sub">{w.path.split('/').slice(-1)[0]}</span>
-              </div>
+                <span className="sub">{w.name || w.path.split(/[\\/]/).pop()}</span>
+              </button>
             ))}
         </Section>
       </div>

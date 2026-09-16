@@ -239,16 +239,14 @@ async function fileAt(git, { projectPath, ref, path: filePath }) {
 
 /** Every worktree of this repository, the main one first. */
 async function worktrees(git, { projectPath }) {
-  const { stdout } = await git(projectPath, ['worktree', 'list', '--porcelain']);
-  // Blank-line-separated records of "key value" lines. `detached` and `bare`
-  // are bare keys with no value.
+  const { stdout } = await git(projectPath, ['worktree', 'list', '--porcelain', '-z']);
+  // NUL separators keep spaces, Unicode and newlines in paths intact.
   return stdout
-    .split('\n\n')
-    .map((rec) => rec.trim())
+    .split('\0\0')
     .filter(Boolean)
     .map((rec) => {
       const out = { path: null, head: null, branch: null, detached: false, bare: false };
-      for (const line of rec.split('\n')) {
+      for (const line of rec.split('\0')) {
         const sp = line.indexOf(' ');
         const key = sp === -1 ? line : line.slice(0, sp);
         const value = sp === -1 ? '' : line.slice(sp + 1);
@@ -257,6 +255,7 @@ async function worktrees(git, { projectPath }) {
         else if (key === 'branch') out.branch = value.replace(/^refs\/heads\//, '');
         else if (key === 'detached') out.detached = true;
         else if (key === 'bare') out.bare = true;
+        else if (key === 'prunable') out.prunable = true;
       }
       return out;
     })
