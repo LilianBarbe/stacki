@@ -194,6 +194,11 @@ test('IPC collection, string, integer, depth, and path bounds fail explicitly', 
   for (const value of [-1, 1.5, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
     assert.throws(() => parseIpcPayload('git:log', { projectPath: '/site', limit: value }));
   }
+  assert.deepEqual(parseIpcPayload('git:log', { projectPath: '/site', withFiles: true }), {
+    projectPath: '/site',
+    withFiles: true,
+  });
+  assert.throws(() => parseIpcPayload('git:log', { projectPath: '/site', withFiles: 'yes' }));
   let deep: unknown = 'leaf';
   for (let index = 0; index <= BOUNDARY_LIMITS.depthMax; index++) {
     deep = { child: deep };

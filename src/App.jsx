@@ -14,7 +14,7 @@ import { scanProject } from './bridge';
 import { LIMITS } from '../shared/limits';
 import PreviewPane from './panels/PreviewPane';
 import GitChip from './panels/GitChip';
-import HistoryPanel, { relativeTime } from './panels/HistoryPanel.jsx';
+import HistoryPanel, { relativeTime } from './panels/HistoryPanel';
 import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog.jsx';
 import { mergeBranchAction, deleteBranchAction } from './gitActions.js';
 import LeftRail from './ui/LeftRail.jsx';
@@ -4109,8 +4109,6 @@ export default function App() {
                 project={project}
                 gitInfo={gitInfo}
                 previewRef={previewRef}
-                onRefreshGit={refreshGit}
-                showToast={showToast}
                 onOpenFile={(f) => {
                   // A page opens in the editor. Anything else has no canvas to
                   // show it on, so the row says where it is and does nothing —

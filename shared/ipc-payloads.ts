@@ -148,6 +148,7 @@ export const IPC_PAYLOADS = {
     ref: optional(text),
     limit: optional(count),
     skip: optional(count),
+    withFiles: optional(boolean),
   }),
   'git:merge': object({ ...branch }),
   'git:park': object({ ...project }),

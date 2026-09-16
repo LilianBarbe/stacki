@@ -857,7 +857,9 @@ export type WireGitInfo = {
 };
 
 export type WireCommitInfo = {
-  readonly files: undefined | ReadonlyArray<WireFileChange>;
+  readonly files:
+    | undefined
+    | ReadonlyArray<WireFileChange & WireFileDescription & { readonly from: undefined | string }>;
   readonly hash: undefined | string;
   readonly shortHash: undefined | string;
   readonly author: undefined | string;

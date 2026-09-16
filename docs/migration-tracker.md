@@ -255,7 +255,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 16/20 original files converted ⏳
+### src/panels — 17/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -535,22 +535,34 @@ production-build checks pass without warnings in the new modules. Four original
 panels remain; the full gate passes 146/146 commands (98.0s). Continue with
 `HistoryPanel.jsx`.
 
-| File                                     | Lines                                                        |
-| ---------------------------------------- | ------------------------------------------------------------ |
-| `PropsPanel.tsx`                         | ✅ converted with typed controls/editors                     |
-| `VariablesView.tsx`                      | ✅ converted with typed edits, history, and refreshes        |
-| `CmsView.tsx`                            | ✅ converted with per-file saves and parsed contracts        |
-| `GitChip.tsx`                            | ✅ converted with typed repository states and split dropdown |
-| `ContentView.tsx`                        | ✅ converted with typed fields, saves, and rename boundaries |
-| `CmsPanel.tsx`                           | ✅ converted with independent parsed content inventories     |
-| `StructurePanel.tsx`                     | ✅ converted with typed rows, drops, and bounded traversal   |
-| `PreviewPane.tsx`                        | ✅ converted with parsed frame messages and typed runtime    |
-| `AssetsPanel.tsx`                        | ✅ converted with bounded listings and typed mutations       |
-| `PalettePanel.tsx`                       | ✅ converted with typed creation and usage popup states      |
-| `PagesPanel.tsx`                         | ✅ converted with bounded trees and parsed drag payloads     |
-| `HistoryPanel` 392 · `WelcomeScreen` 391 | small                                                        |
-| `StylePanel.tsx`                         | ✅ converted with parsed stylesheet inventories              |
-| `CanvasView.tsx`                         | ✅ converted with typed frame and gesture lifetimes          |
+HistoryPanel is converted to `HistoryPanel.tsx`, with the timeline, branch/file/
+worktree sections, model, and renderer bridge split into typed modules. The
+`git:log` contract now preserves and forwards `withFiles`; main describes each
+changed file before returning it, so timeline summaries receive the data they
+were designed to show. Log, inventory, and worktree replies are parsed and
+bounded, stale replies are discarded, and pagination stops at 10,000 commits.
+History wording, bridge, payload-contract, app-render, and production-build
+checks pass without warnings in the new modules. Three original panels remain;
+the full gate passes 147/147 commands (98.1s). Continue with
+`WelcomeScreen.jsx`.
+
+| File                 | Lines                                                        |
+| -------------------- | ------------------------------------------------------------ |
+| `PropsPanel.tsx`     | ✅ converted with typed controls/editors                     |
+| `VariablesView.tsx`  | ✅ converted with typed edits, history, and refreshes        |
+| `CmsView.tsx`        | ✅ converted with per-file saves and parsed contracts        |
+| `GitChip.tsx`        | ✅ converted with typed repository states and split dropdown |
+| `ContentView.tsx`    | ✅ converted with typed fields, saves, and rename boundaries |
+| `CmsPanel.tsx`       | ✅ converted with independent parsed content inventories     |
+| `StructurePanel.tsx` | ✅ converted with typed rows, drops, and bounded traversal   |
+| `PreviewPane.tsx`    | ✅ converted with parsed frame messages and typed runtime    |
+| `AssetsPanel.tsx`    | ✅ converted with bounded listings and typed mutations       |
+| `PalettePanel.tsx`   | ✅ converted with typed creation and usage popup states      |
+| `PagesPanel.tsx`     | ✅ converted with bounded trees and parsed drag payloads     |
+| `HistoryPanel.tsx`   | ✅ converted with parsed history and stale-reply guards      |
+| `WelcomeScreen` 391  | small                                                        |
+| `StylePanel.tsx`     | ✅ converted with parsed stylesheet inventories              |
+| `CanvasView.tsx`     | ✅ converted with typed frame and gesture lifetimes          |
 
 ### src/App.jsx — 4,584 lines ⬜ hotspot, last
 

@@ -4806,9 +4806,16 @@ ipcMain.handle('preview:stop', async (_e, { projectPath }) => {
 // this is the side that knows the project's shape, and because it keeps the
 // panel about drawing rather than about interpreting paths.
 
-ipcMain.handle('git:log', async (_e, { projectPath, ref, limit, skip }) =>
-  gitHistory.log(git, definedFields({ projectPath, ref, limit, skip })),
-);
+async function readGitLog(payload: IpcPayloads['git:log']) {
+  const result = await gitHistory.log(git, definedFields(payload));
+  const commits = result.commits.map((commit) => ({
+    ...commit,
+    files: commit.files === undefined ? undefined : gitHistory.describeFiles(commit.files),
+  }));
+  return { ...result, commits };
+}
+
+ipcMain.handle('git:log', async (_event, payload) => readGitLog(payload));
 
 ipcMain.handle('git:commitFiles', async (_e, { projectPath, ref }) =>
   gitHistory.describeFiles(await gitHistory.commitFiles(git, { projectPath, ref })),
