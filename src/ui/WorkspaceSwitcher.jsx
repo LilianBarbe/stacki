@@ -57,7 +57,16 @@ export default function WorkspaceSwitcher({ project, onSelect }) {
     setLoading(true);
     setError(null);
     window.avb.gitWorktrees({ projectPath: project.path })
-      .then((rows) => { if (!cancelled) setWorkspaces(rows || []); })
+      // A worktree whose folder has been deleted stays in git's list until
+      // someone runs `git worktree prune`, and agent runners make and delete
+      // those folders by the dozen. This menu exists to go somewhere, and
+      // there is nowhere left to go, so a row that can only fail is left out.
+      // Git marks these itself and never marks a LOCKED worktree, so a
+      // checkout on a drive that is merely unplugged keeps its row.
+      // The history panel still lists them and says the folder is gone —
+      // that row is the only explanation of why its branch is missing from
+      // the branch list.
+      .then((rows) => { if (!cancelled) setWorkspaces((rows || []).filter((w) => !w.prunable)); })
       .catch((err) => { if (!cancelled) setError(cleanError(err)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
