@@ -941,7 +941,7 @@ export default function App() {
     async (projectPath) => {
       setDevStatus('starting');
       try {
-        const { url, external, trailingSlash: resolved } =
+        const { url, external, bare, trailingSlash: resolved } =
           await window.avb.startDevServer(projectPath);
         setDevUrl(url);
         if (resolved) setTrailingSlash(resolved);
@@ -955,6 +955,11 @@ export default function App() {
           // quitting the other server.
           showToast(
             `Reusing the dev server already running for this project (${url}) — outlines, canvas selection and live editing need the one Stacki starts itself. Quit that server, then restart the dev server from the log.`,
+            'info'
+          );
+        } else if (bare) {
+          showToast(
+            'The preview started without the editor configuration. Canvas selection and live editing are unavailable — check the Astro log, then restart the dev server.',
             'info'
           );
         }
