@@ -87,7 +87,7 @@ const StylePanel = lazyPanel(() => import('./panels/StylePanel.jsx'));
 const CodeWindow = lazyPanel(() => import('./ui/CodeWindow.jsx'));
 const CmsPanel = lazyPanel(() => import('./panels/CmsPanel.jsx'));
 const CmsView = lazyPanel(() => import('./panels/CmsView.jsx'));
-const ContentView = lazyPanel(() => import('./panels/ContentView.jsx'));
+const ContentView = lazyPanel(() => import('./panels/ContentView'));
 const VariablesPanel = lazyPanel(() => import('./panels/VariablesPanel.jsx'));
 const VariablesView = lazyPanel(() => import('./panels/VariablesView.jsx'));
 

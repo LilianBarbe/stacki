@@ -65,6 +65,8 @@
   "test:apprenders": "node test/app-renders.js",
   "test:starter": "node test/starter.js",
   "test:content": "node test/content-config.js",
+  "test:contentviewboundary": "node --test test/content-view-boundary.test.js",
+  "test:contentviewrender": "node --test test/content-view-render.test.js",
   "test:entries": "node test/content-entries.js",
   "test:refs": "node test/content-refs.js",
   "test:fields": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON test/content-fields.js",

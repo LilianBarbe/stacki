@@ -254,7 +254,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 7/20 original files converted ⏳
+### src/panels — 8/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -447,13 +447,24 @@ visible error state. Branch, bridge, publish, action, and conflict checks pass;
 the full gate passes 138/138 commands (104.8s), and both new modules lint without
 warnings. Thirteen original panels remain; continue with `ContentView.jsx`.
 
+ContentView is fully converted to `ContentView.tsx`. Recursive schema controls
+live in `ContentFields.tsx`; their values use the bounded shared `Data` type and
+exhaustive control dispatch. `contentViewBridge.ts` parses entries, targets,
+validation, writes, and rename plans before UI state sees them. Target caching is
+bounded, stale loads and validations are discarded, and all save/validation/saved
+timers are owned and cleared. A fixture-independent mounted test confirms a title
+edit writes only that field while preserving adjacent data; parser tests cover
+malformed nested replies, limits, payloads, and failure channels. The full gate
+passes 140/140 commands (101.5s), and the new modules lint without warnings.
+Twelve original panels remain; continue with `StructurePanel.jsx`.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
 | `VariablesView.tsx`                                                                                  | ✅ converted with typed edits, history, and refreshes |
 | `CmsView.tsx`                                                                                        | ✅ converted with per-file saves and parsed contracts                                                        |
 | `GitChip.tsx`                                                                                        | ✅ converted with typed repository states and split dropdown |
-| `ContentView.jsx`                                                                                    | 1,001                                                        |
+| `ContentView.tsx`                                                                                    | ✅ converted with typed fields, saves, and rename boundaries |
 | `StructurePanel.jsx`                                                                                 | 793                                                          |
 | `PreviewPane.jsx`                                                                                    | 727                                                          |
 | `AssetsPanel` 473 · `PalettePanel` 455 · `PagesPanel` 442 · `HistoryPanel` 392 · `WelcomeScreen` 391 | small                                                        |

@@ -62,7 +62,7 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   fs.mkdirSync(buildDir, { recursive: true });
   const bundlePath = path.join(buildDir, 'content-view.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'ContentView.jsx')],
+    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'ContentView.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
