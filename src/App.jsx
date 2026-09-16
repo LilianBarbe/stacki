@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import WelcomeScreen from './panels/WelcomeScreen.jsx';
+import WelcomeScreen from './panels/WelcomeScreen';
 import PagesPanel from './panels/PagesPanel';
 import PalettePanel from './panels/PalettePanel';
 import StructurePanel from './panels/StructurePanel';
@@ -3799,7 +3799,7 @@ export default function App() {
         <div className="titlebar">
           <span className="spacer" />
         </div>
-        <WelcomeScreen onOpen={loadProject} setBusy={setBusy} showToast={showToast} />
+        <WelcomeScreen onOpen={loadProject} showToast={showToast} />
         {busy && <BusyOverlay message={busy} />}
         {toast && <Toast toast={toast} />}
         <ConfirmHost />

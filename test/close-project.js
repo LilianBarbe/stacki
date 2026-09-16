@@ -99,7 +99,7 @@ const settle = (ms = 30) => new Promise((r) => setTimeout(r, ms));
       gitLog: async () => ({ commits: [], atEnd: true }),
       gitWorktrees: async () => [],
       gitStatus: async () => [],
-      recentProjects: async () => [],
+      listRecents: async () => [],
       onCssChanged: () => () => {},
     },
     {

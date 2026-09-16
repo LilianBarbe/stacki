@@ -17,7 +17,9 @@ const failures = [];
 let checked = 0;
 const check = (what, condition, detail) => {
   checked++;
-  if (!condition) {failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);}
+  if (!condition) {
+    failures.push(`  ${what}${detail ? `\n    ${detail}` : ''}`);
+  }
 };
 const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -30,7 +32,7 @@ const PIXEL =
   fs.mkdirSync(buildDir, { recursive: true });
   const bundlePath = path.join(buildDir, 'welcome.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'WelcomeScreen.jsx')],
+    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'WelcomeScreen.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
@@ -52,7 +54,8 @@ const PIXEL =
   // the background is expected to cope with it — the cards are what is under
   // test here.
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
-  global.WebGLRenderingContext = dom.window.WebGLRenderingContext = function WebGLRenderingContext() {};
+  global.WebGLRenderingContext = dom.window.WebGLRenderingContext =
+    function WebGLRenderingContext() {};
 
   const React = require('react');
   const { createRoot } = require('react-dom/client');
@@ -65,10 +68,10 @@ const PIXEL =
   const text = () => container.textContent;
 
   const recents = [
-    { path: '/p/fresh', name: 'fresh', thumb: PIXEL, stale: false, canRefresh: true },
-    { path: '/p/stale', name: 'stale', thumb: PIXEL, stale: true, canRefresh: true },
-    { path: '/p/never', name: 'never', thumb: null, stale: true, canRefresh: true },
-    { path: '/p/nodeps', name: 'nodeps', thumb: null, stale: true, canRefresh: false },
+    { path: '/p/fresh', name: 'fresh', thumb: PIXEL, stale: false, canRefresh: true, openedAt: 4 },
+    { path: '/p/stale', name: 'stale', thumb: PIXEL, stale: true, canRefresh: true, openedAt: 3 },
+    { path: '/p/never', name: 'never', thumb: null, stale: true, canRefresh: true, openedAt: 2 },
+    { path: '/p/nodeps', name: 'nodeps', thumb: null, stale: true, canRefresh: false, openedAt: 1 },
   ];
 
   // Each refresh waits to be released, so the order and the overlap are
@@ -104,33 +107,47 @@ const PIXEL =
           onOpen: () => {},
           setBusy: () => {},
           showToast: (message) => toasts.push(message),
-        })
+        }),
       );
       await settle(30);
     });
 
   await mount();
 
-  check('every recent project gets a card', all('.recent-card').length === 4, `${all('.recent-card').length}`);
+  check(
+    'every recent project gets a card',
+    all('.recent-card').length === 4,
+    `${all('.recent-card').length}`,
+  );
 
   // Three ways to start, in the order they are reached for — and the one the
   // situation calls for is the one that looks like the answer.
   const actions = all('.actions button').map((b) => b.textContent.trim());
-  check('the actions read in that order', actions.join(' | ') === 'Open Project… | Start from Lumos… | Empty Astro project…', actions.join(' | '));
+  check(
+    'the actions read in that order',
+    actions.join(' | ') === 'Open Project… | Start from Lumos… | Empty Astro project…',
+    actions.join(' | '),
+  );
   check(
     'with projects to return to, opening one leads',
     all('.actions button')[0].classList.contains('primary'),
-    all('.actions button').map((b) => b.className).join(' | ')
+    all('.actions button')
+      .map((b) => b.className)
+      .join(' | '),
   );
   check(
     'and the blank one is the quiet third',
-    all('.actions button')[2].classList.contains('quiet')
+    all('.actions button')[2].classList.contains('quiet'),
   );
   check('nothing tells the user a picture is old', !/out of date/i.test(text()), text());
   check('and nothing offers to fix it', all('.recent-refresh').length === 0);
 
   // The queue: stale first, one at a time, skipping what cannot be rendered.
-  check('the first stale project is being re-rendered', asked[0] === '/p/stale', JSON.stringify(asked));
+  check(
+    'the first stale project is being re-rendered',
+    asked[0] === '/p/stale',
+    JSON.stringify(asked),
+  );
   check('one at a time', maxInFlight === 1, `${maxInFlight} at once`);
   check('a card that is up to date is left alone', !asked.includes('/p/fresh'));
 
@@ -147,7 +164,7 @@ const PIXEL =
   check(
     'a project with no dependencies is never asked for',
     !asked.includes('/p/nodeps'),
-    JSON.stringify(asked)
+    JSON.stringify(asked),
   );
   check('so the queue ends', asked.length === 2, JSON.stringify(asked));
   check('quietly', toasts.length === 0, JSON.stringify(toasts));
@@ -168,12 +185,20 @@ const PIXEL =
     });
     check('choosing it asks where the site should go', asked);
     const wizard = dom.window.document.querySelector('.new-project-modal');
-    check('and then asks what it is called', !!wizard, 'no wizard appeared after the folder was chosen');
-    check('naming it Lumos', /Start from Lumos/.test(wizard?.textContent || ''), wizard?.textContent?.slice(0, 80));
+    check(
+      'and then asks what it is called',
+      !!wizard,
+      'no wizard appeared after the folder was chosen',
+    );
+    check(
+      'naming it Lumos',
+      /Start from Lumos/.test(wizard?.textContent || ''),
+      wizard?.textContent?.slice(0, 80),
+    );
     check(
       'with a name to edit and where it will land',
       !!wizard?.querySelector('input') && /\/tmp\/sites\/my-site/.test(wizard?.textContent || ''),
-      wizard?.textContent?.slice(0, 200)
+      wizard?.textContent?.slice(0, 200),
     );
 
     // Cancelling the folder dialog leaves the screen where it was.
@@ -187,7 +212,10 @@ const PIXEL =
       all('.actions button')[1].click();
       await settle(30);
     });
-    check('and cancelling the folder shows nothing', !dom.window.document.querySelector('.new-project-modal'));
+    check(
+      'and cancelling the folder shows nothing',
+      !dom.window.document.querySelector('.new-project-modal'),
+    );
   }
 
   // A first run has nothing to return to, so starting a site is the answer
@@ -203,12 +231,20 @@ const PIXEL =
     reactRoot = createRoot(container);
     await act(async () => {
       reactRoot.render(
-        React.createElement(WelcomeScreen, { onOpen: () => {}, setBusy: () => {}, showToast: () => {} })
+        React.createElement(WelcomeScreen, {
+          onOpen: () => {},
+          setBusy: () => {},
+          showToast: () => {},
+        }),
       );
       await settle(40);
     });
     const buttons = all('.actions button');
-    check('with no projects, starting from Lumos leads', buttons[1]?.classList.contains('primary'), buttons.map((b) => b.className).join(' | '));
+    check(
+      'with no projects, starting from Lumos leads',
+      buttons[1]?.classList.contains('primary'),
+      buttons.map((b) => b.className).join(' | '),
+    );
     check('and opening one does not', !buttons[0]?.classList.contains('primary'));
   }
 
@@ -223,7 +259,11 @@ const PIXEL =
     reactRoot.unmount();
     await settle(40);
   });
-  check('nothing carries on after the screen closes', stopped.length === 0, JSON.stringify(stopped));
+  check(
+    'nothing carries on after the screen closes',
+    stopped.length === 0,
+    JSON.stringify(stopped),
+  );
 
   if (failures.length) {
     console.error(`\nwelcome: ${failures.length} failed, ${checked - failures.length} passed\n`);

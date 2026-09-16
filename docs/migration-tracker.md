@@ -255,7 +255,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 17/20 original files converted ⏳
+### src/panels — 18/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -546,6 +546,16 @@ checks pass without warnings in the new modules. Three original panels remain;
 the full gate passes 147/147 commands (98.1s). Continue with
 `WelcomeScreen.jsx`.
 
+WelcomeScreen is converted to `WelcomeScreen.tsx`, with both creation wizards
+split into `WelcomeWizards.tsx` and all IPC calls routed through
+`welcomeBridge.ts`. Recent projects, thumbnails, dialogs, creation results, and
+streamed log chunks are parsed before use. Thumbnail refreshes stay serial and
+stop when the screen unmounts; removed cards reject late updates, and both
+creation logs retain at most 20,000 characters. Welcome behavior, sound scope,
+bridge, app-render, boundary, and production-build checks pass without warnings
+in the new modules. Two original panels remain; the full gate passes 148/148
+commands (98.4s). Continue with `TerminalPane.jsx` and `TerminalDock.jsx`.
+
 | File                 | Lines                                                        |
 | -------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`     | ✅ converted with typed controls/editors                     |
@@ -560,7 +570,9 @@ the full gate passes 147/147 commands (98.1s). Continue with
 | `PalettePanel.tsx`   | ✅ converted with typed creation and usage popup states      |
 | `PagesPanel.tsx`     | ✅ converted with bounded trees and parsed drag payloads     |
 | `HistoryPanel.tsx`   | ✅ converted with parsed history and stale-reply guards      |
-| `WelcomeScreen` 391  | small                                                        |
+| `WelcomeScreen.tsx`  | ✅ converted with parsed recents and bounded creation logs   |
+| `TerminalPane` 354   | next                                                         |
+| `TerminalDock` 228   | next                                                         |
 | `StylePanel.tsx`     | ✅ converted with parsed stylesheet inventories              |
 | `CanvasView.tsx`     | ✅ converted with typed frame and gesture lifetimes          |
 

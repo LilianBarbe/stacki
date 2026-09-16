@@ -451,7 +451,10 @@ export interface IpcResults {
   readonly 'project:close': {
     readonly ok: true;
   };
-  readonly 'project:createAstro': unknown;
+  readonly 'project:createAstro': {
+    readonly ok: true;
+    readonly installed: boolean;
+  };
   readonly 'project:createStarter': {
     readonly ok: boolean;
     readonly projectPath: string;
