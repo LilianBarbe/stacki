@@ -1019,11 +1019,21 @@ export type WireFileKind =
   | 'script'
   | 'doc';
 
+export type WireConflictPart =
+  | { readonly kind: 'same'; readonly text: string }
+  | {
+      readonly kind: 'clash';
+      readonly ours: string;
+      readonly theirs: string;
+      readonly changedBy: 'ours' | 'theirs' | 'both';
+      readonly merged?: string | null;
+    };
+
 export type WireMergeClash = {
   readonly path: string;
   readonly ours: null | string;
   readonly theirs: null | string;
-  readonly parts: null | ReadonlyArray<unknown>;
+  readonly parts: null | ReadonlyArray<WireConflictPart>;
 };
 
 export type WireMarkdownNodeList = ReadonlyArray<WireMdNodeLike> & {

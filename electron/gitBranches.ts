@@ -3,6 +3,7 @@ import path from 'path';
 
 import { toArray } from '../shared/dist/record.js';
 import { parseConflict, renderResolved } from './conflicts.js';
+import type { ConflictPart } from './conflicts.js';
 import { gitErrorDetail, gitErrorFull } from './git.js';
 import type { Git } from './git.js';
 
@@ -37,7 +38,7 @@ export interface MergeClash {
   readonly path: string;
   readonly ours: string | null;
   readonly theirs: string | null;
-  readonly parts: readonly unknown[] | null;
+  readonly parts: readonly ConflictPart[] | null;
 }
 
 export type MergeOutcome =
@@ -185,7 +186,7 @@ async function mergeBranch(
         // and each disagreement comes back separately, so a page whose heading
         // should come from one branch and whose footer should come from the
         // other can say so.
-        let parts: readonly unknown[] | null = null;
+        let parts: readonly ConflictPart[] | null = null;
         try {
           parts = parseConflict(fs.readFileSync(path.join(projectPath, file), 'utf8'));
         } catch {

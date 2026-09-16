@@ -305,7 +305,13 @@ const END = /^>>>>>>> ?(.*)$/;
 
 export type ConflictPart =
   | { readonly kind: 'same'; readonly text: string }
-  | { readonly kind: 'clash'; readonly ours: string; readonly theirs: string; readonly changedBy: string; merged?: string };
+  | {
+      readonly kind: 'clash';
+      readonly ours: string;
+      readonly theirs: string;
+      readonly changedBy: 'ours' | 'theirs' | 'both';
+      merged?: string;
+    };
 
 /**
  * A conflicted file as a list of parts.

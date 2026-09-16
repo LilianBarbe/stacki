@@ -4,7 +4,8 @@
 import {
   boolean,
   count,
-  data,
+  BOUNDARY_LIMITS,
+  pathText,
   list,
   nullable,
   object,
@@ -13,16 +14,50 @@ import {
   text,
 } from '../shared/boundary';
 import type { IpcPayloads } from '../shared/ipc-payloads';
-import type { WireMergeOutcome, WireDeleteOutcome } from '../shared/ipc-results';
+import type { WireMergeOutcome, WireDeleteOutcome, WireConflictPart } from '../shared/ipc-results';
 
-const clash = object({
-  path: text,
-  ours: nullable(text),
-  theirs: nullable(text),
-  parts: nullable(list(data)),
-});
+const mergeFile = object({ path: pathText, ours: nullable(text), theirs: nullable(text) });
+const commonPart = object({ text });
+const changedPart = object({ ours: text, theirs: text, merged: optional(nullable(text)) });
+
+export function parseConflictPart(input: unknown): WireConflictPart {
+  const value = record(input);
+  if (value['kind'] === 'same') {
+    return { kind: 'same', ...commonPart(value) };
+  }
+  if (value['kind'] !== 'clash') {
+    throw new Error('Merge part: expected same or clash');
+  }
+  const changedBy = value['changedBy'];
+  if (changedBy !== 'ours' && changedBy !== 'theirs' && changedBy !== 'both') {
+    throw new Error('Merge part: unknown changed side');
+  }
+  return { kind: 'clash', changedBy, ...changedPart(value) };
+}
+function parseMergeFiles(input: unknown) {
+  let remaining = BOUNDARY_LIMITS.itemsMax;
+  const files = list((entry) => {
+    if (--remaining < 0) {
+      throw new Error('Merge files: item limit exceeded');
+    }
+    const value = record(entry);
+    const parts = nullable(
+      list((part) => {
+        if (--remaining < 0) {
+          throw new Error('Merge files: item limit exceeded');
+        }
+        return parseConflictPart(part);
+      }),
+    )(value['parts']);
+    return { ...mergeFile(value), parts };
+  })(input);
+  if (files.length === 0) {
+    throw new Error('Merge files: at least one conflict is required');
+  }
+  return files;
+}
 const mergeSuccess = object({ into: nullable(text), changed: boolean, resolved: optional(count) });
-const mergeConflict = object({ from: nullable(text), branch: text, files: list(clash) });
+const mergeConflict = object({ from: nullable(text), branch: text, files: parseMergeFiles });
 const mergeDirty = object({ from: nullable(text), branch: text, files: list(text) });
 const parkResult = object({
   ok: boolean,

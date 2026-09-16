@@ -12,7 +12,7 @@ conversion** are complete. `electron/main.ts` now emits the ignored `main.js`
 package entry. The invoke inventory is complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
 **The Electron, root renderer, and UI queues are complete. Continue through
-`src/panels` (PropsPanel, VariablesPanel, VariablesView, and CmsView are complete; GitChip next), then `src/App.jsx`.**
+`src/panels` (PropsPanel, VariablesPanel, VariablesView, and CmsView are complete; GitChip in progress), then `src/App.jsx`.**
 
 Main verification: 26 old/new handler and output comparisons matched, including
 byte-identical generated Astro config, preview page, and both API endpoints.
@@ -388,6 +388,17 @@ All 50 old/new dialog/remote comparisons match. The full gate passes 138/138
 commands (101.8s); new modules lint without warnings. Continue GitChip's merge
 conflict model, publish state, and remaining actions/root.
 
+GitChip conflict checkpoint: `MergeConflictModal.tsx` and `gitConflictModel.ts`
+type per-hunk and whole-file choices. The shared IPC contract now describes
+same/clash parts, and the renderer parses every part with a cumulative file/part
+budget. Electron producers retain their actual part types through the handler
+contract. Context lines are built in one pass rather than rescanning all parts
+for each hunk. Whole-file choices now honor the busy lock. All 54 old/new displays
+match after accounting for that fix. Real-parser, malformed-input, bounds, and
+mounted-choice tests pass, alongside 64 conflict and 107 Git branch checks.
+The full gate passes 138/138 commands (101.9s); new renderer modules lint without
+warnings. GitChip's publish state, action boundaries, and root remain to convert.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -461,7 +472,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 138/138 (101.8s), exit 0. No quarantined tests remain.
+- Gate green at last run: 138/138 (101.9s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 156/156. Full-repository lint has 156 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.
