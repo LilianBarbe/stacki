@@ -122,6 +122,14 @@ for (const mutate of [
   mutate(invalid);
   assert.throws(() => parseCSSVariables(invalid));
 }
+const matrix = good();
+block(matrix).kind = 'matrix';
+assert.throws(() => parseCSSVariables(matrix), /matrix columns are required/);
+block(matrix).columns = group(matrix).columns;
+assert.equal(parseCSSVariables(matrix).ok, true);
+block(matrix).titleStart = 30;
+block(matrix).titleEnd = 20;
+assert.throws(() => parseCSSVariables(matrix), /reversed title range/);
 const holes = good();
 row(holes).cells[0] = null;
 assert.equal(parseCSSVariables(holes).ok, true, 'matrix holes are valid');

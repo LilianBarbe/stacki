@@ -330,6 +330,14 @@ matrix updates and checks draft cleanup. All 12 old/new cell displays match;
 value/name limits are asserted, and the full gate passes 138/138 commands
 (100.0s). Continue with the table controls and stylesheet mutation boundary.
 
+VariablesView table checkpoint: `VariableTable.tsx` types sheet/table layout,
+inline renaming, new-variable rows, drag offsets, and scroll registration. Matrix
+blocks now require columns in both the model and parser, with a regression for
+missing columns and reversed title ranges. All 24 old/new table comparisons and
+171 sheet interactions pass; helpers lint without warnings and meet the size
+limits. The full gate passes 138/138 commands (100.5s). Finish the remaining
+VariablesView data/mutation coordinator and rename its root to TypeScript.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -403,7 +411,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 138/138 (100.0s), exit 0. No quarantined tests remain.
+- Gate green at last run: 138/138 (100.5s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.

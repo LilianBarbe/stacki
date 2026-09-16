@@ -31,14 +31,17 @@ export interface VariableRow {
   readonly name?: string;
   readonly cells: readonly (VariableCell | null)[];
 }
-export interface VariableBlock {
-  readonly kind: 'rows' | 'matrix';
+interface VariableBlockBase {
   readonly title: string | null;
   readonly titleStart?: number;
   readonly titleEnd?: number;
   readonly rows: readonly VariableRow[];
-  readonly columns?: readonly WireColumn[];
 }
+export type VariableBlock = VariableBlockBase &
+  (
+    | { readonly kind: 'rows'; readonly columns?: readonly WireColumn[] }
+    | { readonly kind: 'matrix'; readonly columns: readonly WireColumn[] }
+  );
 export interface VariableGroup {
   readonly kind: 'modes' | 'single';
   readonly label: string;
@@ -166,7 +169,7 @@ function variableFileParser(budget: VariablesBudget): Parser<VariableFile> {
     name: optional(variableText),
     cells: budget.list(nullable(parseVariableCell)),
   });
-  const block = object({
+  const blockShape = object({
     kind: blockKind,
     title: nullable(variableText),
     titleStart: optional(sourceOffset),
@@ -174,6 +177,21 @@ function variableFileParser(budget: VariablesBudget): Parser<VariableFile> {
     rows: budget.list(row),
     columns: optional(budget.list(column)),
   });
+  const block = (input: unknown): VariableBlock => {
+    const parsed = blockShape(input);
+    if (parsed.titleStart !== undefined && parsed.titleEnd !== undefined) {
+      if (parsed.titleEnd < parsed.titleStart) {
+        throw new Error('CSSVariables: reversed title range');
+      }
+    }
+    if (parsed.kind === 'matrix') {
+      if (parsed.columns === undefined) {
+        throw new Error('CSSVariables: matrix columns are required');
+      }
+      return { ...parsed, kind: 'matrix', columns: parsed.columns };
+    }
+    return { ...parsed, kind: 'rows' };
+  };
   const group = object({
     kind: groupKind,
     label: variableText,
