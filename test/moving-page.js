@@ -211,25 +211,32 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   // A canvas click picks the copy under the pointer. Every other route to a
   // selection points at the node, and the node is every copy of it — outlining
   // only the first read as the app ignoring the rest of the strip.
-  const pane = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PreviewPane.jsx'), 'utf8');
+  const runtime = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'),
+    'utf8'
+  );
+  const overlays = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'panels', 'PreviewOverlays.tsx'),
+    'utf8'
+  );
   check(
     'a selection from anywhere but the canvas means the node',
-    /setSelOcc\(null\)/.test(pane) && /React\.useState\(null\)/.test(pane.slice(pane.indexOf('const [selOcc'), pane.indexOf('const [selOcc') + 80)),
+    /setSelOcc\(null\)/.test(runtime) && /useState<number \| null>\(null\)/.test(runtime),
     'a navigator selection still means the first copy'
   );
   check(
     'and a click still means the copy that was clicked',
-    /setSelOcc\(d\.occurrence \|\| 0\)/.test(pane),
+    /setSelOcc\(message\.occurrence\)/.test(runtime),
     'a canvas click no longer picks an instance'
   );
   check(
     'which the outline draws as every place',
-    /o\.occ == null \? onePerPlace\(all\)/.test(pane),
+    /outline\.occ === null \? onePerPlace\(all\)/.test(overlays),
     'a selection with no occurrence draws one box'
   );
   check(
     'the panels read the first copy when the selection means all of them',
-    /selOcc \?\? 0/.test(pane),
+    /selOcc \?\? 0/.test(`${runtime}\n${overlays}`),
     'the spacing box and the class list have no instance to read'
   );
   check(

@@ -254,7 +254,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 12/20 original files converted ⏳
+### src/panels — 13/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -496,6 +496,15 @@ bridge, panel-sound, and production-build checks pass without warnings in the
 new modules. The full gate passes 142/142 commands (98.8s). Eight original
 panels remain; continue with `PreviewPane.jsx`.
 
+PreviewPane is converted to `PreviewPane.tsx`. Iframe messages now cross a
+bounded parser before reaching React state, and the runtime, toolbar, overlays,
+and offline diagnosis are split into typed modules with stable effect inputs.
+Malformed project messages are ignored at the frame boundary; finite geometry,
+spacing, classes, node states, clicks, and query replies remain discriminated.
+Preview lifecycle, outline, moving-page, spacing, bridge, and production-build
+checks pass without warnings in the new modules. The full gate passes 143/143
+commands (97.3s). Seven original panels remain; continue with `AssetsPanel.jsx`.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -505,7 +514,7 @@ panels remain; continue with `PreviewPane.jsx`.
 | `ContentView.tsx`                                                                                    | ✅ converted with typed fields, saves, and rename boundaries |
 | `CmsPanel.tsx`                                                                                       | ✅ converted with independent parsed content inventories     |
 | `StructurePanel.tsx`                                                                                 | ✅ converted with typed rows, drops, and bounded traversal   |
-| `PreviewPane.jsx`                                                                                    | 727                                                          |
+| `PreviewPane.tsx`                                                                                    | ✅ converted with parsed frame messages and typed runtime     |
 | `AssetsPanel` 473 · `PalettePanel` 455 · `PagesPanel` 442 · `HistoryPanel` 392 · `WelcomeScreen` 391 | small                                                        |
 | `StylePanel.tsx`                                                                                     | ✅ converted with parsed stylesheet inventories              |
 | `CanvasView.tsx`                                                                                     | ✅ converted with typed frame and gesture lifetimes          |

@@ -1,0 +1,69 @@
+// Goal: project iframes cannot place unbounded or malformed measurements into
+// renderer state. Methodology: parse every message variant, then corrupt
+// numeric, nested, discriminant, and collection fields at the boundary.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { parsePreviewMessage } = require('./renderer-module')('previewMessages.ts');
+
+const box = { x: -1.5, y: 2, w: 30, h: 40 };
+const spacing = {
+  padding: { top: 2, right: 3, bottom: 4, left: 5 },
+  margin: { top: 1 },
+  gaps: [{ ...box, axis: 'row' }],
+};
+
+test('preview message parser preserves every supported message variant', () => {
+  const messages = [
+    {
+      type: 'avb:rects',
+      rects: { 0: [box] },
+      classes: { 0: [['card']] },
+      spacing: { 0: [spacing] },
+    },
+    { type: 'avb:node-classes', classes: { 0: ['card'] } },
+    { type: 'avb:rendered-nodes', paths: ['0'] },
+    { type: 'avb:node-states', hidden: ['0'], inert: [] },
+    { type: 'avb:modifiers', shiftKey: true, altKey: false },
+    { type: 'avb:hover-node', path: null, occurrence: 0 },
+    { type: 'avb:click-node', path: '0', occurrence: 1, outside: false },
+    { type: 'avb:open-node', path: '0', occurrence: 2 },
+    { type: 'avb:canvas-ready' },
+    { type: 'avb:query-result', id: 1, found: false },
+  ];
+  assert.deepEqual(
+    messages.map((message) => parsePreviewMessage(message)?.kind),
+    [
+      'rects',
+      'node-classes',
+      'rendered-nodes',
+      'node-states',
+      'modifiers',
+      'hover-node',
+      'click-node',
+      'open-node',
+      'canvas-ready',
+      'query-result',
+    ],
+  );
+  assert.deepEqual(parsePreviewMessage(messages[0]).spacing['0'], [spacing]);
+});
+
+test('preview message parser ignores unknown and malformed project messages', () => {
+  for (const value of [
+    null,
+    { type: 'other' },
+    { type: 'avb:rects', rects: { 0: [{ ...box, w: -1 }] }, classes: {}, spacing: {} },
+    { type: 'avb:rects', rects: { 0: [{ ...box, x: Number.NaN }] }, classes: {}, spacing: {} },
+    {
+      type: 'avb:rects',
+      rects: {},
+      classes: {},
+      spacing: { 0: [{ gaps: [{ ...box, axis: 'diagonal' }] }] },
+    },
+    { type: 'avb:click-node', path: '0', occurrence: -1, outside: false },
+    { type: 'avb:modifiers', shiftKey: 'yes', altKey: false },
+    { type: 'avb:rendered-nodes', paths: Array(100_001).fill('0') },
+  ]) {
+    assert.equal(parsePreviewMessage(value), undefined);
+  }
+});

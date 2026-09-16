@@ -582,13 +582,13 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
     );
     check(
       'and the app passes them to the panel',
-      /avb:modifiers'[\s\S]{0,400}setModifiers\(/.test(
-        fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PreviewPane.jsx'), 'utf8')
+      /case 'modifiers':[\s\S]{0,100}setModifiers\(/.test(
+        fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'previewRuntime.ts'), 'utf8')
       ),
       'the message arrives and goes nowhere'
     );
     const pane = fs.readFileSync(
-      path.join(__dirname, '..', 'src', 'panels', 'PreviewPane.jsx'),
+      path.join(__dirname, '..', 'src', 'panels', 'PreviewOverlays.tsx'),
       'utf8'
     );
     check('the preview draws the bands', /spacingBands\(/.test(pane));

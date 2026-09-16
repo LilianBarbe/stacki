@@ -9,7 +9,7 @@ const dir = path.join(__dirname, '..', 'node_modules', '.stacki-test', 'preview-
 fs.mkdirSync(dir, { recursive: true });
 esbuild.buildSync({
   stdin: {
-    contents: "export { default as PreviewPane, deviceForWidth } from './src/panels/PreviewPane.jsx'; export { hasCanvas, queryCanvas } from './src/canvasQuery.js';",
+    contents: "export { default as PreviewPane, deviceForWidth } from './src/panels/PreviewPane.tsx'; export { hasCanvas, queryCanvas } from './src/canvasQuery.js';",
     resolveDir: path.join(__dirname, '..'), loader: 'jsx',
   },
   outfile: path.join(dir, 'preview.js'), bundle: true, format: 'cjs', platform: 'node',

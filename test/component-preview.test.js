@@ -24,7 +24,13 @@ test('component navigation keeps the real iframe and inspector mounted while loa
         const name = path.basename(args.path, path.extname(args.path));
         // Keep both preview components real: a mocked pane cannot reveal frame
         // replacement, navigation, or an inspector vanishing beside the frame.
-        if (name === 'PreviewPane' || name === 'CanvasView') {return;}
+        if (
+          ['PreviewPane', 'CanvasView', 'DevOffline', 'PreviewOverlays', 'PreviewToolbar'].includes(
+            name,
+          )
+        ) {
+          return;
+        }
         return { contents: `export const relativeTime = () => ''; export default function Panel(props) { globalThis.__componentPanels[${JSON.stringify(name)}] = props; return null; }`, loader: 'jsx' };
       });
     } }],

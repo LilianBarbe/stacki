@@ -12,7 +12,7 @@ import { tellCanvas } from './canvasQuery.js';
 import { renameAttr } from './attrOrder.js';
 import { scanProject } from './bridge';
 import { LIMITS } from '../shared/limits';
-import PreviewPane from './panels/PreviewPane.jsx';
+import PreviewPane from './panels/PreviewPane';
 import GitChip from './panels/GitChip';
 import HistoryPanel, { relativeTime } from './panels/HistoryPanel.jsx';
 import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog.jsx';
