@@ -270,7 +270,11 @@ const SCREENS = [
     'a JSON file would be handed an identifier'
   );
   const main = fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8');
-  check("a picked public/ file is a URL, not an import", /if \(root === 'public'\) \{return \{ value: '\/' \+/.test(main), 'public assets would be imported');
+  check(
+    "a picked public/ file is a URL, not an import",
+    /if \(root === 'public'\) \{\s*return \{ value: '\/' \+/.test(main),
+    'public assets would be imported'
+  );
   check('the same picture twice is one import', /const already = imports\.find\(/.test(main), 'a second import of the same file');
   check('and what is read carries what each name is bound to', /withAssets\(col\.data, assetOfImport\(/.test(main), 'the read hands over bare names');
 }

@@ -85,7 +85,7 @@ Four cooperating processes, each with one job:
 ```
 
 - **Main** (`electron/`, Node.js, CommonJS): owns everything that touches the
-  OS. `main.js` (~111 `ipcMain.handle` channels) is a registry of
+  OS. `main.ts` (emits `main.js`, 111 invoke channels) is a registry of
   capabilities; leaf modules do the work (`astroParser`, `frontmatter`,
   `htmlText`, `assetRefs`, `cssVars`, `gitBranches`, `gitHistory`,
   `projectWatcher`, `terminal` via node-pty, `previewWorktree`,
@@ -228,14 +228,16 @@ green at every commit.
   Electron modules convert in place with side-by-side tsc emit
   (`electron/tsconfig.json`, plus per-module projects for `morphClient` and
   `preload`, which need DOM libs) so `require` sites never move; renderer
-  modules convert directly (Vite resolves `.js` → `.ts`). Done so far: 31
-  electron modules, including `astroParser.ts`; `main.js` is next, with the
-  `shared/ipc.ts` channel inventory. Also converted: 8 src
+  modules convert directly (Vite resolves `.js` → `.ts`). The Electron queue is
+  complete: 38 converted source modules, including `astroParser.ts` and `main.ts`.
+  `shared/ipc.ts` inventories all 115 invoke channels (111 main, four terminal);
+  handlers parse inputs and compile-check results. The contract suite has 152
+  tests, and the full gate passes 125 test commands. Also converted: 8 src
   modules (`editorTree`, `pagePersistence`, `cleanError`, `branchName`,
   `loopBindings`, `bindings`, `arrayValue`, `dataSuggest`). Remaining: the
-  Electron entry point, ~30 src leaf libs, the panels, and the four
+  ~30 src leaf libs, the UI, the panels, and the remaining
   hotspots last (`App.jsx` 4.6k lines, `PropsPanel.jsx` 3.8k,
-  `parsePropSchema`, `ClipPath.tsx` 8.8k). Live status:
+  `ClipPath.tsx` 8.8k). Live status:
   `docs/migration-tracker.md`.
 - **Phase 4 (planned)** — `docs/contracts.md` for invariants types can't
   express; an AGENTS.md "contracts" section; CI/pre-push hook.
@@ -250,10 +252,10 @@ pain, in priority order:
 1. **The IPC protocol lives in three places, hand-maintained.** 111 channels
    in `main.js`, mirrored in `preload.js`'s dispatch, mirrored at every
    renderer call site; co-change data shows renderer files driving preload
-   and main edits at 0.8–1.0 confidence with no static link. Fix: complete
-   the `IpcContract` channel inventory (only 6 channels typed so far) and
-   derive preload's dispatch from the contract — one place defines a
-   capability, and channel-name typos become compile errors.
+   and main edits at 0.8–1.0 confidence with no static link. **Main conversion
+   addressed the inventory:** all 115 invoke channels now have shared payload
+   parsers and result types; main, terminal, and preload use those channel types.
+   Remaining renderer conversions can adopt those payload/result types directly.
 2. **One mutable tree wears two hats.** The live editor model is mutated in
    place (`loopBindings` even rewrites node `kind`s), while the boundary
    contract is `readonly`; saves ack by `WeakSet` identity as a workaround

@@ -1,3 +1,4 @@
+import type { IpcChannel, IpcPayloads } from '../shared/dist/ipc-payloads.js';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 // The boxes this file measures and the shapes it reports, shared by the
@@ -1878,8 +1879,12 @@ window.addEventListener('message', (e: MessageEvent) => {
   // this preload — the frame-side canvas logic above, the app-facing bridge
   // below — are an if/else on the same flag.
 
-  const invoke = (channel: string) => (payload?: unknown): Promise<unknown> =>
-    ipcRenderer.invoke(channel, payload);
+  // Types erase here: sandboxed preload cannot require arbitrary local modules.
+  // Main parses every payload before it reaches a handler.
+  const invoke = <K extends IpcChannel>(channel: K) =>
+    (...args: undefined extends IpcPayloads[K]
+      ? [payload?: IpcPayloads[K]] : [payload: IpcPayloads[K]]): Promise<unknown> =>
+      ipcRenderer.invoke(channel, args[0]);
 
 contextBridge.exposeInMainWorld('avb', {
   platform: process.platform,

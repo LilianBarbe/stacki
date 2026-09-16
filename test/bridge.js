@@ -70,7 +70,7 @@ const handled = new Set();
 // loads the module that registers it — the terminal keeps its own (and its
 // pty bookkeeping) in electron/terminal.js rather than in main.js.
 const mainSide = [main];
-for (const m of main.matchAll(/require\(\s*'\.\/([\w.-]+?)(?:\.js)?'\s*\)/g)) {
+for (const m of main.matchAll(/require\(\s*['"]\.\/([\w.-]+?)(?:\.js)?['"]\s*\)/g)) {
   try {
     mainSide.push(fs.readFileSync(path.join(root, 'electron', `${m[1]}.js`), 'utf8'));
   } catch {

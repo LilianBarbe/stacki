@@ -7,33 +7,39 @@ then update the counts below.
 
 ## Handoff state (read this first)
 
-The `v0.1.26` renderer startup repair is on `main`. The Astro parser conversion
-is complete: `electron/astroParser.ts` replaces the source `.js` and its seed
-`.d.ts`; the build emits the ignored `.js` in place for existing require sites.
-**Next conversion: `electron/main.js` (4,741 lines), completing the
-`shared/ipc.ts` channel inventory with it. After Electron: remaining renderer
-leaves, `src/ui`, then `src/panels` (PropsPanel first), and `src/App.jsx` last.**
+The `v0.1.26` startup repair, Astro parser conversion, and **Electron main
+conversion** are complete. `electron/main.ts` now emits the ignored `main.js`
+package entry. The invoke inventory is complete: **111 main channels + 4 terminal
+channels**, with parsed inputs and compile-checked handler results.
+**Next: remaining renderer leaves, then `src/ui`, then `src/panels` (PropsPanel
+first), and `src/App.jsx` last. The scheduled Electron conversion queue is done.**
 
-Parser verification: 84 old/new page parses matched, along with plain and marked
-serialization, prop schemas, slots, root tags, and attributes. The full gate
-passed all 125 test commands; the expanded contract suite passes 23 tests.
-The converted parser, types, validation, and new tests have zero lint warnings.
+Main verification: 26 old/new handler and output comparisons matched, including
+byte-identical generated Astro config, preview page, and both API endpoints.
+The contract suite passes 152 tests. The full gate passes all 125 test commands;
+repository lint retains 177 existing warnings and no errors. New main helpers,
+IPC contracts, and tests have no lint warnings and meet the 70-line function limit.
+The live lifecycle integration also passes against Electron 33.4.11 and Astro
+5.13.10: content schemas, concurrent starts, stop/restart, startup cancellation,
+process cleanup, and the built renderer/preload boot.
+
+Main conversion details:
+- One shared payload inventory drives main and terminal registration. Preload
+  channel/payload types erase at build time, keeping sandboxed preload free of
+  additional runtime imports. Renderer result parsers remain at their boundary.
+- Disk settings, recents, package/config fields, Astro locks, content manifests,
+  and dev-server responses are parsed. Markdown save metadata is checked without
+  dropping source-preservation fields or trailing blank lines.
+- Directory depth/count, file reads, port searches, name collisions, pending style
+  writes, previews, logs, clipboard bytes, and IPC collections have explicit bounds.
+- CMS scanning, menu construction, Git identity, preview startup, and image header
+  reading use responsibility-sized helpers. Generated preview output is unchanged.
+- Native source-text test checks tolerate emitted import quotes and whitespace.
+  No runtime dependencies were added. Root `allowImportingTsExtensions` lets native
+  Node TypeScript tests share a checked VM harness under the existing no-emit build.
+
 Run the gate as `env -u ELECTRON_RUN_AS_NODE npm test` if the surrounding shell
 sets that variable: browser probes need Electron's app API, not Node mode.
-
-Conversion details:
-- Node payloads use a discriminated union; legacy serialization inputs are
-  validated without dropping their source-preservation metadata.
-- Shared frontmatter slots are `ImportSlot[]`, with bounds and negative tests.
-  Block-loop `body` is correctly contracted as a statement array, not a string.
-- Template and conditional recursion, tree traversal, and serializer inputs are
-  bounded. A truncated raw closing tag now falls back to code view instead of
-  revisiting the same source offset.
-- Responsibility-sized helpers meet the current AGENTS.md 70-line requirement.
-  This required helper extraction during conversion; public entry points and
-  supported source output remain unchanged.
-- The validator is included in `asarUnpack`; the standalone packaged-parser
-  closure test passes. No dependencies were added.
 
 Field lessons a real project surfaced (a user's Windows machine, 2026-09-15):
 the renderer contract had never run against a real scan payload (every suite
@@ -60,7 +66,7 @@ Gate: builds + `tsc --noEmit` + ESLint + ratchet + 125/125 test commands, exit 0
 ## Phase 1 — Contract layer (`shared/`) ✅
 
 `brand`, `limits`, `assert`, `result`, `page-node`, `prop-schema`, `scan`,
-`ipc`, `record` (+ `toArray`). 23 contract tests, including a roundtrip
+`ipc`, `record` (+ `toArray`). 152 contract tests, including a roundtrip
 property test and parser/import-slot boundary tests. Also fixed a lone-top-level-component layout bug found by the
 contracts.
 
@@ -85,7 +91,7 @@ touching `shared/` wire shapes.
 
 ## Phase 3 — Mechanical conversion (leaf → hotspot) ⏳
 
-### electron/ — 31 modules converted
+### electron/ — 38 source modules converted ✅
 
 | Module                                                                                                                      | State                |
 | --------------------------------------------------------------------------------------------------------------------------- | -------------------- |
@@ -114,11 +120,11 @@ touching `shared/` wire shapes.
 `astroParser` is also converted: checked tree/schema types, serializer validation,
 shared import slots, and bounded parsing; its seed declaration is retired.
 
-Remaining electron items (by lines):
-
-| File             | Lines | Notes                                                                                                                                                      |
-| ---------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `main.js`        | 4,741 | ~111 IPC channels; largest single file; last electron item                                                                                                 |
+`main` is converted with `main.types`, `main.validation`, `main.bounds`, and the
+shared typed IPC registrar. The count is 38 converted source modules (including
+formats); seven supporting TypeScript modules bring the checked total to 45.
+No scheduled Electron `.js` conversion remains. The authored content-worker
+`.mjs` files stay outside this conversion queue.
 
 Cleanup owed: `electron/scratch2-7.js` are stray tsc-emitted outputs from the
 cssVars conversion experiments, still tracked in git (198 lines). Delete them
@@ -215,7 +221,7 @@ move-blindness.
 
 | Task                                                                 | State                        |
 | -------------------------------------------------------------------- | ---------------------------- |
-| Complete `IpcContract` channel inventory (only 6 of ~111 typed)      | ⬜ before or with `main.js`  |
+| Complete `IpcContract` invoke inventory (115 channels) | ✅ with `main.ts` |
 | Fix 15 conditional-hook bugs in PropsPanel / VariablesView           | ⬜ with those conversions    |
 | Delete stray `electron/scratch2-7.js` (tracked tsc-emit leftovers)   | ⬜ standalone cleanup commit |
 | `release.sh` → TypeScript (`scripts/*.ts`, per AGENTS §17)           | ⬜                           |
@@ -226,8 +232,8 @@ move-blindness.
 
 - Gate green at last run: 125/125, exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
-- Contract suite: 23/23. Full-repository lint has 177 existing warnings and no
-  errors; the converted parser and its new supporting files have no warnings.
+- Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
+  errors; the converted parser, main, and their new supporting files have no warnings.
 - Healed out of quarantine during Phase 3 (verified two consecutive direct
   runs each, then removed per the gate's own heal report): binding, chipedit,
   codeeditorlifecycle, codeprop, jsguard.

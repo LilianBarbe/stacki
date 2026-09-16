@@ -1,4 +1,6 @@
-import { ipcMain } from 'electron';
+import { ipcMain as nativeIpcMain } from 'electron';
+import { createIpcRegistrar } from './ipc.js';
+
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
@@ -20,6 +22,8 @@ import { toRecord } from '../shared/dist/record.js';
 // payload, so the renderer owns that setting) and its clipboard-image paste
 // (kept — see below) minus the projects-base path model, which Stacki replaces
 // with the open-project check the asset protocol already uses.
+
+const ipcMain = { handle: createIpcRegistrar(nativeIpcMain) };
 
 const isWin = process.platform === 'win32';
 
@@ -284,30 +288,15 @@ function stopPolling(): void {
 // IPC
 // ---------------------------------------------------------------------------
 
-interface TerminalStartPayload {
-  readonly id: string;
-  readonly cwd: string;
-  readonly autoLaunch?: string;
-}
-interface TerminalIdPayload {
-  readonly id: string;
-}
+
 interface TerminalInputPayload {
   readonly id: string;
   readonly data: string;
 }
-interface TerminalResizePayload {
-  readonly id: string;
-  readonly cols: number;
-  readonly rows: number;
-}
+
 interface TerminalAckPayload {
   readonly id: string;
   readonly count: number;
-}
-interface TerminalClipboardPayload {
-  readonly bytes: readonly number[];
-  readonly mime: string;
 }
 
 /**
@@ -321,18 +310,18 @@ function registerTerminalHandlers({
   readonly send: (channel: string, payload: unknown) => void;
   readonly projectRoot: () => string | null;
 }): void {
-  ipcMain.handle('terminal:start', async (event: unknown, payload: TerminalStartPayload) => {
+  ipcMain.handle('terminal:start', async (event: unknown, payload) => {
     // The shell can go anywhere the user takes it, but the app only ever opens
     // one *at* the project it has open — same reach as the asset protocol.
     const root = projectRoot();
     const cwd = payload?.cwd;
     const abs = cwd ? path.resolve(cwd) : null;
     if (!root || !abs || (abs !== root && !(abs + path.sep).startsWith(root + path.sep))) {
-      return { ok: false, error: 'Terminal can only open inside the current project.' };
+      return { ok: false as const, error: 'Terminal can only open inside the current project.' };
     }
     const id = payload?.id ?? '';
     if (!id) {
-      return { ok: false, error: 'Missing terminal id.' };
+      return { ok: false as const, error: 'Missing terminal id.' };
     }
 
     // Ids are reused (a renderer reload re-creates "…:term-1"), so retire any
@@ -365,7 +354,7 @@ function registerTerminalHandlers({
     if (!proc) {
       const code = error.code;
       return {
-        ok: false,
+        ok: false as const,
         error: FD_LIMIT_CODES.has(code ?? '')
           ? `Couldn't open a terminal — too many open files (${code}). Close a few tabs and try again.`
           : `Couldn't start ${shell}${code ? ` (${code})` : ''}: ${error.message || 'unknown error'}`,
@@ -452,12 +441,12 @@ function registerTerminalHandlers({
       send('terminal:exit', { id, exitCode });
     });
 
-    return { ok: true, id };
+    return { ok: true as const, id };
   });
 
   // `on`, not `handle`: keystrokes and acks are high-frequency one-way signals
   // that need no reply, so they shouldn't pay for a round trip.
-  ipcMain.on('terminal:input', (event: unknown, payload: TerminalInputPayload) => {
+  nativeIpcMain.on('terminal:input', (event: unknown, payload: TerminalInputPayload) => {
     const entry = terminals.get(payload?.id ?? '');
     if (!entry || payload?.data === undefined) {
       return;
@@ -471,7 +460,7 @@ function registerTerminalHandlers({
 
   // The renderer reports chars it has actually rendered. Resume a pty the high
   // watermark paused once it has drained.
-  ipcMain.on('terminal:ack', (event: unknown, payload: TerminalAckPayload) => {
+  nativeIpcMain.on('terminal:ack', (event: unknown, payload: TerminalAckPayload) => {
     const flow = flowState.get(payload?.id ?? '');
     if (!flow) {
       return;
@@ -493,48 +482,46 @@ function registerTerminalHandlers({
     }
   });
 
-  ipcMain.handle('terminal:resize', (event: unknown, payload: TerminalResizePayload) => {
+  ipcMain.handle('terminal:resize', (event: unknown, payload) => {
     const entry = terminals.get(payload?.id ?? '');
     const cols = payload?.cols;
     const rows = payload?.rows;
     if (!entry || typeof cols !== 'number' || typeof rows !== 'number') {
       // Mirrors the original: missing sizes made node-pty throw, and the
       // caller got { ok: false } from the catch.
-      return { ok: false };
+      return { ok: false as const };
     }
     try {
       entry.proc.resize(cols, rows);
     } catch {
-      return { ok: false };
+      return { ok: false as const };
     }
-    return { ok: true };
+    return { ok: true as const };
   });
 
-  ipcMain.handle('terminal:close', (event: unknown, payload: TerminalIdPayload) => {
+  ipcMain.handle('terminal:close', (event: unknown, payload) => {
     const id = payload?.id ?? '';
     const entry = terminals.get(id);
     terminals.delete(id);
     flowState.delete(id);
     lastProcessName.delete(id);
     if (!entry) {
-      return { ok: false };
+      return { ok: false as const };
     }
     try {
       entry.proc.kill();
     } catch {
       /* already gone */
     }
-    return { ok: true };
+    return { ok: true as const };
   });
 
   // Persist pasted image bytes and hand back the path. Returns ok:false so the
   // renderer can fall back to forwarding the raw Ctrl+V byte.
-  ipcMain.handle('terminal:clipboardImage', (event: unknown, payload: TerminalClipboardPayload) => {
-    const bytes = payload?.bytes;
-    const raw: number[] | Uint8Array = Array.isArray(bytes) || bytes instanceof Uint8Array ? bytes : [];
-    const buf = Buffer.from(raw);
+  ipcMain.handle('terminal:clipboardImage', (event: unknown, payload) => {
+    const buf = Buffer.from(payload.bytes);
     if (buf.length === 0) {
-      return { ok: false, error: 'empty image' };
+      return { ok: false as const, error: 'empty image' };
     }
     try {
       pruneOldClipboardImages();
@@ -543,10 +530,13 @@ function registerTerminalHandlers({
       const name = `clipboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const file = path.join(CLIPBOARD_DIR, name);
       fs.writeFileSync(file, buf);
-      return { ok: true, path: file };
+      return { ok: true as const, path: file };
     } catch (err) {
       const record = toRecord(err);
-      return { ok: false, error: record?.['message'] ?? String(err) };
+      return {
+        ok: false as const,
+        error: typeof record?.['message'] === 'string' ? record['message'] : String(err),
+      };
     }
   });
 }

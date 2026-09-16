@@ -1,8 +1,50 @@
+import { createIpcRegistrar } from './ipc.js';
+import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds.js';
+import { definedFields } from '../shared/dist/boundary.js';
+import { gitErrorDetail } from './git.js';
+import { userInfo } from 'os';
+import type {
+  BrowserWindow as Window,
+  MenuItemConstructorOptions,
+  MessageBoxOptions,
+  OpenDialogOptions,
+} from 'electron';
+import type { ChildProcess, ExecFileOptions } from 'child_process';
+import { toRecord, toArray } from '../shared/dist/record.js';
+import { assert } from '../shared/dist/assert.js';
+import type { IpcPayloads } from '../shared/dist/ipc-payloads.js';
+import type { ParserNode, ParserPageModel, SchemaField } from './astroParser.types.js';
+import { parseSerializePage } from './astroParser.validation.js';
+import { parseMarkdownModel } from './main.validation.js';
+import {
+  parseData,
+  parseRecord,
+  parseOptionalString,
+  parseRecents,
+  parseValidationResult,
+  parseSettings,
+  parseContentConfig,
+  parseAliases,
+  parseDynamicPaths,
+  parseSampleEntry,
+  parseAstroLock,
+} from './main.validation.js';
+import type {
+  RecentProject,
+  AssetEntry,
+  CmsFile,
+  StyleFile,
+  GitInfo,
+  DevServer,
+  PreviewServer,
+} from './main.types.js';
+
+import * as electronModule from 'electron';
 const {
   app,
   BrowserWindow,
   screen,
-  ipcMain,
+  ipcMain: nativeIpcMain,
   dialog,
   shell,
   Menu,
@@ -10,14 +52,16 @@ const {
   net: enet,
   nativeImage,
   clipboard,
-} = require('electron');
-const path = require('path');
-const fs = require('fs');
-const { pathToFileURL } = require('url');
-const net = require('net');
-const crypto = require('crypto');
-const { spawn, spawnSync, execFile, execFileSync } = require('child_process');
+} = electronModule;
+import * as path from 'path';
+import * as fs from 'fs';
+import * as urlModule from 'url';
+const { pathToFileURL } = urlModule;
+import * as net from 'net';
+import * as childprocessModule from 'child_process';
+const { spawn, spawnSync, execFile, execFileSync } = childprocessModule;
 
+import * as astroParserModule from './astroParser';
 const {
   parsePage,
   locateSelection,
@@ -30,47 +74,59 @@ const {
   parseSlots,
   defaultSlotInline,
   rootTag,
-} = require('./astroParser');
-const { parseMarkdownPage, serializeMarkdownPage } = require('./markdownParser');
-const { scaffoldProject } = require('./scaffold');
-const {
-  findCollections,
-  replaceCollection,
-  readGeneral,
-  writeGeneral,
-  GENERAL,
-} = require('./jsCollections');
-const {
-  defaultImports,
-  addImport,
-  importName,
-  importSpecFor,
-  withAssets,
-} = require('./assetRefs.js');
-const { aliasMap, importersOf, resolveImport } = require('./cmsRefs');
-const { readContentConfig, validateEntry, stopAllServices } = require('./contentConfig');
-const thumbs = require('./thumbs');
-const cssVars = require('./cssVars');
-const { readInjectedRoutes } = require('./injectedRoutes.js');
-const { createStarter } = require('./starter');
-const { openingBounds } = require('./windowBounds');
-const { componentFile } = require('./componentFile');
-const { componentUsage, instancesIn } = require('./componentUsage');
-const { listEntries, writeEntry, countEntries, coveredPaths } = require('./contentEntries');
-const { planRename, applyRename } = require('./contentRefs');
-const { mergeBranch, deleteBranch, switchBranch, resolveMerge } = require('./gitBranches');
-const { probeUrl } = require('./devProbe');
-const gitHistory = require('./gitHistory');
-const gitSnapshot = require('./gitSnapshot');
-const previewWorktree = require('./previewWorktree');
-const { registerTerminalHandlers, cleanupTerminals } = require('./terminal');
-const { createSelfWrites } = require('./selfWrites');
-const { watchProject } = require('./projectWatcher');
-const { createSerialQueue, createKeyedQueue } = require('./serialQueue');
-const { autoUpdater } = require('electron-updater');
+} = astroParserModule;
+import * as markdownParserModule from './markdownParser';
+const { parseMarkdownPage, serializeMarkdownPage } = markdownParserModule;
+import * as scaffoldModule from './scaffold';
+const { scaffoldProject } = scaffoldModule;
+import * as jsCollectionsModule from './jsCollections';
+const { findCollections, replaceCollection, readGeneral, writeGeneral, GENERAL } =
+  jsCollectionsModule;
+import * as assetRefsModule from './assetRefs.js';
+const { defaultImports, addImport, importName, importSpecFor, withAssets } = assetRefsModule;
+import * as cmsRefsModule from './cmsRefs';
+const { aliasMap, importersOf, resolveImport } = cmsRefsModule;
+import * as contentConfigModule from './contentConfig';
+const { readContentConfig, validateEntry, stopAllServices } = contentConfigModule;
+import * as thumbs from './thumbs';
+import * as cssVars from './cssVars';
+import * as injectedRoutesModule from './injectedRoutes.js';
+const { readInjectedRoutes } = injectedRoutesModule;
+import * as starterModule from './starter';
+const { createStarter } = starterModule;
+import * as windowBoundsModule from './windowBounds';
+const { openingBounds } = windowBoundsModule;
+import * as componentFileModule from './componentFile';
+const { componentFile } = componentFileModule;
+import * as componentUsageModule from './componentUsage';
+const { componentUsage, instancesIn } = componentUsageModule;
+import * as contentEntriesModule from './contentEntries';
+const { listEntries, writeEntry, countEntries, coveredPaths } = contentEntriesModule;
+import * as contentRefsModule from './contentRefs';
+const { planRename, applyRename } = contentRefsModule;
+import * as gitBranchesModule from './gitBranches';
+const { mergeBranch, deleteBranch, switchBranch, resolveMerge } = gitBranchesModule;
+import * as devProbeModule from './devProbe';
+const { probeUrl } = devProbeModule;
+import * as gitHistory from './gitHistory';
+import * as gitSnapshot from './gitSnapshot';
+import * as previewWorktree from './previewWorktree';
+import * as terminalModule from './terminal';
+const { registerTerminalHandlers, cleanupTerminals } = terminalModule;
+import * as selfWritesModule from './selfWrites';
+const { createSelfWrites } = selfWritesModule;
+import * as projectWatcherModule from './projectWatcher';
+const { watchProject } = projectWatcherModule;
+import * as serialQueueModule from './serialQueue';
+const { createSerialQueue, createKeyedQueue } = serialQueueModule;
+import * as electronupdaterModule from 'electron-updater';
+const { autoUpdater } = electronupdaterModule;
 
-let mainWindow = null;
-let devServer = null; // {proc, url, projectPath}
+// The facade keeps native Electron registration behind a parsed payload boundary.
+const ipcMain = { handle: createIpcRegistrar(nativeIpcMain) };
+
+let mainWindow: Window | null = null;
+let devServer: DevServer | null = null; // {proc, url, projectPath}
 
 // --- Dev reload ------------------------------------------------------------
 // Only the renderer hot-reloads on its own (Vite). preload.js is re-read from
@@ -80,7 +136,7 @@ let devServer = null; // {proc, url, projectPath}
 // open project in a file for the next process to pick up (the supervisor
 // re-spawns us with the same argv, so there's nothing to hand forward there),
 // landing back where you were instead of on the welcome screen.
-const isDev = !!process.env.VITE_DEV_SERVER_URL;
+const isDev = !!process.env['VITE_DEV_SERVER_URL'];
 // Exiting with this asks scripts/dev-electron.mjs to start us again. Not
 // app.relaunch(): `npm run dev` runs us under `concurrently -k`, so quitting
 // would take the Vite server down with us and the new process would load a
@@ -118,7 +174,7 @@ const isWin = process.platform === 'win32';
 // ---------------------------------------------------------------------------
 
 const ASSET_SCHEME = 'stacki-asset';
-let openProjectRoot = null; // set when a project's watcher starts
+let openProjectRoot: string | null = null; // set when a project's watcher starts
 
 // Must run before the app is ready.
 protocol.registerSchemesAsPrivileged([
@@ -137,7 +193,9 @@ function registerAssetProtocol() {
       return new Response(null, { status: 400 });
     }
     // stacki-asset://local/Users/… on posix, //local/C:/… on Windows.
-    if (isWin) {abs = abs.replace(/^\//, '');}
+    if (isWin) {
+      abs = abs.replace(/^\//, '');
+    }
     abs = path.resolve(abs);
     // Preview iframes run the user's own site; keep the scheme from being a
     // general-purpose file reader by serving only the open project's files.
@@ -148,7 +206,7 @@ function registerAssetProtocol() {
   });
 }
 
-async function serveFile(abs, request) {
+async function serveFile(abs: string, request: Request) {
   const res = await enet.fetch(pathToFileURL(abs).toString(), { headers: request.headers });
   // The renderer is a different origin from this scheme, and font loading is
   // CORS-checked (unlike <img>/<video>), so the Assets panel's "Aa" preview
@@ -163,7 +221,7 @@ async function serveFile(abs, request) {
 // Window
 // ---------------------------------------------------------------------------
 
-const resource = (name) => path.join(__dirname, '..', 'resources', name);
+const resource = (name: string) => path.join(__dirname, '..', 'resources', name);
 
 // electron-builder stamps the icon onto packaged builds (build.mac.icon), but
 // `npm run dev` runs the bare Electron binary, which shows its own icon in the
@@ -171,9 +229,13 @@ const resource = (name) => path.join(__dirname, '..', 'resources', name);
 // padded icon-dock.png; elsewhere the Dock isn't a thing and the window icon
 // below covers it.
 function setApplicationIcon() {
-  if (process.platform !== 'darwin') {return;}
+  if (process.platform !== 'darwin') {
+    return;
+  }
   const img = nativeImage.createFromPath(resource('icon-dock.png'));
-  if (!img.isEmpty()) {app.dock?.setIcon(img);}
+  if (!img.isEmpty()) {
+    app.dock?.setIcon(img);
+  }
 }
 
 function createWindow() {
@@ -207,8 +269,8 @@ function createWindow() {
     },
   });
 
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  if (process.env['VITE_DEV_SERVER_URL']) {
+    mainWindow.loadURL(process.env['VITE_DEV_SERVER_URL']);
   } else {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
@@ -237,8 +299,8 @@ function createWindow() {
 // between app-level actions (nodes) and native ones (text fields).
 function buildMenu() {
   const isMac = process.platform === 'darwin';
-  const template = [
-    ...(isMac ? [{ role: 'appMenu' }] : []),
+  const template: MenuItemConstructorOptions[] = [
+    ...(isMac ? [{ role: 'appMenu' as const }] : []),
     {
       // Spelled out rather than `role: 'fileMenu'`, which takes no additions.
       // What that role provides is one item — Close Window on macOS, Quit
@@ -305,27 +367,7 @@ function buildMenu() {
     // reload keeps its usual behaviour one item down. A packaged build has no
     // supervisor to restart it and no source to pick up, so it keeps the stock
     // menu.
-    isDev
-      ? {
-          label: 'View',
-          submenu: [
-            { label: 'Reload All Code', accelerator: 'CmdOrCtrl+R', click: () => relaunchApp() },
-            {
-              label: 'Reload Window Only',
-              accelerator: 'Shift+CmdOrCtrl+R',
-              click: () => mainWindow?.webContents.reload(),
-            },
-            { type: 'separator' },
-            { role: 'toggleDevTools' },
-            { type: 'separator' },
-            { role: 'resetZoom' },
-            { role: 'zoomIn' },
-            { role: 'zoomOut' },
-            { type: 'separator' },
-            { role: 'togglefullscreen' },
-          ],
-        }
-      : { role: 'viewMenu' },
+    buildViewMenu(),
     { role: 'windowMenu' },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -335,7 +377,7 @@ function buildMenu() {
 // set by `project:close` when somebody picks a different project, since letting
 // go of one is done by reloading the window and the choice has to outlive that.
 // Consumed on read.
-let pendingProject = null;
+let pendingProject: string | null = null;
 
 // The project the renderer should pick up as it mounts, or null — which is the
 // welcome screen, and is what a cold start gets.
@@ -354,12 +396,19 @@ let pendingProject = null;
 ipcMain.handle('project:pending', () => {
   const asked = pendingProject;
   pendingProject = null;
-  if (asked && fs.existsSync(asked)) {return asked;}
-  if (!isDev) {return null;}
-  if (openProjectRoot && fs.existsSync(openProjectRoot)) {return openProjectRoot;}
+  if (asked && fs.existsSync(asked)) {
+    return asked;
+  }
+  if (!isDev) {
+    return null;
+  }
+  if (openProjectRoot && fs.existsSync(openProjectRoot)) {
+    return openProjectRoot;
+  }
   let p = null;
   try {
-    p = JSON.parse(fs.readFileSync(reopenFile(), 'utf8'))?.path || null;
+    const input: unknown = JSON.parse(readSource(reopenFile()));
+    p = parseOptionalString(toRecord(input)?.['path']) || null;
   } catch {
     return null;
   }
@@ -375,22 +424,22 @@ ipcMain.handle('project:pending', () => {
 // when a menu Copy/Paste lands while a text field has focus.
 ipcMain.handle('native:copy', () => {
   mainWindow?.webContents.copy();
-  return { ok: true };
+  return { ok: true as const };
 });
 ipcMain.handle('native:paste', () => {
   mainWindow?.webContents.paste();
-  return { ok: true };
+  return { ok: true as const };
 });
 // Undo INSIDE a field. ⌘Z is a menu accelerator, so the key never reaches the
 // page and a text field's own undo never runs — this is the app handing it
 // back when that is what the shortcut meant.
 ipcMain.handle('native:undo', () => {
   mainWindow?.webContents.undo();
-  return { ok: true };
+  return { ok: true as const };
 });
 ipcMain.handle('native:redo', () => {
   mainWindow?.webContents.redo();
-  return { ok: true };
+  return { ok: true as const };
 });
 
 app.whenReady().then(() => {
@@ -405,7 +454,9 @@ app.whenReady().then(() => {
   // protocol, which is what `openProjectRoot` already scopes.
   registerTerminalHandlers({ send, projectRoot: () => openProjectRoot });
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {createWindow();}
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
   });
 });
 
@@ -429,7 +480,7 @@ ipcMain.handle('project:close', async (_e, next) => {
   // stack and forty pieces of state that belong to the project just closed, and
   // none of it should be in the window that opens the next one.
   mainWindow?.webContents.reload();
-  return { ok: true };
+  return { ok: true as const };
 });
 
 app.on('window-all-closed', () => {
@@ -437,12 +488,16 @@ app.on('window-all-closed', () => {
   // destroying it fires this. That is not the app being closed — and treating
   // it as one killed the dev server (and, off macOS, quit) in the middle of
   // taking a picture.
-  if (mainWindow && !mainWindow.isDestroyed()) {return;}
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    return;
+  }
   stopDevServer();
   // The pty ids are keyed to the window that opened them, so a surviving shell
   // could never be reached again — and on macOS the app stays running.
   cleanupTerminals();
-  if (process.platform !== 'darwin') {app.quit();}
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
 
 app.on('before-quit', () => {
@@ -467,7 +522,7 @@ app.on('before-quit', () => cleanupTerminals());
 // ---------------------------------------------------------------------------
 
 const AUTO_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
-let autoUpdateInterval = null;
+let autoUpdateInterval: ReturnType<typeof setTimeout> | undefined;
 let autoUpdateCheckInFlight = false;
 let autoUpdateErrorDialogShown = false;
 // A check somebody asked for, rather than the scheduled one. It answers in a
@@ -478,9 +533,9 @@ let manualUpdateCheck = false;
 // see a dialog for: they're offline, or a release is mid-publish and its
 // channel file for this platform hasn't uploaded yet. Both resolve on their
 // own by the next check.
-function isExpectedAutoUpdateNetworkError(error) {
-  const code = String(error?.code || '').toUpperCase();
-  const message = String(error?.message || error || '').toLowerCase();
+function isExpectedAutoUpdateNetworkError(error: unknown) {
+  const code = String(toRecord(error)?.['code'] || '').toUpperCase();
+  const message = String(toRecord(error)?.['message'] || error || '').toLowerCase();
 
   // A release whose other platform published first: the channel file is
   // briefly absent, which surfaces as a 404 on latest-mac.yml / latest.yml.
@@ -521,11 +576,11 @@ function isExpectedAutoUpdateNetworkError(error) {
   ].some((fragment) => message.includes(fragment));
 }
 
-function formatAutoUpdateError(error) {
+function formatAutoUpdateError(error: unknown) {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
-function logAutoUpdate(message, details) {
+function logAutoUpdate(message: string, details?: unknown) {
   const detailText =
     details === undefined
       ? ''
@@ -534,7 +589,9 @@ function logAutoUpdate(message, details) {
 
   console.log(line);
 
-  if (!app.isReady()) {return;}
+  if (!app.isReady()) {
+    return;
+  }
 
   try {
     const logsDirectory = app.getPath('logs');
@@ -545,9 +602,9 @@ function logAutoUpdate(message, details) {
   }
 }
 
-async function promptToInstallDownloadedUpdate(version) {
+async function promptToInstallDownloadedUpdate(version: string) {
   const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
-  const { response } = await dialog.showMessageBox(parent, {
+  const { response } = await showMessageBox(parent, {
     type: 'info',
     title: 'Update Ready',
     buttons: ['Restart Now', 'Later'],
@@ -586,24 +643,32 @@ function registerAutoUpdaterEvents() {
     // A check from the File menu reports its own failure, and reports it even
     // when this dialog has already been shown once — two dialogs for the one
     // click would be worse than none.
-    if (manualUpdateCheck) {return;}
-    if (autoUpdateErrorDialogShown || isExpectedAutoUpdateNetworkError(error)) {return;}
+    if (manualUpdateCheck) {
+      return;
+    }
+    if (autoUpdateErrorDialogShown || isExpectedAutoUpdateNetworkError(error)) {
+      return;
+    }
     autoUpdateErrorDialogShown = true;
 
     const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
-    void dialog.showMessageBox(parent, {
+    void showMessageBox(parent, {
       type: 'warning',
       title: 'Update Check Failed',
       message: 'Stacki could not check for updates.',
       // The raw error carries response headers and a stack trace; the full
       // text is in the log, so show the user only the first line.
-      detail: `${formatAutoUpdateError(error).split('\n')[0].slice(0, 200)}\n\nStacki will try again later.`,
+      detail:
+        formatAutoUpdateError(error).split('\n')[0]?.slice(0, 200) +
+        '\n\nStacki will try again later.',
     });
   });
 }
 
 async function runAutoUpdateCheck() {
-  if (!app.isPackaged || autoUpdateCheckInFlight) {return;}
+  if (!app.isPackaged || autoUpdateCheckInFlight) {
+    return;
+  }
 
   autoUpdateCheckInFlight = true;
   try {
@@ -628,17 +693,19 @@ async function checkForUpdatesFromMenu() {
   // was built with, and a dev run has no installer. Saying so beats a check
   // that silently does nothing.
   if (!app.isPackaged) {
-    await dialog.showMessageBox(parent, {
+    await showMessageBox(parent, {
       type: 'info',
       title: 'Check for Updates',
       message: 'Updates are only checked in the installed app.',
-      detail: `This is a development build (${app.getVersion()}), which updates when you rebuild it.`,
+      detail:
+        `This is a development build (${app.getVersion()}), ` +
+        'which updates when you rebuild it.',
     });
     return;
   }
 
   if (autoUpdateCheckInFlight) {
-    await dialog.showMessageBox(parent, {
+    await showMessageBox(parent, {
       type: 'info',
       title: 'Check for Updates',
       message: 'Already checking for updates.',
@@ -655,7 +722,7 @@ async function checkForUpdatesFromMenu() {
     // what electron-updater does only when it is actually newer.
     if (result?.downloadPromise) {
       logAutoUpdate('Manual check found an update', { version: result.updateInfo?.version });
-      await dialog.showMessageBox(parent, {
+      await showMessageBox(parent, {
         type: 'info',
         title: 'Update Available',
         message: `Stacki ${result.updateInfo?.version} is downloading.`,
@@ -664,20 +731,20 @@ async function checkForUpdatesFromMenu() {
       return;
     }
     logAutoUpdate('Manual check found no update', { version: app.getVersion() });
-    await dialog.showMessageBox(parent, {
+    await showMessageBox(parent, {
       type: 'info',
       title: 'Check for Updates',
       message: `Stacki ${app.getVersion()} is the latest version.`,
     });
   } catch (error) {
     logAutoUpdate('Manual check failed', formatAutoUpdateError(error));
-    await dialog.showMessageBox(parent, {
+    await showMessageBox(parent, {
       type: 'warning',
       title: 'Check for Updates',
       // The raw error carries response headers and a stack; the log has all of
       // it, the dialog gets the first line.
       message: 'Stacki could not check for updates.',
-      detail: formatAutoUpdateError(error).split('\n')[0].slice(0, 200),
+      detail: formatAutoUpdateError(error).split('\n')[0]?.slice(0, 200) ?? '',
     });
   } finally {
     autoUpdateCheckInFlight = false;
@@ -694,7 +761,9 @@ function startAutoUpdateChecks() {
   registerAutoUpdaterEvents();
   void runAutoUpdateCheck();
 
-  if (autoUpdateInterval) {clearInterval(autoUpdateInterval);}
+  if (autoUpdateInterval) {
+    clearInterval(autoUpdateInterval);
+  }
   autoUpdateInterval = setInterval(() => void runAutoUpdateCheck(), AUTO_UPDATE_CHECK_INTERVAL_MS);
 }
 
@@ -702,7 +771,7 @@ function startAutoUpdateChecks() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function send(channel, payload) {
+function send(channel: string, payload?: unknown) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
   }
@@ -725,15 +794,17 @@ function send(channel, payload) {
 function shellPathDirs() {
   // $SHELL is usually set even under launchd, but not always — the account's
   // registered login shell is the reliable source when it isn't.
-  let shell = process.env.SHELL;
+  let shell: string | null | undefined = process.env['SHELL'];
   if (!shell) {
     try {
-      shell = require('os').userInfo().shell || null;
+      shell = userInfo().shell || null;
     } catch {
       shell = null;
     }
   }
-  if (!shell) {return [];}
+  if (!shell) {
+    return [];
+  }
   try {
     const out = execFileSync(shell, ['-ilc', 'printf "__AVB__%s__AVB__" "$PATH"'], {
       encoding: 'utf8',
@@ -743,16 +814,24 @@ function shellPathDirs() {
       env: { ...process.env, TERM: 'dumb', DISABLE_AUTO_UPDATE: 'true' },
     });
     const m = /__AVB__([\s\S]*?)__AVB__/.exec(out);
-    return m ? m[1].split(path.delimiter).filter(Boolean) : [];
+    return m ? (capture(m, 1) ?? '').split(path.delimiter).filter(Boolean) : [];
   } catch {
     return []; // no shell, hung rc file, exotic setup — fall through to the guesses
   }
 }
 
-const cmpVersion = (a, b) => {
-  const parts = (v) => v.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+const cmpVersion = (a: string, b: string) => {
+  const parts = (v: string) =>
+    v
+      .replace(/^v/, '')
+      .split('.')
+      .map((n) => parseInt(n, 10) || 0);
   const [x, y] = [parts(a), parts(b)];
-  for (let i = 0; i < 3; i++) {if (x[i] !== y[i]) {return x[i] - y[i];}}
+  for (let i = 0; i < 3; i++) {
+    if (x[i] !== y[i]) {
+      return (x[i] ?? 0) - (y[i] ?? 0);
+    }
+  }
   return 0;
 };
 
@@ -762,9 +841,9 @@ function nodeDirGuesses() {
   const home = app.getPath('home');
   const dirs = isWin
     ? [
-        path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs'),
+        path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'nodejs'),
         path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'nodejs'),
-        path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'npm'),
+        path.join(process.env['APPDATA'] || path.join(home, 'AppData', 'Roaming'), 'npm'),
         path.join(home, 'AppData', 'Local', 'Volta', 'bin'),
         path.join(home, 'AppData', 'Roaming', 'fnm'),
         path.join(home, 'scoop', 'shims'),
@@ -785,7 +864,7 @@ function nodeDirGuesses() {
       ];
   // Version managers keep one directory per version — take the newest, so a
   // project needing a modern Node still gets one.
-  const versioned = isWin
+  const versioned: readonly (readonly [string, string])[] = isWin
     ? [[path.join(home, 'AppData', 'Roaming', 'nvm'), '']]
     : [
         [path.join(home, '.nvm/versions/node'), 'bin'],
@@ -804,7 +883,9 @@ function nodeDirGuesses() {
         .filter((v) => /^v?\d/.test(v))
         .sort(cmpVersion)
         .pop();
-      if (newest) {dirs.push(suffix ? path.join(base, newest, suffix) : path.join(base, newest));}
+      if (newest) {
+        dirs.push(suffix ? path.join(base, newest, suffix) : path.join(base, newest));
+      }
     } catch {
       /* not installed */
     }
@@ -816,11 +897,13 @@ function nodeDirGuesses() {
 // child process is about to start.
 let toolPathReady = false;
 function ensureToolPath() {
-  if (toolPathReady || isWin) {return;}
+  if (toolPathReady || isWin) {
+    return;
+  }
   toolPathReady = true;
-  const parts = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  const parts = (process.env['PATH'] || '').split(path.delimiter).filter(Boolean);
   const seen = new Set(parts);
-  const append = (dir) => {
+  const append = (dir: string) => {
     if (dir && !seen.has(dir)) {
       seen.add(dir);
       parts.push(dir);
@@ -828,19 +911,29 @@ function ensureToolPath() {
   };
   // Appended, not prepended: the system's own resolution order stays intact,
   // and these directories only ever win for tools the base PATH lacks.
-  for (const dir of shellPathDirs()) {append(dir);}
-  for (const dir of nodeDirGuesses()) {if (fs.existsSync(dir)) {append(dir);}}
-  process.env.PATH = parts.join(path.delimiter);
+  for (const dir of shellPathDirs()) {
+    append(dir);
+  }
+  for (const dir of nodeDirGuesses()) {
+    if (fs.existsSync(dir)) {
+      append(dir);
+    }
+  }
+  process.env['PATH'] = parts.join(path.delimiter);
 }
 
 function resolveNodeBin() {
   ensureToolPath();
   const exe = isWin ? 'node.exe' : 'node';
-  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
-    if (!dir) {continue;}
+  for (const dir of (process.env['PATH'] || '').split(path.delimiter)) {
+    if (!dir) {
+      continue;
+    }
     const p = path.join(dir, exe);
     try {
-      if (fs.statSync(p).isFile()) {return p;}
+      if (fs.statSync(p).isFile()) {
+        return p;
+      }
     } catch {
       /* not here */
     }
@@ -852,22 +945,27 @@ function resolveNodeBin() {
 // and a wrapper script on Windows. The package's own `bin` field is correct
 // on both (and survives pnpm's store layout, where the symlink points
 // somewhere else entirely), so read that first and fall back to the link.
-function resolveCliEntry(binPath) {
+function resolveCliEntry(binPath: string) {
   const name = path.basename(binPath).replace(/\.(cmd|ps1|exe|bat)$/i, '');
   const pkgDir = path.join(path.dirname(binPath), '..', name);
   try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
-    const rel = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin && pkg.bin[name];
+    const pkg = parseRecord(readJson(path.join(pkgDir, 'package.json')));
+    const bin = pkg['bin'];
+    const rel = parseOptionalString(typeof bin === 'string' ? bin : toRecord(bin)?.[name]);
     if (rel) {
       const entry = path.join(pkgDir, rel);
-      if (fs.existsSync(entry)) {return entry;}
+      if (fs.existsSync(entry)) {
+        return entry;
+      }
     }
   } catch {
     /* not a plain node_modules layout */
   }
   try {
     const real = fs.realpathSync(binPath);
-    if (/\.(js|mjs|cjs)$/i.test(real)) {return real;}
+    if (/\.(js|mjs|cjs)$/i.test(real)) {
+      return real;
+    }
   } catch {
     /* not a symlink */
   }
@@ -877,43 +975,69 @@ function resolveCliEntry(binPath) {
 // Runs the CLI's JS entry point under a resolved Node instead of going
 // through the .bin shim, so the shebang's own PATH lookup — the thing that
 // fails on a GUI launch — never happens. Returns [command, argv].
-function nodeCliCommand(binPath, args) {
+function nodeCliCommand(binPath: string, args: readonly string[]): [string, string[]] {
   const node = resolveNodeBin();
-  if (!node) {return [binPath, args];}
+  if (!node) {
+    return [binPath, [...args]];
+  }
   const entry = resolveCliEntry(binPath);
-  return entry ? [node, [entry, ...args]] : [binPath, args];
+  return entry ? [node, [entry, ...args]] : [binPath, [...args]];
 }
 
-function run(cmd, args, cwd, opts = {}) {
+function run(cmd: string, args: readonly string[], cwd: string, opts: ExecFileOptions = {}) {
   // Launched from Finder, the packaged app inherits a bare PATH — Homebrew's
   // bin isn't on it, so `gh` looks uninstalled however it was set up. Cheap
   // after the first call (memoized).
   ensureToolPath();
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { cwd, timeout: opts.timeout || 60000, ...opts }, (err, stdout, stderr) => {
-      if (err) {
-        err.stdout = stdout;
-        err.stderr = stderr;
-        reject(err);
-      } else {
-        resolve({ stdout: stdout.toString(), stderr: stderr.toString() });
-      }
-    });
+  return new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    execFile(
+      cmd,
+      [...args],
+      { cwd, timeout: opts.timeout || 60000, ...opts },
+      (err, stdout, stderr) => {
+        if (err) {
+          Object.assign(err, { stdout, stderr });
+          reject(err);
+        } else {
+          resolve({ stdout: stdout.toString(), stderr: stderr.toString() });
+        }
+      },
+    );
   });
 }
 
-async function git(projectPath, args, opts = {}) {
+async function git(projectPath: string, args: readonly string[], opts: ExecFileOptions = {}) {
   return run('git', args, projectPath, opts);
 }
 
-function findFreePort(start) {
-  return new Promise((resolve) => {
+async function findFreePort(start: number): Promise<number> {
+  assert(Number.isSafeInteger(start), 'Starting port must be an integer');
+  assert(start > 0, 'Starting port must be positive');
+  for (let attempt = 0; attempt < MAIN_LIMITS.portAttemptsMax; attempt++) {
+    const port = start + attempt;
+    if (port > 65535) {
+      break;
+    }
+    const available = await findFreePortProbe(port);
+    if (available) {
+      return port;
+    }
+  }
+  throw new Error('No available preview port within the search limit');
+}
+
+function findFreePortProbe(port: number): Promise<boolean> {
+  return new Promise((resolve, reject) => {
     const server = net.createServer();
-    server.once('error', () => resolve(findFreePort(start + 1)));
-    server.once('listening', () => {
-      server.close(() => resolve(start));
+    server.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        resolve(false);
+      } else {
+        reject(error);
+      }
     });
-    server.listen(start, '127.0.0.1');
+    server.once('listening', () => server.close(() => resolve(true)));
+    server.listen(port, '127.0.0.1');
   });
 }
 
@@ -921,19 +1045,29 @@ function findFreePort(start) {
 // project has the integration for it (.md always, .mdx via @astrojs/mdx).
 // Kept as one place so discovery, routing and reading can't drift apart.
 const PAGE_MD_RE = /\.mdx?$/i;
-const isMarkdownPage = (p) => PAGE_MD_RE.test(p);
-const isMdx = (p) => /\.mdx$/i.test(p);
+const isMarkdownPage = (p: string) => PAGE_MD_RE.test(p);
+const isMdx = (p: string) => /\.mdx$/i.test(p);
 
-function listAstroFiles(dir) {
-  if (!fs.existsSync(dir)) {return [];}
-  const out = [];
-  const walk = (d) => {
-    for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+function listAstroFiles(dir: string) {
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+  const out: string[] = [];
+  const checkDirectory = directoryBudget(dir);
+  const walk = (d: string): void => {
+    const entries = fs.readdirSync(d, { withFileTypes: true });
+    checkDirectory(d, entries.length);
+    for (const entry of entries) {
       const full = path.join(d, entry.name);
-      if (entry.isDirectory()) {walk(full);}
+      if (entry.isDirectory()) {
+        walk(full);
+      }
       // Markdown only counts as a page. A .md under src/components isn't a
       // component, it's a README.
-      else if (entry.name.endsWith('.astro') || (d.includes(`${path.sep}pages`) && PAGE_MD_RE.test(entry.name))) {
+      else if (
+        entry.name.endsWith('.astro') ||
+        (d.includes(`${path.sep}pages`) && PAGE_MD_RE.test(entry.name))
+      ) {
         out.push(full);
       }
     }
@@ -942,15 +1076,19 @@ function listAstroFiles(dir) {
   return out;
 }
 
-function toPosix(p) {
+function toPosix(p: string) {
   return p.split(path.sep).join('/');
 }
 
-function routeForPage(projectPath, pagePath) {
+function routeForPage(projectPath: string, pagePath: string) {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   let rel = toPosix(path.relative(pagesDir, pagePath)).replace(/\.(astro|mdx?)$/i, '');
-  if (rel === 'index') {return '/';}
-  if (rel.endsWith('/index')) {rel = rel.slice(0, -'/index'.length);}
+  if (rel === 'index') {
+    return '/';
+  }
+  if (rel.endsWith('/index')) {
+    rel = rel.slice(0, -'/index'.length);
+  }
   return '/' + rel;
 }
 
@@ -972,13 +1110,13 @@ const ASTRO_CONFIG_FILES = [
 // process. Whole-line comments go first so a commented-out setting doesn't
 // count; a trailing `//` is left alone because it can't be told from the one
 // in a URL without really parsing.
-function trailingSlashFromSource(text) {
+function trailingSlashFromSource(text: string) {
   const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
   const m = code.match(/(^|[\s,{])trailingSlash\s*:\s*['"`](always|never|ignore)['"`]/);
-  return m ? m[2] : null;
+  return m ? capture(m, 2) : null;
 }
 
-function readTrailingSlash(projectPath) {
+function readTrailingSlash(projectPath: string) {
   // What the dev server resolved beats what the config says: it has been
   // through Astro's own defaults, and it accounts for a value that arrives by
   // variable, spread or integration rather than as a literal. Only this app's
@@ -986,44 +1124,52 @@ function readTrailingSlash(projectPath) {
   // one running — an adopted external server never loads the marker config,
   // and a file left behind by an earlier run would answer for a config that
   // has since changed.
-  const ours =
-    devServer && devServer.projectPath === projectPath && !devServer.external;
+  const ours = devServer && devServer.projectPath === projectPath && !devServer.external;
   try {
-    if (!ours) {throw new Error('no server of ours');}
-    const resolved = JSON.parse(
-      fs.readFileSync(path.join(projectPath, 'node_modules', '.avb', 'resolved.json'), 'utf8')
+    if (!ours) {
+      throw new Error('no server of ours');
+    }
+    const resolved = parseRecord(
+      readJson(path.join(projectPath, 'node_modules', '.avb', 'resolved.json')),
     );
-    if (TRAILING_SLASH_MODES.includes(resolved.trailingSlash)) {return resolved.trailingSlash;}
+    const mode = parseOptionalString(resolved['trailingSlash']);
+    if (mode && TRAILING_SLASH_MODES.includes(mode)) {
+      return mode;
+    }
   } catch {
     /* no server has run yet — read the config instead */
   }
   for (const file of ASTRO_CONFIG_FILES) {
     let text;
     try {
-      text = fs.readFileSync(path.join(projectPath, file), 'utf8');
+      text = readSource(path.join(projectPath, file));
     } catch {
       continue;
     }
     const mode = trailingSlashFromSource(text);
-    if (mode) {return mode;}
+    if (mode) {
+      return mode;
+    }
     break; // the first config that exists is the one Astro loads
   }
   return 'ignore'; // Astro's default, and the one that serves either spelling
 }
 
-function isAstroProject(dir) {
+function isAstroProject(dir: string) {
   const pkgPath = path.join(dir, 'package.json');
   if (fs.existsSync(pkgPath)) {
     try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-      if (deps.astro) {return true;}
+      const pkg = parseRecord(readJson(pkgPath));
+      const deps = { ...toRecord(pkg['dependencies']), ...toRecord(pkg['devDependencies']) };
+      if (parseOptionalString(deps['astro'])) {
+        return true;
+      }
     } catch {
       /* fall through */
     }
   }
   return ['astro.config.mjs', 'astro.config.ts', 'astro.config.js'].some((f) =>
-    fs.existsSync(path.join(dir, f))
+    fs.existsSync(path.join(dir, f)),
   );
 }
 
@@ -1043,8 +1189,8 @@ const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 
 function readSettings() {
   try {
-    const saved = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
-    return saved && typeof saved === 'object' ? { ...SETTINGS_DEFAULTS, ...saved } : { ...SETTINGS_DEFAULTS };
+    const input: unknown = JSON.parse(readSource(settingsFile()));
+    return parseSettings(input);
   } catch {
     return { ...SETTINGS_DEFAULTS };
   }
@@ -1069,14 +1215,14 @@ const recentsFile = () => path.join(app.getPath('userData'), 'recents.json');
 
 function readRecents() {
   try {
-    const list = JSON.parse(fs.readFileSync(recentsFile(), 'utf8'));
-    return Array.isArray(list) ? list : [];
+    const input: unknown = JSON.parse(readSource(recentsFile()));
+    return parseRecents(input);
   } catch {
     return [];
   }
 }
 
-function writeRecents(list) {
+function writeRecents(list: readonly RecentProject[]) {
   try {
     fs.writeFileSync(recentsFile(), JSON.stringify(list, null, 2), 'utf8');
   } catch {
@@ -1113,7 +1259,7 @@ ipcMain.handle('recents:list', async () => {
 
 // Astro has to be installed for a page to be rendered at all; without it the
 // card can only offer to open the project.
-function hasDependencies(projectPath) {
+function hasDependencies(projectPath: string) {
   const binName = isWin ? 'astro.cmd' : 'astro';
   return fs.existsSync(path.join(projectPath, 'node_modules', '.bin', binName));
 }
@@ -1126,14 +1272,14 @@ ipcMain.handle('recents:add', async (_e, projectPath) => {
     openedAt: Date.now(),
   });
   writeRecents(list.slice(0, 12));
-  return { ok: true };
+  return { ok: true as const };
 });
 
 ipcMain.handle('recents:remove', async (_e, projectPath) => {
   writeRecents(readRecents().filter((r) => r.path !== projectPath));
   // The picture and the note about when it was taken both go.
   thumbs.forget(app.getPath('userData'), projectPath);
-  return { ok: true };
+  return { ok: true as const };
 });
 
 // The project's home page, rendered on its own and photographed from the top.
@@ -1149,14 +1295,14 @@ const queueCapture = createSerialQueue(); // each capture owns a browser and a s
 // is now busy starting the project the user actually asked for.
 let captureEra = 0;
 
-function captureThumb(projectPath) {
+function captureThumb(projectPath: string) {
   const era = captureEra;
-  return queueCapture(() => era === captureEra
-    ? doCaptureThumb(projectPath)
-    : { ok: false, error: 'skipped' });
+  return queueCapture(() =>
+    era === captureEra ? doCaptureThumb(projectPath) : { ok: false as const, error: 'skipped' },
+  );
 }
 
-async function doCaptureThumb(projectPath) {
+async function doCaptureThumb(projectPath: string) {
   const userData = app.getPath('userData');
   // Already running for this project (it is the one that is open) — use it.
   if (devServer && devServer.projectPath === projectPath && devServer.url) {
@@ -1165,16 +1311,18 @@ async function doCaptureThumb(projectPath) {
     }
   }
   if (!hasDependencies(projectPath)) {
-    return { ok: false, error: 'This project has no dependencies installed yet.' };
+    return { ok: false as const, error: 'This project has no dependencies installed yet.' };
   }
-  return withTemporaryServer(projectPath, (url) => thumbs.capture(userData, projectPath, url + '/'));
+  return withTemporaryServer(projectPath, (url) =>
+    thumbs.capture(userData, projectPath, url + '/'),
+  );
 }
 
 // A dev server for a project that is not open, kept apart from the app's own:
 // `devServer` belongs to the canvas, and a thumbnail must not disturb what the
 // editor is showing. The project's own config is used rather than the app's
 // generated one — the picture is of the site, not of the canvas.
-function spawnAstroServer(projectPath, localBin, args) {
+function spawnAstroServer(projectPath: string, localBin: string, args: readonly string[]) {
   const [cmd, argv] = nodeCliCommand(localBin, args);
   return spawn(cmd, argv, {
     cwd: projectPath,
@@ -1187,29 +1335,52 @@ function spawnAstroServer(projectPath, localBin, args) {
   });
 }
 
-function stopProcessTree(proc) {
-  if (!proc?.pid) {return;}
+function stopProcessTree(proc: ChildProcess | null | undefined) {
+  if (!proc?.pid) {
+    return;
+  }
   try {
     if (isWin) {
-      spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true })
-        .on('error', () => { try { proc.kill('SIGTERM'); } catch { /* already gone */ } });
+      spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { windowsHide: true }).on(
+        'error',
+        () => {
+          try {
+            proc.kill('SIGTERM');
+          } catch {
+            /* already gone */
+          }
+        },
+      );
     } else {
       process.kill(-proc.pid, 'SIGTERM');
     }
   } catch {
-    try { proc.kill('SIGTERM'); } catch { /* already gone */ }
+    try {
+      proc.kill('SIGTERM');
+    } catch {
+      /* already gone */
+    }
   }
 }
 
-async function withTemporaryServer(projectPath, fn) {
+async function withTemporaryServer(
+  projectPath: string,
+  fn: (url: string) => ReturnType<typeof thumbs.capture>,
+) {
   const binName = isWin ? 'astro.cmd' : 'astro';
   const localBin = path.join(projectPath, 'node_modules', '.bin', binName);
   const port = await findFreePort(4400 + Math.floor(Math.random() * 200));
   const proc = spawnAstroServer(projectPath, localBin, [
-    'dev', '--port', String(port), '--host', '127.0.0.1',
+    'dev',
+    '--port',
+    String(port),
+    '--host',
+    '127.0.0.1',
   ]);
-  let spawnError = null;
-  proc.on('error', (error) => { spawnError = error; });
+  const spawnState: { error?: Error } = {};
+  proc.on('error', (error) => {
+    spawnState.error = error;
+  });
   let log = '';
   proc.stdout.on('data', (d) => (log = (log + d).slice(-4000)));
   proc.stderr.on('data', (d) => (log = (log + d).slice(-4000)));
@@ -1223,7 +1394,11 @@ async function withTemporaryServer(projectPath, fn) {
       // Opening this project can replace the thumbnail's daemon while its
       // capture is running. Stop only the daemon that still owns our port.
       const lock = readAstroLock(projectPath);
-      if (lock?.url && new URL(lock.url).port === String(port) && devServer?.projectPath !== projectPath) {
+      if (
+        lock?.url &&
+        new URL(lock.url).port === String(port) &&
+        devServer?.projectPath !== projectPath
+      ) {
         const [stopCmd, stopArgv] = nodeCliCommand(localBin, ['dev', 'stop']);
         execFile(stopCmd, stopArgv, { cwd: projectPath, timeout: 10000 }, () => {});
       }
@@ -1237,8 +1412,12 @@ async function withTemporaryServer(projectPath, fn) {
     const deadline = Date.now() + 45000;
     let up = false;
     while (Date.now() < deadline) {
-      if (spawnError) {return { ok: false, error: spawnError.message };}
-      if (proc.exitCode !== null && proc.exitCode !== 0) {break;}
+      if (spawnState.error) {
+        return { ok: false as const, error: spawnState.error.message };
+      }
+      if (proc.exitCode !== null && proc.exitCode !== 0) {
+        break;
+      }
       if (await serverAlive(url)) {
         up = true;
         break;
@@ -1246,7 +1425,10 @@ async function withTemporaryServer(projectPath, fn) {
       await new Promise((r) => setTimeout(r, 400));
     }
     if (!up) {
-      return { ok: false, error: cleanDevLog(log) || 'the dev server did not start in time' };
+      return {
+        ok: false as const,
+        error: cleanDevLog(log) || 'the dev server did not start in time',
+      };
     }
     return await fn(url);
   } finally {
@@ -1254,7 +1436,7 @@ async function withTemporaryServer(projectPath, fn) {
   }
 }
 
-const cleanDevLog = (text) =>
+const cleanDevLog = (text: string) =>
   String(text || '')
     .split('\n')
     .map((l) => l.trim())
@@ -1267,23 +1449,35 @@ const cleanDevLog = (text) =>
 ipcMain.handle('recents:refreshThumb', async (_e, projectPath) => {
   const result = await captureThumb(projectPath);
   const userData = app.getPath('userData');
-  return { ...result, thumb: thumbs.readThumb(userData, projectPath), stale: thumbs.isStale(userData, projectPath) };
+  return {
+    ...result,
+    thumb: thumbs.readThumb(userData, projectPath),
+    stale: thumbs.isStale(userData, projectPath),
+  };
 });
 
 // While a project is open, its picture is kept current in the background: once
 // when the preview comes up, and again a while after the last edit. Neither
 // touches the window the user is working in.
-let thumbTimer = null;
-function scheduleThumb(projectPath, delay) {
+let thumbTimer: ReturnType<typeof setTimeout> | undefined;
+function scheduleThumb(projectPath: string, delay: number) {
   clearTimeout(thumbTimer);
   thumbTimer = setTimeout(() => {
-    if (!devServer || devServer.projectPath !== projectPath) {return;}
-    if (!thumbs.isStale(app.getPath('userData'), projectPath)) {return;}
+    if (!devServer || devServer.projectPath !== projectPath) {
+      return;
+    }
+    if (!thumbs.isStale(app.getPath('userData'), projectPath)) {
+      return;
+    }
     captureThumb(projectPath).then((r) => {
-      if (r?.ok) {send('recents:thumb', { projectPath });}
+      if (r?.ok) {
+        send('recents:thumb', { projectPath });
+      }
     });
   }, delay);
-  if (thumbTimer.unref) {thumbTimer.unref();}
+  if (thumbTimer.unref) {
+    thumbTimer.unref();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1291,42 +1485,61 @@ function scheduleThumb(projectPath, delay) {
 // ---------------------------------------------------------------------------
 
 ipcMain.handle('project:openDialog', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await showOpenDialog({
     title: 'Open an Astro project',
     properties: ['openDirectory'],
   });
-  if (result.canceled || !result.filePaths.length) {return { canceled: true };}
-  const dir = result.filePaths[0];
-  if (!isAstroProject(dir)) {
-    return { canceled: false, error: 'That folder does not look like an Astro project (no astro dependency or astro.config found).' };
+  if (result.canceled || !result.filePaths.length) {
+    return { canceled: true as const };
   }
-  return { canceled: false, projectPath: dir };
+  const dir = result.filePaths[0];
+  assert(dir !== undefined, 'Accepted directory dialog must have a path');
+  if (!isAstroProject(dir)) {
+    return {
+      canceled: false as const,
+      error:
+        'That folder does not look like an Astro project ' +
+        '(no astro dependency or astro.config found).',
+    };
+  }
+  return { canceled: false as const, projectPath: dir };
 });
 
 ipcMain.handle('project:newDialog', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await showOpenDialog({
     title: 'Choose an empty folder for the new project',
     properties: ['openDirectory', 'createDirectory'],
   });
-  if (result.canceled || !result.filePaths.length) {return { canceled: true };}
+  if (result.canceled || !result.filePaths.length) {
+    return { canceled: true as const };
+  }
   const dir = result.filePaths[0];
+  assert(dir !== undefined, 'Accepted directory dialog must have a path');
   const entries = fs.readdirSync(dir).filter((f) => !f.startsWith('.'));
   if (entries.length > 0) {
-    return { canceled: false, error: 'That folder is not empty. Choose or create an empty folder for the new project.' };
+    return {
+      canceled: false as const,
+      error: 'That folder is not empty. Choose or create an empty folder for the new project.',
+    };
   }
-  return { canceled: false, projectPath: dir };
+  return { canceled: false as const, projectPath: dir };
 });
 
 // Detects the project's package manager from its lockfile.
-function detectPackageManager(dir) {
-  if (fs.existsSync(path.join(dir, 'pnpm-lock.yaml'))) {return 'pnpm';}
-  if (fs.existsSync(path.join(dir, 'yarn.lock'))) {return 'yarn';}
-  if (fs.existsSync(path.join(dir, 'bun.lockb')) || fs.existsSync(path.join(dir, 'bun.lock')))
-    {return 'bun';}
+function detectPackageManager(dir: string) {
+  if (fs.existsSync(path.join(dir, 'pnpm-lock.yaml'))) {
+    return 'pnpm';
+  }
+  if (fs.existsSync(path.join(dir, 'yarn.lock'))) {
+    return 'yarn';
+  }
+  if (fs.existsSync(path.join(dir, 'bun.lockb')) || fs.existsSync(path.join(dir, 'bun.lock'))) {
+    return 'bun';
+  }
   return 'npm';
 }
 
-async function installDependencies(dir) {
+async function installDependencies(dir: string) {
   ensureToolPath(); // npm/pnpm/yarn are Node shims — same PATH problem as astro
   const pm = detectPackageManager(dir);
   send('progress', { message: `Installing dependencies (${pm} install)…` });
@@ -1337,12 +1550,13 @@ async function installDependencies(dir) {
       shell: isWin,
     });
   } catch (err) {
-    if (err.code === 'ENOENT') {
+    if (toRecord(err)?.['code'] === 'ENOENT') {
       throw new Error(
-        `This project uses ${pm} (found its lockfile), but ${pm} is not installed. Install it and try again.`
+        `This project uses ${pm} (found its lockfile), but ${pm} is not installed. ` +
+          'Install it and try again.',
       );
     }
-    throw new Error(`${pm} install failed: ${(err.stderr || err.message || '').slice(-400)}`);
+    throw new Error(`${pm} install failed: ${gitErrorDetail(err).slice(-400)}`);
   }
 }
 
@@ -1353,7 +1567,9 @@ async function installDependencies(dir) {
 // create-astro never has to guess a name from a parent directory.
 ipcMain.handle('project:createAstro', async (_e, opts) => {
   const { dir, template = 'basics', install = true, git = true, ai = false } = opts || {};
-  if (!dir || !fs.existsSync(dir)) {throw new Error('Choose a folder for the new project first.');}
+  if (!dir || !fs.existsSync(dir)) {
+    throw new Error('Choose a folder for the new project first.');
+  }
   ensureToolPath(); // npm is a Node shim — same PATH problem as astro
 
   const args = [
@@ -1381,12 +1597,12 @@ ipcMain.handle('project:createAstro', async (_e, opts) => {
         env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1', CI: '1' },
       });
     } catch (err) {
-      reject(new Error(`Could not run npm: ${err.message}`));
+      reject(new Error(`Could not run npm: ${errorMessage(err)}`));
       return;
     }
 
     let tail = '';
-    const onOut = (d) => {
+    const onOut = (d: Buffer) => {
       // create-astro animates with cursor moves and line clears; strip the
       // escape codes so the log pane reads as plain text.
       const text = d
@@ -1401,10 +1617,10 @@ ipcMain.handle('project:createAstro', async (_e, opts) => {
     proc.on('error', (err) => {
       reject(
         new Error(
-          err.code === 'ENOENT'
+          toRecord(err)?.['code'] === 'ENOENT'
             ? 'npm could not be found. Install Node.js (which includes npm) and try again.'
-            : `Could not run npm: ${err.message}`
-        )
+            : `Could not run npm: ${errorMessage(err)}`,
+        ),
       );
     });
     proc.on('exit', (code) => {
@@ -1414,7 +1630,7 @@ ipcMain.handle('project:createAstro', async (_e, opts) => {
           reject(new Error(`create-astro finished but no package.json appeared.\n\n${tail}`));
           return;
         }
-        resolve({ ok: true, installed: install });
+        resolve({ ok: true as const, installed: install });
       } else {
         reject(new Error(`create-astro exited with code ${code}.\n\n${tail}`));
       }
@@ -1425,12 +1641,14 @@ ipcMain.handle('project:createAstro', async (_e, opts) => {
 // A folder to put a new project IN, rather than the project's own folder: the
 // starter arrives as a directory of its own, named by the user.
 ipcMain.handle('project:parentDialog', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await showOpenDialog({
     title: 'Choose where the site should go',
     properties: ['openDirectory', 'createDirectory'],
   });
-  if (result.canceled || !result.filePaths.length) {return { canceled: true };}
-  return { canceled: false, parentPath: result.filePaths[0] };
+  if (result.canceled || !result.filePaths.length) {
+    return { canceled: true as const };
+  }
+  return { canceled: false as const, parentPath: result.filePaths[0] };
 });
 
 // Starting from a starter. The scaffolder, the first commit and the package's
@@ -1453,7 +1671,7 @@ ipcMain.handle('project:createStarter', async (_e, { starter = 'lumos', parentPa
 ipcMain.handle('project:scaffold', async (_e, { dir, name }) => {
   scaffoldProject(dir, name);
   await installDependencies(dir);
-  return { ok: true };
+  return { ok: true as const };
 });
 
 ipcMain.handle('project:hasNodeModules', async (_e, projectPath) => {
@@ -1462,7 +1680,7 @@ ipcMain.handle('project:hasNodeModules', async (_e, projectPath) => {
 
 ipcMain.handle('project:install', async (_e, projectPath) => {
   await installDependencies(projectPath);
-  return { ok: true };
+  return { ok: true as const };
 });
 
 ipcMain.handle('project:scan', async (_e, projectPath) => {
@@ -1481,11 +1699,16 @@ ipcMain.handle('project:scan', async (_e, projectPath) => {
   }));
 
   // Folders under src/pages (including empty ones) for the pages tree.
-  const pageFolders = [];
+  const pageFolders: string[] = [];
   if (fs.existsSync(pagesDir)) {
-    const walkDirs = (d) => {
-      for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
-        if (!entry.isDirectory()) {continue;}
+    const checkDirectory = directoryBudget(pagesDir);
+    const walkDirs = (d: string): void => {
+      const entries = fs.readdirSync(d, { withFileTypes: true });
+      checkDirectory(d, entries.length);
+      for (const entry of entries) {
+        if (!entry.isDirectory()) {
+          continue;
+        }
         const full = path.join(d, entry.name);
         pageFolders.push(toPosix(path.relative(pagesDir, full)));
         walkDirs(full);
@@ -1502,6 +1725,7 @@ ipcMain.handle('project:scan', async (_e, projectPath) => {
     path: p,
     name: path.basename(p, '.astro'),
     folder: toPosix(path.relative(src, path.dirname(p))),
+    instances: 0,
     isLayout: true,
     ...safeSchema(p, projectPath),
   }));
@@ -1510,6 +1734,7 @@ ipcMain.handle('project:scan', async (_e, projectPath) => {
     path: p,
     name: path.basename(p, '.astro'),
     folder: toPosix(path.relative(componentsDir, path.dirname(p))),
+    instances: 0,
     ...safeSchema(p, projectPath),
   }));
 
@@ -1517,7 +1742,7 @@ ipcMain.handle('project:scan', async (_e, projectPath) => {
   // file in src (pages, layouts, and other components).
   const allSources = listAstroFiles(src).map((file) => {
     try {
-      return { file, text: fs.readFileSync(file, 'utf8') };
+      return { file, text: readSource(file) };
     } catch {
       return { file, text: '' };
     }
@@ -1536,8 +1761,13 @@ ipcMain.handle('project:scan', async (_e, projectPath) => {
         n +
         (path.resolve(file) === path.resolve(comp.path)
           ? 0 // a file is not one of its own users
-          : instancesIn(text, { file, targetPath: comp.path, name: comp.name, aliases: importAliases })),
-      0
+          : instancesIn(text, {
+              file,
+              targetPath: comp.path,
+              name: comp.name,
+              aliases: importAliases,
+            })),
+      0,
     );
   }
 
@@ -1548,33 +1778,40 @@ ipcMain.handle('project:scan', async (_e, projectPath) => {
 // plus selectors in stylesheets and <style> blocks — for the class-prop
 // autocomplete in the props panel.
 ipcMain.handle('project:classes', async (_e, projectPath) => {
-  const out = new Set();
+  const out = new Set<string>();
   const exts = /\.(astro|css|scss|less|html|jsx|tsx|js|ts|vue|svelte)$/i;
-  const files = [];
-  const walk = (d) => {
+  const files: string[] = [];
+  const checkDirectory = directoryBudget(path.join(projectPath, 'src'));
+  const walk = (d: string): void => {
     let entries;
     try {
       entries = fs.readdirSync(d, { withFileTypes: true });
     } catch {
       return;
     }
+    checkDirectory(d, entries.length);
     for (const e of entries) {
       const full = path.join(d, e.name);
-      if (e.isDirectory()) {walk(full);}
-      else if (exts.test(e.name)) {files.push(full);}
+      if (e.isDirectory()) {
+        walk(full);
+      } else if (exts.test(e.name)) {
+        files.push(full);
+      }
     }
   };
   walk(path.join(projectPath, 'src'));
 
-  const addCssClasses = (css) => {
+  const addCssClasses = (css: string) => {
     const re = /(?:^|[\s,{>~+()])\.(-?[A-Za-z_][A-Za-z0-9_-]*)/g;
     let m;
-    while ((m = re.exec(css)) !== null) {out.add(m[1]);}
+    while ((m = re.exec(css)) !== null) {
+      out.add(capture(m, 1));
+    }
   };
   for (const f of files) {
     let content;
     try {
-      content = fs.readFileSync(f, 'utf8');
+      content = readSource(f);
     } catch {
       continue;
     }
@@ -1585,11 +1822,17 @@ ipcMain.handle('project:classes', async (_e, projectPath) => {
     const attrRe = /class(?:Name)?\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
     let m;
     while ((m = attrRe.exec(content)) !== null) {
-      for (const t of (m[1] ?? m[2] ?? '').split(/\s+/)) {if (t) {out.add(t);}}
+      for (const t of (m[1] ?? m[2] ?? '').split(/\s+/)) {
+        if (t) {
+          out.add(t);
+        }
+      }
     }
     const styleRe = /<style[^>]*>([\s\S]*?)<\/style>/gi;
     let sm;
-    while ((sm = styleRe.exec(content)) !== null) {addCssClasses(sm[1]);}
+    while ((sm = styleRe.exec(content)) !== null) {
+      addCssClasses(capture(sm, 1));
+    }
   }
   return [...out].sort();
 });
@@ -1598,29 +1841,41 @@ ipcMain.handle('project:classes', async (_e, projectPath) => {
 // SeoProps` can be read when SeoProps lives in types.ts. One level deep and
 // only within the project — enough for the shape components actually use,
 // without turning this into a type checker.
-function importedTypes(source, filePath, projectPath) {
+function importedTypes(source: string, filePath: string, projectPath: string) {
   const fm = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!fm) {return '';}
-  const out = [];
+  if (!fm) {
+    return '';
+  }
+  const out: string[] = [];
   const seen = new Set();
   // `import type { A, B } from '…'`, `import { type A } from '…'`, and the
   // default form — a type-only import is the common way to write this, but a
   // plain `import { X }` of a type is legal too.
   const re = /import\s+(?:type\s+)?(\{[^}]*\}|[\w$]+)\s*from\s*['"]([^'"]+)['"]/g;
   let m;
-  while ((m = re.exec(fm[1])) !== null) {
-    const names = m[1]
+  while ((m = re.exec(capture(fm, 1))) !== null) {
+    const names = capture(m, 1)
       .replace(/[{}]/g, '')
       .split(',')
-      .map((n) => n.replace(/\btype\b/, '').split(/\s+as\s+/)[0].trim())
+      .map(
+        (n) =>
+          n
+            .replace(/\btype\b/, '')
+            .split(/\s+as\s+/)[0]
+            ?.trim() ?? '',
+      )
       .filter(Boolean);
-    if (!names.length) {continue;}
-    const target = resolveImportPath(projectPath, filePath, m[2]);
-    if (!target || seen.has(target) || target.endsWith('.astro')) {continue;}
+    if (!names.length) {
+      continue;
+    }
+    const target = resolveImportPath(projectPath, filePath, capture(m, 2));
+    if (!target || seen.has(target) || target.endsWith('.astro')) {
+      continue;
+    }
     seen.add(target);
     let text;
     try {
-      text = fs.readFileSync(target, 'utf8');
+      text = readSource(target);
     } catch {
       continue;
     }
@@ -1628,21 +1883,30 @@ function importedTypes(source, filePath, projectPath) {
     // in the same file can't shadow one the component declares itself.
     for (const name of names) {
       const decl = new RegExp(
-        `(?:^|\n)\\s*(?:export\\s+)?(?:type|interface)\\s+${name.replace(/[^\w$]/g, '')}\\b`
+        `(?:^|\n)\\s*(?:export\\s+)?(?:type|interface)\\s+${name.replace(/[^\w$]/g, '')}\\b`,
       ).exec(text);
-      if (!decl) {continue;}
+      if (!decl) {
+        continue;
+      }
       const from = decl.index;
       // To the end of the declaration: an interface ends at its closing brace,
       // a type alias at the semicolon that closes it.
       let depth = 0;
       let end = text.length;
       for (let i = from; i < text.length; i++) {
-        const c = text[i];
-        if ('{(['.includes(c)) {depth++;}
-        else if ('})]'.includes(c)) {
+        const c = text.charAt(i);
+        if ('{(['.includes(c)) {
+          depth++;
+        } else if ('})]'.includes(c)) {
           depth--;
-          if (depth === 0 && /\{/.test(text.slice(from, i))) { end = i + 1; break; }
-        } else if (c === ';' && depth === 0 && from !== i) { end = i + 1; break; }
+          if (depth === 0 && /\{/.test(text.slice(from, i))) {
+            end = i + 1;
+            break;
+          }
+        } else if (c === ';' && depth === 0 && from !== i) {
+          end = i + 1;
+          break;
+        }
       }
       out.push(text.slice(from, end));
     }
@@ -1650,11 +1914,11 @@ function importedTypes(source, filePath, projectPath) {
   return out.join('\n');
 }
 
-function safeSchema(filePath, projectPath) {
+function safeSchema(filePath: string, projectPath: string) {
   try {
-    const source = fs.readFileSync(filePath, 'utf8');
-    const schema = parsePropSchema(source, importedTypes(source, filePath, projectPath));
-    resolveIdentifierDefaults(schema, source, filePath, projectPath);
+    const source = readSource(filePath);
+    const fields = parsePropSchema(source, importedTypes(source, filePath, projectPath));
+    const schema = resolveIdentifierDefaults(fields, source, filePath, projectPath);
     return {
       schema,
       extendsTag: parseExtendsTag(source),
@@ -1674,7 +1938,14 @@ function safeSchema(filePath, projectPath) {
       hasRest: /\.\.\.\s*\w+\s*\}\s*(?::[^=]+)?=\s*Astro\.props/.test(source),
     };
   } catch {
-    return { schema: [], extendsTag: null, slots: [], slotText: false, renderTag: null, hasRest: false };
+    return {
+      schema: [],
+      extendsTag: null,
+      slots: [],
+      slotText: false,
+      renderTag: null,
+      hasRest: false,
+    };
   }
 }
 
@@ -1684,11 +1955,17 @@ function safeSchema(filePath, projectPath) {
 // it to its literal value so the UI shows the real default.
 // ---------------------------------------------------------------------------
 
-function literalValue(raw) {
-  if (raw === undefined) {return undefined;}
+function literalValue(raw: string | undefined) {
+  if (raw === undefined) {
+    return undefined;
+  }
   const s = raw.trim();
-  if (/^(true|false)$/.test(s)) {return s === 'true';}
-  if (/^-?\d+(\.\d+)?$/.test(s)) {return Number(s);}
+  if (/^(true|false)$/.test(s)) {
+    return s === 'true';
+  }
+  if (/^-?\d+(\.\d+)?$/.test(s)) {
+    return Number(s);
+  }
   // Strings, including template literals without interpolation.
   if (/^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`$]*`)$/s.test(s)) {
     return s.slice(1, -1).replace(/\\(['"`\\])/g, '$1');
@@ -1697,39 +1974,47 @@ function literalValue(raw) {
 }
 
 // Finds `export const NAME = <literal>` (or let/var, optional type note).
-function constLiteralIn(code, name) {
+function constLiteralIn(code: string, name: string) {
   const re = new RegExp(
     `(?:^|\\n)\\s*(?:export\\s+)?(?:const|let|var)\\s+${name}\\s*(?::[^=\\n]+)?=\\s*` +
-      '("(?:[^"\\\\]|\\\\.)*"|\'(?:[^\'\\\\]|\\\\.)*\'|`[^`$]*`|-?\\d+(?:\\.\\d+)?|true|false)'
+      '("(?:[^"\\\\]|\\\\.)*"|\'(?:[^\'\\\\]|\\\\.)*\'|`[^`$]*`|-?\\d+(?:\\.\\d+)?|true|false)',
   );
   const m = code.match(re);
-  return m ? literalValue(m[1]) : undefined;
+  return m ? literalValue(capture(m, 1)) : undefined;
 }
 
 // Finds which module a named import binds `name` from: {orig, spec}.
-function findNamedImport(code, name) {
+function findNamedImport(code: string, name: string) {
   const re = /import\s+(?:[\w$]+\s*,\s*)?\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g;
   let m;
   while ((m = re.exec(code)) !== null) {
-    for (const part of m[1].split(',')) {
+    for (const part of capture(m, 1).split(',')) {
       const seg = part.trim().replace(/^type\s+/, '');
-      if (!seg) {continue;}
+      if (!seg) {
+        continue;
+      }
       const asMatch = seg.match(/^([\w$]+)\s+as\s+([\w$]+)$/);
-      const orig = asMatch ? asMatch[1] : seg;
-      const local = asMatch ? asMatch[2] : seg;
-      if (local === name) {return { orig, spec: m[2] };}
+      const orig = asMatch ? capture(asMatch, 1) : seg;
+      const local = asMatch ? capture(asMatch, 2) : seg;
+      if (local === name) {
+        return { orig, spec: capture(m, 2) };
+      }
     }
   }
   return null;
 }
 
-function resolveModuleFile(spec, fromFile, projectPath) {
+function resolveModuleFile(spec: string, fromFile: string, projectPath: string) {
   let base;
-  if (spec.startsWith('.')) {base = path.resolve(path.dirname(fromFile), spec);}
-  else if (spec.startsWith('@/') || spec.startsWith('~/')) {
+  if (spec.startsWith('.')) {
+    base = path.resolve(path.dirname(fromFile), spec);
+  } else if (spec.startsWith('@/') || spec.startsWith('~/')) {
     base = path.join(projectPath, 'src', spec.slice(2));
-  } else if (spec.startsWith('src/')) {base = path.join(projectPath, spec);}
-  else {return null;}
+  } else if (spec.startsWith('src/')) {
+    base = path.join(projectPath, spec);
+  } else {
+    return null;
+  }
   const candidates = [
     base,
     `${base}.ts`,
@@ -1741,7 +2026,9 @@ function resolveModuleFile(spec, fromFile, projectPath) {
   ];
   for (const c of candidates) {
     try {
-      if (fs.existsSync(c) && fs.statSync(c).isFile()) {return c;}
+      if (fs.existsSync(c) && fs.statSync(c).isFile()) {
+        return c;
+      }
     } catch {
       /* keep looking */
     }
@@ -1749,11 +2036,20 @@ function resolveModuleFile(spec, fromFile, projectPath) {
   return null;
 }
 
-function resolveIdentifierDefaults(schema, source, filePath, projectPath) {
-  for (const field of schema) {
-    if (!field.defaultExpr) {continue;}
+function resolveIdentifierDefaults(
+  schema: readonly SchemaField[],
+  source: string,
+  filePath: string,
+  projectPath: string,
+) {
+  return schema.map((field): SchemaField => {
+    if (!field.defaultExpr) {
+      return field;
+    }
     const ident = String(field.default).trim();
-    if (!/^[A-Za-z_$][\w$]*$/.test(ident)) {continue;}
+    if (!/^[A-Za-z_$][\w$]*$/.test(ident)) {
+      return field;
+    }
     // Local const in the component's own frontmatter first.
     let value = constLiteralIn(source, ident);
     if (value === undefined) {
@@ -1762,33 +2058,36 @@ function resolveIdentifierDefaults(schema, source, filePath, projectPath) {
         const file = resolveModuleFile(imp.spec, filePath, projectPath);
         if (file) {
           try {
-            value = constLiteralIn(fs.readFileSync(file, 'utf8'), imp.orig);
+            value = constLiteralIn(readSource(file), imp.orig);
           } catch {
             /* unreadable module — leave the identifier as-is */
           }
         }
       }
     }
-    if (value !== undefined) {
-      field.default = value;
-      delete field.defaultExpr;
-      if (field.type === 'other') {
-        field.type =
-          typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string';
-      }
+    if (value === undefined) {
+      return field;
     }
-  }
+    // Build a resolved field without mutating the parser's original schema.
+    const resolved = { ...field, default: value };
+    delete resolved.defaultExpr;
+    if (resolved.type === 'other') {
+      resolved.type =
+        typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string';
+    }
+    return resolved;
+  });
 }
 
 // ---------------------------------------------------------------------------
 // File watching — reflect external edits back into the app
 // ---------------------------------------------------------------------------
 
-let watcher = null;
+let watcher: ReturnType<typeof watchProject> | undefined;
 // What the app itself has written, so the watcher can tell its own echo from
 // somebody else's edit — see electron/selfWrites.js for why that is a question
 // about bytes and not about elapsed time.
-const selfWrites = createSelfWrites({ read: (p) => fs.readFileSync(p, 'utf8') });
+const selfWrites = createSelfWrites({ read: (p) => readSource(p) });
 
 // A compile error replaces the site with the dev server's own error screen, and
 // that screen carries no HMR client — so when the mistake is fixed, nothing in
@@ -1802,7 +2101,7 @@ const selfWrites = createSelfWrites({ read: (p) => fs.readFileSync(p, 'utf8') })
 // same way, when that socket is still listening. This flag is what lets the
 // app tell the canvas directly as well, so a socket that has gone quiet is no
 // longer the difference between seeing your edit and pressing refresh.
-let pageChangeTimer = null;
+let pageChangeTimer: ReturnType<typeof setTimeout> | undefined;
 let pageChangeExternal = false;
 function notePageMayHaveChanged(external = false) {
   pageChangeExternal = pageChangeExternal || external;
@@ -1814,34 +2113,43 @@ function notePageMayHaveChanged(external = false) {
   }, 200);
 }
 
-function markSelfWrite(p, text = null) {
+function markSelfWrite(p: string, text: string | null = null) {
   selfWrites.note(path.resolve(p), text);
   notePageMayHaveChanged();
 }
 
 // Whether a watcher event is the app hearing its own write come back — see
 // electron/selfWrites.js.
-const isSelfWrite = (full) => selfWrites.isEcho(path.resolve(full));
+const isSelfWrite = (full: string) => selfWrites.isEcho(path.resolve(full));
 
 ipcMain.handle('watch:start', async (_e, projectPath) => {
   stopWatchingProject();
   openProjectRoot = path.resolve(projectPath);
-  if (!fs.existsSync(path.join(projectPath, 'src'))) {return { ok: false };}
+  if (!fs.existsSync(path.join(projectPath, 'src'))) {
+    return { ok: false as const };
+  }
   watcher = watchProject({
-    projectPath, send, isSelfWrite, notePageMayHaveChanged, scheduleThumb, mediaPattern: MEDIA_EXT,
+    projectPath,
+    send,
+    isSelfWrite,
+    notePageMayHaveChanged,
+    scheduleThumb,
+    mediaPattern: MEDIA_EXT,
   });
-  return { ok: true };
+  return { ok: true as const };
 });
 
 function stopWatchingProject() {
   watcher?.close();
-  watcher = null;
+  watcher = undefined;
   clearTimeout(pageChangeTimer);
-  pageChangeTimer = null;
+  pageChangeTimer = undefined;
   pageChangeExternal = false;
   clearTimeout(thumbTimer);
-  thumbTimer = null;
-  for (const timer of styleNudges.values()) {clearTimeout(timer);}
+  thumbTimer = undefined;
+  for (const timer of styleNudges.values()) {
+    clearTimeout(timer);
+  }
   styleNudges.clear();
   captureEra++;
   selfWrites.clear();
@@ -1851,8 +2159,7 @@ function stopWatchingProject() {
 // Assets (public/) — list, upload, move, rename, folders
 // ---------------------------------------------------------------------------
 
-
-const publicDirOf = (projectPath) => path.join(projectPath, 'public');
+const publicDirOf = (projectPath: string) => path.join(projectPath, 'public');
 
 // Assets live in two places and they mean different things:
 //
@@ -1868,16 +2175,21 @@ const ASSET_ROOTS = ['public', 'src'];
 
 // Media only under src/: everything else there is code. public/ lists whatever
 // is in it — that folder exists to be served.
-const MEDIA_EXT =
-  /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp|tiff?|mp4|webm|mov|m4v|ogv|mp3|wav|ogg|m4a|flac|aac|woff2?|ttf|otf|eot)$/i;
+const MEDIA_EXT = new RegExp(
+  '\\.(png|jpe?g|gif|webp|avif|svg|ico|bmp|tiff?|' +
+    'mp4|webm|mov|m4v|ogv|mp3|wav|ogg|m4a|flac|aac|woff2?|ttf|otf|eot)$',
+  'i',
+);
 
-const rootOfRel = (rel) => String(rel || '').split('/')[0];
+const rootOfRel = (rel: string) => String(rel || '').split('/')[0] ?? '';
 
 // Refuses anything that escapes the two roots.
-function assetAbs(projectPath, rel) {
+function assetAbs(projectPath: string, rel: string) {
   const clean = String(rel || '').replace(/^\/+/, '');
   const root = rootOfRel(clean);
-  if (!ASSET_ROOTS.includes(root)) {throw new Error('Invalid asset path');}
+  if (!ASSET_ROOTS.includes(root)) {
+    throw new Error('Invalid asset path');
+  }
   const rootAbs = path.resolve(projectPath, root);
   const abs = path.resolve(projectPath, clean);
   if (abs !== rootAbs && !abs.startsWith(rootAbs + path.sep)) {
@@ -1887,87 +2199,54 @@ function assetAbs(projectPath, rel) {
 }
 
 // A destination name that doesn't collide: name.ext, name-1.ext, name-2.ext …
-function uniqueDest(dir, name) {
+function uniqueDest(dir: string, name: string) {
   const ext = path.extname(name);
   const base = path.basename(name, ext);
   let candidate = name;
   let i = 1;
   while (fs.existsSync(path.join(dir, candidate))) {
+    if (i > MAIN_LIMITS.fileNameAttemptsMax) {
+      throw new Error('File name attempts exceed limit');
+    }
     candidate = `${base}-${i++}${ext}`;
   }
   return path.join(dir, candidate);
 }
 
 ipcMain.handle('assets:list', async (_e, projectPath) => {
-  const entries = [];
-  // Folders are only worth showing when something is in them, which for src/
-  // means "holds media somewhere below" — otherwise every component folder in
-  // the project would show up as an empty asset folder.
-  const walk = (dir, rel, mediaOnly) => {
-    let held = false;
-    let names = [];
-    try {
-      names = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return false;
-    }
-    for (const entry of names) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') {continue;}
-      const full = path.join(dir, entry.name);
-      const entryRel = `${rel}/${entry.name}`;
-      if (entry.isDirectory()) {
-        const at = entries.length;
-        const placeholder = { rel: entryRel, name: entry.name, parent: rel, isDir: true, root: rootOfRel(rel) };
-        entries.push(placeholder);
-        const any = walk(full, entryRel, mediaOnly);
-        if (any) {held = true;}
-        else if (mediaOnly) {entries.splice(at, 1);} // nothing below it — not an asset folder
-      } else {
-        if (mediaOnly && !MEDIA_EXT.test(entry.name)) {continue;}
-        let size = 0;
-        try {
-          size = fs.statSync(full).size;
-        } catch {
-          /* race */
-        }
-        held = true;
-        entries.push({
-          rel: entryRel,
-          name: entry.name,
-          parent: rel,
-          isDir: false,
-          size,
-          abs: full,
-          root: rootOfRel(rel),
-        });
-      }
-    }
-    return held;
-  };
-
+  const entries: AssetEntry[] = [];
   // The roots themselves are entries, so the panel navigates and drops into
   // them with the folder handling it already has.
   const publicDir = publicDirOf(projectPath);
   const srcDir = path.join(projectPath, 'src');
   const hasPublic = fs.existsSync(publicDir);
   if (hasPublic) {
-    entries.push({ rel: 'public', name: 'public', parent: '', isDir: true, root: 'public', isRoot: true });
-    walk(publicDir, 'public', false);
+    entries.push({
+      rel: 'public',
+      name: 'public',
+      parent: '',
+      isDir: true,
+      root: 'public',
+      isRoot: true,
+    });
+    entries.push(...listAssetTree(publicDir, 'public', { mediaOnly: false }));
   }
   if (fs.existsSync(srcDir)) {
     entries.push({ rel: 'src', name: 'src', parent: '', isDir: true, root: 'src', isRoot: true });
-    walk(srcDir, 'src', true);
+    entries.push(...listAssetTree(srcDir, 'src', { mediaOnly: true }));
   }
   return { entries, missing: !hasPublic };
 });
 
 // Opens a picker and copies the chosen files into public/<destRel>.
 ipcMain.handle('assets:pickUpload', async (_e, { projectPath, destRel }) => {
-  const result = await dialog.showOpenDialog(mainWindow, {
+  const result = await showOpenDialog({
     title: 'Upload assets',
     properties: ['openFile', 'multiSelections'],
   });
-  if (result.canceled || !result.filePaths.length) {return { added: 0 };}
+  if (result.canceled || !result.filePaths.length) {
+    return { added: 0 };
+  }
   return copyAssetsIn(projectPath, destRel, result.filePaths);
 });
 
@@ -1976,7 +2255,7 @@ ipcMain.handle('assets:upload', async (_e, { projectPath, destRel, filePaths }) 
   return copyAssetsIn(projectPath, destRel, filePaths || []);
 });
 
-function copyAssetsIn(projectPath, destRel, filePaths) {
+function copyAssetsIn(projectPath: string, destRel: string, filePaths: readonly string[]) {
   const destDir = assetAbs(projectPath, destRel);
   fs.mkdirSync(destDir, { recursive: true });
   let added = 0;
@@ -2005,10 +2284,12 @@ ipcMain.handle('assets:move', async (_e, { projectPath, fromRel, toDirRel }) => 
     throw new Error(
       'Moving between public/ and src/ changes how the file is referenced ' +
         '(URL vs import), so it needs the references updated too. Not supported yet — ' +
-        'move it outside the app and fix the references by hand.'
+        'move it outside the app and fix the references by hand.',
     );
   }
-  if (!fs.existsSync(from)) {return { ok: false };}
+  if (!fs.existsSync(from)) {
+    return { ok: false as const };
+  }
   // Refuse moving a folder into itself/its own subtree.
   if (fs.statSync(from).isDirectory() && (toDir === from || toDir.startsWith(from + path.sep))) {
     throw new Error('Cannot move a folder into itself.');
@@ -2019,21 +2300,27 @@ ipcMain.handle('assets:move', async (_e, { projectPath, fromRel, toDirRel }) => 
   fs.mkdirSync(toDir, { recursive: true });
   fs.renameSync(from, dest);
   send('assets:changed', {});
-  return { ok: true };
+  return { ok: true as const };
 });
 
 ipcMain.handle('assets:rename', async (_e, { projectPath, rel, newName }) => {
   const clean = String(newName).trim().replace(/[/\\]/g, '');
-  if (!clean) {throw new Error('Invalid name');}
+  if (!clean) {
+    throw new Error('Invalid name');
+  }
   const from = assetAbs(projectPath, rel);
   const dest = path.join(path.dirname(from), clean);
-  if (dest === from) {return { ok: true };}
-  if (fs.existsSync(dest)) {throw new Error('Something with that name already exists.');}
+  if (dest === from) {
+    return { ok: true as const };
+  }
+  if (fs.existsSync(dest)) {
+    throw new Error('Something with that name already exists.');
+  }
   markSelfWrite(from);
   markSelfWrite(dest);
   fs.renameSync(from, dest);
   send('assets:changed', {});
-  return { ok: true };
+  return { ok: true as const };
 });
 
 // To the system's bin, not to nothing. An asset is somebody's photograph as
@@ -2042,11 +2329,13 @@ ipcMain.handle('assets:rename', async (_e, { projectPath, rel, newName }) => {
 // can get it back from without us.
 ipcMain.handle('assets:delete', async (_e, { projectPath, rel }) => {
   const abs = assetAbs(projectPath, rel);
-  if (!fs.existsSync(abs)) {return { ok: false };}
+  if (!fs.existsSync(abs)) {
+    return { ok: false as const };
+  }
   markSelfWrite(abs);
   await shell.trashItem(abs);
   send('assets:changed', {});
-  return { ok: true };
+  return { ok: true as const };
 });
 
 // Text assets (css/js/json/svg/…) are editable in the floating code window.
@@ -2058,24 +2347,26 @@ ipcMain.handle('assets:readText', async (_e, { projectPath, rel }) => {
   if (stat.size > MAX_EDITABLE_BYTES) {
     throw new Error('That file is too large to edit in the app (over 5 MB).');
   }
-  return { text: fs.readFileSync(abs, 'utf8') };
+  return { text: readSource(abs) };
 });
 
 ipcMain.handle('assets:writeText', async (_e, { projectPath, rel, text }) => {
   const abs = assetAbs(projectPath, rel);
   markSelfWrite(abs, text);
   fs.writeFileSync(abs, text, 'utf8');
-  return { ok: true };
+  return { ok: true as const };
 });
 
 ipcMain.handle('assets:mkdir', async (_e, { projectPath, parentRel, name }) => {
   const clean = String(name).trim().replace(/[/\\]/g, '');
-  if (!clean) {throw new Error('Invalid folder name');}
+  if (!clean) {
+    throw new Error('Invalid folder name');
+  }
   const dir = path.join(assetAbs(projectPath, parentRel), clean);
   markSelfWrite(dir);
   fs.mkdirSync(dir, { recursive: true });
   send('assets:changed', {});
-  return { ok: true };
+  return { ok: true as const };
 });
 
 // ---------------------------------------------------------------------------
@@ -2090,20 +2381,24 @@ const CMS_SKIP = /^(tsconfig|jsconfig|package|package-lock|env\.d)\.json$/i;
 // strings is the content itself rather than a constant.
 const PAGE_SCAN = { requireExport: false, allowPlainLists: true };
 
-const isAstroRel = (rel) => /\.astro$/i.test(String(rel || ''));
+const isAstroRel = (rel: string) => /\.astro$/i.test(String(rel || ''));
 
 // The frontmatter's own span, so a page's data can be read and written without
 // the scanners ever seeing its markup.
-function frontmatterSpan(source) {
+function frontmatterSpan(source: string) {
   const open = /^---[ \t]*\r?\n/.exec(source);
-  if (!open) {return null;}
+  if (!open) {
+    return null;
+  }
   const start = open[0].length;
   const close = source.slice(start).search(/\r?\n---[ \t]*(\r?\n|$)/);
-  if (close === -1) {return null;}
+  if (close === -1) {
+    return null;
+  }
   return { start, end: start + close };
 }
 
-function frontmatterOf(source) {
+function frontmatterOf(source: string) {
   const span = frontmatterSpan(source);
   return span ? source.slice(span.start, span.end) : null;
 }
@@ -2111,7 +2406,7 @@ function frontmatterOf(source) {
 // A JS/TS collection is addressed as `path/to/file.ts#EXPORT_NAME` — the file
 // holds several, so the export name picks which one. A page's frontmatter uses
 // the same form: `pages/index.astro#rotatingWords`.
-function splitCmsRel(rel) {
+function splitCmsRel(rel: string) {
   const at = String(rel || '').lastIndexOf('#');
   return at === -1
     ? { fileRel: String(rel || ''), exportName: null }
@@ -2119,10 +2414,12 @@ function splitCmsRel(rel) {
 }
 
 // Refuses paths that escape src/.
-function cmsAbs(projectPath, rel) {
+function cmsAbs(projectPath: string, rel: string) {
   const root = path.resolve(projectPath, 'src');
   const abs = path.resolve(root, rel || '');
-  if (abs !== root && !abs.startsWith(root + path.sep)) {throw new Error('Invalid data path');}
+  if (abs !== root && !abs.startsWith(root + path.sep)) {
+    throw new Error('Invalid data path');
+  }
   return abs;
 }
 
@@ -2131,112 +2428,33 @@ function cmsAbs(projectPath, rel) {
 // and it lets the panel show item counts without opening anything.
 ipcMain.handle('cms:list', async (_e, projectPath) => {
   const root = path.join(projectPath, 'src');
-  const files = [];
-  if (!fs.existsSync(root)) {return { files };}
-  const walk = (dir, rel) => {
+  const files: CmsFile[] = [];
+  if (!fs.existsSync(root)) {
+    return { files };
+  }
+  const checkDirectory = directoryBudget(root);
+  const walk = (dir: string, rel: string): void => {
     let entries = [];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
+    checkDirectory(dir, entries.length);
     for (const entry of entries) {
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') {continue;}
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+        continue;
+      }
       const full = path.join(dir, entry.name);
       const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
         walk(full, entryRel);
       } else if (/\.(ts|js|mjs|mts)$/i.test(entry.name) && !/\.d\.ts$/i.test(entry.name)) {
-        // Exported record arrays edit like a JSON collection. They're grouped
-        // under their file rather than their folder, since one file usually
-        // holds several and the folder alone wouldn't tell them apart.
-        let source = '';
-        try {
-          if (fs.statSync(full).size > MAX_CMS_BYTES) {continue;}
-          source = fs.readFileSync(full, 'utf8');
-        } catch {
-          continue;
-        }
-        if (!/export\s+const\s+[A-Za-z_$][\w$]*\s*(?::[^=]+)?=\s*\[/.test(source)) {continue;}
-        // Single values (site name, url, a count) have no rows to repeat, so
-        // they ride together as one "General" record at the top of the file's
-        // group rather than being invisible.
-        const general = readGeneral(source);
-        if (general) {
-          files.push({
-            rel: `${entryRel}#${GENERAL}`,
-            name: 'General',
-            dir: entryRel,
-            abs: full,
-            fromFile: true,
-            data: general,
-          });
-        }
-        for (const col of findCollections(source)) {
-          if (!col.data) {continue;} // computed contents — nothing safe to write back
-          files.push({
-            rel: `${entryRel}#${col.name}`,
-            name: col.name,
-            dir: entryRel, // the file is the group
-            abs: full,
-            fromFile: true,
-            data: col.data,
-          });
-        }
+        files.push(...readCmsSource(full, entryRel, { page: false }));
       } else if (/\.astro$/i.test(entry.name)) {
-        // A page's own data — the lists and values declared in its
-        // frontmatter — edits like any other collection, grouped under the
-        // page. Nothing is exported there, and a list of plain strings is
-        // content rather than a constant, so the scan is told both.
-        let source = '';
-        try {
-          if (fs.statSync(full).size > MAX_CMS_BYTES) {continue;}
-          source = fs.readFileSync(full, 'utf8');
-        } catch {
-          continue;
-        }
-        const body = frontmatterOf(source);
-        if (!body) {continue;}
-        // Single values ride together as one "General" record, the same way a
-        // data file's do.
-        const general = readGeneral(body, PAGE_SCAN);
-        if (general) {
-          files.push({
-            rel: `${entryRel}#${GENERAL}`,
-            name: 'General',
-            dir: entryRel,
-            abs: full,
-            fromFile: true,
-            fromPage: true,
-            data: general,
-          });
-        }
-        for (const col of findCollections(body, PAGE_SCAN)) {
-          if (!col.data) {continue;}
-          files.push({
-            rel: `${entryRel}#${col.name}`,
-            name: col.name,
-            dir: entryRel,
-            abs: full,
-            fromFile: true,
-            fromPage: true,
-            data: col.data,
-          });
-        }
+        files.push(...readCmsSource(full, entryRel, { page: true }));
       } else if (/\.json$/i.test(entry.name) && !CMS_SKIP.test(entry.name)) {
-        const file = { rel: entryRel, name: entry.name, dir: rel, abs: full };
-        try {
-          const stat = fs.statSync(full);
-          file.size = stat.size;
-          if (stat.size > MAX_CMS_BYTES) {
-            file.error = 'This file is too large to edit here (over 2 MB).';
-          } else {
-            file.data = JSON.parse(fs.readFileSync(full, 'utf8'));
-          }
-        } catch (err) {
-          file.error = `Not valid JSON — ${String(err.message || err).replace(/\s+in JSON.*$/, '')}`;
-        }
-        files.push(file);
+        files.push(readCmsJson(full, entryRel, rel, entry.name));
       }
     }
   };
@@ -2248,17 +2466,23 @@ ipcMain.handle('cms:list', async (_e, projectPath) => {
 ipcMain.handle('cms:read', async (_e, { projectPath, rel }) => {
   const { fileRel, exportName } = splitCmsRel(rel);
   const abs = cmsAbs(projectPath, fileRel);
-  if (!exportName) {return { data: JSON.parse(fs.readFileSync(abs, 'utf8')) };}
-  const file = fs.readFileSync(abs, 'utf8');
+  if (!exportName) {
+    return { data: parseData(readJson(abs)) };
+  }
+  const file = readSource(abs);
   // A page's data lives in its frontmatter; everything below it is markup the
   // scanners must never see.
   const page = isAstroRel(fileRel);
   const source = page ? frontmatterOf(file) : file;
-  if (source == null) {throw new Error(`src/${fileRel} has no frontmatter.`);}
+  if (source == null) {
+    throw new Error(`src/${fileRel} has no frontmatter.`);
+  }
   const scan = page ? PAGE_SCAN : undefined;
   if (exportName === GENERAL) {
     const general = readGeneral(source, scan);
-    if (!general) {throw new Error(`src/${fileRel} has no single values left to edit.`);}
+    if (!general) {
+      throw new Error(`src/${fileRel} has no single values left to edit.`);
+    }
     return { data: general };
   }
   const col = findCollections(source, scan).find((c) => c.name === exportName);
@@ -2266,10 +2490,12 @@ ipcMain.handle('cms:read', async (_e, { projectPath, rel }) => {
     throw new Error(
       page
         ? `${exportName} is no longer declared in src/${fileRel}.`
-        : `${exportName} is no longer exported from src/${fileRel}.`
+        : `${exportName} is no longer exported from src/${fileRel}.`,
     );
   }
-  if (!col.data) {throw new Error(`${exportName} isn't plain data — ${col.reason}.`);}
+  if (!col.data) {
+    throw new Error(`${exportName} isn't plain data — ${col.reason}.`);
+  }
   return { data: withAssets(col.data, assetOfImport(projectPath, abs, source)) };
 });
 
@@ -2277,13 +2503,17 @@ ipcMain.handle('cms:read', async (_e, { projectPath, rel }) => {
 // project-relative file, or null for anything else. Only imports are read —
 // `image: dailyDevotionals` says nothing on its own, and the import above it
 // says everything.
-function assetOfImport(projectPath, abs, source) {
+function assetOfImport(projectPath: string, abs: string, source: string) {
   const imports = defaultImports(source);
-  return (name) => {
+  return (name: string) => {
     const imp = imports.find((i) => i.name === name);
-    if (!imp) {return null;}
+    if (!imp) {
+      return null;
+    }
     const target = resolveImportPath(projectPath, abs, imp.spec);
-    if (!target || !MEDIA_EXT.test(target)) {return null;}
+    if (!target || !MEDIA_EXT.test(target)) {
+      return null;
+    }
     const rel = toPosix(path.relative(projectPath, target));
     return rel && !rel.startsWith('..') ? rel : null;
   };
@@ -2299,27 +2529,40 @@ ipcMain.handle('cms:assetRef', async (_e, { projectPath, rel, assetRel }) => {
   const abs = cmsAbs(projectPath, fileRel);
   const clean = String(assetRel || '').replace(/^\/+/, '');
   const root = clean.split('/')[0];
-  if (root === 'public') {return { value: '/' + clean.split('/').slice(1).join('/') };}
-  if (root !== 'src') {throw new Error('Invalid asset path');}
+  if (root === 'public') {
+    return { value: '/' + clean.split('/').slice(1).join('/') };
+  }
+  if (root !== 'src') {
+    throw new Error('Invalid asset path');
+  }
   const target = path.resolve(projectPath, clean);
-  if (!fs.existsSync(target)) {throw new Error(`${clean} no longer exists.`);}
-  const file = fs.readFileSync(abs, 'utf8');
+  if (!fs.existsSync(target)) {
+    throw new Error(`${clean} no longer exists.`);
+  }
+  const file = readSource(abs);
   const page = isAstroRel(fileRel);
   const span = page ? frontmatterSpan(file) : null;
-  if (page && !span) {throw new Error(`src/${fileRel} has no frontmatter.`);}
-  const source = page ? file.slice(span.start, span.end) : file;
+  if (page && !span) {
+    throw new Error(`src/${fileRel} has no frontmatter.`);
+  }
+  const source = span ? file.slice(span.start, span.end) : file;
   const imports = defaultImports(source);
   const already = imports.find((i) => resolveImportPath(projectPath, abs, i.spec) === target);
-  if (already) {return { name: already.name, asset: clean };}
+  if (already) {
+    return { name: already.name, asset: clean };
+  }
   const fromHere = toPosix(path.relative(path.dirname(abs), target));
   const spec = importSpecFor({
     imports,
     srcRelative: toPosix(path.relative(path.join(projectPath, 'src'), target)),
     relative: fromHere.startsWith('.') ? fromHere : './' + fromHere,
   });
-  const name = importName(clean, imports.map((i) => i.name));
+  const name = importName(
+    clean,
+    imports.map((i) => i.name),
+  );
   const next = addImport(source, name, spec);
-  const written = page ? file.slice(0, span.start) + next + file.slice(span.end) : next;
+  const written = span ? file.slice(0, span.start) + next + file.slice(span.end) : next;
   markSelfWrite(abs, written);
   fs.writeFileSync(abs, written, 'utf8');
   return { name, asset: clean };
@@ -2331,55 +2574,80 @@ ipcMain.handle('cms:write', async (_e, { projectPath, rel, data }) => {
   const { fileRel, exportName } = splitCmsRel(rel);
   if (exportName) {
     const abs = cmsAbs(projectPath, fileRel);
-    if (!fs.existsSync(abs)) {throw new Error(`src/${fileRel} no longer exists.`);}
+    if (!fs.existsSync(abs)) {
+      throw new Error(`src/${fileRel} no longer exists.`);
+    }
     // Only the edited span is rewritten — imports, comments and the file's
     // other exports are left exactly as they were.
-    const file = fs.readFileSync(abs, 'utf8');
+    const file = readSource(abs);
     // Only the frontmatter is handed to the writer for a page, and only its
     // span is spliced back — the markup below is never re-serialized.
     const page = isAstroRel(fileRel);
     const span = page ? frontmatterSpan(file) : null;
-    if (page && !span) {throw new Error(`src/${fileRel} has no frontmatter.`);}
-    const source = page ? file.slice(span.start, span.end) : file;
+    if (page && !span) {
+      throw new Error(`src/${fileRel} has no frontmatter.`);
+    }
+    const source = span ? file.slice(span.start, span.end) : file;
     const scan = page ? PAGE_SCAN : undefined;
     const written =
       exportName === GENERAL
-        ? writeGeneral(source, data && typeof data === 'object' && !Array.isArray(data) ? data : {}, scan)
-        : replaceCollection(source, exportName, data, scan);
-    if (written == null) {throw new Error(`Couldn't write ${exportName} back into src/${fileRel}.`);}
-    const next = page ? file.slice(0, span.start) + written + file.slice(span.end) : written;
+        ? writeGeneral(
+            source,
+            data && typeof data === 'object' && !Array.isArray(data) ? data : {},
+            scan,
+          )
+        : replaceCollection(source, exportName, parseDataList(data), scan);
+    if (written == null) {
+      throw new Error(`Couldn't write ${exportName} back into src/${fileRel}.`);
+    }
+    const next = span ? file.slice(0, span.start) + written + file.slice(span.end) : written;
     markSelfWrite(abs, next);
     fs.writeFileSync(abs, next, 'utf8');
     // Editing a page's own frontmatter changes a file the editor may have
     // open. Our writes are invisible to the watcher, so say so directly —
     // otherwise the model would keep the old data and write it back over this.
-    if (page) {send('fs:changed', { files: [abs] });}
-    return { ok: true };
+    if (page) {
+      send('fs:changed', { files: [abs] });
+    }
+    return { ok: true as const };
   }
   const abs = cmsAbs(projectPath, rel);
   // A save still in flight when the collection is deleted must not recreate
   // the file — the editor closes a moment after the delete lands.
-  if (!fs.existsSync(abs)) {throw new Error(`src/${rel} no longer exists.`);}
-  let indent = 2;
+  if (!fs.existsSync(abs)) {
+    throw new Error(`src/${rel} no longer exists.`);
+  }
+  let indent: string | number = 2;
   let trailingNewline = true;
-  const before = fs.readFileSync(abs, 'utf8');
+  const before = readSource(abs);
   const match = before.match(/\n([ \t]+)\S/);
-  if (match) {indent = match[1] === '\t' ? '\t' : match[1].length;}
+  if (match) {
+    indent = capture(match, 1) === '\t' ? '\t' : capture(match, 1).length;
+  }
   trailingNewline = /\n$/.test(before);
   const json = JSON.stringify(data, null, indent) + (trailingNewline ? '\n' : '');
   markSelfWrite(abs, json);
   fs.writeFileSync(abs, json, 'utf8');
-  return { ok: true };
+  return { ok: true as const };
 });
 
 // New collections land in src/data/, the conventional home for Astro content
 // that isn't a content collection.
 ipcMain.handle('cms:create', async (_e, { projectPath, name }) => {
-  const slug = String(name).trim().toLowerCase().replace(/\.json$/i, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  if (!slug) {throw new Error('Give the collection a name.');}
+  const slug = String(name)
+    .trim()
+    .toLowerCase()
+    .replace(/\.json$/i, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (!slug) {
+    throw new Error('Give the collection a name.');
+  }
   const rel = `data/${slug}.json`;
   const abs = cmsAbs(projectPath, rel);
-  if (fs.existsSync(abs)) {throw new Error(`src/${rel} already exists.`);}
+  if (fs.existsSync(abs)) {
+    throw new Error(`src/${rel} already exists.`);
+  }
   markSelfWrite(abs);
   fs.mkdirSync(path.dirname(abs), { recursive: true });
   fs.writeFileSync(abs, '[]\n', 'utf8');
@@ -2390,11 +2658,11 @@ ipcMain.handle('cms:create', async (_e, { projectPath, name }) => {
 // A field's type is inferred from its values, which can't tell a phone number
 // from a line of text — or anything at all from an empty field. Types the user
 // picked explicitly are remembered here, keyed by collection and field path.
-const cmsMetaPath = (projectPath) => path.join(projectPath, '.stacki', 'cms.json');
+const cmsMetaPath = (projectPath: string) => path.join(projectPath, '.stacki', 'cms.json');
 
-function readCmsMeta(projectPath) {
+function readCmsMeta(projectPath: string) {
   try {
-    return JSON.parse(fs.readFileSync(cmsMetaPath(projectPath), 'utf8'));
+    return parseRecord(parseData(readJson(cmsMetaPath(projectPath))));
   } catch {
     return {};
   }
@@ -2407,16 +2675,18 @@ ipcMain.handle('cms:meta', async (_e, projectPath) => ({ meta: readCmsMeta(proje
 // zod schema amounts to. Read from the config itself rather than inferred from
 // the data, so the editor enforces the same rules the build does — see
 // contentConfig.js for how, and why it happens in a child process.
-ipcMain.handle('content:config', async (_e, { projectPath, force } = {}) =>
-  readContentConfig(projectPath, { force: !!force })
+ipcMain.handle('content:config', async (_e, { projectPath, force }) =>
+  parseContentConfig(await readContentConfig(projectPath, { force: !!force })),
 );
 
 // One collection's entries: where each one lives, what it holds, and what
 // identifies it. A collection whose loader builds its entries has none to give.
-const collectionOf = async (projectPath, name) => {
-  const config = await readContentConfig(projectPath);
+const collectionOf = async (projectPath: string, name: string) => {
+  const config = parseContentConfig(await readContentConfig(projectPath));
   const collection = (config.collections || []).find((c) => c.name === name);
-  if (!collection) {throw new Error(`${name} is not a collection in this project.`);}
+  if (!collection) {
+    throw new Error(`${name} is not a collection in this project.`);
+  }
   return { config, collection };
 };
 
@@ -2427,7 +2697,7 @@ ipcMain.handle('css:variables', async (_e, projectPath) => {
   try {
     return cssVars.readVariables(projectPath);
   } catch (err) {
-    return { files: [], error: String(err.message || err) };
+    return { files: [], error: errorMessage(err) };
   }
 });
 
@@ -2435,27 +2705,38 @@ ipcMain.handle('css:variables', async (_e, projectPath) => {
 // a table of modes is one name in every mode, and a row in a family is one
 // property of every member.
 ipcMain.handle('css:addVariables', async (_e, { projectPath, adds }) => {
-  let last = { ok: true };
+  let last: { ok: boolean; error?: string; name?: string; changed?: boolean } = { ok: true };
   for (const add of adds || []) {
     markSelfWrite(path.resolve(projectPath, add.file));
     last = cssVars.addVariable(projectPath, add);
-    if (!last.ok) {break;}
+    if (!last.ok) {
+      break;
+    }
   }
-  if (last.ok) {send('css:changed', {});}
+  if (last.ok) {
+    send('css:changed', {});
+  }
   return last;
 });
 
 // A row dragged to a new place: the declaration moves inside its rule, which is
 // where the order actually lives.
 ipcMain.handle('css:moveVariables', async (_e, { projectPath, moves }) => {
-  let last = { ok: true };
+  let last: { ok: boolean; error?: string; name?: string; changed?: boolean } = { ok: true };
   for (const move of moves || []) {
     markSelfWrite(path.resolve(projectPath, move.file));
     // A group carries its heading and every line under it; a row is one line.
-    last = move.names ? cssVars.moveSection(projectPath, move) : cssVars.moveVariable(projectPath, move);
-    if (!last.ok) {break;}
+    last =
+      'names' in move
+        ? cssVars.moveSection(projectPath, move)
+        : cssVars.moveVariable(projectPath, move);
+    if (!last.ok) {
+      break;
+    }
   }
-  if (last.ok) {send('css:changed', {});}
+  if (last.ok) {
+    send('css:changed', {});
+  }
   return last;
 });
 
@@ -2464,7 +2745,9 @@ ipcMain.handle('css:moveVariables', async (_e, { projectPath, moves }) => {
 ipcMain.handle('css:setSectionTitle', async (_e, { projectPath, ...edit }) => {
   markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.setSectionTitle(projectPath, edit);
-  if (result.ok) {send('css:changed', {});}
+  if (result.ok) {
+    send('css:changed', {});
+  }
   return result;
 });
 
@@ -2473,21 +2756,27 @@ ipcMain.handle('css:setSectionTitle', async (_e, { projectPath, ...edit }) => {
 ipcMain.handle('css:removeSection', async (_e, { projectPath, ...edit }) => {
   markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.removeSection(projectPath, edit);
-  if (result.ok) {send('css:changed', {});}
+  if (result.ok) {
+    send('css:changed', {});
+  }
   return result;
 });
 
 ipcMain.handle('css:moveHeading', async (_e, { projectPath, ...edit }) => {
   markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.moveHeading(projectPath, edit);
-  if (result.ok) {send('css:changed', {});}
+  if (result.ok) {
+    send('css:changed', {});
+  }
   return result;
 });
 
 ipcMain.handle('css:addSection', async (_e, { projectPath, ...edit }) => {
   markSelfWrite(path.resolve(projectPath, edit.file));
   const result = cssVars.addSection(projectPath, edit);
-  if (result.ok) {send('css:changed', {});}
+  if (result.ok) {
+    send('css:changed', {});
+  }
   return result;
 });
 
@@ -2496,7 +2785,9 @@ ipcMain.handle('css:addSection', async (_e, { projectPath, ...edit }) => {
 // them move or none does.
 ipcMain.handle('css:renameVariables', async (_e, { projectPath, renames }) => {
   const result = cssVars.renameVariables(projectPath, { renames, markWrite: markSelfWrite });
-  if (result.ok) {send('css:changed', {});}
+  if (result.ok) {
+    send('css:changed', {});
+  }
   return result;
 });
 
@@ -2507,13 +2798,17 @@ ipcMain.handle('css:setVariable', async (_e, { projectPath, ...edit }) => {
   const abs = path.resolve(projectPath, edit.file);
   markSelfWrite(abs);
   const result = cssVars.setVariable(projectPath, edit);
-  if (result.ok) {send('css:changed', {});}
+  if (result.ok) {
+    send('css:changed', {});
+  }
   return result;
 });
 
 ipcMain.handle('content:collections', async (_e, projectPath) => {
-  const config = await readContentConfig(projectPath);
-  if (config.missing || config.error) {return { ...config, collections: [] };}
+  const config = parseContentConfig(await readContentConfig(projectPath));
+  if (config.missing || config.error) {
+    return { ...config, collections: [] };
+  }
   const collections = (config.collections || []).map((collection) => ({
     name: collection.name,
     editable: collection.editable,
@@ -2523,7 +2818,11 @@ ipcMain.handle('content:collections', async (_e, projectPath) => {
     error: collection.error || null,
     count: countEntries(projectPath, collection),
   }));
-  return { collections, covered: coveredPaths(config.collections || []), configPath: config.configPath };
+  return {
+    collections,
+    covered: coveredPaths(config.collections || []),
+    configPath: config.configPath,
+  };
 });
 
 ipcMain.handle('content:entries', async (_e, { projectPath, name }) => {
@@ -2534,14 +2833,14 @@ ipcMain.handle('content:entries', async (_e, { projectPath, name }) => {
 // A save is a list of edits against one entry, not a new copy of the file: see
 // contentEntries.js and ./formats for what that protects.
 ipcMain.handle('content:writeEntry', async (_e, { projectPath, entry, edits, body }) => {
-  const result = writeEntry(projectPath, entry, edits || [], { body });
+  const result = writeEntry(projectPath, entry, edits || [], definedFields({ body }));
   markSelfWrite(path.resolve(projectPath, entry.file));
   send('cms:changed', {});
   return result;
 });
 
 ipcMain.handle('content:validate', async (_e, { projectPath, collection, data }) =>
-  validateEntry(projectPath, { collection, data })
+  parseValidationResult(await validateEntry(projectPath, { collection, data })),
 );
 
 // What renaming an entry's id would change, and then changing it. Two calls,
@@ -2549,18 +2848,34 @@ ipcMain.handle('content:validate', async (_e, { projectPath, collection, data })
 // before anything is written, so a rename that would touch six other entries
 // says so first.
 ipcMain.handle('content:renamePlan', async (_e, { projectPath, name, from, to }) => {
-  const config = await readContentConfig(projectPath);
-  const plan = planRename(projectPath, config.collections || [], { collection: name, from, to });
+  const config = parseContentConfig(await readContentConfig(projectPath));
+  const plan = planRename(
+    projectPath,
+    config.collections.map((collection) => ({
+      ...collection,
+      loader: collection.loader ?? { kind: 'none' },
+    })),
+    { collection: name, from, to },
+  );
   // The entry data itself is big and the renderer only needs the shape of the
   // change.
   return { ...plan, entry: { id: plan.entry.id, file: plan.entry.file } };
 });
 
 ipcMain.handle('content:rename', async (_e, { projectPath, name, from, to }) => {
-  const config = await readContentConfig(projectPath);
-  const plan = planRename(projectPath, config.collections || [], { collection: name, from, to });
+  const config = parseContentConfig(await readContentConfig(projectPath));
+  const plan = planRename(
+    projectPath,
+    config.collections.map((collection) => ({
+      ...collection,
+      loader: collection.loader ?? { kind: 'none' },
+    })),
+    { collection: name, from, to },
+  );
   const result = applyRename(projectPath, plan);
-  for (const file of result.files) {markSelfWrite(path.resolve(projectPath, file));}
+  for (const file of result.files) {
+    markSelfWrite(path.resolve(projectPath, file));
+  }
   send('cms:changed', {});
   return result;
 });
@@ -2583,12 +2898,15 @@ ipcMain.handle('project:resolveImport', async (_e, { projectPath, fromFile, spec
 
 ipcMain.handle('cms:setMeta', async (_e, { projectPath, rel, fields }) => {
   const meta = readCmsMeta(projectPath);
-  if (fields && Object.keys(fields).length) {meta[rel] = fields;}
-  else {delete meta[rel];}
+  if (fields && Object.keys(fields).length) {
+    meta[rel] = fields;
+  } else {
+    delete meta[rel];
+  }
   const file = cmsMetaPath(projectPath);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(meta, null, 2) + '\n', 'utf8');
-  return { ok: true };
+  return { ok: true as const };
 });
 
 // Deleting a collection rewrites the pages that imported it (see cmsRefs.js):
@@ -2621,8 +2939,10 @@ ipcMain.handle('cms:delete', async (_e, { projectPath, rel }) => {
   send('cms:changed', {});
   // Our own writes are invisible to the watcher, so tell the app directly —
   // an open page holding the old import needs to reload.
-  if (hits.length) {send('fs:changed', { files: hits.map((h) => h.file) });}
-  return { ok: true, rewritten: hits.map((h) => h.rel) };
+  if (hits.length) {
+    send('fs:changed', { files: hits.map((h) => h.file) });
+  }
+  return { ok: true as const, rewritten: hits.map((h) => h.rel) };
 });
 
 // ---------------------------------------------------------------------------
@@ -2633,14 +2953,14 @@ ipcMain.handle('cms:delete', async (_e, { projectPath, rel }) => {
 // Writes any edited chunk subtrees back to their .html files. Compares
 // normalized (reparsed) forms so untouched chunks aren't rewritten just for
 // formatting differences.
-function writeChunks(model) {
-  const walk = (list) => {
+function writeChunks(model: ParserPageModel) {
+  const walk = (list: readonly ParserNode[]): void => {
     for (const node of list) {
       if (node.chunkFile && Array.isArray(node.children)) {
         const next = serializeNodes(node.children);
         let unchanged = false;
         try {
-          const disk = fs.readFileSync(node.chunkFile, 'utf8');
+          const disk = readSource(node.chunkFile);
           const parsed = parseTemplate(disk);
           unchanged = parsed.clean && serializeNodes(parsed.nodes) === next;
         } catch {
@@ -2651,7 +2971,9 @@ function writeChunks(model) {
           fs.writeFileSync(node.chunkFile, next, 'utf8');
         }
       }
-      if (Array.isArray(node.children)) {walk(node.children);}
+      if (Array.isArray(node.children)) {
+        walk(node.children);
+      }
     }
   };
   walk(model.nodes);
@@ -2662,7 +2984,7 @@ function writeChunks(model) {
 // ---------------------------------------------------------------------------
 
 ipcMain.handle('page:read', async (_e, pagePath) => {
-  const source = fs.readFileSync(pagePath, 'utf8');
+  const source = readSource(pagePath);
   // Markdown builds the same tree from a different syntax, so everything
   // downstream — navigator, props, text editing, undo — is unchanged. Only
   // the writer has to know which one it is; model.format carries that.
@@ -2670,7 +2992,9 @@ ipcMain.handle('page:read', async (_e, pagePath) => {
     return { ...parseMarkdownPage(source, { mdx: isMdx(pagePath) }), source };
   }
   const parsed = parsePage(source);
-  if (parsed.editable) {resolveChunks(parsed.model, pagePath);}
+  if (parsed.editable) {
+    resolveChunks(parsed.model, pagePath);
+  }
   return { ...parsed, source };
 });
 
@@ -2682,12 +3006,21 @@ ipcMain.handle('page:read', async (_e, pagePath) => {
 // value". Writing the same bytes a second time flushes it. Plain .css files transform
 // correctly, so this is only for .astro files that carry a <style> block.
 const STYLE_NUDGE_MS = 150;
-const styleNudges = new Map(); // path -> pending timer
+const styleNudges = new Map<string, ReturnType<typeof setTimeout>>(); // path -> pending timer
 
-function writePageText(pagePath, text) {
+function writePageText(pagePath: string, text: string) {
+  if (/<style[\s>]/i.test(text)) {
+    if (styleNudges.size >= MAIN_LIMITS.styleNudgesMax) {
+      if (!styleNudges.has(pagePath)) {
+        throw new Error('Pending style writes exceed limit');
+      }
+    }
+  }
   markSelfWrite(pagePath, text);
   fs.writeFileSync(pagePath, text, 'utf8');
-  if (!/<style[\s>]/i.test(text)) {return;}
+  if (!/<style[\s>]/i.test(text)) {
+    return;
+  }
   clearTimeout(styleNudges.get(pagePath)); // a newer edit supersedes this one's nudge
   styleNudges.set(
     pagePath,
@@ -2696,45 +3029,65 @@ function writePageText(pagePath, text) {
       try {
         // Skip it if anything has changed the file since — the nudge must never
         // resurrect text that's already been superseded.
-        if (fs.readFileSync(pagePath, 'utf8') !== text) {return;}
+        if (readSource(pagePath) !== text) {
+          return;
+        }
         markSelfWrite(pagePath, text);
         fs.writeFileSync(pagePath, text, 'utf8');
       } catch {
         /* file moved or deleted — nothing to flush */
       }
-    }, STYLE_NUDGE_MS)
+    }, STYLE_NUDGE_MS),
   );
 }
 
 ipcMain.handle('page:write', async (_e, { pagePath, model }) => {
   if (isMarkdownPage(pagePath)) {
-    writePageText(pagePath, serializeMarkdownPage(model));
-    return { ok: true };
+    writePageText(pagePath, serializeMarkdownPage(parseMarkdownModel(model)));
+    return { ok: true as const };
   }
   writePageText(pagePath, serializePage(model));
-  writeChunks(model);
-  return { ok: true };
+  writeChunks(parseSerializePage(model));
+  return { ok: true as const };
 });
 
 ipcMain.handle('page:writeRaw', async (_e, { pagePath, source }) => {
   writePageText(pagePath, source);
-  return { ok: true };
+  return { ok: true as const };
 });
 
 ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   let fileName = name.trim().replace(/\.astro$/i, '');
   fileName = fileName.replace(/[^a-zA-Z0-9/_-]+/g, '-');
-  if (!fileName) {throw new Error('Invalid page name');}
+  if (!fileName) {
+    throw new Error('Invalid page name');
+  }
   const pagePath = path.join(pagesDir, fileName + '.astro');
-  if (fs.existsSync(pagePath)) {throw new Error('A page with that name already exists.');}
+  if (fs.existsSync(pagePath)) {
+    throw new Error('A page with that name already exists.');
+  }
   fs.mkdirSync(path.dirname(pagePath), { recursive: true });
 
-  const model = { imports: [], extraFrontmatter: '', nodes: [] };
+  const model: ParserPageModel & { imports: { name: string; path: string }[] } = {
+    imports: [],
+    extraFrontmatter: '',
+    nodes: [],
+    frontmatterLead: '',
+    extraFrontmatterSpaced: true,
+    hadFrontmatter: true,
+    trailingBlank: 0,
+  };
   if (layout) {
     const rel = toPosix(path.relative(path.dirname(pagePath), layout.path));
     model.imports.push({ name: layout.name, path: rel.startsWith('.') ? rel : './' + rel });
-    model.nodes.push({ id: 'layout', kind: 'component', name: layout.name, props: {}, children: [] });
+    model.nodes.push({
+      id: 'layout',
+      kind: 'component',
+      name: layout.name,
+      props: {},
+      children: [],
+    });
   }
   const created = serializePage(model);
   markSelfWrite(pagePath, created);
@@ -2745,7 +3098,7 @@ ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
 ipcMain.handle('page:delete', async (_e, pagePath) => {
   markSelfWrite(pagePath);
   fs.rmSync(pagePath);
-  return { ok: true };
+  return { ok: true as const };
 });
 
 // Moves/renames a page within src/pages. `to` is the new path relative to
@@ -2754,12 +3107,18 @@ ipcMain.handle('page:delete', async (_e, pagePath) => {
 ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   const dest = path.resolve(pagesDir, to);
-  if (!dest.startsWith(pagesDir + path.sep)) {throw new Error('Invalid destination.');}
-  if (path.resolve(from) === dest) {return { newPath: dest };}
-  if (fs.existsSync(dest)) {throw new Error('A page with that name already exists there.');}
+  if (!dest.startsWith(pagesDir + path.sep)) {
+    throw new Error('Invalid destination.');
+  }
+  if (path.resolve(from) === dest) {
+    return { newPath: dest };
+  }
+  if (fs.existsSync(dest)) {
+    throw new Error('A page with that name already exists there.');
+  }
   fs.mkdirSync(path.dirname(dest), { recursive: true });
 
-  let source = fs.readFileSync(from, 'utf8');
+  let source = readSource(from);
   const fromDir = path.dirname(from);
   const toDir = path.dirname(dest);
   if (path.resolve(fromDir) !== path.resolve(toDir)) {
@@ -2768,9 +3127,11 @@ ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
       (m, pre, spec, post) => {
         const abs = path.resolve(fromDir, spec);
         let rel = toPosix(path.relative(toDir, abs));
-        if (!rel.startsWith('.')) {rel = './' + rel;}
+        if (!rel.startsWith('.')) {
+          rel = './' + rel;
+        }
         return pre + rel + post;
-      }
+      },
     );
   }
   markSelfWrite(from);
@@ -2782,7 +3143,7 @@ ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
 
 // Folder management under src/pages. Renames are same-parent only (from the
 // UI), so contained files keep their relative-import depth.
-const resolvePagesDir = (projectPath, rel) => {
+const resolvePagesDir = (projectPath: string, rel: string) => {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   const full = path.resolve(pagesDir, rel);
   if (full !== pagesDir && !full.startsWith(pagesDir + path.sep)) {
@@ -2793,37 +3154,46 @@ const resolvePagesDir = (projectPath, rel) => {
 
 ipcMain.handle('pagefolder:create', async (_e, { projectPath, dir }) => {
   fs.mkdirSync(resolvePagesDir(projectPath, dir), { recursive: true });
-  return { ok: true };
+  return { ok: true as const };
 });
 
 ipcMain.handle('pagefolder:rename', async (_e, { projectPath, from, to }) => {
   const a = resolvePagesDir(projectPath, from);
   const b = resolvePagesDir(projectPath, to);
-  if (fs.existsSync(b)) {throw new Error('A folder with that name already exists.');}
+  if (fs.existsSync(b)) {
+    throw new Error('A folder with that name already exists.');
+  }
   fs.renameSync(a, b);
-  return { ok: true };
+  return { ok: true as const };
 });
 
 ipcMain.handle('pagefolder:delete', async (_e, { projectPath, dir }) => {
   const full = resolvePagesDir(projectPath, dir);
   const pagesDir = path.join(projectPath, 'src', 'pages');
-  if (full === pagesDir) {throw new Error('Invalid folder.');}
+  if (full === pagesDir) {
+    throw new Error('Invalid folder.');
+  }
   fs.rmSync(full, { recursive: true, force: true });
-  return { ok: true };
+  return { ok: true as const };
 });
 
 // Fill a route pattern in with one entry's params: /posts/[slug] + {slug:'a'}
 // → /posts/a. A rest param ([...path]) holds a whole segment run, and an
 // undefined one collapses rather than writing "undefined" into the URL.
-function fillRoute(pattern, params) {
-  const filled = pattern.replace(/\[(\.\.\.)?([^\]]+)\]/g, (_m, rest, name) => {
-    const value = params?.[name];
-    if (value == null) {return '';}
-    return String(value)
-      .split('/')
-      .map((s) => encodeURIComponent(s))
-      .join('/');
-  });
+function fillRoute(pattern: string, params: Readonly<Record<string, unknown>>) {
+  const filled = pattern.replace(
+    /\[(\.\.\.)?([^\]]+)\]/g,
+    (_m: string, _rest: string | undefined, name: string) => {
+      const value = params?.[name];
+      if (value == null) {
+        return '';
+      }
+      return String(value)
+        .split('/')
+        .map((s) => encodeURIComponent(s))
+        .join('/');
+    },
+  );
   // A dropped rest param leaves a double slash or a trailing one behind.
   return filled.replace(/\/{2,}/g, '/').replace(/(.)\/$/, '$1');
 }
@@ -2842,16 +3212,21 @@ ipcMain.handle('project:injectedRoutes', async (_e, { projectPath }) => ({
 // page that can't answer is previewed at its own pattern, exactly as before.
 ipcMain.handle('page:dynamicPaths', async (_e, { projectPath, pagePath, devUrl }) => {
   const pattern = routeForPage(projectPath, pagePath);
-  if (!pattern.includes('[') || !devUrl) {return { entries: [] };}
+  if (!pattern.includes('[') || !devUrl) {
+    return { entries: [] };
+  }
   const rel = toPosix(path.relative(projectPath, pagePath));
   try {
     const res = await fetch(`${devUrl}/__avb/paths?p=${encodeURIComponent(rel)}`);
-    if (!res.ok) {return { entries: [], error: `Dev server returned ${res.status}` };}
-    const data = await res.json();
+    if (!res.ok) {
+      return { entries: [], error: `Dev server returned ${res.status}` };
+    }
+    const input: unknown = await res.json();
+    const data = parseDynamicPaths(input);
     const entries = (data.entries || []).map((e) => {
       // A dev server started before this app was updated still answers with
       // bare params objects — read both shapes rather than break its preview.
-      const params = e && e.params ? e.params : e;
+      const params = e.params;
       return {
         params,
         props: (e && e.props) || null,
@@ -2862,7 +3237,7 @@ ipcMain.handle('page:dynamicPaths', async (_e, { projectPath, pagePath, devUrl }
     });
     return { entries, error: data.error || null };
   } catch (err) {
-    return { entries: [], error: String(err?.message || err) };
+    return { entries: [], error: errorMessage(err) };
   }
 });
 
@@ -2870,14 +3245,19 @@ ipcMain.handle('page:dynamicPaths', async (_e, { projectPath, pagePath, devUrl }
 // of a page that lists them. Answered by the dev server because only it can
 // run the project's loaders; without one there is simply no sample.
 ipcMain.handle('content:sampleEntry', async (_e, { devUrl, name, id }) => {
-  if (!devUrl || !name) {return { entry: null };}
+  if (!devUrl || !name) {
+    return { entry: null };
+  }
   try {
     const q = `c=${encodeURIComponent(name)}${id ? `&id=${encodeURIComponent(id)}` : ''}`;
     const res = await fetch(`${devUrl}/__avb/data?${q}`);
-    if (!res.ok) {return { entry: null, error: `Dev server returned ${res.status}` };}
-    return await res.json();
+    if (!res.ok) {
+      return { entry: null, error: `Dev server returned ${res.status}` };
+    }
+    const input: unknown = await res.json();
+    return parseSampleEntry(input);
   } catch (err) {
-    return { entry: null, error: String(err?.message || err) };
+    return { entry: null, error: errorMessage(err) };
   }
 });
 
@@ -2894,7 +3274,7 @@ ipcMain.handle('component:create', async (_e, opts) => {
 // Which files hold instances of a component — the list behind the palette's
 // "23 instances".
 ipcMain.handle('component:usage', async (_e, { projectPath, name, exclude }) =>
-  componentUsage({ projectPath, name, exclude })
+  componentUsage(definedFields({ projectPath, name, exclude })),
 );
 
 ipcMain.handle('page:importPathFor', async (_e, { pagePath, targetPath, projectPath }) => {
@@ -2919,8 +3299,12 @@ ipcMain.handle('page:importPathFor', async (_e, { pagePath, targetPath, projectP
 // is handed back untouched.
 ipcMain.handle('page:rebaseImport', async (_e, { fromPagePath, toPagePath, spec }) => {
   const text = String(spec || '');
-  if (!text.startsWith('.')) {return { path: text };}
-  if (!fromPagePath || !toPagePath) {return { path: text };}
+  if (!text.startsWith('.')) {
+    return { path: text };
+  }
+  if (!fromPagePath || !toPagePath) {
+    return { path: text };
+  }
   const abs = path.resolve(path.dirname(fromPagePath), text);
   const rel = toPosix(path.relative(path.dirname(toPagePath), abs));
   return { path: rel.startsWith('.') ? rel : './' + rel };
@@ -2941,31 +3325,45 @@ ipcMain.handle('page:rebaseImport', async (_e, { fromPagePath, toPagePath, spec 
 
 // Turns "<file>#<path>" node keys into "<file>:<line>" / "<file>:<from>-<to>"
 // pointers, project-relative. Returns null when there's nothing to point at.
-function selectionTrail(state) {
-  if (!state || !state.projectPath || !Array.isArray(state.keys)) {return null;}
+function selectionTrail(state: IpcPayloads['selection:copy']) {
+  if (!state || !state.projectPath || !Array.isArray(state.keys)) {
+    return null;
+  }
   const root = path.resolve(state.projectPath);
-  const trail = [];
+  const trail: string[] = [];
   for (const key of state.keys) {
     const hash = typeof key === 'string' ? key.indexOf('#') : -1;
-    if (hash === -1) {continue;}
+    if (hash === -1) {
+      continue;
+    }
     // The key's file half is renderer input; keep it inside the project.
     const abs = path.resolve(root, key.slice(0, hash));
-    if (abs !== root && !abs.startsWith(root + path.sep)) {continue;}
+    if (abs !== root && !abs.startsWith(root + path.sep)) {
+      continue;
+    }
     const at = locateSelection(abs, key.slice(hash + 1));
-    if (!at) {continue;}
+    if (!at) {
+      continue;
+    }
     const file = toPosix(path.relative(root, at.file));
-    if (at.startLine == null) {trail.push(file);}
-    else if (at.startLine === at.endLine) {trail.push(`${file}:${at.startLine}`);}
-    else {trail.push(`${file}:${at.startLine}-${at.endLine}`);}
+    if (!('startLine' in at)) {
+      trail.push(file);
+    } else if (at.startLine === at.endLine) {
+      trail.push(`${file}:${at.startLine}`);
+    } else {
+      trail.push(`${file}:${at.startLine}-${at.endLine}`);
+    }
   }
   return trail.length ? trail : null;
 }
 
 ipcMain.handle('selection:copy', async (_e, state) => {
   const trail = selectionTrail(state);
-  if (!trail) {return { ok: false };}
+  if (!trail) {
+    return { ok: false as const };
+  }
   clipboard.writeText(trail.join('\n'));
-  return { ok: true, count: trail.length };
+  return { ok: true as const, count: trail.length };
 });
 
 // ---------------------------------------------------------------------------
@@ -2973,8 +3371,12 @@ ipcMain.handle('selection:copy', async (_e, state) => {
 // ---------------------------------------------------------------------------
 
 function stopDevServer(cancelPending = true) {
-  if (cancelPending) {devStarts.cancel();}
-  if (!devServer) {return;}
+  if (cancelPending) {
+    devStarts.cancel();
+  }
+  if (!devServer) {
+    return;
+  }
   const { proc, daemon, bin, projectPath } = devServer;
   devServer = null;
   // Daemonized servers (Astro >= 7 forks a background process) stop via the CLI.
@@ -2991,12 +3393,14 @@ function stopDevServer(cancelPending = true) {
   stopProcessTree(proc);
 }
 
-let devLogBuffer = [];
+let devLogBuffer: string[] = [];
 
-function pushDevLog(chunk) {
-  devLogBuffer.push(chunk);
+function pushDevLog(chunk: string) {
+  devLogBuffer.push(chunk.slice(-MAIN_LIMITS.logChunkCharsMax));
   // Keep roughly the last 200 chunks.
-  if (devLogBuffer.length > 200) {devLogBuffer = devLogBuffer.slice(-200);}
+  if (devLogBuffer.length > 200) {
+    devLogBuffer = devLogBuffer.slice(-200);
+  }
   send('dev:log', chunk);
 }
 
@@ -3005,7 +3409,7 @@ function recentDevLog(maxChars = 1200) {
   return text.slice(-maxChars).trim();
 }
 
-function portAnswers(port, host = '127.0.0.1') {
+function portAnswers(port: number, host = '127.0.0.1') {
   return new Promise((resolve) => {
     const sock = net.connect(port, host);
     sock.setTimeout(1500);
@@ -3026,9 +3430,9 @@ function portAnswers(port, host = '127.0.0.1') {
 // varies: "already running.\n  URL: http://..." on a TTY, or a JSON log line
 // "Dev server already running at http://localhost:4322 (pid 69052)" otherwise —
 // so grab the first URL that follows "already running".
-function parseExistingServer(log) {
+function parseExistingServer(log: string) {
   const m = log.match(/already running[\s\S]*?(https?:\/\/[^\s"\\)]+)/i);
-  return m ? m[1].replace(/\/+$/, '') : null;
+  return m ? capture(m, 1).replace(/\/+$/, '') : null;
 }
 
 // Wraps the project's Astro config (dev preview only) with a Vite plugin
@@ -3307,7 +3711,7 @@ if (/^[A-Za-z][\\w-]*$/.test(name)) {
 // the way they always did.
 let MORPH_CLIENT = '';
 try {
-  MORPH_CLIENT = fs.readFileSync(path.join(__dirname, 'morphClient.js'), 'utf8');
+  MORPH_CLIENT = readSource(path.join(__dirname, 'morphClient.js'));
 } catch {
   MORPH_CLIENT = '';
 }
@@ -3328,19 +3732,23 @@ const MORPH_TAG_HTML = MORPH_CLIENT ? "<script>import 'virtual:avb-morph';</scri
 // Node's own parser, asked the same question it will be asked at startup.
 // Cheap next to spawning a dev server, and it turns a whole class of mistake
 // in the generated config from "no preview" into "preview without extras".
-function parsesAsModule(file) {
+function parsesAsModule(file: string) {
   try {
     const bin = resolveNodeBin();
-    if (!bin) {return true;} // nothing to check with — let Astro have its say
+    if (!bin) {
+      return true;
+    } // nothing to check with — let Astro have its say
     const out = spawnSync(bin, ['--check', file], { encoding: 'utf8', timeout: 10000 });
-    if (out.error || out.status === null) {return true;} // check could not run
+    if (out.error || out.status === null) {
+      return true;
+    } // check could not run
     return out.status === 0;
   } catch {
     return true;
   }
 }
 
-function writeMarkerConfig(projectPath) {
+function writeMarkerConfig(projectPath: string) {
   try {
     const dir = path.join(projectPath, 'node_modules', '.avb');
     fs.mkdirSync(dir, { recursive: true });
@@ -3349,7 +3757,7 @@ function writeMarkerConfig(projectPath) {
     fs.rmSync(path.join(dir, 'resolved.json'), { force: true });
     fs.rmSync(path.join(dir, 'routes.json'), { force: true });
     const userCfg = ['astro.config.mjs', 'astro.config.js', 'astro.config.ts'].find((f) =>
-      fs.existsSync(path.join(projectPath, f))
+      fs.existsSync(path.join(projectPath, f)),
     );
     // The dev server is a plain Node process, and plain Node can't read
     // inside app.asar — it would fail the config import and take the whole
@@ -3362,19 +3770,1464 @@ function writeMarkerConfig(projectPath) {
     // Vite normally resolves symlinks before loading source (including
     // macOS /var -> /private/var). Match both spellings because a project's
     // preserveSymlinks option can keep the original one instead.
-    const projectDirs = [...new Set([
-      toPosix(path.resolve(projectPath)), toPosix(fs.realpathSync(projectPath)),
-    ])];
-    const cfg = `// Generated by Stacki (dev preview only) — do not edit.
+    const projectDirs = [
+      ...new Set([toPosix(path.resolve(projectPath)), toPosix(fs.realpathSync(projectPath))]),
+    ];
+    const cfg = renderMarkerConfig([
+      userCfg ? `import userConfig from '../../${userCfg}';` : 'const userConfig = {};',
+      JSON.stringify(parserPath),
+      JSON.stringify(projectDirs),
+      JSON.stringify(MORPH_CLIENT),
+      JSON.stringify(MORPH_TAG_HTML),
+      JSON.stringify(toPosix(path.join(dir, 'preview.astro'))),
+      JSON.stringify(toPosix(path.join(dir, 'paths.js'))),
+      JSON.stringify(toPosix(path.join(dir, 'data.js'))),
+    ]);
+    const cfgPath = path.join(dir, 'astro.config.mjs');
+    fs.writeFileSync(cfgPath, cfg);
+    fs.writeFileSync(path.join(dir, 'preview.astro'), PREVIEW_PAGE);
+    fs.writeFileSync(path.join(dir, 'paths.js'), PATHS_ENDPOINT);
+    fs.writeFileSync(path.join(dir, 'data.js'), DATA_ENDPOINT);
+    // This file is assembled here and handed to Astro as its config. If it
+    // will not parse, Astro does not start, and the project gets no preview at
+    // all — the editor's own canvas broken by the editor's own scaffolding,
+    // over something the project never asked for. Read it back the way node
+    // will and say no rather than hand over something that cannot load: the
+    // caller falls back to a plain dev server, which costs the outlines and
+    // the live patching and keeps everything else working.
+    if (!parsesAsModule(cfgPath)) {
+      pushDevLog(
+        '\n[stacki] the generated preview config did not parse; starting the dev ' +
+          'server without it. Outlines and live updates are off for this session.\n',
+      );
+      return null;
+    }
+    return cfgPath;
+  } catch {
+    return null; // preview still works, just without outlines
+  }
+}
+
+async function spawnDevServer(
+  projectPath: string,
+  localBin: string,
+  force: boolean,
+  bare: boolean,
+  assertActive: () => void,
+) {
+  const port = await findFreePort(4321);
+  assertActive();
+  const args = ['dev', '--port', String(port), '--host', '127.0.0.1'];
+  // Astro resolves --config against the project root and rejects absolute
+  // paths ([ConfigNotFound]), so pass it relative to the spawn cwd.
+  // `bare` is the last resort: the project's own config, none of this app's,
+  // so a preview still comes up even if what this app generates cannot run.
+  const markerCfg = bare ? null : writeMarkerConfig(projectPath);
+  if (markerCfg) {
+    args.push('--config', toPosix(path.relative(projectPath, markerCfg)));
+  }
+  if (force) {
+    args.push('--force');
+  }
+
+  const proc = spawnAstroServer(projectPath, localBin, args);
+
+  const url = `http://127.0.0.1:${port}`;
+  devServer = { proc, url, projectPath, bin: localBin };
+
+  proc.stdout.on('data', (d: Buffer) => pushDevLog(d.toString()));
+  proc.stderr.on('data', (d: Buffer) => pushDevLog(d.toString()));
+  proc.on('error', (err) => {
+    pushDevLog(`\n[spawn error] ${errorMessage(err)}\n`);
+    if (devServer?.proc === proc) {
+      devServer = null;
+    }
+  });
+  proc.on('exit', (code) => {
+    if (devServer && devServer.proc === proc) {
+      // Astro >= 7 daemonizes: the CLI exits 0 after forking the real server
+      // into a background process. That's a success, not a failure.
+      const running = recentDevLog().match(/Dev server running at (https?:\/\/[^\s"\\)]+)/i);
+      if (code === 0 && running) {
+        devServer = { proc: null, url, projectPath, daemon: true, bin: localBin };
+      } else {
+        devServer = null;
+        send('dev:exit', { code, log: recentDevLog() });
+      }
+    }
+  });
+
+  // The daemon's own failure reasons only land in `astro dev logs`.
+
+  // Wait until the port answers so the iframe doesn't load into a dead server.
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    assertActive();
+    if (!devServer) {
+      throw new Error(
+        'Dev server exited before it was ready.\n\n' +
+          (await spawnDevServerFailureDetail(projectPath, localBin)),
+      );
+    }
+    if (await portAnswers(port)) {
+      assertActive();
+      return url;
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  throw new Error(
+    'Astro dev server did not start within 60 seconds.\n\n' +
+      (await spawnDevServerFailureDetail(projectPath, localBin)),
+  );
+}
+
+// Probes the URL's port on its hostname plus both loopback families —
+// on macOS "localhost" may resolve to ::1 while the server listens on IPv4.
+async function serverAlive(urlString: string) {
+  const u = new URL(urlString);
+  const port = Number(u.port || 80);
+  for (const host of [u.hostname, '127.0.0.1', '::1']) {
+    if (await portAnswers(port, host)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Astro's daemon lock file (.astro/dev.json) — the source of truth for an
+// already-running background server, regardless of who started it.
+function readAstroLock(projectPath: string) {
+  try {
+    const data = parseAstroLock(readJson(path.join(projectPath, '.astro', 'dev.json')));
+    if (data.url) {
+      return data;
+    }
+  } catch {
+    /* no lock */
+  }
+  return null;
+}
+
+// Serialize dev:start calls — concurrent spawns race Astro's daemon lock and
+// the loser dies with "exited before becoming ready".
+const devStarts = createKeyedQueue();
+
+ipcMain.handle('dev:start', (_e, projectPath) => {
+  captureEra++;
+  return devStarts.run(projectPath, async (assertActive) => {
+    const result = await doDevStart(projectPath, assertActive);
+    assertActive();
+    scheduleThumb(projectPath, 6000);
+    return { ...result, trailingSlash: readTrailingSlash(projectPath) };
+  });
+});
+
+async function doDevStart(projectPath: string, assertActive: () => void) {
+  assertActive();
+  if (devServer && devServer.projectPath === projectPath) {
+    // For adopted external servers, make sure it's still alive.
+    if (devServer.external) {
+      const current = devServer;
+      if (await serverAlive(current.url)) {
+        assertActive();
+        return { url: current.url, external: true };
+      }
+      devServer = null;
+    } else {
+      return { url: devServer.url };
+    }
+  }
+  assertActive();
+  stopDevServer(false);
+  devLogBuffer = [];
+
+  const localBin = await doDevStartDependencies(projectPath, assertActive);
+
+  // A lock file means a daemon exists (possibly stale, possibly started
+  // without the app's marker config) — pass --force so ours replaces it.
+  let lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const force = attempt > 0 || !!readAstroLock(projectPath);
+    try {
+      // Retry with --force: first-attempt daemon startup can flake (stale
+      // daemon state, vite re-optimizing after a config change).
+      return { url: await spawnDevServer(projectPath, localBin, force, false, assertActive) };
+    } catch (err) {
+      assertActive();
+      lastErr = err;
+      stopDevServer(false);
+      // Another dev server already running for this project?
+      const existing = parseExistingServer(recentDevLog());
+      if (existing) {
+        const alive = await serverAlive(existing);
+        assertActive();
+        if (alive) {
+          // Adopt the user's own server instead of fighting it.
+          devServer = { proc: null, url: existing, projectPath, external: true };
+          return { url: existing, external: true };
+        }
+      }
+      devLogBuffer = [];
+      await new Promise((r) => setTimeout(r, 800));
+      assertActive();
+    }
+  }
+  // Everything above ran with this app's generated config. A project whose
+  // preview will not come up is worse than one without outlines, so try once
+  // more on the project's own config before giving up. What starts here has no
+  // markers and no live patching — an edit reloads the page, the way it did
+  // before any of this — but the canvas is a canvas again.
+  try {
+    const url = await spawnDevServer(projectPath, localBin, true, true, assertActive);
+    pushDevLog(
+      "\n[stacki] the preview would not start with this app's config, so it is " +
+        "running on the project's own. Outlines and live updates are off; the " +
+        'log above says why.\n',
+    );
+    if (devServer) {
+      devServer = { ...devServer, bare: true };
+    }
+    return { url, bare: true };
+  } catch {
+    assertActive();
+    stopDevServer(false);
+    throw lastErr; // report the first failure: it is the one that explains it
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Style sources
+//
+// Where the style panel can author CSS: every stylesheet in the project, plus
+// (added on the renderer side) the <style> blocks on the current page and in
+// its components. Anything under node_modules, dist or the app's own generated
+// config is skipped — those aren't the author's to edit.
+// ---------------------------------------------------------------------------
+
+// Same containment rule the asset protocol uses: the style panel writes only
+// inside the project that is currently open.
+function assertInProject(filePath: string) {
+  const abs = path.resolve(String(filePath || ''));
+  if (!openProjectRoot || !(abs + path.sep).startsWith(openProjectRoot + path.sep)) {
+    throw new Error('Refusing to touch a file outside the open project.');
+  }
+  return abs;
+}
+
+const CSS_SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.astro', 'release', '.avb']);
+
+function listCssFiles(root: string) {
+  const out: StyleFile[] = [];
+  const checkDirectory = directoryBudget(root);
+  const walk = (dir: string, rel: string): void => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    checkDirectory(dir, entries.length);
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') && entry.name !== '.') {
+        continue;
+      }
+      const full = path.join(dir, entry.name);
+      const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (CSS_SKIP_DIRS.has(entry.name)) {
+          continue;
+        }
+        walk(full, relPath);
+      } else if (/\.(css|scss|sass|less)$/i.test(entry.name)) {
+        let size = 0;
+        try {
+          size = fs.statSync(full).size;
+        } catch {
+          /* unreadable — still list it, the read will report the error */
+        }
+        out.push({ rel: toPosix(relPath), name: entry.name, path: full, size });
+      }
+    }
+  };
+  walk(root, '');
+  // Shallow paths first (src/styles/global.css before a deeply nested partial),
+  // then alphabetical — the file you want is usually near the top of the tree.
+  return out.sort((a, b) => {
+    const da = a.rel.split('/').length;
+    const db = b.rel.split('/').length;
+    return da - db || a.rel.localeCompare(b.rel);
+  });
+}
+
+ipcMain.handle('style:listFiles', async (_e, projectPath) => {
+  if (!projectPath) {
+    return { files: [] };
+  }
+  return { files: listCssFiles(projectPath) };
+});
+
+// A component's `<style is:global>` is page CSS. Astro leaves those rules
+// unhashed, so they style whatever the page renders — including elements that
+// live in a different file from the one being edited, which is exactly the case
+// the style panel used to be blind to. Scoped `<style>` blocks are deliberately
+// left out: Astro hashes them to their own component's elements, so their rules
+// can't reach a selection made from another file.
+const ASTRO_GLOBAL_STYLE = /<style\b[^>]*\bis:global\b[^>]*>/i;
+const ASTRO_SCAN_LIMIT = 512 * 1024; // a .astro file this big isn't a component
+
+function listAstroStyleFiles(root: string) {
+  const out: StyleFile[] = [];
+  const checkDirectory = directoryBudget(root);
+  const walk = (dir: string, rel: string): void => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    checkDirectory(dir, entries.length);
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) {
+        continue;
+      }
+      const full = path.join(dir, entry.name);
+      const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (CSS_SKIP_DIRS.has(entry.name)) {
+          continue;
+        }
+        walk(full, relPath);
+        continue;
+      }
+      if (!/\.astro$/i.test(entry.name)) {
+        continue;
+      }
+      try {
+        const { size } = fs.statSync(full);
+        if (size > ASTRO_SCAN_LIMIT) {
+          continue;
+        }
+        if (!ASTRO_GLOBAL_STYLE.test(readSource(full))) {
+          continue;
+        }
+        out.push({ rel: toPosix(relPath), name: entry.name, path: full, size });
+      } catch {
+        /* unreadable — nothing to offer for it */
+      }
+    }
+  };
+  // Only src/: components elsewhere aren't part of the page's CSS, and this
+  // keeps the scan off node_modules and build output entirely.
+  walk(path.join(root, 'src'), 'src');
+  return out.sort((a, b) => a.rel.localeCompare(b.rel));
+}
+
+ipcMain.handle('style:listAstroStyles', async (_e, projectPath) => {
+  if (!projectPath) {
+    return { files: [] };
+  }
+  return { files: listAstroStyleFiles(projectPath) };
+});
+
+ipcMain.handle('style:readFile', async (_e, filePath) => {
+  const abs = assertInProject(filePath);
+  return { css: readSource(abs) };
+});
+
+ipcMain.handle('style:writeFile', async (_e, { filePath, css }) => {
+  const abs = assertInProject(filePath);
+  markSelfWrite(abs); // the watcher must not treat our own write as external
+  fs.writeFileSync(abs, css, 'utf8');
+  return { ok: true as const };
+});
+
+// ---------------------------------------------------------------------------
+// Source files behind a symbol
+// ---------------------------------------------------------------------------
+
+// tsconfig/jsconfig `paths` for the open project, as [prefix, [targets]] with
+// the trailing /* stripped. Astro's own config is extended, not read: only the
+// project's aliases matter here, and those live in its own file.
+function projectAliases(projectPath: string) {
+  for (const name of ['tsconfig.json', 'jsconfig.json']) {
+    const file = path.join(projectPath, name);
+    if (!fs.existsSync(file)) {
+      continue;
+    }
+    try {
+      // Config files allow comments and trailing commas; strip both rather
+      // than pulling in a JSON5 parser for one field.
+      const raw = readSource(file)
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/(^|[^:])\/\/.*$/gm, '$1')
+        .replace(/,(\s*[}\]])/g, '$1');
+      const input: unknown = JSON.parse(raw);
+      const aliases = toRecord(toRecord(input)?.['compilerOptions'])?.['paths'];
+      if (aliases) {
+        return parseAliases(input);
+      }
+    } catch {
+      // A malformed config just means no aliases.
+    }
+  }
+  return [];
+}
+
+const SRC_EXTS = ['', '.ts', '.js', '.mjs', '.mts', '.tsx', '.jsx', '.json', '.astro'];
+
+function firstExisting(base: string) {
+  for (const ext of SRC_EXTS) {
+    const p = base + ext;
+    if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+      return p;
+    }
+  }
+  for (const ext of SRC_EXTS.slice(1)) {
+    const p = path.join(base, 'index' + ext);
+    if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+      return p;
+    }
+  }
+  return null;
+}
+
+// The file an import specifier points at: relative paths, project aliases
+// (`@/consts.ts`), and the usual extension guessing. Bare package names
+// resolve to nothing — node_modules isn't the user's code to edit.
+function resolveImportPath(projectPath: string, fromFile: string, spec: string) {
+  const s = String(spec || '');
+  if (!s) {
+    return null;
+  }
+  if (s.startsWith('.')) {
+    return firstExisting(path.resolve(path.dirname(fromFile), s));
+  }
+  for (const [prefix, targets] of projectAliases(projectPath)) {
+    if (!prefix || !s.startsWith(prefix)) {
+      continue;
+    }
+    const rest = s.slice(prefix.length);
+    for (const target of targets) {
+      const found = firstExisting(path.resolve(projectPath, target, rest));
+      if (found) {
+        return found;
+      }
+    }
+  }
+  if (s.startsWith('/')) {
+    return firstExisting(path.join(projectPath, s.slice(1)));
+  }
+  return null;
+}
+
+// 1-based line of `name`'s top-level declaration, so the editor can open on it.
+function declarationLine(text: string, name: string) {
+  if (!name) {
+    return 0;
+  }
+  const re = new RegExp(
+    // `[ \t]*`, not `\s*`: with the m flag `\s` eats the newlines before the
+    // declaration, and the match would start on a blank line above it.
+    `^[ \\t]*(?:export\\s+)?(?:const|let|var|function|class)\\s+` +
+      `${String(name).replace(/[^\w$]/g, '')}\\b`,
+    'm',
+  );
+  const m = re.exec(text);
+  if (!m) {
+    return 0;
+  }
+  return text.slice(0, m.index).split('\n').length;
+}
+
+// Opens the file an imported symbol comes from. `fromFile` is the file doing
+// the importing, so relative specifiers resolve the way the bundler sees them.
+ipcMain.handle('src:readSymbol', async (_e, { projectPath, fromFile, spec, name }) => {
+  if (!projectPath || !fromFile) {
+    return { ok: false as const };
+  }
+  const abs = resolveImportPath(projectPath, path.resolve(fromFile), spec);
+  if (!abs) {
+    return { ok: false as const, reason: 'not-found' };
+  }
+  assertInProject(abs);
+  const stat = fs.statSync(abs);
+  if (stat.size > MAX_EDITABLE_BYTES) {
+    return { ok: false as const, reason: 'too-large' };
+  }
+  const text = readSource(abs);
+  return {
+    ok: true as const,
+    rel: path.relative(projectPath, abs),
+    text,
+    line: declarationLine(text, name),
+  };
+});
+
+// Where an import points, as a project-relative path. Same resolution as
+// src:readSymbol, but it never reads the file — the callers here are asking
+// about images, and their bytes are none of this channel's business.
+ipcMain.handle('src:resolvePath', async (_e, { projectPath, fromFile, spec }) => {
+  if (!projectPath || !fromFile) {
+    return { ok: false as const };
+  }
+  const abs = resolveImportPath(projectPath, path.resolve(fromFile), spec);
+  if (!abs) {
+    return { ok: false as const };
+  }
+  assertInProject(abs);
+  return { ok: true as const, rel: toPosix(path.relative(projectPath, abs)) };
+});
+
+// An image's pixel size, read from the file's own header.
+//
+// Astro takes the intrinsic size straight from a local asset — only a remote
+// source gets `inferSize`. So a width/height field over a project file should
+// say what that size IS, and to do that the app has to know it without waiting
+// for a thumbnail somewhere to finish decoding.
+function imageSizeOf(abs: string) {
+  let fd;
+  try {
+    fd = fs.openSync(abs, 'r');
+    const head = Buffer.alloc(32768);
+    const read = fs.readSync(fd, head, 0, head.length, 0);
+    const buf = head.subarray(0, read);
+
+    // PNG: IHDR is always the first chunk.
+    if (buf.length > 24 && buf.toString('binary', 1, 4) === 'PNG') {
+      return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+    }
+    // GIF: little-endian in the logical screen descriptor.
+    if (buf.length > 10 && buf.toString('binary', 0, 3) === 'GIF') {
+      return { w: buf.readUInt16LE(6), h: buf.readUInt16LE(8) };
+    }
+    const webp = imageSizeWebP(buf);
+    if (webp) {
+      return webp;
+    }
+    // JPEG: walk the segments to the start-of-frame, which carries the size.
+    if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
+      let at = 2;
+      while (at + 9 < buf.length) {
+        if (buf[at] !== 0xff) {
+          at += 1;
+          continue;
+        }
+        const marker = buf.readUInt8(at + 1);
+        const len = buf.readUInt16BE(at + 2);
+        // SOF0…SOF15, minus the four that aren't frame headers.
+        if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc, 0xd8].includes(marker)) {
+          return { h: buf.readUInt16BE(at + 5), w: buf.readUInt16BE(at + 7) };
+        }
+        at += 2 + len;
+      }
+    }
+    // SVG: width/height when they're absolute, else the viewBox's own units.
+    if (/\.svg$/i.test(abs)) {
+      const text = buf.toString('utf8');
+      const tag = text.match(/<svg\b[^>]*>/i)?.[0] || '';
+      const num = (name: string) => {
+        const raw = tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, 'i'))?.[1];
+        return raw && /^[\d.]+(px)?$/i.test(raw.trim()) ? Math.round(parseFloat(raw)) : null;
+      };
+      const w = num('width');
+      const h = num('height');
+      if (w && h) {
+        return { w, h };
+      }
+      const box = tag.match(/\bviewBox\s*=\s*["']\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)/i);
+      if (box) {
+        return {
+          w: Math.round(parseFloat(capture(box, 1))),
+          h: Math.round(parseFloat(capture(box, 2))),
+        };
+      }
+    }
+  } catch {
+    /* unreadable or a format we don't decode — the caller falls back */
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* already gone */
+      }
+    }
+  }
+  return null;
+}
+
+ipcMain.handle('assets:dimensions', async (_e, { projectPath, rel }) => {
+  const abs = assertInProject(path.resolve(projectPath, rel));
+  return { dims: imageSizeOf(abs) };
+});
+
+ipcMain.handle('src:readText', async (_e, { projectPath, rel }) => {
+  const abs = assertInProject(path.resolve(projectPath, rel));
+  return { text: readSource(abs) };
+});
+
+ipcMain.handle('src:writeText', async (_e, { projectPath, rel, text }) => {
+  const abs = assertInProject(path.resolve(projectPath, rel));
+  markSelfWrite(abs);
+  fs.writeFileSync(abs, text, 'utf8');
+  return { ok: true as const };
+});
+
+ipcMain.handle('dev:stop', async () => {
+  stopDevServer();
+  return { ok: true as const };
+});
+
+// ---------------------------------------------------------------------------
+// Why the dev server won't start
+//
+// A raw Astro log tells a user nothing actionable. Nearly every failure that
+// isn't the project's own code is one of: no Node at all, a Node too old for
+// the version of Astro the project pins, or dependencies never installed —
+// so name which one it is and what the project actually needs.
+// ---------------------------------------------------------------------------
+
+// engines.node ranges as they're actually written ("18.20.8 || ^20.3.0 ||
+// >=22.0.0", ">=22.12.0"). Anything this can't parse counts as satisfied:
+// the point is to explain a failure that already happened, never to block a
+// launch over a range we couldn't read.
+function satisfiesRange(version: string | null, range: string | null) {
+  if (!version || !range) {
+    return true;
+  }
+  const parse = (v: string): readonly [number, number, number] | null => {
+    const m = /(\d+)\.(\d+)\.(\d+)/.exec(String(v));
+    return m ? [+capture(m, 1), +capture(m, 2), +capture(m, 3)] : null;
+  };
+  const cur = parse(version);
+  if (!cur) {
+    return true;
+  }
+  const cmp = (a: readonly [number, number, number], b: readonly [number, number, number]) =>
+    a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+  return range.split('||').some((partRaw) => {
+    const part = partRaw.trim();
+    const target = parse(part);
+    if (!target) {
+      return true;
+    } // "*", "latest", something exotic — don't judge
+    if (part.startsWith('>=')) {
+      return cmp(cur, target) >= 0;
+    }
+    if (part.startsWith('>')) {
+      return cmp(cur, target) > 0;
+    }
+    if (part.startsWith('^')) {
+      return cur[0] === target[0] && cmp(cur, target) >= 0;
+    }
+    if (part.startsWith('~')) {
+      return cur[0] === target[0] && cur[1] === target[1] && cmp(cur, target) >= 0;
+    }
+    return cmp(cur, target) === 0;
+  });
+}
+
+function nodeVersionOf(bin: string) {
+  try {
+    return execFileSync(bin, ['--version'], {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+ipcMain.handle('dev:probe', (_e, url) => probeUrl(url));
+
+ipcMain.handle('dev:diagnose', async (_e, projectPath) => {
+  const nodePath = resolveNodeBin();
+  const nodeVersion = nodePath ? nodeVersionOf(nodePath) : null;
+
+  let astroVersion = null;
+  let requires = null;
+  try {
+    const pkg = parseRecord(
+      readJson(path.join(projectPath, 'node_modules', 'astro', 'package.json')),
+    );
+    astroVersion = parseOptionalString(pkg['version']) || null;
+    requires = parseOptionalString(toRecord(pkg['engines'])?.['node']) || null;
+  } catch {
+    /* astro not installed — reported as its own kind below */
+  }
+
+  const hasDeps = fs.existsSync(path.join(projectPath, 'node_modules'));
+  const nodeOk = nodeVersion ? satisfiesRange(nodeVersion, requires) : false;
+
+  let kind = 'unknown';
+  if (!nodePath) {
+    kind = 'no-node';
+  } else if (!hasDeps || !astroVersion) {
+    kind = 'no-deps';
+  } else if (!nodeOk) {
+    kind = 'node-too-old';
+  }
+
+  return {
+    kind,
+    nodePath,
+    nodeVersion,
+    astroVersion,
+    requires,
+    launchedFromGui: !process.env['SHELL'],
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Git / GitHub IPC
+// ---------------------------------------------------------------------------
+
+ipcMain.handle('git:info', async (_e, projectPath) => {
+  try {
+    await git(projectPath, ['rev-parse', '--is-inside-work-tree']);
+  } catch {
+    return { isRepo: false as const };
+  }
+  const info: GitInfo = {
+    isRepo: true as const,
+    branch: '',
+    branches: [],
+    remote: null,
+    dirty: false,
+    ahead: 0,
+    // Branches holding work that was left behind on the way out, so the
+    // switcher can say where it is rather than making it a thing you have to
+    // remember.
+    parked: [],
+  };
+  info.parked = await readGitParked(projectPath);
+  Object.assign(info, await readGitIdentity(projectPath));
+  try {
+    const listed = (await git(projectPath, ['branch', '--format=%(refname:short)'])).stdout
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    // Git lists branches alphabetically, which puts the trunk wherever its
+    // name happens to fall. But the trunk is not one branch among many — it
+    // is the one you came from and the one you go back to, so it goes first
+    // and the rest keep the order git gave them.
+    const trunk = ['main', 'master'].find((b) => listed.includes(b));
+    info.branches = trunk ? [trunk, ...listed.filter((b) => b !== trunk)] : listed;
+    // Named as well as ordered. Git will delete the trunk as readily as any
+    // other branch — `git branch -d main` succeeds the moment main is merged
+    // into whatever you are standing on — and the branch everything comes back
+    // to is not one to lose to a stray click.
+    info.trunk = trunk || null;
+  } catch {
+    /* empty repo */
+  }
+  try {
+    info.remote = (await git(projectPath, ['remote', 'get-url', 'origin'])).stdout.trim() || null;
+  } catch {
+    info.remote = null;
+  }
+  try {
+    const out = (await git(projectPath, ['status', '--porcelain'])).stdout;
+    // Porcelain v1 is "XY path" — two status columns, a space, then the path
+    // (renames as "old -> new"). Don't trim the line before slicing: the
+    // first column is a space for worktree-only changes.
+    const lines = out.split('\n').filter((l) => l.trim());
+    info.dirty = lines.length > 0;
+    info.dirtyFiles = lines.slice(0, 50).map((l) => {
+      const p = l.slice(3);
+      const arrow = p.lastIndexOf(' -> ');
+      return (arrow === -1 ? p : p.slice(arrow + 4)).replace(/^"|"$/g, '');
+    });
+  } catch {
+    /* ignore */
+  }
+  // Without an upstream there's no count to give — and "0 ahead" would read
+  // as "nothing to push" when in fact the branch has never been pushed at
+  // all, so the two cases have to stay distinguishable.
+  try {
+    await git(projectPath, ['rev-parse', '--abbrev-ref', '@{upstream}']);
+    info.hasUpstream = true;
+  } catch {
+    info.hasUpstream = false;
+  }
+  if (info.hasUpstream) {
+    try {
+      const counts = (
+        await git(projectPath, ['rev-list', '--count', '--left-only', 'HEAD...@{upstream}'])
+      ).stdout.trim();
+      info.ahead = parseInt(counts, 10) || 0;
+    } catch {
+      info.ahead = 0;
+    }
+  }
+  return info;
+});
+
+// Is the GitHub CLI usable? Checked when the publish dialog opens so a
+// missing or logged-out `gh` is stated up front, instead of surfacing as a
+// failure after the user has filled the form in.
+ipcMain.handle('git:ghStatus', async (_e, projectPath) => {
+  try {
+    await run('gh', ['--version'], projectPath);
+  } catch {
+    return { installed: false as const, authed: false as const };
+  }
+  try {
+    // Writes its report to stderr and exits non-zero when logged out.
+    const r = await run('gh', ['auth', 'status'], projectPath);
+    const out = `${r.stdout}${r.stderr}`;
+    const m = out.match(/(?:account|as)\s+([\w-]+)/i);
+    return { installed: true as const, authed: true as const, user: m ? capture(m, 1) : null };
+  } catch {
+    return { installed: true as const, authed: false as const };
+  }
+});
+
+ipcMain.handle('git:init', async (_e, projectPath) => {
+  await git(projectPath, ['init', '-b', 'main']);
+  return { ok: true as const };
+});
+
+// Work in progress, set aside under the branch it belongs to.
+//
+// Git will not switch branches over changes it would have to overwrite, and
+// the usual advice — commit first — asks for a commit that only exists to
+// make git cooperate. So the changes are put away against the branch being
+// left, and taken back out when that branch is next opened. They are never
+// lost and never travel to a branch they were not written on.
+//
+// The tag is what makes this safe: only a stash Stacki wrote is ever restored,
+// so someone's own `git stash` is left alone.
+const parkTag = (branch: string | null) => `stacki:park:${branch}`;
+
+async function isDirty(projectPath: string) {
+  const { stdout } = await git(projectPath, ['status', '--porcelain']);
+  return stdout.trim().length > 0;
+}
+
+// The most recent parking for this branch, as a ref that is still valid right
+// now — stash indices shift as entries come and go, so this is resolved
+// immediately before it is used.
+async function parkedRef(projectPath: string, branch: string | null) {
+  const { stdout } = await git(projectPath, ['stash', 'list', '--format=%gd%x09%gs']);
+  const tag = parkTag(branch);
+  for (const line of stdout.split('\n')) {
+    const [ref, subject] = line.split('\t');
+    if (ref && subject && subject.trim().endsWith(tag)) {
+      return ref.trim();
+    }
+  }
+  return null;
+}
+
+async function park(projectPath: string, branch: string | null) {
+  if (!(await isDirty(projectPath))) {
+    return false;
+  }
+  await git(projectPath, ['stash', 'push', '--include-untracked', '-m', parkTag(branch)]);
+  return true;
+}
+
+async function unpark(projectPath: string, branch: string | null) {
+  const ref = await parkedRef(projectPath, branch);
+  if (!ref) {
+    return { restored: false };
+  }
+  try {
+    await git(projectPath, ['stash', 'pop', ref]);
+    return { restored: true };
+  } catch {
+    // A pop that cannot apply leaves conflict markers in the files. That is a
+    // reasonable state for someone at a terminal and a bad one for an editor
+    // that will parse those files a moment later — the page would read as
+    // broken markup. The tree goes back to the branch as committed, and the
+    // work stays parked, which is the state it was already in. Safe because
+    // the switch left the tree clean, so there is nothing else here to lose.
+    try {
+      await git(projectPath, ['reset', '--hard', 'HEAD']);
+      await git(projectPath, ['clean', '-fd']);
+    } catch {
+      /* nothing better to try */
+    }
+    return {
+      restored: false,
+      error:
+        `Your work on "${branch}" is still parked — it could not be put back automatically ` +
+        'because the branch has changed underneath it. ' +
+        'It is safe: recover it with `git stash list` and `git stash pop`.',
+    };
+  }
+}
+
+// Switching branches. The behaviour, and why it tries before it asks, is in
+// gitBranches.js; park/unpark are handed in because they live here.
+ipcMain.handle('git:checkout', async (_e, { projectPath, branch, create, parkFirst }) => {
+  const r = await switchBranch(git, {
+    projectPath,
+    branch,
+    ...definedFields({ create, parkFirst }),
+    park: async () => park(projectPath, await currentBranch(projectPath)),
+    unpark: (from) => unpark(projectPath, from),
+  });
+  if (!r.ok) {
+    return r;
+  }
+  // Whatever was last left on this branch comes back out, however the switch
+  // was made — that half is always wanted.
+  const back = await unpark(projectPath, branch);
+  return { ...r, parkedFrom: r.parked ? r.from : null, ...back };
+});
+
+async function currentBranch(projectPath: string) {
+  try {
+    return (await git(projectPath, ['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim();
+  } catch {
+    return null;
+  }
+}
+
+// --- Previewing an old version ---------------------------------------------
+//
+// A second, deliberately dumb dev server pointed at a checkout of an old
+// commit (see previewWorktree.js). None of the primary server's machinery
+// applies: a preview is read-only, so it needs no markers, no morph client and
+// no click-to-select — it only has to render. That is `bare` on spawnDevServer,
+// which already exists as the primary server's last-resort path.
+//
+// Kept in its own registry rather than generalising `devServer`, whose daemon
+// detection, external-server adoption and log plumbing are all keyed to there
+// being exactly one.
+const previewServers = new Map<string, PreviewServer>(); // projectPath -> {proc, url, ref, port}
+
+async function stopPreview(projectPath: string) {
+  const cur = previewServers.get(projectPath);
+  if (!cur) {
+    return;
+  }
+  previewServers.delete(projectPath);
+  stopProcessTree(cur.proc);
+  try {
+    await previewWorktree.removeWorktree(git, { projectPath });
+  } catch {
+    /* the checkout is disposable; nothing here is the user's work */
+  }
+}
+
+function stopAllPreviews() {
+  for (const [projectPath] of previewServers) {
+    stopPreview(projectPath);
+  }
+}
+
+ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
+  const dir = await previewWorktree.ensureWorktree(git, { projectPath, ref });
+
+  // A server already up for this project just needs the checkout moved under
+  // it — Vite notices the files changed and reloads, which is far quicker than
+  // starting Astro again for every commit somebody clicks.
+  const running = previewServers.get(projectPath);
+  if (running?.proc && !running.proc.killed) {
+    previewServers.set(projectPath, { ...running, ref });
+    return { url: running.url, ref, reused: true as const };
+  }
+
+  const bin = isWin ? 'astro.cmd' : 'astro';
+  const localBin = path.join(projectPath, 'node_modules', '.bin', bin);
+  if (!fs.existsSync(localBin)) {
+    throw new Error(
+      'This project’s packages aren’t installed, so an older version can’t be shown. ' +
+        'Install them and try again.',
+    );
+  }
+  const port = await findFreePort(4500);
+  if (previewServers.size >= MAIN_LIMITS.previewServersMax) {
+    if (!previewServers.has(projectPath)) {
+      throw new Error('Preview server limit');
+    }
+  }
+  const proc = spawnAstroServer(dir, localBin, [
+    'dev',
+    '--port',
+    String(port),
+    '--host',
+    '127.0.0.1',
+  ]);
+
+  const url = `http://127.0.0.1:${port}`;
+  let log = '';
+  proc.stdout.on('data', (d) => (log = (log + d).slice(-12000)));
+  proc.stderr.on('data', (d) => (log = (log + d).slice(-12000)));
+  const spawnState: { error?: Error } = {};
+  proc.on('error', (error) => {
+    spawnState.error = error;
+  });
+  previewServers.set(projectPath, { proc, url, ref, port });
+  proc.on('exit', () => {
+    if (previewServers.get(projectPath)?.proc === proc) {
+      previewServers.delete(projectPath);
+    }
+  });
+
+  // Wait for it to answer rather than guessing at a delay. An old commit can
+  // need packages that are not installed now, and that shows up as a server
+  // that never comes up — so the failure has to be caught here and explained,
+  // not left as a blank canvas.
+  const deadline = Date.now() + 45000;
+  while (Date.now() < deadline) {
+    if (spawnState.error || proc.exitCode !== null || proc.killed) {
+      break;
+    }
+    if (await serverAlive(url)) {
+      return { url, ref, reused: false as const };
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  await stopPreview(projectPath);
+  // The commonest real cause, said in those terms rather than as a stack trace.
+  const missing = /Cannot find (?:module|package) ['"]?([^'"\s]+)/i.exec(log);
+  throw new Error(
+    missing
+      ? `That version needs ${missing[1]}, which isn’t installed here. ` +
+          'It can’t be shown without it.'
+      : 'That version wouldn’t start. It may need packages that aren’t installed any more.',
+  );
+});
+
+ipcMain.handle('preview:stop', async (_e, { projectPath }) => {
+  await stopPreview(projectPath);
+  return { ok: true as const };
+});
+
+// --- Reading history -------------------------------------------------------
+//
+// The panel gets files already described (see describeFile): "Home" rather
+// than "src/pages/index.astro". Done here rather than in the renderer because
+// this is the side that knows the project's shape, and because it keeps the
+// panel about drawing rather than about interpreting paths.
+
+ipcMain.handle('git:log', async (_e, { projectPath, ref, limit, skip }) =>
+  gitHistory.log(git, definedFields({ projectPath, ref, limit, skip })),
+);
+
+ipcMain.handle('git:commitFiles', async (_e, { projectPath, ref }) =>
+  gitHistory.describeFiles(await gitHistory.commitFiles(git, { projectPath, ref })),
+);
+
+// Every file in the project, with what has happened to each — the file
+// browser's list, and the same status the commit picker reads.
+ipcMain.handle('git:allFiles', async (_e, { projectPath }) =>
+  gitHistory.describeFiles(await gitHistory.allFiles(git, { projectPath })),
+);
+
+ipcMain.handle('git:status', async (_e, { projectPath }) =>
+  gitHistory.describeFiles(await gitHistory.status(git, { projectPath })),
+);
+
+ipcMain.handle('git:fileAt', async (_e, { projectPath, ref, path: filePath }) =>
+  gitHistory.fileAt(git, { projectPath, ref, path: filePath }),
+);
+
+ipcMain.handle('git:worktrees', async (_e, { projectPath }) =>
+  gitHistory.worktrees(git, { projectPath }),
+);
+
+// Setting work aside and picking it back up, on their own. The switch has done
+// this internally for a while; a merge that finds unsaved work in its way needs
+// the same two steps, and the user is the one deciding to take them.
+ipcMain.handle('git:park', async (_e, { projectPath }) => {
+  const branch = await currentBranch(projectPath);
+  const parked = await park(projectPath, branch);
+  return { ok: true as const, parked, branch };
+});
+
+ipcMain.handle('git:unpark', async (_e, { projectPath }) => {
+  const branch = await currentBranch(projectPath);
+  return unpark(projectPath, branch);
+});
+
+ipcMain.handle('git:merge', async (_e, { projectPath, branch }) =>
+  mergeBranch(git, { projectPath, branch }),
+);
+
+// Finishing a merge the user has chosen their way through. The conflicting
+// files come back from git:merge with both versions; this applies the answers.
+ipcMain.handle('git:resolveMerge', async (_e, { projectPath, branch, choices }) =>
+  resolveMerge(git, definedFields({ projectPath, branch, choices })),
+);
+
+ipcMain.handle('git:deleteBranch', async (_e, { projectPath, branch, force }) =>
+  deleteBranch(git, definedFields({ projectPath, branch, force })),
+);
+
+ipcMain.handle('git:commit', async (_e, { projectPath, message, paths }) =>
+  gitSnapshot.commit(git, definedFields({ projectPath, message, paths })),
+);
+
+ipcMain.handle('git:restoreFile', async (_e, { projectPath, ref, path: filePath }) =>
+  gitSnapshot.restoreFile(git, { projectPath, ref, path: filePath }),
+);
+
+// `park` is handed in rather than imported: it lives here, over the stash, and
+// is the reason going back to an old version cannot lose what is on disk now.
+ipcMain.handle('git:restoreProject', async (_e, { projectPath, ref }) => {
+  const branch = await currentBranch(projectPath);
+  return gitSnapshot.restoreProject(git, {
+    projectPath,
+    ref,
+    park: () => park(projectPath, branch),
+  });
+});
+
+ipcMain.handle('git:push', async (_e, { projectPath, branch }) => {
+  await git(projectPath, ['push', '-u', 'origin', branch], { timeout: 120000 });
+  return { ok: true as const };
+});
+
+ipcMain.handle('git:publish', async (_e, { projectPath, repoName, isPrivate }) => {
+  try {
+    await run('gh', ['--version'], projectPath);
+  } catch {
+    throw new Error(
+      'GitHub CLI (gh) is not installed. Install it from https://cli.github.com ' +
+        'and run `gh auth login`.',
+    );
+  }
+  const args = [
+    'repo',
+    'create',
+    repoName,
+    isPrivate ? '--private' : '--public',
+    '--source',
+    '.',
+    '--remote',
+    'origin',
+    '--push',
+  ];
+  const result = await run('gh', args, projectPath, { timeout: 180000 });
+  const output = result.stdout + result.stderr;
+  // gh prints the new repo's URL; fall back to the remote it just set.
+  let url = (output.match(/https:\/\/github\.com\/[^\s"']+/) || [])[0] || null;
+  if (!url) {
+    try {
+      url = (await git(projectPath, ['remote', 'get-url', 'origin'])).stdout.trim() || null;
+    } catch {
+      /* no remote — caller just won't get a link */
+    }
+  }
+  if (url) {
+    url = url.replace(/[.,)]+$/, '').replace(/\.git$/, '');
+  }
+  return { ok: true as const, url, output };
+});
+
+ipcMain.handle('shell:openExternal', async (_e, url) => {
+  if (/^https?:\/\//.test(url)) {
+    shell.openExternal(url);
+  }
+  return { ok: true as const };
+});
+
+function showMessageBox(parent: Window | undefined, options: MessageBoxOptions) {
+  return parent ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options);
+}
+function showOpenDialog(options: OpenDialogOptions) {
+  return mainWindow ? dialog.showOpenDialog(mainWindow, options) : dialog.showOpenDialog(options);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+function capture(match: RegExpMatchArray, index: number): string {
+  const value = match[index];
+  assert(value !== undefined, `Missing required regex group ${index}`);
+  return value;
+}
+function readJson(file: string): unknown {
+  const input: unknown = JSON.parse(readSource(file));
+  return input;
+}
+function parseDataList(input: unknown): unknown[] {
+  const values = toArray(input);
+  if (!values) {
+    throw new Error('Expected collection array');
+  }
+  return values;
+}
+
+function buildViewMenu(): MenuItemConstructorOptions {
+  return isDev
+    ? {
+        label: 'View',
+        submenu: [
+          { label: 'Reload All Code', accelerator: 'CmdOrCtrl+R', click: () => relaunchApp() },
+          {
+            label: 'Reload Window Only',
+            accelerator: 'Shift+CmdOrCtrl+R',
+            click: () => mainWindow?.webContents.reload(),
+          },
+          { type: 'separator' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+          { role: 'resetZoom' },
+          { role: 'zoomIn' },
+          { role: 'zoomOut' },
+          { type: 'separator' },
+          { role: 'togglefullscreen' },
+        ],
+      }
+    : { role: 'viewMenu' };
+}
+
+function readCmsSource(
+  full: string,
+  entryRel: string,
+  options: { readonly page: boolean },
+): CmsFile[] {
+  let source: string;
+  try {
+    if (fs.statSync(full).size > MAX_CMS_BYTES) {
+      return [];
+    }
+    source = readSource(full);
+  } catch {
+    return [];
+  }
+  if (options.page) {
+    const body = frontmatterOf(source);
+    if (!body) {
+      return [];
+    }
+    source = body;
+  } else if (!/export\s+const\s+[A-Za-z_$][\w$]*\s*(?::[^=]+)?=\s*\[/.test(source)) {
+    return [];
+  }
+  const scan = options.page ? PAGE_SCAN : undefined;
+  const metadata = {
+    dir: entryRel,
+    abs: full,
+    fromFile: true,
+    ...(options.page ? { fromPage: true } : {}),
+  };
+  const general = readGeneral(source, scan);
+  const files: CmsFile[] = general
+    ? [{ ...metadata, rel: `${entryRel}#${GENERAL}`, name: 'General', data: general }]
+    : [];
+  for (const collection of findCollections(source, scan)) {
+    if (collection.data) {
+      files.push({
+        ...metadata,
+        rel: `${entryRel}#${collection.name}`,
+        name: collection.name,
+        data: collection.data,
+      });
+    }
+  }
+  return files;
+}
+
+function readCmsJson(full: string, entryRel: string, rel: string, name: string): CmsFile {
+  let file: CmsFile = { rel: entryRel, name, dir: rel, abs: full };
+  try {
+    const stat = fs.statSync(full);
+    file = { ...file, size: stat.size };
+    if (stat.size > MAX_CMS_BYTES) {
+      return { ...file, error: 'This file is too large to edit here (over 2 MB).' };
+    }
+    return { ...file, data: parseData(readJson(full)) };
+  } catch (error) {
+    return {
+      ...file,
+      error: `Not valid JSON — ${errorMessage(error).replace(/\s+in JSON.*$/, '')}`,
+    };
+  }
+}
+
+function listAssetTree(
+  root: string,
+  rel: string,
+  options: { readonly mediaOnly: boolean },
+): AssetEntry[] {
+  const entries: AssetEntry[] = [];
+  // Folders are only worth showing when something is in them, which for src/
+  // means "holds media somewhere below" — otherwise every component folder in
+  // the project would show up as an empty asset folder.
+  const checkDirectory = directoryBudget(root);
+  const walk = (dir: string, rel: string, mediaOnly: boolean): boolean => {
+    let held = false;
+    let names = [];
+    try {
+      names = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    checkDirectory(dir, names.length);
+    for (const entry of names) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+        continue;
+      }
+      const full = path.join(dir, entry.name);
+      const entryRel = `${rel}/${entry.name}`;
+      if (entry.isDirectory()) {
+        const at = entries.length;
+        const placeholder: AssetEntry = {
+          rel: entryRel,
+          name: entry.name,
+          parent: rel,
+          isDir: true,
+          root: rootOfRel(rel),
+        };
+        entries.push(placeholder);
+        const any = walk(full, entryRel, mediaOnly);
+        if (any) {
+          held = true;
+        } else if (mediaOnly) {
+          entries.splice(at, 1);
+        } // nothing below it — not an asset folder
+      } else {
+        if (mediaOnly && !MEDIA_EXT.test(entry.name)) {
+          continue;
+        }
+        let size = 0;
+        try {
+          size = fs.statSync(full).size;
+        } catch {
+          /* race */
+        }
+        held = true;
+        entries.push({
+          rel: entryRel,
+          name: entry.name,
+          parent: rel,
+          isDir: false,
+          size,
+          abs: full,
+          root: rootOfRel(rel),
+        });
+      }
+    }
+    return held;
+  };
+
+  walk(root, rel, options.mediaOnly);
+  return entries;
+}
+
+async function spawnDevServerFailureDetail(projectPath: string, localBin: string) {
+  let log = recentDevLog();
+  try {
+    const [logCmd, logArgs] = nodeCliCommand(localBin, ['dev', 'logs']);
+    const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) =>
+      execFile(logCmd, logArgs, { cwd: projectPath, timeout: 10000 }, (err, so) =>
+        err ? reject(err) : resolve({ stdout: so.toString() }),
+      ),
+    );
+    const tail = stdout.trim().split('\n').slice(-12).join('\n');
+    if (tail) {
+      log += `\n\n— astro dev logs —\n${tail}`;
+    }
+  } catch {
+    /* no daemon logs available */
+  }
+  return log;
+}
+
+async function doDevStartDependencies(projectPath: string, assertActive: () => void) {
+  // Without this the failure is the shim's "env: node: No such file or
+  // directory", which reads like a broken project rather than a missing tool.
+  if (!resolveNodeBin() && !isWin) {
+    throw new Error(
+      'Node.js could not be found. Stacki launched from the Dock only sees the system PATH, ' +
+        'so a Node installed by Homebrew, nvm, fnm, or volta has to be on it. Install Node, ' +
+        'or launch Stacki from a terminal, and try again.',
+    );
+  }
+
+  const binName = isWin ? 'astro.cmd' : 'astro';
+  const localBin = path.join(projectPath, 'node_modules', '.bin', binName);
+  if (!fs.existsSync(localBin)) {
+    // Dependencies missing or incomplete — install with the right PM first.
+    await installDependencies(projectPath);
+    assertActive();
+    send('progress', { message: null });
+    if (!fs.existsSync(localBin)) {
+      throw new Error(
+        'astro is not installed in this project (no node_modules/.bin/astro after install). ' +
+          'Is astro listed in package.json dependencies?',
+      );
+    }
+  }
+
+  return localBin;
+}
+
+function imageSizeWebP(buf: Buffer) {
+  // WebP: VP8 (lossy), VP8L (lossless) and VP8X (extended) each differ.
+  if (
+    buf.length > 30 &&
+    buf.toString('binary', 0, 4) === 'RIFF' &&
+    buf.toString('binary', 8, 12) === 'WEBP'
+  ) {
+    const kind = buf.toString('binary', 12, 16);
+    if (kind === 'VP8 ') {
+      return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };
+    }
+    if (kind === 'VP8L') {
+      const bits = buf.readUInt32LE(21);
+      return { w: (bits & 0x3fff) + 1, h: ((bits >> 14) & 0x3fff) + 1 };
+    }
+    if (kind === 'VP8X') {
+      const w = 1 + buf.readUIntLE(24, 3);
+      const h = 1 + buf.readUIntLE(27, 3);
+      return { w, h };
+    }
+  }
+  return null;
+}
+
+async function readGitIdentity(projectPath: string) {
+  const identity: { branch: string; head: string | null; userEmail: string | null } = {
+    branch: '',
+    head: null,
+    userEmail: null,
+  };
+  try {
+    identity.branch = (await git(projectPath, ['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim();
+  } catch {
+    identity.branch = '(no commits yet)';
+  }
+  try {
+    // What HEAD actually points at. The history panel reloads when this moves,
+    // which is how a commit made from the chip shows up in the timeline
+    // without the panel having to know the chip exists.
+    identity.head = (await git(projectPath, ['rev-parse', 'HEAD'])).stdout.trim();
+  } catch {
+    identity.head = null; // no commits yet
+  }
+  try {
+    // Whose commits are "yours". Git records an author on every commit, and on
+    // your own machine that is nearly always you — "Timothy Ricks changed the
+    // hero" reads oddly about yourself.
+    identity.userEmail = (await git(projectPath, ['config', 'user.email'])).stdout.trim() || null;
+  } catch {
+    identity.userEmail = null;
+  }
+  return identity;
+}
+
+// Keep static generated source outside functions so the assembly stays reviewable.
+const MARKER_CONFIG_PARTS = [
+  `// Generated by Stacki (dev preview only) — do not edit.
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync } from 'node:fs';
-${userCfg ? `import userConfig from '../../${userCfg}';` : 'const userConfig = {};'}
+`,
+  `
 
 const require = createRequire(import.meta.url);
-const { parsePage, serializePageMarked, resolveChunks, markChunkHtml } = require(${JSON.stringify(
-      parserPath
-    )});
-const PROJECT_DIRS = ${JSON.stringify(projectDirs)};
+const { parsePage, serializePageMarked, resolveChunks, markChunkHtml } = require(`,
+  `);
+const PROJECT_DIRS = `,
+  `;
 
 // Nothing this serves is a child of anything. Every marker is a comment —
 // invisible to selectors, to layout and to the box model — and the patcher
@@ -3432,7 +5285,8 @@ const avbMorph = {
     return null;
   },
   load(id) {
-    return id === '\0virtual:avb-morph' ? ${JSON.stringify(MORPH_CLIENT)} : null;
+    return id === '\0virtual:avb-morph' ? `,
+  ` : null;
   },
   // Vite reapplies a page's extracted stylesheet whenever its .astro file
   // changes, whether or not a single character of that CSS is different. The
@@ -3470,7 +5324,8 @@ const avbMorph = {
   },
 };
 
-const AVB_MORPH_TAG = ${JSON.stringify(MORPH_TAG_HTML)};
+const AVB_MORPH_TAG = `,
+  `;
 
 const avbMarkers = {
   name: 'avb-node-markers',
@@ -3623,15 +5478,12 @@ const avbPreviewRoute = {
       }
     },
     'astro:config:setup': ({ injectRoute }) => {
-      injectRoute({ pattern: '/__avb/preview', entrypoint: ${JSON.stringify(
-        toPosix(path.join(dir, 'preview.astro'))
-      )} });
-      injectRoute({ pattern: '/__avb/paths', entrypoint: ${JSON.stringify(
-        toPosix(path.join(dir, 'paths.js'))
-      )} });
-      injectRoute({ pattern: '/__avb/data', entrypoint: ${JSON.stringify(
-        toPosix(path.join(dir, 'data.js'))
-      )} });
+      injectRoute({ pattern: '/__avb/preview', entrypoint: `,
+  ` });
+      injectRoute({ pattern: '/__avb/paths', entrypoint: `,
+  ` });
+      injectRoute({ pattern: '/__avb/data', entrypoint: `,
+  ` });
     },
   },
 };
@@ -3662,1080 +5514,30 @@ export default {
     plugins: [avbMarkers, avbMorph, ...((base.vite && base.vite.plugins) || [])],
   },
 };
-`;
-    const cfgPath = path.join(dir, 'astro.config.mjs');
-    fs.writeFileSync(cfgPath, cfg);
-    fs.writeFileSync(path.join(dir, 'preview.astro'), PREVIEW_PAGE);
-    fs.writeFileSync(path.join(dir, 'paths.js'), PATHS_ENDPOINT);
-    fs.writeFileSync(path.join(dir, 'data.js'), DATA_ENDPOINT);
-    // This file is assembled here and handed to Astro as its config. If it
-    // will not parse, Astro does not start, and the project gets no preview at
-    // all — the editor's own canvas broken by the editor's own scaffolding,
-    // over something the project never asked for. Read it back the way node
-    // will and say no rather than hand over something that cannot load: the
-    // caller falls back to a plain dev server, which costs the outlines and
-    // the live patching and keeps everything else working.
-    if (!parsesAsModule(cfgPath)) {
-      pushDevLog(
-        '\n[stacki] the generated preview config did not parse; starting the dev ' +
-          'server without it. Outlines and live updates are off for this session.\n'
-      );
-      return null;
-    }
-    return cfgPath;
-  } catch {
-    return null; // preview still works, just without outlines
-  }
+`,
+] as const;
+
+function renderMarkerConfig(values: readonly string[]): string {
+  assert(values.length + 1 === MARKER_CONFIG_PARTS.length, 'Marker template interpolation count');
+  const source = MARKER_CONFIG_PARTS.map((part, index) => part + (values[index] ?? '')).join('');
+  assert(source.startsWith('// Generated by Stacki'), 'Marker config must retain its header');
+  return source;
 }
 
-async function spawnDevServer(projectPath, localBin, force, bare, assertActive) {
-  const port = await findFreePort(4321);
-  assertActive();
-  const args = ['dev', '--port', String(port), '--host', '127.0.0.1'];
-  // Astro resolves --config against the project root and rejects absolute
-  // paths ([ConfigNotFound]), so pass it relative to the spawn cwd.
-  // `bare` is the last resort: the project's own config, none of this app's,
-  // so a preview still comes up even if what this app generates cannot run.
-  const markerCfg = bare ? null : writeMarkerConfig(projectPath);
-  if (markerCfg) {args.push('--config', toPosix(path.relative(projectPath, markerCfg)));}
-  if (force) {args.push('--force');}
-
-  const proc = spawnAstroServer(projectPath, localBin, args);
-
-  const url = `http://127.0.0.1:${port}`;
-  devServer = { proc, url, projectPath, bin: localBin };
-
-  proc.stdout.on('data', (d) => pushDevLog(d.toString()));
-  proc.stderr.on('data', (d) => pushDevLog(d.toString()));
-  proc.on('error', (err) => {
-    pushDevLog(`\n[spawn error] ${err.message}\n`);
-    if (devServer?.proc === proc) {devServer = null;}
-  });
-  proc.on('exit', (code) => {
-    if (devServer && devServer.proc === proc) {
-      // Astro >= 7 daemonizes: the CLI exits 0 after forking the real server
-      // into a background process. That's a success, not a failure.
-      const running = recentDevLog().match(
-        /Dev server running at (https?:\/\/[^\s"\\)]+)/i
-      );
-      if (code === 0 && running) {
-        devServer = { proc: null, url, projectPath, daemon: true, bin: localBin };
-      } else {
-        devServer = null;
-        send('dev:exit', { code, log: recentDevLog() });
-      }
-    }
-  });
-
-  // The daemon's own failure reasons only land in `astro dev logs`.
-  const failureDetail = async () => {
-    let log = recentDevLog();
-    try {
-      const [logCmd, logArgs] = nodeCliCommand(localBin, ['dev', 'logs']);
-      const { stdout } = await new Promise((resolve, reject) =>
-        execFile(logCmd, logArgs, { cwd: projectPath, timeout: 10000 }, (err, so) =>
-          err ? reject(err) : resolve({ stdout: so.toString() })
-        )
-      );
-      const tail = stdout.trim().split('\n').slice(-12).join('\n');
-      if (tail) {log += `\n\n— astro dev logs —\n${tail}`;}
-    } catch {
-      /* no daemon logs available */
-    }
-    return log;
-  };
-
-  // Wait until the port answers so the iframe doesn't load into a dead server.
-  const deadline = Date.now() + 60000;
-  while (Date.now() < deadline) {
-    assertActive();
-    if (!devServer) {
-      throw new Error('Dev server exited before it was ready.\n\n' + (await failureDetail()));
-    }
-    if (await portAnswers(port)) {
-      assertActive();
-      return url;
-    }
-    await new Promise((r) => setTimeout(r, 300));
-  }
-  throw new Error('Astro dev server did not start within 60 seconds.\n\n' + (await failureDetail()));
-}
-
-// Probes the URL's port on its hostname plus both loopback families —
-// on macOS "localhost" may resolve to ::1 while the server listens on IPv4.
-async function serverAlive(urlString) {
-  const u = new URL(urlString);
-  const port = Number(u.port || 80);
-  for (const host of [u.hostname, '127.0.0.1', '::1']) {
-    if (await portAnswers(port, host)) {return true;}
-  }
-  return false;
-}
-
-// Astro's daemon lock file (.astro/dev.json) — the source of truth for an
-// already-running background server, regardless of who started it.
-function readAstroLock(projectPath) {
-  try {
-    const data = JSON.parse(
-      fs.readFileSync(path.join(projectPath, '.astro', 'dev.json'), 'utf8')
-    );
-    if (data && data.url) {return data;}
-  } catch {
-    /* no lock */
-  }
-  return null;
-}
-
-// Serialize dev:start calls — concurrent spawns race Astro's daemon lock and
-// the loser dies with "exited before becoming ready".
-const devStarts = createKeyedQueue();
-
-ipcMain.handle('dev:start', (_e, projectPath) => {
-  captureEra++;
-  return devStarts.run(projectPath, async (assertActive) => {
-    const result = await doDevStart(projectPath, assertActive);
-    assertActive();
-    scheduleThumb(projectPath, 6000);
-    return { ...result, trailingSlash: readTrailingSlash(projectPath) };
-  });
-});
-
-async function doDevStart(projectPath, assertActive) {
-  assertActive();
-  if (devServer && devServer.projectPath === projectPath) {
-    // For adopted external servers, make sure it's still alive.
-    if (devServer.external) {
-      const current = devServer;
-      if (await serverAlive(current.url)) {
-        assertActive();
-        return { url: current.url, external: true };
-      }
-      devServer = null;
-    } else {
-      return { url: devServer.url };
-    }
-  }
-  assertActive();
-  stopDevServer(false);
-  devLogBuffer = [];
-
-  // Without this the failure is the shim's "env: node: No such file or
-  // directory", which reads like a broken project rather than a missing tool.
-  if (!resolveNodeBin() && !isWin) {
-    throw new Error(
-      'Node.js could not be found. Stacki launched from the Dock only sees the system PATH, ' +
-        'so a Node installed by Homebrew, nvm, fnm, or volta has to be on it. Install Node, ' +
-        'or launch Stacki from a terminal, and try again.'
-    );
-  }
-
-  const binName = isWin ? 'astro.cmd' : 'astro';
-  const localBin = path.join(projectPath, 'node_modules', '.bin', binName);
-  if (!fs.existsSync(localBin)) {
-    // Dependencies missing or incomplete — install with the right PM first.
-    await installDependencies(projectPath);
-    assertActive();
-    send('progress', { message: null });
-    if (!fs.existsSync(localBin)) {
-      throw new Error('astro is not installed in this project (no node_modules/.bin/astro after install). Is astro listed in package.json dependencies?');
-    }
-  }
-
-  // A lock file means a daemon exists (possibly stale, possibly started
-  // without the app's marker config) — pass --force so ours replaces it.
-  let lastErr = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const force = attempt > 0 || !!readAstroLock(projectPath);
-    try {
-      // Retry with --force: first-attempt daemon startup can flake (stale
-      // daemon state, vite re-optimizing after a config change).
-      return { url: await spawnDevServer(projectPath, localBin, force, false, assertActive) };
-    } catch (err) {
-      assertActive();
-      lastErr = err;
-      stopDevServer(false);
-      // Another dev server already running for this project?
-      const existing = parseExistingServer(recentDevLog());
-      if (existing) {
-        const alive = await serverAlive(existing);
-        assertActive();
-        if (alive) {
-          // Adopt the user's own server instead of fighting it.
-          devServer = { proc: null, url: existing, projectPath, external: true };
-          return { url: existing, external: true };
-        }
-      }
-      devLogBuffer = [];
-      await new Promise((r) => setTimeout(r, 800));
-      assertActive();
-    }
-  }
-  // Everything above ran with this app's generated config. A project whose
-  // preview will not come up is worse than one without outlines, so try once
-  // more on the project's own config before giving up. What starts here has no
-  // markers and no live patching — an edit reloads the page, the way it did
-  // before any of this — but the canvas is a canvas again.
-  try {
-    const url = await spawnDevServer(projectPath, localBin, true, true, assertActive);
-    pushDevLog(
-      '\n[stacki] the preview would not start with this app\'s config, so it is ' +
-        'running on the project\'s own. Outlines and live updates are off; the ' +
-        'log above says why.\n'
-    );
-    if (devServer) {devServer.bare = true;}
-    return { url, bare: true };
-  } catch {
-    assertActive();
-    stopDevServer(false);
-    throw lastErr; // report the first failure: it is the one that explains it
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Style sources
-//
-// Where the style panel can author CSS: every stylesheet in the project, plus
-// (added on the renderer side) the <style> blocks on the current page and in
-// its components. Anything under node_modules, dist or the app's own generated
-// config is skipped — those aren't the author's to edit.
-// ---------------------------------------------------------------------------
-
-// Same containment rule the asset protocol uses: the style panel writes only
-// inside the project that is currently open.
-function assertInProject(filePath) {
-  const abs = path.resolve(String(filePath || ""));
-  if (!openProjectRoot || !(abs + path.sep).startsWith(openProjectRoot + path.sep)) {
-    throw new Error("Refusing to touch a file outside the open project.");
-  }
-  return abs;
-}
-
-const CSS_SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.astro', 'release', '.avb']);
-
-function listCssFiles(root) {
-  const out = [];
-  const walk = (dir, rel) => {
-    let entries;
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.name.startsWith('.') && entry.name !== '.') {continue;}
-      const full = path.join(dir, entry.name);
-      const relPath = rel ? `${rel}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) {
-        if (CSS_SKIP_DIRS.has(entry.name)) {continue;}
-        walk(full, relPath);
-      } else if (/\.(css|scss|sass|less)$/i.test(entry.name)) {
-        let size = 0;
-        try {
-          size = fs.statSync(full).size;
-        } catch {
-          /* unreadable — still list it, the read will report the error */
-        }
-        out.push({ rel: toPosix(relPath), name: entry.name, path: full, size });
-      }
-    }
-  };
-  walk(root, '');
-  // Shallow paths first (src/styles/global.css before a deeply nested partial),
-  // then alphabetical — the file you want is usually near the top of the tree.
-  return out.sort((a, b) => {
-    const da = a.rel.split('/').length;
-    const db = b.rel.split('/').length;
-    return da - db || a.rel.localeCompare(b.rel);
-  });
-}
-
-ipcMain.handle('style:listFiles', async (_e, projectPath) => {
-  if (!projectPath) {return { files: [] };}
-  return { files: listCssFiles(projectPath) };
-});
-
-// A component's `<style is:global>` is page CSS. Astro leaves those rules
-// unhashed, so they style whatever the page renders — including elements that
-// live in a different file from the one being edited, which is exactly the case
-// the style panel used to be blind to. Scoped `<style>` blocks are deliberately
-// left out: Astro hashes them to their own component's elements, so their rules
-// can't reach a selection made from another file.
-const ASTRO_GLOBAL_STYLE = /<style\b[^>]*\bis:global\b[^>]*>/i;
-const ASTRO_SCAN_LIMIT = 512 * 1024; // a .astro file this big isn't a component
-
-function listAstroStyleFiles(root) {
-  const out = [];
-  const walk = (dir, rel) => {
-    let entries;
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.name.startsWith('.')) {continue;}
-      const full = path.join(dir, entry.name);
-      const relPath = rel ? `${rel}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) {
-        if (CSS_SKIP_DIRS.has(entry.name)) {continue;}
-        walk(full, relPath);
-        continue;
-      }
-      if (!/\.astro$/i.test(entry.name)) {continue;}
-      try {
-        const { size } = fs.statSync(full);
-        if (size > ASTRO_SCAN_LIMIT) {continue;}
-        if (!ASTRO_GLOBAL_STYLE.test(fs.readFileSync(full, 'utf8'))) {continue;}
-        out.push({ rel: toPosix(relPath), name: entry.name, path: full, size });
-      } catch {
-        /* unreadable — nothing to offer for it */
-      }
-    }
-  };
-  // Only src/: components elsewhere aren't part of the page's CSS, and this
-  // keeps the scan off node_modules and build output entirely.
-  walk(path.join(root, 'src'), 'src');
-  return out.sort((a, b) => a.rel.localeCompare(b.rel));
-}
-
-ipcMain.handle('style:listAstroStyles', async (_e, projectPath) => {
-  if (!projectPath) {return { files: [] };}
-  return { files: listAstroStyleFiles(projectPath) };
-});
-
-ipcMain.handle('style:readFile', async (_e, filePath) => {
-  const abs = assertInProject(filePath);
-  return { css: fs.readFileSync(abs, 'utf8') };
-});
-
-ipcMain.handle('style:writeFile', async (_e, { filePath, css }) => {
-  const abs = assertInProject(filePath);
-  markSelfWrite(abs); // the watcher must not treat our own write as external
-  fs.writeFileSync(abs, css, 'utf8');
-  return { ok: true };
-});
-
-// ---------------------------------------------------------------------------
-// Source files behind a symbol
-// ---------------------------------------------------------------------------
-
-// tsconfig/jsconfig `paths` for the open project, as [prefix, [targets]] with
-// the trailing /* stripped. Astro's own config is extended, not read: only the
-// project's aliases matter here, and those live in its own file.
-function projectAliases(projectPath) {
-  for (const name of ['tsconfig.json', 'jsconfig.json']) {
-    const file = path.join(projectPath, name);
-    if (!fs.existsSync(file)) {continue;}
-    try {
-      // Config files allow comments and trailing commas; strip both rather
-      // than pulling in a JSON5 parser for one field.
-      const raw = fs
-        .readFileSync(file, 'utf8')
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .replace(/(^|[^:])\/\/.*$/gm, '$1')
-        .replace(/,(\s*[}\]])/g, '$1');
-      const json = JSON.parse(raw);
-      const paths = json?.compilerOptions?.paths;
-      if (!paths) {continue;}
-      return Object.entries(paths).map(([k, v]) => [
-        k.replace(/\*$/, ''),
-        (Array.isArray(v) ? v : [v]).map((t) => String(t).replace(/\*$/, '')),
-      ]);
-    } catch {
-      // A malformed config just means no aliases.
-    }
-  }
-  return [];
-}
-
-const SRC_EXTS = ['', '.ts', '.js', '.mjs', '.mts', '.tsx', '.jsx', '.json', '.astro'];
-
-function firstExisting(base) {
-  for (const ext of SRC_EXTS) {
-    const p = base + ext;
-    if (fs.existsSync(p) && fs.statSync(p).isFile()) {return p;}
-  }
-  for (const ext of SRC_EXTS.slice(1)) {
-    const p = path.join(base, 'index' + ext);
-    if (fs.existsSync(p) && fs.statSync(p).isFile()) {return p;}
-  }
-  return null;
-}
-
-// The file an import specifier points at: relative paths, project aliases
-// (`@/consts.ts`), and the usual extension guessing. Bare package names
-// resolve to nothing — node_modules isn't the user's code to edit.
-function resolveImportPath(projectPath, fromFile, spec) {
-  const s = String(spec || '');
-  if (!s) {return null;}
-  if (s.startsWith('.')) {
-    return firstExisting(path.resolve(path.dirname(fromFile), s));
-  }
-  for (const [prefix, targets] of projectAliases(projectPath)) {
-    if (!prefix || !s.startsWith(prefix)) {continue;}
-    const rest = s.slice(prefix.length);
-    for (const target of targets) {
-      const found = firstExisting(path.resolve(projectPath, target, rest));
-      if (found) {return found;}
-    }
-  }
-  if (s.startsWith('/')) {return firstExisting(path.join(projectPath, s.slice(1)));}
-  return null;
-}
-
-// 1-based line of `name`'s top-level declaration, so the editor can open on it.
-function declarationLine(text, name) {
-  if (!name) {return 0;}
-  const re = new RegExp(
-    // `[ \t]*`, not `\s*`: with the m flag `\s` eats the newlines before the
-    // declaration, and the match would start on a blank line above it.
-    `^[ \\t]*(?:export\\s+)?(?:const|let|var|function|class)\\s+${String(name).replace(/[^\w$]/g, '')}\\b`,
-    'm'
-  );
-  const m = re.exec(text);
-  if (!m) {return 0;}
-  return text.slice(0, m.index).split('\n').length;
-}
-
-// Opens the file an imported symbol comes from. `fromFile` is the file doing
-// the importing, so relative specifiers resolve the way the bundler sees them.
-ipcMain.handle('src:readSymbol', async (_e, { projectPath, fromFile, spec, name }) => {
-  if (!projectPath || !fromFile) {return { ok: false };}
-  const abs = resolveImportPath(projectPath, path.resolve(fromFile), spec);
-  if (!abs) {return { ok: false, reason: 'not-found' };}
-  assertInProject(abs);
-  const stat = fs.statSync(abs);
-  if (stat.size > MAX_EDITABLE_BYTES) {return { ok: false, reason: 'too-large' };}
-  const text = fs.readFileSync(abs, 'utf8');
-  return {
-    ok: true,
-    rel: path.relative(projectPath, abs),
-    text,
-    line: declarationLine(text, name),
-  };
-});
-
-// Where an import points, as a project-relative path. Same resolution as
-// src:readSymbol, but it never reads the file — the callers here are asking
-// about images, and their bytes are none of this channel's business.
-ipcMain.handle('src:resolvePath', async (_e, { projectPath, fromFile, spec }) => {
-  if (!projectPath || !fromFile) {return { ok: false };}
-  const abs = resolveImportPath(projectPath, path.resolve(fromFile), spec);
-  if (!abs) {return { ok: false };}
-  assertInProject(abs);
-  return { ok: true, rel: toPosix(path.relative(projectPath, abs)) };
-});
-
-// An image's pixel size, read from the file's own header.
-//
-// Astro takes the intrinsic size straight from a local asset — only a remote
-// source gets `inferSize`. So a width/height field over a project file should
-// say what that size IS, and to do that the app has to know it without waiting
-// for a thumbnail somewhere to finish decoding.
-function imageSizeOf(abs) {
-  let fd;
-  try {
-    fd = fs.openSync(abs, 'r');
-    const head = Buffer.alloc(32768);
-    const read = fs.readSync(fd, head, 0, head.length, 0);
-    const buf = head.subarray(0, read);
-
-    // PNG: IHDR is always the first chunk.
-    if (buf.length > 24 && buf.toString('binary', 1, 4) === 'PNG') {
-      return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
-    }
-    // GIF: little-endian in the logical screen descriptor.
-    if (buf.length > 10 && buf.toString('binary', 0, 3) === 'GIF') {
-      return { w: buf.readUInt16LE(6), h: buf.readUInt16LE(8) };
-    }
-    // WebP: VP8 (lossy), VP8L (lossless) and VP8X (extended) each differ.
-    if (buf.length > 30 && buf.toString('binary', 0, 4) === 'RIFF' && buf.toString('binary', 8, 12) === 'WEBP') {
-      const kind = buf.toString('binary', 12, 16);
-      if (kind === 'VP8 ') {return { w: buf.readUInt16LE(26) & 0x3fff, h: buf.readUInt16LE(28) & 0x3fff };}
-      if (kind === 'VP8L') {
-        const bits = buf.readUInt32LE(21);
-        return { w: (bits & 0x3fff) + 1, h: ((bits >> 14) & 0x3fff) + 1 };
-      }
-      if (kind === 'VP8X') {
-        const w = 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16));
-        const h = 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16));
-        return { w, h };
-      }
-    }
-    // JPEG: walk the segments to the start-of-frame, which carries the size.
-    if (buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8) {
-      let at = 2;
-      while (at + 9 < buf.length) {
-        if (buf[at] !== 0xff) { at += 1; continue; }
-        const marker = buf[at + 1];
-        const len = buf.readUInt16BE(at + 2);
-        // SOF0…SOF15, minus the four that aren't frame headers.
-        if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc, 0xd8].includes(marker)) {
-          return { h: buf.readUInt16BE(at + 5), w: buf.readUInt16BE(at + 7) };
-        }
-        at += 2 + len;
-      }
-    }
-    // SVG: width/height when they're absolute, else the viewBox's own units.
-    if (/\.svg$/i.test(abs)) {
-      const text = buf.toString('utf8');
-      const tag = text.match(/<svg\b[^>]*>/i)?.[0] || '';
-      const num = (name) => {
-        const raw = tag.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']+)["']`, 'i'))?.[1];
-        return raw && /^[\d.]+(px)?$/i.test(raw.trim()) ? Math.round(parseFloat(raw)) : null;
-      };
-      const w = num('width');
-      const h = num('height');
-      if (w && h) {return { w, h };}
-      const box = tag.match(/\bviewBox\s*=\s*["']\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)/i);
-      if (box) {return { w: Math.round(parseFloat(box[1])), h: Math.round(parseFloat(box[2])) };}
-    }
-  } catch {
-    /* unreadable or a format we don't decode — the caller falls back */
-  } finally {
-    if (fd !== undefined) {try { fs.closeSync(fd); } catch { /* already gone */ }}
-  }
-  return null;
-}
-
-ipcMain.handle('assets:dimensions', async (_e, { projectPath, rel }) => {
-  const abs = assertInProject(path.resolve(projectPath, rel));
-  return { dims: imageSizeOf(abs) };
-});
-
-ipcMain.handle('src:readText', async (_e, { projectPath, rel }) => {
-  const abs = assertInProject(path.resolve(projectPath, rel));
-  return { text: fs.readFileSync(abs, 'utf8') };
-});
-
-ipcMain.handle('src:writeText', async (_e, { projectPath, rel, text }) => {
-  const abs = assertInProject(path.resolve(projectPath, rel));
-  markSelfWrite(abs);
-  fs.writeFileSync(abs, text, 'utf8');
-  return { ok: true };
-});
-
-ipcMain.handle('dev:stop', async () => {
-  stopDevServer();
-  return { ok: true };
-});
-
-// ---------------------------------------------------------------------------
-// Why the dev server won't start
-//
-// A raw Astro log tells a user nothing actionable. Nearly every failure that
-// isn't the project's own code is one of: no Node at all, a Node too old for
-// the version of Astro the project pins, or dependencies never installed —
-// so name which one it is and what the project actually needs.
-// ---------------------------------------------------------------------------
-
-// engines.node ranges as they're actually written ("18.20.8 || ^20.3.0 ||
-// >=22.0.0", ">=22.12.0"). Anything this can't parse counts as satisfied:
-// the point is to explain a failure that already happened, never to block a
-// launch over a range we couldn't read.
-function satisfiesRange(version, range) {
-  if (!version || !range) {return true;}
-  const parse = (v) => {
-    const m = /(\d+)\.(\d+)\.(\d+)/.exec(String(v));
-    return m ? [+m[1], +m[2], +m[3]] : null;
-  };
-  const cur = parse(version);
-  if (!cur) {return true;}
-  const cmp = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
-  return range.split('||').some((partRaw) => {
-    const part = partRaw.trim();
-    const target = parse(part);
-    if (!target) {return true;} // "*", "latest", something exotic — don't judge
-    if (part.startsWith('>=')) {return cmp(cur, target) >= 0;}
-    if (part.startsWith('>')) {return cmp(cur, target) > 0;}
-    if (part.startsWith('^')) {return cur[0] === target[0] && cmp(cur, target) >= 0;}
-    if (part.startsWith('~')) {return cur[0] === target[0] && cur[1] === target[1] && cmp(cur, target) >= 0;}
-    return cmp(cur, target) === 0;
-  });
-}
-
-function nodeVersionOf(bin) {
-  try {
-    return execFileSync(bin, ['--version'], {
-      encoding: 'utf8',
-      timeout: 5000,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-  } catch {
-    return null;
-  }
-}
-
-ipcMain.handle('dev:probe', (_e, url) => probeUrl(url));
-
-ipcMain.handle('dev:diagnose', async (_e, projectPath) => {
-  const nodePath = resolveNodeBin();
-  const nodeVersion = nodePath ? nodeVersionOf(nodePath) : null;
-
-  let astroVersion = null;
-  let requires = null;
-  try {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.join(projectPath, 'node_modules', 'astro', 'package.json'), 'utf8')
-    );
-    astroVersion = pkg.version || null;
-    requires = (pkg.engines && pkg.engines.node) || null;
-  } catch {
-    /* astro not installed — reported as its own kind below */
-  }
-
-  const hasDeps = fs.existsSync(path.join(projectPath, 'node_modules'));
-  const nodeOk = nodeVersion ? satisfiesRange(nodeVersion, requires) : false;
-
-  let kind = 'unknown';
-  if (!nodePath) {kind = 'no-node';}
-  else if (!hasDeps || !astroVersion) {kind = 'no-deps';}
-  else if (!nodeOk) {kind = 'node-too-old';}
-
-  return { kind, nodePath, nodeVersion, astroVersion, requires, launchedFromGui: !process.env.SHELL };
-});
-
-// ---------------------------------------------------------------------------
-// Git / GitHub IPC
-// ---------------------------------------------------------------------------
-
-ipcMain.handle('git:info', async (_e, projectPath) => {
-  try {
-    await git(projectPath, ['rev-parse', '--is-inside-work-tree']);
-  } catch {
-    return { isRepo: false };
-  }
-  const info = {
-    isRepo: true,
-    branch: '',
-    branches: [],
-    remote: null,
-    dirty: false,
-    ahead: 0,
-    // Branches holding work that was left behind on the way out, so the
-    // switcher can say where it is rather than making it a thing you have to
-    // remember.
-    parked: [],
-  };
+async function readGitParked(projectPath: string): Promise<string[]> {
   try {
     const { stdout } = await git(projectPath, ['stash', 'list', '--format=%gs']);
     const tag = /stacki:park:(.+)$/;
-    info.parked = [
+    return [
       ...new Set(
         stdout
           .split('\n')
           .map((l) => (l.match(tag) || [])[1])
-          .filter(Boolean)
-          .map((b) => b.trim())
+          .filter((branch): branch is string => branch !== undefined)
+          .map((b) => b.trim()),
       ),
     ];
   } catch {
-    /* no stashes, or not a repo yet */
-  }
-  try {
-    info.branch = (await git(projectPath, ['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim();
-  } catch {
-    info.branch = '(no commits yet)';
-  }
-  try {
-    // What HEAD actually points at. The history panel reloads when this moves,
-    // which is how a commit made from the chip shows up in the timeline
-    // without the panel having to know the chip exists.
-    info.head = (await git(projectPath, ['rev-parse', 'HEAD'])).stdout.trim();
-  } catch {
-    info.head = null; // no commits yet
-  }
-  try {
-    // Whose commits are "yours". Git records an author on every commit, and on
-    // your own machine that is nearly always you — "Timothy Ricks changed the
-    // hero" reads oddly about yourself.
-    info.userEmail = (await git(projectPath, ['config', 'user.email'])).stdout.trim() || null;
-  } catch {
-    info.userEmail = null;
-  }
-  try {
-    const listed = (await git(projectPath, ['branch', '--format=%(refname:short)'])).stdout
-      .split('\n')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    // Git lists branches alphabetically, which puts the trunk wherever its
-    // name happens to fall. But the trunk is not one branch among many — it
-    // is the one you came from and the one you go back to, so it goes first
-    // and the rest keep the order git gave them.
-    const trunk = ['main', 'master'].find((b) => listed.includes(b));
-    info.branches = trunk ? [trunk, ...listed.filter((b) => b !== trunk)] : listed;
-    // Named as well as ordered. Git will delete the trunk as readily as any
-    // other branch — `git branch -d main` succeeds the moment main is merged
-    // into whatever you are standing on — and the branch everything comes back
-    // to is not one to lose to a stray click.
-    info.trunk = trunk || null;
-  } catch {
-    /* empty repo */
-  }
-  try {
-    info.remote = (await git(projectPath, ['remote', 'get-url', 'origin'])).stdout.trim() || null;
-  } catch {
-    info.remote = null;
-  }
-  try {
-    const out = (await git(projectPath, ['status', '--porcelain'])).stdout;
-    // Porcelain v1 is "XY path" — two status columns, a space, then the path
-    // (renames as "old -> new"). Don't trim the line before slicing: the
-    // first column is a space for worktree-only changes.
-    const lines = out.split('\n').filter((l) => l.trim());
-    info.dirty = lines.length > 0;
-    info.dirtyFiles = lines.slice(0, 50).map((l) => {
-      const p = l.slice(3);
-      const arrow = p.lastIndexOf(' -> ');
-      return (arrow === -1 ? p : p.slice(arrow + 4)).replace(/^"|"$/g, '');
-    });
-  } catch {
-    /* ignore */
-  }
-  // Without an upstream there's no count to give — and "0 ahead" would read
-  // as "nothing to push" when in fact the branch has never been pushed at
-  // all, so the two cases have to stay distinguishable.
-  try {
-    await git(projectPath, ['rev-parse', '--abbrev-ref', '@{upstream}']);
-    info.hasUpstream = true;
-  } catch {
-    info.hasUpstream = false;
-  }
-  if (info.hasUpstream) {
-    try {
-      const counts = (
-        await git(projectPath, ['rev-list', '--count', '--left-only', 'HEAD...@{upstream}'])
-      ).stdout.trim();
-      info.ahead = parseInt(counts, 10) || 0;
-    } catch {
-      info.ahead = 0;
-    }
-  }
-  return info;
-});
-
-// Is the GitHub CLI usable? Checked when the publish dialog opens so a
-// missing or logged-out `gh` is stated up front, instead of surfacing as a
-// failure after the user has filled the form in.
-ipcMain.handle('git:ghStatus', async (_e, projectPath) => {
-  try {
-    await run('gh', ['--version'], projectPath);
-  } catch {
-    return { installed: false, authed: false };
-  }
-  try {
-    // Writes its report to stderr and exits non-zero when logged out.
-    const r = await run('gh', ['auth', 'status'], projectPath);
-    const out = `${r.stdout}${r.stderr}`;
-    const m = out.match(/(?:account|as)\s+([\w-]+)/i);
-    return { installed: true, authed: true, user: m ? m[1] : null };
-  } catch {
-    return { installed: true, authed: false };
-  }
-});
-
-ipcMain.handle('git:init', async (_e, projectPath) => {
-  await git(projectPath, ['init', '-b', 'main']);
-  return { ok: true };
-});
-
-// Work in progress, set aside under the branch it belongs to.
-//
-// Git will not switch branches over changes it would have to overwrite, and
-// the usual advice — commit first — asks for a commit that only exists to
-// make git cooperate. So the changes are put away against the branch being
-// left, and taken back out when that branch is next opened. They are never
-// lost and never travel to a branch they were not written on.
-//
-// The tag is what makes this safe: only a stash Stacki wrote is ever restored,
-// so someone's own `git stash` is left alone.
-const parkTag = (branch) => `stacki:park:${branch}`;
-
-async function isDirty(projectPath) {
-  const { stdout } = await git(projectPath, ['status', '--porcelain']);
-  return stdout.trim().length > 0;
-}
-
-// The most recent parking for this branch, as a ref that is still valid right
-// now — stash indices shift as entries come and go, so this is resolved
-// immediately before it is used.
-async function parkedRef(projectPath, branch) {
-  const { stdout } = await git(projectPath, ['stash', 'list', '--format=%gd%x09%gs']);
-  const tag = parkTag(branch);
-  for (const line of stdout.split('\n')) {
-    const [ref, subject] = line.split('\t');
-    if (ref && subject && subject.trim().endsWith(tag)) {return ref.trim();}
-  }
-  return null;
-}
-
-async function park(projectPath, branch) {
-  if (!(await isDirty(projectPath))) {return false;}
-  await git(projectPath, ['stash', 'push', '--include-untracked', '-m', parkTag(branch)]);
-  return true;
-}
-
-async function unpark(projectPath, branch) {
-  const ref = await parkedRef(projectPath, branch);
-  if (!ref) {return { restored: false };}
-  try {
-    await git(projectPath, ['stash', 'pop', ref]);
-    return { restored: true };
-  } catch (err) {
-    // A pop that cannot apply leaves conflict markers in the files. That is a
-    // reasonable state for someone at a terminal and a bad one for an editor
-    // that will parse those files a moment later — the page would read as
-    // broken markup. The tree goes back to the branch as committed, and the
-    // work stays parked, which is the state it was already in. Safe because
-    // the switch left the tree clean, so there is nothing else here to lose.
-    try {
-      await git(projectPath, ['reset', '--hard', 'HEAD']);
-      await git(projectPath, ['clean', '-fd']);
-    } catch {
-      /* nothing better to try */
-    }
-    return {
-      restored: false,
-      error:
-        `Your work on "${branch}" is still parked — it could not be put back automatically because the branch has changed underneath it. ` +
-        'It is safe: recover it with `git stash list` and `git stash pop`.',
-    };
+    return []; // No stashes, or not a repository yet.
   }
 }
-
-// Switching branches. The behaviour, and why it tries before it asks, is in
-// gitBranches.js; park/unpark are handed in because they live here.
-ipcMain.handle('git:checkout', async (_e, { projectPath, branch, create, parkFirst }) => {
-  const r = await switchBranch(git, {
-    projectPath,
-    branch,
-    create,
-    parkFirst,
-    park: async () => park(projectPath, await currentBranch(projectPath)),
-    unpark: (from) => unpark(projectPath, from),
-  });
-  if (!r.ok) {return r;}
-  // Whatever was last left on this branch comes back out, however the switch
-  // was made — that half is always wanted.
-  const back = await unpark(projectPath, branch);
-  return { ...r, parkedFrom: r.parked ? r.from : null, ...back };
-});
-
-async function currentBranch(projectPath) {
-  try {
-    return (await git(projectPath, ['rev-parse', '--abbrev-ref', 'HEAD'])).stdout.trim();
-  } catch {
-    return null;
-  }
-}
-
-// --- Previewing an old version ---------------------------------------------
-//
-// A second, deliberately dumb dev server pointed at a checkout of an old
-// commit (see previewWorktree.js). None of the primary server's machinery
-// applies: a preview is read-only, so it needs no markers, no morph client and
-// no click-to-select — it only has to render. That is `bare` on spawnDevServer,
-// which already exists as the primary server's last-resort path.
-//
-// Kept in its own registry rather than generalising `devServer`, whose daemon
-// detection, external-server adoption and log plumbing are all keyed to there
-// being exactly one.
-const previewServers = new Map(); // projectPath -> {proc, url, ref, port}
-
-async function stopPreview(projectPath) {
-  const cur = previewServers.get(projectPath);
-  if (!cur) {return;}
-  previewServers.delete(projectPath);
-  stopProcessTree(cur.proc);
-  try {
-    await previewWorktree.removeWorktree(git, { projectPath });
-  } catch {
-    /* the checkout is disposable; nothing here is the user's work */
-  }
-}
-
-function stopAllPreviews() {
-  for (const [projectPath] of previewServers) {stopPreview(projectPath);}
-}
-
-ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
-  const dir = await previewWorktree.ensureWorktree(git, { projectPath, ref });
-
-  // A server already up for this project just needs the checkout moved under
-  // it — Vite notices the files changed and reloads, which is far quicker than
-  // starting Astro again for every commit somebody clicks.
-  const running = previewServers.get(projectPath);
-  if (running?.proc && !running.proc.killed) {
-    running.ref = ref;
-    return { url: running.url, ref, reused: true };
-  }
-
-  const bin = isWin ? 'astro.cmd' : 'astro';
-  const localBin = path.join(projectPath, 'node_modules', '.bin', bin);
-  if (!fs.existsSync(localBin)) {
-    throw new Error(
-      'This project’s packages aren’t installed, so an older version can’t be shown. Install them and try again.'
-    );
-  }
-  const port = await findFreePort(4500);
-  const proc = spawnAstroServer(dir, localBin, [
-    'dev', '--port', String(port), '--host', '127.0.0.1',
-  ]);
-
-  const url = `http://127.0.0.1:${port}`;
-  let log = '';
-  proc.stdout.on('data', (d) => (log = (log + d).slice(-12000)));
-  proc.stderr.on('data', (d) => (log = (log + d).slice(-12000)));
-  let spawnError = null;
-  proc.on('error', (error) => { spawnError = error; });
-  previewServers.set(projectPath, { proc, url, ref, port });
-  proc.on('exit', () => {
-    if (previewServers.get(projectPath)?.proc === proc) {previewServers.delete(projectPath);}
-  });
-
-  // Wait for it to answer rather than guessing at a delay. An old commit can
-  // need packages that are not installed now, and that shows up as a server
-  // that never comes up — so the failure has to be caught here and explained,
-  // not left as a blank canvas.
-  const deadline = Date.now() + 45000;
-  while (Date.now() < deadline) {
-    if (spawnError || proc.exitCode !== null || proc.killed) {break;}
-    if (await serverAlive(url)) {return { url, ref, reused: false };}
-    await new Promise((r) => setTimeout(r, 400));
-  }
-  await stopPreview(projectPath);
-  // The commonest real cause, said in those terms rather than as a stack trace.
-  const missing = /Cannot find (?:module|package) ['"]?([^'"\s]+)/i.exec(log);
-  throw new Error(
-    missing
-      ? `That version needs ${missing[1]}, which isn’t installed here. It can’t be shown without it.`
-      : 'That version wouldn’t start. It may need packages that aren’t installed any more.'
-  );
-});
-
-ipcMain.handle('preview:stop', async (_e, { projectPath }) => {
-  await stopPreview(projectPath);
-  return { ok: true };
-});
-
-// --- Reading history -------------------------------------------------------
-//
-// The panel gets files already described (see describeFile): "Home" rather
-// than "src/pages/index.astro". Done here rather than in the renderer because
-// this is the side that knows the project's shape, and because it keeps the
-// panel about drawing rather than about interpreting paths.
-
-ipcMain.handle('git:log', async (_e, { projectPath, ref, limit, skip }) =>
-  gitHistory.log(git, { projectPath, ref, limit, skip })
-);
-
-ipcMain.handle('git:commitFiles', async (_e, { projectPath, ref }) =>
-  gitHistory.describeFiles(await gitHistory.commitFiles(git, { projectPath, ref }))
-);
-
-// Every file in the project, with what has happened to each — the file
-// browser's list, and the same status the commit picker reads.
-ipcMain.handle('git:allFiles', async (_e, { projectPath }) =>
-  gitHistory.describeFiles(await gitHistory.allFiles(git, { projectPath }))
-);
-
-ipcMain.handle('git:status', async (_e, { projectPath }) =>
-  gitHistory.describeFiles(await gitHistory.status(git, { projectPath }))
-);
-
-ipcMain.handle('git:fileAt', async (_e, { projectPath, ref, path: filePath }) =>
-  gitHistory.fileAt(git, { projectPath, ref, path: filePath })
-);
-
-ipcMain.handle('git:worktrees', async (_e, { projectPath }) =>
-  gitHistory.worktrees(git, { projectPath })
-);
-
-// Setting work aside and picking it back up, on their own. The switch has done
-// this internally for a while; a merge that finds unsaved work in its way needs
-// the same two steps, and the user is the one deciding to take them.
-ipcMain.handle('git:park', async (_e, { projectPath }) => {
-  const branch = await currentBranch(projectPath);
-  const parked = await park(projectPath, branch);
-  return { ok: true, parked, branch };
-});
-
-ipcMain.handle('git:unpark', async (_e, { projectPath }) => {
-  const branch = await currentBranch(projectPath);
-  return unpark(projectPath, branch);
-});
-
-ipcMain.handle('git:merge', async (_e, { projectPath, branch }) =>
-  mergeBranch(git, { projectPath, branch })
-);
-
-// Finishing a merge the user has chosen their way through. The conflicting
-// files come back from git:merge with both versions; this applies the answers.
-ipcMain.handle('git:resolveMerge', async (_e, { projectPath, branch, choices }) =>
-  resolveMerge(git, { projectPath, branch, choices })
-);
-
-ipcMain.handle('git:deleteBranch', async (_e, { projectPath, branch, force }) =>
-  deleteBranch(git, { projectPath, branch, force })
-);
-
-ipcMain.handle('git:commit', async (_e, { projectPath, message, paths }) =>
-  gitSnapshot.commit(git, { projectPath, message, paths })
-);
-
-ipcMain.handle('git:restoreFile', async (_e, { projectPath, ref, path: filePath }) =>
-  gitSnapshot.restoreFile(git, { projectPath, ref, path: filePath })
-);
-
-// `park` is handed in rather than imported: it lives here, over the stash, and
-// is the reason going back to an old version cannot lose what is on disk now.
-ipcMain.handle('git:restoreProject', async (_e, { projectPath, ref }) => {
-  const branch = await currentBranch(projectPath);
-  return gitSnapshot.restoreProject(git, {
-    projectPath,
-    ref,
-    park: () => park(projectPath, branch),
-  });
-});
-
-ipcMain.handle('git:push', async (_e, { projectPath, branch }) => {
-  await git(projectPath, ['push', '-u', 'origin', branch], { timeout: 120000 });
-  return { ok: true };
-});
-
-ipcMain.handle('git:publish', async (_e, { projectPath, repoName, isPrivate }) => {
-  try {
-    await run('gh', ['--version'], projectPath);
-  } catch {
-    throw new Error('GitHub CLI (gh) is not installed. Install it from https://cli.github.com and run `gh auth login`.');
-  }
-  const args = [
-    'repo',
-    'create',
-    repoName,
-    isPrivate ? '--private' : '--public',
-    '--source',
-    '.',
-    '--remote',
-    'origin',
-    '--push',
-  ];
-  const result = await run('gh', args, projectPath, { timeout: 180000 });
-  const output = result.stdout + result.stderr;
-  // gh prints the new repo's URL; fall back to the remote it just set.
-  let url = (output.match(/https:\/\/github\.com\/[^\s"']+/) || [])[0] || null;
-  if (!url) {
-    try {
-      url = (await git(projectPath, ['remote', 'get-url', 'origin'])).stdout.trim() || null;
-    } catch {
-      /* no remote — caller just won't get a link */
-    }
-  }
-  if (url) {url = url.replace(/[.,)]+$/, '').replace(/\.git$/, '');}
-  return { ok: true, url, output };
-});
-
-ipcMain.handle('shell:openExternal', async (_e, url) => {
-  if (/^https?:\/\//.test(url)) {shell.openExternal(url);}
-  return { ok: true };
-});

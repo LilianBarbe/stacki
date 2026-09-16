@@ -58,6 +58,7 @@
     "formats/frontmatter.ts",
     "formats/json.ts",
     "formats/toml.ts",
-    "astroParser.ts"
+    "astroParser.ts",
+    "main.ts"
   ]
 }

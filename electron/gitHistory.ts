@@ -448,7 +448,7 @@ function describeFile(relPath: unknown): FileDescription {
 }
 
 /** Every file in a list, described. Renames keep where they came from. */
-const describeFiles = <T extends { readonly path: string; readonly from?: string }>(
+const describeFiles = <T extends { readonly path: string; readonly from?: string | undefined }>(
   files: readonly T[] | null | undefined,
 ): (T & FileDescription & { readonly from: string | undefined })[] =>
   (files ?? []).map((f) => ({ ...f, ...describeFile(f.path), from: f.from }));

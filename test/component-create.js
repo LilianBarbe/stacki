@@ -425,7 +425,9 @@ const check = (what, condition, detail) => {
     // they cannot drift apart — which is the whole point of sharing it.
     check(
       'the palette counts with this same function',
-      /instancesIn\(text, \{ file, targetPath: comp\.path/.test(fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8')),
+      /instancesIn\(text,\s*\{\s*file,\s*targetPath:\s*comp\.path/.test(
+        fs.readFileSync(path.join(__dirname, '..', 'electron', 'main.js'), 'utf8')
+      ),
       'project:scan counts instances its own way again'
     );
     check('an unused component says so plainly', componentUsage({ projectPath: proj, name: 'Hero' }).files.length === 0, '');

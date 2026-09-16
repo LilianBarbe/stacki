@@ -51,3 +51,10 @@ electron/preload.js
 electron/astroParser.js
 electron/astroParser.types.js
 electron/astroParser.validation.js
+
+# Main-process TypeScript emit.
+electron/main.js
+electron/main.types.js
+electron/main.validation.js
+electron/main.bounds.js
+electron/ipc.js
