@@ -254,7 +254,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 9/20 original files converted ⏳
+### src/panels — 10/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -467,6 +467,15 @@ cover both stylesheet endpoints and malformed replies. The full gate passes
 141/141 commands (104.7s), with no warnings in the new modules. Eleven original
 panels remain.
 
+CanvasView is converted to `CanvasView.tsx`. Breakpoints, world layout, iframe
+ownership, zoom state, and pointer sessions are typed; page-height messages are
+parsed from `unknown`, reject non-finite heights, and clamp to the existing
+limits. Frame refs are removed on unmount, and fit/wheel/pointer behavior is
+split into bounded hooks. The preview lifecycle test still covers malformed
+messages, stale frames, refresh resets, pointer cancellation, and cleanup. The
+full gate passes 141/141 commands (106.5s), with no warnings in the converted
+module. Ten original panels remain.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -478,6 +487,7 @@ panels remain.
 | `PreviewPane.jsx`                                                                                    | 727                                                          |
 | `AssetsPanel` 473 · `PalettePanel` 455 · `PagesPanel` 442 · `HistoryPanel` 392 · `WelcomeScreen` 391 | small                                                        |
 | `StylePanel.tsx`                                                                                     | ✅ converted with parsed stylesheet inventories              |
+| `CanvasView.tsx`                                                                                     | ✅ converted with typed frame and gesture lifetimes          |
 
 ### src/App.jsx — 4,584 lines ⬜ hotspot, last
 

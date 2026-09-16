@@ -1,6 +1,6 @@
 import React from 'react';
 import { usePointerDrag } from '../ui/usePointerDrag.js';
-import CanvasView from './CanvasView.jsx';
+import CanvasView from './CanvasView';
 import { setCanvasFrame, receiveCanvasReply, noteCanvasReady } from '../canvasQuery.js';
 import { forgetComputedColors } from '../style-panel/lib/computed-color';
 import { forgetComputedStyles } from '../style-panel/lib/computed-style';
