@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Colour normalization for writes. Webflow's native Style API accepts hex and
 // rgb()/rgba() but not hsl()/hsla() — it silently drops an hsl* value. So on every
 // write we rewrite any hsl()/hsla() in the value to rgb()/rgba() (works natively AND
@@ -29,11 +27,11 @@ function convertHsl(inner: string): string | null {
 
   const parts = body.split(/[\s,]+/).filter(Boolean)
   if (parts.length < 3) {return null}
-  if (alpha == null && parts.length >= 4) {alpha = parts[3]} // legacy `h, s, l, a`
+  if (alpha == null && parts.length >= 4) {alpha = parts[3] ?? null} // legacy `h, s, l, a`
 
-  const h = parseHue(parts[0])
-  const s = parsePercent(parts[1])
-  const l = parsePercent(parts[2])
+  const h = parseHue(parts[0] ?? '')
+  const s = parsePercent(parts[1] ?? '')
+  const l = parsePercent(parts[2] ?? '')
   if (h == null || s == null || l == null) {return null}
 
   const [r, g, b] = hslToRgb(h, s, l)
@@ -49,7 +47,7 @@ function convertHsl(inner: string): string | null {
 function parseHue(token: string): number | null {
   const m = token.match(/^(-?[\d.]+)(deg|grad|rad|turn)?$/i)
   if (!m) {return null}
-  let n = parseFloat(m[1])
+  let n = parseFloat(m[1] ?? '')
   switch ((m[2] || 'deg').toLowerCase()) {
     case 'grad': n *= 0.9; break
     case 'rad': n = (n * 180) / Math.PI; break
@@ -62,7 +60,7 @@ function parseHue(token: string): number | null {
 function parsePercent(token: string): number | null {
   const m = token.match(/^(-?[\d.]+)%?$/)
   if (!m) {return null}
-  let n = parseFloat(m[1])
+  let n = parseFloat(m[1] ?? '')
   if (token.trim().endsWith('%') || n > 1) {n /= 100}
   return Math.max(0, Math.min(1, n))
 }
@@ -71,7 +69,7 @@ function parsePercent(token: string): number | null {
 function parseAlpha(token: string): number | null {
   const m = token.match(/^(-?[\d.]+)%?$/)
   if (!m) {return null}
-  let n = parseFloat(m[1])
+  let n = parseFloat(m[1] ?? '')
   if (token.trim().endsWith('%')) {n /= 100}
   return Math.max(0, Math.min(1, n))
 }

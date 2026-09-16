@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Where a picked variable goes in the field.
 //
 // Picking one used to replace the whole value, which is right for most fields:
@@ -15,7 +13,9 @@
 /** `!important` and whatever whitespace led up to it, kept aside and put back. */
 function splitImportant(value: string): { body: string; suffix: string } {
   const m = value.match(/(\s*!\s*important\s*)$/i)
-  return m ? { body: value.slice(0, m.index), suffix: m[1] } : { body: value, suffix: '' }
+  return m
+    ? { body: value.slice(0, m.index), suffix: m[1] ?? '' }
+    : { body: value, suffix: '' }
 }
 
 const LONE_VAR = /^var\(\s*--[A-Za-z0-9_-]+\s*(?:,[^)]*)?\)$/i

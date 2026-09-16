@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Small shared helpers for reading/writing a rule's declarations from the
 // bespoke section controls (Size, Layout, …).
 
@@ -12,6 +10,9 @@ export function readProp(rule: ParsedRule, prop: string): Found | null {
   const list = rule.declarations.filter((decl) => decl.prop === prop)
   if (!list.length) {return null}
   const decl = list[list.length - 1]
+  if (decl === undefined) {
+    throw new Error(`Declaration invariant failed for ${prop}`)
+  }
   return { value: decl.value, important: decl.important }
 }
 

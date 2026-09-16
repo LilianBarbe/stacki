@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import { SegBar, StackedField, LiveInput, PropLabel, GroupLabel, displayOf, type Props, type Seg } from './TypographySection'
 import { parseFlexShorthand } from './lib/webflow'
@@ -166,7 +164,9 @@ function flexCurrent(read: Props['read']): string {
   if (shorthand.present) {
     const parsed = parseFlexShorthand(shorthand.value)
     if (!parsed) {return norm(shorthand.value)} // a CSS-wide keyword etc. → custom
-    grow = parsed['flex-grow']; shrink = parsed['flex-shrink']; basis = parsed['flex-basis']
+    grow = parsed['flex-grow'] ?? '0'
+    shrink = parsed['flex-shrink'] ?? '1'
+    basis = parsed['flex-basis'] ?? 'auto'
   } else {
     const g = displayOf(read('flex-grow'))
     const s = displayOf(read('flex-shrink'))
@@ -234,7 +234,11 @@ function SizingControl(props: Props) {
 
   useEffect(() => {
     if (!menuOpen) {return}
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setMenuOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
+        setMenuOpen(false)
+      }
+    }
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setMenuOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)

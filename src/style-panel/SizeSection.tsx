@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties, ReactNode } from 'react'
@@ -10,6 +8,10 @@ import { type SegmentedOption, HoverTooltip } from './components/SegmentedContro
 import Select, { type SelectOption } from './components/Select'
 import useScrub, { type ScrubHandlers } from './components/useScrub'
 import { handleArrowStep } from './lib/number-step'
+
+function tooltipArrowStyle(arrowRight: number): CSSProperties & { readonly '--tip-arrow-right': string } {
+  return { '--tip-arrow-right': `${arrowRight}px` }
+}
 import { useFieldDraft } from './lib/field-draft'
 import ProvenanceList from './ProvenanceList'
 import VariableConnect from './VariableConnect'
@@ -63,8 +65,6 @@ function parseImportant(input: string): { value: string; important: boolean } {
   return { value: input.trim(), important: false }
 }
 
-const cap = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
-
 // A size control's label: blue (picked selector sets it) → FieldLabel with a
 // clear menu; orange (another selector) → a button opening provenance; unset →
 // a dim caption. When the picked selector sets it but a more specific selector
@@ -91,9 +91,9 @@ function SizeLabel({ label, prop, d, contributors, busy, scrubProps, onClear, on
       onReset={onClear}
       resetLabel="Clear"
       tooltip={<PropTip props={[prop]} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => <ProvenanceList contributors={contributors} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
-      scrubProps={scrubProps}
+      {...(scrubProps === undefined ? {} : { scrubProps })}
     >
       {label}
     </FieldLabel>
@@ -332,7 +332,9 @@ function OverflowBar({ value, busy, onCommit, onLiveCommit, onClear }: {
 
   useEffect(() => {
     if (!open) {return}
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -415,7 +417,11 @@ function OverflowBar({ value, busy, onCommit, onLiveCommit, onClear }: {
       ) : null}
 
       {hoveredValue && OVERFLOW_TOOLTIPS[hoveredValue] ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={{ '--tip-arrow-right': `${arrowRight}px` } as CSSProperties}>
+        <div
+          className="u-segmented-tooltip"
+          role="tooltip"
+          style={tooltipArrowStyle(arrowRight)}
+        >
           {OVERFLOW_TOOLTIPS[hoveredValue]}
           <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
         </div>
@@ -570,7 +576,9 @@ function BoxSizingBar({ value, busy, onCommit, onLiveCommit, onClear }: {
 
   useEffect(() => {
     if (!open) {return}
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -653,7 +661,11 @@ function BoxSizingBar({ value, busy, onCommit, onLiveCommit, onClear }: {
       ) : null}
 
       {hoveredValue && BOX_TOOLTIPS[hoveredValue] ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={{ '--tip-arrow-right': `${arrowRight}px` } as CSSProperties}>
+        <div
+          className="u-segmented-tooltip"
+          role="tooltip"
+          style={tooltipArrowStyle(arrowRight)}
+        >
           {BOX_TOOLTIPS[hoveredValue]}
           <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
         </div>

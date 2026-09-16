@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Model for editing grid-template-columns / -rows as an ordered list of tracks, with
 // per-track sizing (a "default" single size, or a minmax(min, max) pair). Reading
 // expands `repeat(n, …)` and drops [line-name] tokens so the list is one entry per
@@ -32,8 +30,8 @@ export function parseTrackList(value: string): string[] {
     if (t.startsWith('[')) {continue}
     const rep = t.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/is)
     if (rep) {
-      const n = parseInt(rep[1], 10)
-      const sub = splitTracks(rep[2]).filter((x) => !x.startsWith('['))
+      const n = parseInt(rep[1] ?? '0', 10)
+      const sub = splitTracks(rep[2] ?? '').filter((x) => !x.startsWith('['))
       for (let i = 0; i < n && sub.length; i += 1) {out.push(...sub)}
     } else {out.push(t)}
   }
@@ -68,8 +66,8 @@ export function trackForm(value: string): 'repeat' | 'list' | 'mixed' | 'none' {
   if (top.length === 1) {
     // `repeat(3, 1fr)` — a count and one track. `repeat(auto-fit, …)` is not a
     // count and has its own control, so it is left alone here.
-    const rep = top[0].match(/^repeat\(\s*\d+\s*,(.*)\)$/is)
-    if (rep && splitTracks(rep[1]).filter((x) => !x.startsWith('[')).length === 1) {return 'repeat'}
+    const rep = (top[0] ?? '').match(/^repeat\(\s*\d+\s*,(.*)\)$/is)
+    if (rep && splitTracks(rep[1] ?? '').filter((x) => !x.startsWith('[')).length === 1) {return 'repeat'}
   }
   const tracks = parseTrackList(v)
   if (tracks.length > 1 && tracks.every((x) => x === tracks[0])) {return 'list'}
@@ -102,7 +100,7 @@ export function canEditAsTracks(value: string): boolean {
   if (!tracks.length) {return lower === 'none'}
   // A variable in place of ONE track is a track — the editors hold it fine. One
   // in place of the whole list only looks like a track.
-  if (tracks.length === 1 && /^var\(/i.test(tracks[0])) {return false}
+  if (tracks.length === 1 && /^var\(/i.test(tracks[0] ?? '')) {return false}
   return true
 }
 
@@ -120,7 +118,7 @@ export type TrackSize =
 /** Parse a single track into its sizing (a minmax pair, or a single value). */
 export function parseTrackSize(track: string): TrackSize {
   const m = track.trim().match(/^minmax\(\s*(.+?)\s*,\s*(.+?)\s*\)$/is)
-  if (m) {return { mode: 'minmax', min: m[1].trim(), max: m[2].trim() }}
+  if (m) {return { mode: 'minmax', min: (m[1] ?? '').trim(), max: (m[2] ?? '').trim() }}
   return { mode: 'default', value: track.trim() }
 }
 
@@ -190,7 +188,10 @@ export function parseAreas(value: string): GridArea[] {
     else { b.r0 = Math.min(b.r0, r); b.r1 = Math.max(b.r1, r); b.c0 = Math.min(b.c0, c); b.c1 = Math.max(b.c1, c) }
   }))
   return order.map((name) => {
-    const b = bounds.get(name)!
+    const b = bounds.get(name)
+    if (b === undefined) {
+      throw new Error(`Grid area invariant failed for ${name}`)
+    }
     return { name, colStart: b.c0 + 1, colEnd: b.c1 + 1, rowStart: b.r0 + 1, rowEnd: b.r1 + 1 }
   })
 }
@@ -206,7 +207,11 @@ export function serializeAreas(areas: GridArea[]): string {
   for (const a of valid) {
     const r0 = Math.min(a.rowStart, a.rowEnd), r1 = Math.max(a.rowStart, a.rowEnd)
     const c0 = Math.min(a.colStart, a.colEnd), c1 = Math.max(a.colStart, a.colEnd)
-    for (let r = r0; r <= r1; r += 1) {for (let c = c0; c <= c1; c += 1) {grid[r - 1][c - 1] = a.name.trim()}}
+    for (let r = r0; r <= r1; r += 1) {
+      const row = grid[r - 1]
+      if (row === undefined) {throw new Error(`Grid row ${r} is outside its bounds`)}
+      for (let c = c0; c <= c1; c += 1) {row[c - 1] = a.name.trim()}
+    }
   }
   return grid.map((row) => `"${row.join(' ')}"`).join(' ')
 }
@@ -220,7 +225,9 @@ export function areaLabel(a: GridArea): string {
 export function nextAreaName(areas: GridArea[]): string {
   const used = new Set(areas.map((a) => a.name))
   if (!used.has('Area')) {return 'Area'}
-  let n = 2
-  while (used.has(`Area-${n}`)) {n += 1}
-  return `Area-${n}`
+  const candidateCount = areas.length + 2
+  for (let number = 2; number <= candidateCount; number += 1) {
+    if (!used.has(`Area-${number}`)) {return `Area-${number}`}
+  }
+  throw new Error('Grid area name search exceeded its bound')
 }

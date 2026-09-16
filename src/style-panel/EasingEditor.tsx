@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { PointerEvent as ReactPointerEvent } from 'react'
@@ -56,7 +54,7 @@ function framedStyle(frame: { left: number; width: number }): { left: number; wi
   return { left, width }
 }
 
-const bezEq = (a: Bezier, b: Bezier) => a.every((n, i) => Math.abs(n - b[i]) < 0.005)
+const bezEq = (a: Bezier, b: Bezier) => a.every((n, i) => Math.abs(n - (b[i] ?? 0)) < 0.005)
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 // One coordinate of the unit cubic-bezier (0,0)->(1,1) at parameter s.
 const bezAt = (s: number, a: number, b: number) => 3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s ** 2 * b + s ** 3
@@ -151,8 +149,8 @@ function BezierEditor({ value, onChange, playT }: { value: Bezier; onChange: (b:
       {([0, 1] as const).map((i) => (
         <circle
           key={i}
-          cx={sx(value[i * 2])}
-          cy={sy(value[i * 2 + 1])}
+          cx={sx(value[i === 0 ? 0 : 2])}
+          cy={sy(value[i === 0 ? 1 : 3])}
           r="7"
           className="embed-editor_ease-handle"
           onPointerDown={(e) => { e.preventDefault(); setDrag(i); svgRef.current?.setPointerCapture(e.pointerId) }}

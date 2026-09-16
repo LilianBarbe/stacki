@@ -182,7 +182,7 @@ wrapper over `window.avb` — the renderer never calls raw `ipcRenderer`.
 
 ## Tests
 
-124 suites under `test/`, run by `scripts/run-tests.js` (`npm test`):
+124 suites under `test/`, run by `scripts/run-tests.ts` (`npm test`):
 
 - **Round-trip tests** (the majority) parse → mutate → write → re-parse and
   assert stability, under the runtime's own parsers.
@@ -198,7 +198,7 @@ window cannot hold the gate hostage). The gate is:
 `build:contracts → build:electron → tsc --noEmit → eslint → ratchet → all
 test suites`, exiting non-zero if any non-quarantined suite fails.
 
-## The TypeScript migration (in progress)
+## The TypeScript migration (completed 2026-09-16)
 
 Continues on `main` after PR #26; plan in `docs/ts-migration-plan.md`.
 Motivation: the app is built heavily with AI assistance, and plain JS gave
@@ -210,37 +210,26 @@ green at every commit.
 - **Phase 0 (done)** — strict `tsconfig` (all of AGENTS.md's flags), an
   ESLint flat config enforcing the ruleset (no `any`, no unchecked
   assertions, exhaustive switches, ≤70-line functions), a **`@ts-nocheck`
-  ratchet** (`scripts/ratchet-check.js`, baseline 44 legacy files — the count
-  may only go down), and ~4,800 mechanical `curly` fixes. No suites remain
+  ratchet** (`scripts/ratchet-check.ts`, baseline zero after removing 44 legacy
+  headers), and ~4,800 mechanical `curly` fixes. No suites remain
   quarantined: `varsrowheight` healed in `v0.1.26`, after five earlier repairs.
-  The latest complete gate passed all 125 test commands.
+  The latest complete gate passed all 150 test commands.
 - **Phase 1 (done)** — the `shared/` contract layer above, with contract
   tests (round-trip, negative space, invariant violations). Found and fixed a
   real bug: a lone top-level component was not treated as a layout.
-- **Phase 2 (done)** — `shared/` compiles to `shared/dist` (CJS + `.d.ts`;
+- **Phase 2 (done)** — `shared/` compiles to `dist/shared` (CJS + `.d.ts`;
   the Electron runtime artifact; Vite reads the TS sources); the renderer's `src/bridge.ts` validates at the
   boundary; packaging unpacks `shared/dist` for the dev server. A first live
   end-to-end open (a real project, on a user's Windows machine) then exposed a
   wrong wire shape — the scan payload's component schema was contracted as a
   `Map` while the wire has always carried an array of fields; fixed in
   b94457c together with `renderTag`'s object shape and the dropped `hasRest`.
-- **Phase 3 (in progress)** — mechanical conversion, leaf → hotspot.
-  Electron modules convert in place with side-by-side tsc emit
-  (`electron/tsconfig.json`, plus per-module projects for `morphClient` and
-  `preload`, which need DOM libs) so `require` sites never move; renderer
-  modules convert directly (Vite resolves `.js` → `.ts`). The Electron queue is
-  complete: 38 converted source modules, including `astroParser.ts` and `main.ts`.
-  `shared/ipc.ts` inventories all 115 invoke channels (111 main, four terminal);
-  handlers parse inputs and compile-check results. The contract suite has 152
-  tests, and the full gate passes 125 test commands. Also converted: 8 src
-  modules (`editorTree`, `pagePersistence`, `cleanError`, `branchName`,
-  `loopBindings`, `bindings`, `arrayValue`, `dataSuggest`). Remaining: the
-  ~30 src leaf libs, the UI, the panels, and the remaining
-  hotspots last (`App.tsx` 4.9k lines, `PropsPanel.tsx` 3.8k,
-  `ClipPath.tsx` 8.8k). Live status:
-  `docs/migration-tracker.md`.
-- **Phase 4 (planned)** — `docs/contracts.md` for invariants types can't
-  express; an AGENTS.md "contracts" section; CI/pre-push hook.
+- **Phase 3 (done)** — all application, panel, Electron, shared, and authored
+  script sources are strict TypeScript. Generated JavaScript lives under
+  `dist/`, including CommonJS automation in `dist/scripts`. The style-panel
+  ratchet reached zero, and the full gate passes 150/150 commands.
+- **Phase 4 (done)** — `docs/contracts.md` records invariants types cannot
+  express; AGENTS.md names the contract surface; CI runs the full gate.
 
 ## Architectural findings (structural review at 4fa3a5d)
 

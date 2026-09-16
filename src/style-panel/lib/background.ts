@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Multi-layer `background` model. CSS backgrounds are parallel comma-separated
 // lists — background-image holds the layers (index 0 = the TOP layer), and
 // background-size / -position / -repeat / -attachment hold one entry per layer.
@@ -60,10 +58,10 @@ export function splitTopLevelCommas(value: string): string[] {
 export function colorOverlayOf(image: string): string | null {
   const match = image.trim().match(/^linear-gradient\((.*)\)$/is)
   if (!match) {return null}
-  const parts = splitTopLevelCommas(match[1])
+  const parts = splitTopLevelCommas(match[1] ?? '')
   if (!parts.length) {return null}
   const isDirection = (s: string) => /^to\s/i.test(s.trim()) || /^-?[\d.]+(deg|grad|rad|turn)$/i.test(s.trim())
-  const stops = isDirection(parts[0]) ? parts.slice(1) : parts
+  const stops = isDirection(parts[0] ?? '') ? parts.slice(1) : parts
   if (stops.length < 2) {return null}
   // Strip a trailing stop position (e.g. `#000 0%`, `red 10px`) to compare colours.
   const colours = stops.map((s) => s.trim().replace(/\s+-?[\d.]+(%|px|em|rem|vw|vh|vmin|vmax)?$/i, '').trim())
@@ -88,7 +86,7 @@ export function splitTopLevelSpaces(value: string): string[] {
   let cur = ''
   const chars = [...value.trim()]
   for (let i = 0; i < chars.length; i += 1) {
-    const ch = chars[i]
+    const ch = chars[i] ?? ''
     if (quote) {
       cur += ch
       if (ch === '\\' && i + 1 < chars.length) { cur += chars[i + 1]; i += 1 }
@@ -182,7 +180,7 @@ export function layerKind(image: string): LayerKind {
 export function urlFileName(image: string): string | null {
   const match = image.match(/url\(\s*['"]?([^'")]+?)['"]?\s*\)/i)
   if (!match) {return null}
-  const path = match[1].split('?')[0]
+  const path = (match[1] ?? '').split('?')[0] ?? ''
   const file = path.split(/[\\/]/).pop() ?? path
   return file || path
 }
@@ -195,7 +193,7 @@ export function layerLabel(image: string): string {
     case 'linear': return 'Linear gradient'
     case 'radial': return 'Radial gradient'
     case 'conic': return 'Conic gradient'
-    default: return image.trim() || 'Layer'
+    case 'other': return image.trim() || 'Layer'
   }
 }
 

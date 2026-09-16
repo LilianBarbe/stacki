@@ -58,7 +58,7 @@ export default function FieldLabel({ children, active, onReset, resetLabel = 'Re
   useEffect(() => {
     if (!open) {return}
     const onDown = (event: globalThis.MouseEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) {return}
+      if (event.target instanceof Node && rootRef.current?.contains(event.target)) {return}
       setOpen(false)
     }
     const onKey = (event: KeyboardEvent) => {

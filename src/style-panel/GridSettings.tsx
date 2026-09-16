@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
@@ -34,21 +32,6 @@ const val = (read: Read, prop: string): string => {
 // ── icons ──
 const CloseIcon = () => (<svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="16" height="16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>)
 const PlusIcon = () => (<svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="16" height="16"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>)
-// The repeat()/written-out toggle. Two tracks collapsing into one boxed count,
-// or opening back out — the arrows say which way the press goes.
-const CollapseTracksIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="16" height="16">
-    <rect x="1.5" y="4.5" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" />
-    <rect x="10.5" y="4.5" width="4" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" />
-    <path d="M6.6 8h2.8M8.6 6.9 9.7 8 8.6 9.1M7.4 6.9 6.3 8l1.1 1.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-)
-const ExpandTracksIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="16" height="16">
-    <rect x="5.5" y="4.5" width="5" height="7" rx="1" stroke="currentColor" strokeWidth="1.2" />
-    <path d="M4.2 8H1.6M2.7 6.9 1.6 8l1.1 1.1M11.8 8h2.6M13.3 6.9 14.4 8l-1.1 1.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-)
 const TrashIcon = () => (<svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="embed-editor_bg-glyph"><path d="M3 4h10M6.5 4V3h3v1M5 4l.5 8.5a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1L11 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>)
 const DuplicateIcon = () => (<svg viewBox="0 0 16 16" fill="none" aria-hidden="true" className="embed-editor_bg-glyph"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>)
 const GripIcon = () => (<svg viewBox="0 0 16 16" aria-hidden="true" className="embed-editor_bg-glyph"><circle cx="6" cy="4" r="1" /><circle cx="10" cy="4" r="1" /><circle cx="6" cy="8" r="1" /><circle cx="10" cy="8" r="1" /><circle cx="6" cy="12" r="1" /><circle cx="10" cy="12" r="1" /></svg>)
@@ -138,7 +121,7 @@ function TrackSizeEditor({ track, busy, autoFit, onChange }: { track: string; bu
   // instead of nesting the whole repeat() inside the new minmax's max.
   const autoFitInner = (() => {
     const m = track.match(/^repeat\(\s*auto-fit\s*,\s*(.+)\)\s*$/is)
-    return m ? parseTrackSize(m[1].trim()) : null
+    return m ? parseTrackSize((m[1] ?? '').trim()) : null
   })()
   const switchMode = (mode: 'default' | 'minmax') => {
     if (mode === size.mode) {return}
@@ -223,8 +206,10 @@ function TrackPopover({ anchorEl, onClose, children }: { anchorEl: HTMLElement; 
     // Ignore clicks on the trigger row — its own onClick toggles the popover closed;
     // if this handler closed it first, that same click would immediately re-open it.
     const onDown = (e: MouseEvent) => {
-      const t = e.target as Node
-      if (!ref.current?.contains(t) && !anchorEl.contains(t)) {onClose()}
+      const target = e.target
+      if (!(target instanceof Node) || (!ref.current?.contains(target) && !anchorEl.contains(target))) {
+        onClose()
+      }
     }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
     const onScroll = () => onClose()
@@ -391,7 +376,7 @@ function TrackSection({ title, prop, axis, setProp, labels }: {
         setProp(prop, `repeat(auto-fit, ${pattern})`, false)
       } else {
         const m = rawTemplate.match(/repeat\(\s*auto-fit\s*,\s*(.+)\)\s*$/is)
-        setProp(prop, m ? m[1].trim() : (tracks[0] ?? '1fr'), false)
+        setProp(prop, m ? (m[1] ?? '').trim() : (tracks[0] ?? '1fr'), false)
       }
     },
   }
@@ -421,7 +406,9 @@ function TrackSection({ title, prop, axis, setProp, labels }: {
   // would differ by a character (`minmax(0px, 1fr)` vs `minmax(0, 1fr)`) and
   // quietly break the list into one that can no longer be a repeat().
   const add = () => {
-    const fresh = same(tracks) ? tracks[0] : axis === 'column' ? 'minmax(0px, 1fr)' : 'auto'
+    const fresh = same(tracks)
+      ? (tracks[0] ?? (axis === 'column' ? 'minmax(0px, 1fr)' : 'auto'))
+      : axis === 'column' ? 'minmax(0px, 1fr)' : 'auto'
     write([...tracks, fresh])
     setOpen(tracks.length)
   }
@@ -430,11 +417,16 @@ function TrackSection({ title, prop, axis, setProp, labels }: {
     setOpen((o) => (o === i ? null : o != null && o > i ? o - 1 : o))
   }
   const setTrack = (i: number, size: TrackSize) => write(tracks.map((t, k) => (k === i ? serializeTrackSize(size) : t)))
-  const duplicate = (i: number) => write([...tracks.slice(0, i + 1), tracks[i], ...tracks.slice(i + 1)])
+  const duplicate = (i: number) => {
+    const track = tracks[i]
+    if (track === undefined) {return}
+    write([...tracks.slice(0, i + 1), track, ...tracks.slice(i + 1)])
+  }
   const reorder = (from: number, to: number) => {
     if (from === to) {return}
     const next = [...tracks]
     const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
     next.splice(to, 0, moved)
     write(next)
     setOpen((o) => (o === from ? to : o))

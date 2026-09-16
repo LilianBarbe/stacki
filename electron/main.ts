@@ -13,6 +13,7 @@ import type { ChildProcess, ExecFileOptions } from 'child_process';
 import { toRecord, toArray } from '../shared/record.js';
 import { assert } from '../shared/assert.js';
 import type { IpcPayloads } from '../shared/ipc-payloads.js';
+import type { IpcResults } from '../shared/ipc-results.js';
 import type { ParserNode, ParserPageModel, SchemaField } from './astroParser.types.js';
 import { parseSerializePage } from './astroParser.validation.js';
 import { parseMarkdownModel } from './main.validation.js';
@@ -137,7 +138,7 @@ let devServer: DevServer | null = null; // {proc, url, projectPath}
 // re-spawns us with the same argv, so there's nothing to hand forward there),
 // landing back where you were instead of on the welcome screen.
 const isDev = !!process.env['VITE_DEV_SERVER_URL'];
-// Exiting with this asks scripts/dev-electron.mjs to start us again. Not
+// Exiting with this asks scripts/dev-electron.ts to start us again. Not
 // app.relaunch(): `npm run dev` runs us under `concurrently -k`, so quitting
 // would take the Vite server down with us and the new process would load a
 // dead localhost:5173.
@@ -3910,7 +3911,7 @@ function readAstroLock(projectPath: string) {
 
 // Serialize dev:start calls — concurrent spawns race Astro's daemon lock and
 // the loser dies with "exited before becoming ready".
-const devStarts = createKeyedQueue();
+const devStarts = createKeyedQueue<IpcResults['dev:start']>();
 
 ipcMain.handle('dev:start', (_e, projectPath) => {
   captureEra++;

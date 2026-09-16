@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Number editing for every numeric field in the tool: arrow-key stepping and
 // pointer scrubbing, sharing one set of step sizes so both gestures agree.
 //
@@ -59,8 +57,10 @@ function numberRuns(text: string): NumberRun[] {
   let match: RegExpExecArray | null
   while ((match = NUMBER_UNIT_RE.exec(text))) {
     const start = match.index
-    const numEnd = start + match[1].length
-    runs.push({ start, numEnd, end: numEnd + match[2].length, raw: match[1], unit: match[2] })
+    const raw = match[1] ?? ''
+    const unit = match[2] ?? ''
+    const numEnd = start + raw.length
+    runs.push({ start, numEnd, end: numEnd + unit.length, raw, unit })
   }
   return runs
 }

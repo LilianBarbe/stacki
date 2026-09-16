@@ -15,21 +15,18 @@ function createSerialQueue(): <T>(task: Task<T>) => Promise<T> {
 
 // One pending result per key, while different keys still share the same serial
 // resource. Cancellation also invalidates active work at its next checkpoint.
-function createKeyedQueue(): {
-  run<T>(key: string, task: (assertActive: () => void) => Promise<T> | T): Promise<T>;
+function createKeyedQueue<T>(): {
+  run(key: string, task: (assertActive: () => void) => Promise<T> | T): Promise<T>;
   cancel(): void;
 } {
   const queue = createSerialQueue();
-  const pending = new Map<string, Promise<unknown>>();
+  const pending = new Map<string, Promise<T>>();
   let era = 0;
   return {
-    run<T>(key: string, task: (assertActive: () => void) => Promise<T> | T): Promise<T> {
+    run(key: string, task: (assertActive: () => void) => Promise<T> | T): Promise<T> {
       const existing = pending.get(key);
       if (existing !== undefined) {
-        // Internal invariant: the promise stored under a key IS the one this
-        // queue created for that key's task, so it settles with that task's T.
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        return existing as Promise<T>;
+        return existing;
       }
       const startedIn = era;
       const assertActive = (): void => {

@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Selector parsing, specificity, and matching against the selected element.
 //
 // The Designer gives us no canvas DOM, so we can't call `element.matches()`.
@@ -248,15 +246,20 @@ function compileSelector(selector: SelectorNode): CompiledSelector {
         break
       }
       case 'attribute': {
-        const attr = node as selectorParser.Attribute
         current.attrs.push({
-          name: attr.attribute.toLowerCase(),
-          operator: attr.operator ?? null,
-          value: attr.value ?? null,
-          insensitive: Boolean(attr.insensitive),
+          name: node.attribute.toLowerCase(),
+          operator: node.operator ?? null,
+          value: node.value ?? null,
+          insensitive: Boolean(node.insensitive),
         })
         b += 1
         started = true
+        break
+      }
+      case 'string':
+      case 'root':
+      case 'comment':
+      case 'nesting': {
         break
       }
       case 'pseudo': {
@@ -426,8 +429,10 @@ export async function matchSelectorList(selectorText: string, target: MatchTarge
 async function matchComplex(sel: CompiledSelector, subjectKey: string, view: TreeView): Promise<MatchResult> {
   if (!sel.compounds.length) {return NO_MATCH}
   const keyIndex = sel.compounds.length - 1
+  const subject = sel.compounds[keyIndex]
+  if (subject === undefined) {return NO_MATCH}
   // Key (rightmost) compound must match the subject element itself.
-  if (!(await matchCompound(sel.compounds[keyIndex], subjectKey, view))) {return NO_MATCH}
+  if (!(await matchCompound(subject, subjectKey, view))) {return NO_MATCH}
   return { matched: await matchUpchain(sel, keyIndex, subjectKey, view), approximate: false }
 }
 
@@ -438,6 +443,7 @@ async function matchUpchain(sel: CompiledSelector, compoundIndex: number, curren
   // the LEFT of compoundIndex lives at compoundIndex - 1.
   const combinator = sel.combinators[compoundIndex - 1]
   const left = sel.compounds[compoundIndex - 1]
+  if (left === undefined) {return false}
 
   if (combinator === '>') {
     const parent = view.parentKey(currentKey)
@@ -657,7 +663,8 @@ function precedingSiblings(key: string, view: TreeView, adjacentOnly: boolean): 
   const sibs = view.childKeys(parent)
   const idx = sibs.indexOf(key)
   if (idx <= 0) {return []}
-  return adjacentOnly ? [sibs[idx - 1]] : sibs.slice(0, idx).reverse() // nearest-first
+  const adjacent = sibs[idx - 1]
+  return adjacentOnly && adjacent !== undefined ? [adjacent] : sibs.slice(0, idx).reverse() // nearest-first
 }
 
 function followingSiblings(key: string, view: TreeView, adjacentOnly: boolean): string[] {
@@ -674,7 +681,8 @@ function descendants(key: string, view: TreeView): string[] {
   const out: string[] = []
   const stack = [...view.childKeys(key)]
   while (stack.length && out.length < MAX_HAS_DESCENDANTS) {
-    const current = stack.shift() as string
+    const current = stack.shift()
+    if (current === undefined) {break}
     out.push(current)
     for (const child of view.childKeys(current)) {stack.push(child)}
   }

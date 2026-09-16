@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import FieldLabel from './components/FieldLabel'
@@ -21,7 +19,7 @@ import ProvenanceList from './ProvenanceList'
 import VariableConnect from './VariableConnect'
 import type { Contributor, ResolvedProp } from './lib/resolved'
 import { splitTopLevelSpaces } from './lib/background'
-import { useComputedChoice, useHighlight } from './lib/computed-style'
+import { useHighlight } from './lib/computed-style'
 import SegmentPill from './components/SegmentPill'
 import { commitInPlace } from './lib/commit-in-place'
 
@@ -158,7 +156,7 @@ export function PropLabel({ label, prop, tipProps, d, contributors, busy, onClea
       onReset={onClear}
       resetLabel="Clear"
       tooltip={<PropTip props={tip} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => <ProvenanceList contributors={contributors} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
     >
       {label}
@@ -183,6 +181,7 @@ export function GroupLabel({ label, props, read, busy, onClear, onProvenance, on
   const prop = props.find((p) => read(p)?.source === 'selected')
     ?? props.find((p) => read(p) != null)
     ?? props[0]
+  if (prop === undefined) {throw new Error('Group label requires at least one property')}
   return (
     <PropLabel
       label={label}
@@ -254,7 +253,7 @@ export function LiveInput({ value, busy, placeholder, ariaLabel, className, data
   })
 
   return (
-    <VariableConnect code ariaLabel={`Connect ${ariaLabel || 'value'} to a variable`} disabled={busy} prop={prop} onPick={(binding) => onCommit(binding, false)}>
+    <VariableConnect code ariaLabel={`Connect ${ariaLabel || 'value'} to a variable`} disabled={busy} {...(prop === undefined ? {} : { prop })} onPick={(binding) => onCommit(binding, false)}>
       <input
         {...scrub.input}
         ref={inputRef}
@@ -316,7 +315,7 @@ function TextField({ prop, label, placeholder, swatch, swatchLabel, read, busy, 
     <LiveInput
       value={shown}
       busy={busy}
-      placeholder={placeholder}
+      {...(placeholder === undefined ? {} : { placeholder })}
       ariaLabel={label}
       className="u-input embed-editor_size-input"
       dataProp={prop}
@@ -350,7 +349,7 @@ export function StackedField({ prop, label, placeholder, read, busy, setProp, cl
       <LiveInput
         value={external}
         busy={busy}
-        placeholder={placeholder}
+        {...(placeholder === undefined ? {} : { placeholder })}
         ariaLabel={label}
         className="u-input embed-editor_size-input"
         dataProp={prop}
@@ -572,7 +571,9 @@ export function SegBar({ segs, current, ariaLabel, prop, busy, onCommit, onLiveC
 
   useEffect(() => {
     if (!open) {return}
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -877,7 +878,7 @@ function PopLabel({ label, prop, read, busy, clearProp, onProvenance, onSelectSe
       onReset={onClear ?? (() => clearProp(prop))}
       resetLabel="Clear"
       tooltip={<PropTip props={[prop]} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => <ProvenanceList contributors={resolved?.contributors ?? []} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
     >
       {label}
@@ -1014,8 +1015,9 @@ function MorePopover({ title, active, busy, children }: {
   useEffect(() => {
     if (!open) {return}
     const onDown = (event: MouseEvent) => {
-      const target = event.target as Element | null
-      if (rootRef.current?.contains(target as Node)) {return}
+      const target = event.target
+      if (!(target instanceof Element)) {setOpen(false); return}
+      if (rootRef.current?.contains(target)) {return}
       // A label inside the popover can open the provenance popover, which is portaled
       // to <body> (outside this wrapper) — clicks there must not close the popover.
       if (target?.closest?.('.embed-editor_provenance')) {return}
@@ -1448,7 +1450,9 @@ function StrokeRow({ read, busy, setProp, clearProp, liveSetProp, onProvenance, 
 
 const ShadowPlusIcon = () => (<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>)
 
-function ShadowEditor({ shadow, busy, onChange }: { shadow: Shadow; busy: boolean; onChange: (patch: Partial<Shadow>, live: boolean) => void }) {
+type ShadowPatch = { x?: string; y?: string; blur?: string; color?: string }
+
+function ShadowEditor({ shadow, busy, onChange }: { shadow: Shadow; busy: boolean; onChange: (patch: ShadowPatch, live: boolean) => void }) {
   return (
     <div className="embed-editor_type-shadow-editor">
       <ShadowNum label="X" value={shadow.x} busy={busy} onCommit={(v) => onChange({ x: v }, false)} onLive={(v) => onChange({ x: v }, true)} />
@@ -1474,10 +1478,12 @@ function TextShadowsRow({ read, busy, setProp, clearProp, liveSetProp, onProvena
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
     if (from === to) {return}
-    const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
-  const patch = (i: number, p: Partial<Shadow>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
+  const patch = (i: number, p: ShadowPatch, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
   const toggle = (i: number) => write(rows.map((r, j) => (j === i ? { ...r, hidden: !r.hidden } : r)), false)
 
   return (
@@ -1495,14 +1501,20 @@ function TextShadowsRow({ read, busy, setProp, clearProp, liveSetProp, onProvena
         onRemove={remove}
         isHidden={(i) => rows[i]?.hidden ?? false}
         onToggleHidden={toggle}
-        renderRow={(i) => ({
-          preview: <span className="embed-editor_bg-layer-preview" style={{ background: `linear-gradient(${shadows[i].color}, ${shadows[i].color}), conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px` }} aria-hidden="true" />,
-          label: shadowLabel(shadows[i]),
-        })}
+        renderRow={(i) => {
+          const shadow = shadows[i]
+          if (shadow === undefined) {throw new Error(`Text shadow ${i} is missing`)}
+          return {
+            preview: <span className="embed-editor_bg-layer-preview" style={{ background: `linear-gradient(${shadow.color}, ${shadow.color}), conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px` }} aria-hidden="true" />,
+            label: shadowLabel(shadow),
+          }
+        }}
       />
       {openIdx != null && anchorEl && shadows[openIdx] ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel="Text shadow" onClose={() => setOpenIdx(null)}>
-          <ShadowEditor shadow={shadows[openIdx]} busy={busy} onChange={(p, live) => patch(openIdx!, p, live)} />
+          <ShadowEditor shadow={shadows[openIdx]} busy={busy} onChange={(p, live) => {
+            if (openIdx !== null) {patch(openIdx, p, live)}
+          }} />
         </LayerPopover>
       ) : null}
     </div>

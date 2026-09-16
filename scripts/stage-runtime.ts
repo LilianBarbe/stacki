@@ -1,10 +1,9 @@
 // Keep the runtime self-contained: content workers and icons are authored assets,
 // copied beside compiled code so development and packaged paths stay identical.
-import { copyFile, mkdir } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import fileSystemPromises = require('node:fs/promises');
+import path = require('node:path');
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const root = path.resolve(__dirname, '..', '..');
 // An explicit inventory bounds the copy and excludes signing material.
 const files = [
   'electron/content/introspect.mjs',
@@ -17,8 +16,15 @@ const files = [
   'resources/icon.png',
 ] as const;
 
-for (const file of files) {
-  const target = resolve(root, 'dist', file);
-  await mkdir(dirname(target), { recursive: true });
-  await copyFile(resolve(root, file), target);
+async function main(): Promise<void> {
+  for (const file of files) {
+    const target = path.resolve(root, 'dist', file);
+    await fileSystemPromises.mkdir(path.dirname(target), { recursive: true });
+    await fileSystemPromises.copyFile(path.resolve(root, file), target);
+  }
 }
+
+void main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});

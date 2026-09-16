@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // A CSS value field that behaves like a code editor: the value is coloured as
 // you type, and the number under the caret answers to the arrow keys.
 //
@@ -38,24 +36,27 @@ export function cssTokens(value: string): CssToken[] {
   let rest = value
   while (rest) {
     let m: RegExpMatchArray | null
-    if ((m = rest.match(COMMENT))) {push('comment', m[0])}
-    else if ((m = rest.match(STRING))) {push('string', m[0])}
-    else if ((m = rest.match(CUSTOM_PROP))) {push('prop', m[0])}
-    else if ((m = rest.match(FUNCTION))) {push('fn', m[0])}
-    else if ((m = rest.match(HEX))) {push('hex', m[0])}
+    let consumedLength = 0
+    if ((m = rest.match(COMMENT))) {push('comment', m[0]); consumedLength = m[0].length}
+    else if ((m = rest.match(STRING))) {push('string', m[0]); consumedLength = m[0].length}
+    else if ((m = rest.match(CUSTOM_PROP))) {push('prop', m[0]); consumedLength = m[0].length}
+    else if ((m = rest.match(FUNCTION))) {push('fn', m[0]); consumedLength = m[0].length}
+    else if ((m = rest.match(HEX))) {push('hex', m[0]); consumedLength = m[0].length}
     else if ((m = rest.match(NUMBER))) {
       push('num', m[0])
+      consumedLength = m[0].length
       const unit = rest.slice(m[0].length).match(UNIT)
       if (unit) {
         push('unit', unit[0])
-        m = [m[0] + unit[0]] as RegExpMatchArray
+        consumedLength += unit[0].length
       }
-    } else if ((m = rest.match(IDENT))) {push('ident', m[0])}
+    } else if ((m = rest.match(IDENT))) {push('ident', m[0]); consumedLength = m[0].length}
     else {
-      push('plain', rest[0])
-      m = [rest[0]] as RegExpMatchArray
+      const plain = rest[0] ?? ''
+      push('plain', plain)
+      consumedLength = plain.length
     }
-    rest = rest.slice(m[0].length)
+    rest = rest.slice(consumedLength)
   }
   return out
 }
@@ -88,8 +89,8 @@ const NUMBER_AT = /(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g
 
 /** Decimal places to keep: whatever the value had, but enough for the step. */
 function precisionOf(text: string, step: number): number {
-  const had = text.includes('.') ? text.split('.')[1].length : 0
-  const needed = Number.isInteger(step) ? 0 : String(step).split('.')[1].length
+  const had = text.includes('.') ? (text.split('.')[1] ?? '').length : 0
+  const needed = Number.isInteger(step) ? 0 : (String(step).split('.')[1] ?? '').length
   return Math.max(had, needed)
 }
 
@@ -145,7 +146,7 @@ export function stepNumberAt(
 // are gone by then. A chip counts as one character, matching the placeholder
 // the value serialiser uses.
 
-const isChip = (n: Node): boolean => n instanceof HTMLElement && n.dataset.chip != null
+const isChip = (n: Node): boolean => n instanceof HTMLElement && n.dataset['chip'] != null
 
 /** Where the caret is, as an offset into the field's text. */
 export function caretOffset(root: HTMLElement): number | null {
@@ -192,25 +193,30 @@ export function setCaretOffset(root: HTMLElement, offset: number): void {
   const sel = doc.getSelection()
   if (!sel) {return}
   let left = offset
-  let target: { node: Node; at: number } | null = null
+  const target: { value: { node: Node; at: number } | null } = { value: null }
   const walk = (node: Node) => {
-    if (target) {return}
+    if (target.value) {return}
     if (node.nodeType === Node.TEXT_NODE) {
       const len = (node.textContent ?? '').length
-      if (left <= len) {target = { node, at: left }}
+      if (left <= len) {target.value = { node, at: left }}
       else {left -= len}
       return
     }
     if (isChip(node)) {
-      if (left <= 0) {target = { node: node.parentNode as Node, at: Array.from((node.parentNode as Node).childNodes).indexOf(node as ChildNode) }}
-      else {left -= 1}
+      const parent = node.parentNode
+      if (left <= 0 && parent !== null) {
+        target.value = {
+          node: parent,
+          at: Array.from(parent.childNodes).findIndex((child) => child === node),
+        }
+      } else {left -= 1}
       return
     }
     node.childNodes.forEach(walk)
   }
   root.childNodes.forEach(walk)
   const range = doc.createRange()
-  if (target) {range.setStart(target.node, target.at)}
+  if (target.value) {range.setStart(target.value.node, target.value.at)}
   else {
     range.selectNodeContents(root)
     range.collapse(false)

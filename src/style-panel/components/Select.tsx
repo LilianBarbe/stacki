@@ -1,8 +1,7 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { panelBounds } from '../lib/panel-box'
+import { isHTMLElementInDocument, isNodeInDocument } from '../lib/dom'
 import { endDragNotes, hoverNote } from '../../ui/sound.js'
 
 export type SelectOption<T extends string> = {
@@ -145,7 +144,7 @@ export default function Select<T extends string>({
   // Headings are non-selectable — resolve the selected/first/last real rows.
   const firstSelectable = Math.max(0, displayed.findIndex((option) => !option.heading))
   const lastSelectable = (() => {
-    for (let i = displayed.length - 1; i >= 0; i -= 1) {if (!displayed[i].heading) {return i}}
+    for (let i = displayed.length - 1; i >= 0; i -= 1) {if (!displayed[i]?.heading) {return i}}
     return 0
   })()
   const found = displayed.findIndex((option) => !option.heading && option.value === value)
@@ -237,7 +236,7 @@ export default function Select<T extends string>({
       if (displayed[idx]?.heading) {
         for (let k = 1; k <= displayed.length; k += 1) {
           const i = (idx + k) % displayed.length
-          if (!displayed[i].heading) { idx = i; break }
+          if (!displayed[i]?.heading) { idx = i; break }
         }
       }
       setActiveIndex(idx)
@@ -267,7 +266,7 @@ export default function Select<T extends string>({
       if (n === 0) {return}
       for (let k = 1; k <= n; k += 1) {
         const i = (((from + dir * k) % n) + n) % n
-        if (!displayed[i].heading) { setActiveIndex(i); return }
+        if (!displayed[i]?.heading) { setActiveIndex(i); return }
       }
     },
     [displayed],
@@ -288,7 +287,8 @@ export default function Select<T extends string>({
       const start = (activeIndex + (q.length === 1 ? 1 : 0)) % displayed.length
       for (let i = 0; i < displayed.length; i += 1) {
         const index = (start + i) % displayed.length
-        if (!displayed[index].heading && displayed[index].label.toLowerCase().startsWith(q)) {
+        const option = displayed[index]
+        if (option && !option.heading && option.label.toLowerCase().startsWith(q)) {
           setActiveIndex(index)
           return true
         }
@@ -326,7 +326,10 @@ export default function Select<T extends string>({
   useEffect(() => {
     if (!open) {return}
     const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) {return}
+      const root = rootRef.current
+      if (root && isNodeInDocument(event.target, root.ownerDocument) && root.contains(event.target)) {
+        return
+      }
       cancelMenu()
     }
     window.addEventListener('pointerdown', onPointerDown, true)
@@ -374,9 +377,15 @@ export default function Select<T extends string>({
     if (list && active) {
       const searchH = list.querySelector<HTMLElement>('.u-select-search')?.offsetHeight ?? 0
       if (opening) {
-        let node = active.previousElementSibling as HTMLElement | null
-        while (node && !node.classList.contains('u-select-heading')) {node = node.previousElementSibling as HTMLElement | null}
-        const anchor = node ?? active
+        let node = active.previousElementSibling
+        while (
+          isHTMLElementInDocument(node, active.ownerDocument) &&
+          !node.classList.contains('u-select-heading')
+        ) {
+          node = node.previousElementSibling
+        }
+        const heading = isHTMLElementInDocument(node, active.ownerDocument) ? node : null
+        const anchor = heading ?? active
         list.scrollTop = Math.max(0, anchor.offsetTop - searchH)
       } else {
         const lr = list.getBoundingClientRect()

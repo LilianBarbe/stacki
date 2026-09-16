@@ -5,7 +5,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const { test } = require('node:test');
-const { patchSigningSource, fixElectronBuilderSigning } = require('../scripts/fix-electron-builder-signing');
+const {
+  patchSigningSource,
+  fixElectronBuilderSigning,
+} = require('../dist/scripts/fix-electron-builder-signing');
 
 const builderRequire = createRequire(require.resolve('electron-builder/package.json'));
 const signingFile = builderRequire.resolve('app-builder-lib/out/codeSign/macCodeSign.js');

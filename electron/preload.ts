@@ -131,7 +131,7 @@ if (!process.isMainFrame) {
         }
         const t = e.target;
         const typing =
-          t instanceof HTMLElement &&
+          t instanceof window.HTMLElement &&
           (t.tagName === 'INPUT' ||
             t.tagName === 'TEXTAREA' ||
             t.tagName === 'SELECT' ||
@@ -1521,7 +1521,7 @@ if (!process.isMainFrame) {
   // synthesised event with no coordinates keeps e.target.
   const targetAt = (e: MouseEvent): Node | null =>
     (e.clientX || e.clientY ? document.elementFromPoint(e.clientX, e.clientY) : null) ||
-    (e.target instanceof Node ? e.target : null);
+    (e.target instanceof window.Node ? e.target : null);
 
   // Same resolution for hover, click and dblclick, so what lights up under the
   // cursor is exactly what a click selects.

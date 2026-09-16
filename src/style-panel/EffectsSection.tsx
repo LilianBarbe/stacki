@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { parseHideable, serializeHideable, type Hideable } from './lib/hideable'
 import TransformSettings from './TransformSettings'
@@ -86,7 +84,7 @@ function EffLabel({ label, prop, props }: { label: string; prop: string; props: 
       onReset={() => clearProp(prop)}
       resetLabel="Clear"
       tooltip={<PropTip props={[prop]} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => <ProvenanceList contributors={contributors} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
     >
       {label}
@@ -113,7 +111,12 @@ function OutlineColor({ props, value }: { props: Props; value: string }) {
           else {setProp('outline-color', c, false)}
         }}
       />
-      <LiveText prop="outline-color" placeholder="currentColor" props={props} dragging={shown === value ? undefined : shown} />
+      <LiveText
+        prop="outline-color"
+        placeholder="currentColor"
+        props={props}
+        {...(shown === value ? {} : { dragging: shown })}
+      />
     </>
   )
 }
@@ -183,7 +186,7 @@ function LiveText({ prop, placeholder, props, dragging }: { prop: string; placeh
 const BLEND_MODES: SelectOption<string>[] = [
   'normal', 'darken', 'multiply', 'color-burn', 'lighten', 'screen', 'color-dodge', 'overlay',
   'soft-light', 'hard-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity',
-].map((v) => ({ value: v, label: v === 'color-burn' ? 'Color burn' : v === 'color-dodge' ? 'Color dodge' : v === 'soft-light' ? 'Soft light' : v === 'hard-light' ? 'Hard light' : v[0].toUpperCase() + v.slice(1) }))
+].map((v) => ({ value: v, label: v === 'color-burn' ? 'Color burn' : v === 'color-dodge' ? 'Color dodge' : v === 'soft-light' ? 'Soft light' : v === 'hard-light' ? 'Hard light' : (v[0] ?? '').toUpperCase() + v.slice(1) }))
 
 // Grouped like Webflow's cursor menu: a non-selectable heading per group, each
 // cursor indented and shown with its Webflow glyph.
@@ -458,7 +461,9 @@ function FiltersRow({ prop, label, props }: { prop: string; label: string; props
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
     if (from === to) {return}
-    const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
   const patch = (i: number, next: Filter, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: next } : r)), live)
@@ -478,11 +483,17 @@ function FiltersRow({ prop, label, props }: { prop: string; label: string; props
         onRemove={remove}
         isHidden={(i) => rows[i]?.hidden ?? false}
         onToggleHidden={toggle}
-        renderRow={(i) => ({ preview: <FilterGlyph />, label: filterLabel(layers[i]) })}
+        renderRow={(i) => {
+          const layer = layers[i]
+          if (layer === undefined) {throw new Error(`Filter layer ${i} is missing`)}
+          return { preview: <FilterGlyph />, label: filterLabel(layer) }
+        }}
       />
       {openIdx != null && anchorEl && layers[openIdx] ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel={label} onClose={() => setOpenIdx(null)}>
-          <FilterEditor filter={layers[openIdx]} busy={busy} onChange={(next, live) => patch(openIdx!, next, live)} />
+          <FilterEditor filter={layers[openIdx]} busy={busy} onChange={(next, live) => {
+            if (openIdx !== null) {patch(openIdx, next, live)}
+          }} />
         </LayerPopover>
       ) : null}
     </div>
@@ -509,8 +520,9 @@ function parseAxis(value: string, fallbackUnit: string): { num: number; unit: st
   const m = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i)
   if (!m) {return null}
   // `none` isn't a real axis unit — never re-attach it (that's what produces `1none`).
-  const raw = m[2].toLowerCase() === 'none' ? '' : m[2]
-  return { num: parseFloat(m[1]), unit: raw || fallbackUnit }
+  const unit = m[2] ?? ''
+  const raw = unit.toLowerCase() === 'none' ? '' : unit
+  return { num: parseFloat(m[1] ?? ''), unit: raw || fallbackUnit }
 }
 
 // One transform axis (X / Y / Z): a coarse drag slider beside a precise number field,
@@ -518,7 +530,7 @@ function parseAxis(value: string, fallbackUnit: string): { num: number; unit: st
 // the value's unit; the field holds the full value (e.g. `10px`) so var()/calc() and any
 // unit survive.
 function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, onCommit }: {
-  type: TransformType; label: string; value: string; placeholder: string; busy: boolean
+  type: TransformType; label: 'X' | 'Y' | 'Z'; value: string; placeholder: string; busy: boolean
   /** Per-frame during a slider drag (before the throttled onLive) — lets a linked pair
    *  mirror this axis smoothly, not just on the throttled write. */
   onPreview?: (v: string) => void; onLive: (v: string) => void; onCommit: (v: string) => void
@@ -546,7 +558,9 @@ function AxisInput({ type, label, value, placeholder, busy, onPreview, onLive, o
   })
   return (
     <div className="embed-editor_size-row">
-      <span className="embed-editor_size-label embed-editor_bg-caption embed-editor_transform-axis" aria-hidden="true">{transformAxisIcon(type, label.toLowerCase() as 'x' | 'y' | 'z')}</span>
+      <span className="embed-editor_size-label embed-editor_bg-caption embed-editor_transform-axis" aria-hidden="true">
+        {transformAxisIcon(type, label === 'X' ? 'x' : label === 'Y' ? 'y' : 'z')}
+      </span>
       <div className="embed-editor_shadow-field">
         <DragSlider
           value={Math.round((parsed?.num ?? 0) * cfg.steps)}
@@ -681,7 +695,9 @@ function TransformsRow({ props }: { props: Props }) {
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
     if (from === to) {return}
-    const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
   const patch = (i: number, p: Partial<Transform>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
@@ -713,11 +729,17 @@ function TransformsRow({ props }: { props: Props }) {
         onRemove={remove}
         isHidden={(i) => rows[i]?.hidden ?? false}
         onToggleHidden={toggle}
-        renderRow={(i) => ({ preview: transformTypeIcon(layers[i].type), label: transformLabel(layers[i]) })}
+        renderRow={(i) => {
+          const layer = layers[i]
+          if (layer === undefined) {throw new Error(`Transform layer ${i} is missing`)}
+          return { preview: transformTypeIcon(layer.type), label: transformLabel(layer) }
+        }}
       />
       {openIdx != null && anchorEl && layers[openIdx] ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel="Transform" onClose={() => setOpenIdx(null)}>
-          <TransformEditor layer={layers[openIdx]} busy={busy} onChange={(p, live) => patch(openIdx!, p, live)} />
+          <TransformEditor layer={layers[openIdx]} busy={busy} onChange={(p, live) => {
+            if (openIdx !== null) {patch(openIdx, p, live)}
+          }} />
         </LayerPopover>
       ) : null}
       {settingsOpen && settingsRef.current ? (
@@ -751,7 +773,7 @@ function EaseCurveIcon({ timing }: { timing: string }) {
 function durationToMs(v: string): number {
   const m = v.trim().toLowerCase().match(/^(-?[\d.]+)(ms|s)?$/)
   if (!m) {return 0}
-  const n = parseFloat(m[1])
+  const n = parseFloat(m[1] ?? '')
   return m[2] === 's' ? Math.round(n * 1000) : Math.round(n)
 }
 // The value's current time unit (so the slider keeps writing seconds when the value
@@ -820,9 +842,9 @@ function EasingField({ value, busy, onCommit, onEditEasing }: { value: string; b
 }
 
 function TransitionEditor({ transition, busy, onChange, onEditEasing }: { transition: Transition; busy: boolean; onChange: (p: Partial<Transition>, live: boolean) => void; onEditEasing: () => void }) {
-  const options: SelectOption<string>[] = TRANSITION_GROUPS.flatMap((g) => [
-    { value: `__h_${g.heading}`, label: g.heading, heading: true } as SelectOption<string>,
-    ...g.items.map((it) => ({ value: it.value, label: it.label, indent: true } as SelectOption<string>)),
+  const options = TRANSITION_GROUPS.flatMap<SelectOption<string>>((group) => [
+    { value: `__h_${group.heading}`, label: group.heading, heading: true },
+    ...group.items.map((item) => ({ value: item.value, label: item.label, indent: true })),
   ])
   return (
     <div className="embed-editor_trans-editor">
@@ -860,7 +882,9 @@ function TransitionsRow({ props }: { props: Props }) {
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
     if (from === to) {return}
-    const next = [...rows]; const [m] = next.splice(from, 1); next.splice(to, 0, m); write(next, false)
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
   const patch = (i: number, p: Partial<Transition>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
@@ -884,12 +908,14 @@ function TransitionsRow({ props }: { props: Props }) {
         onToggleHidden={toggle}
         renderRow={(i) => ({
           preview: <span className="embed-editor_trans-clock" aria-hidden="true"><ClockIcon /></span>,
-          label: transitionLabel(list[i]),
+          label: transitionLabel(list[i] ?? blankTransition()),
         })}
       />
       {openIdx != null && anchorEl && cur ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel="Transition" onClose={() => setOpenIdx(null)}>
-          <TransitionEditor transition={cur} busy={busy} onChange={(p, live) => patch(openIdx!, p, live)} onEditEasing={() => setEasingOpen(true)} />
+          <TransitionEditor transition={cur} busy={busy} onChange={(p, live) => {
+            if (openIdx !== null) {patch(openIdx, p, live)}
+          }} onEditEasing={() => setEasingOpen(true)} />
         </LayerPopover>
       ) : null}
       {easingOpen && cur ? (
@@ -942,7 +968,9 @@ function BoxShadowsRow({ props }: { props: Props }) {
   const remove = (i: number) => { write(rows.filter((_, j) => j !== i), false); setOpenIdx((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur)) }
   const reorder = (from: number, to: number) => {
     if (from === to) {return}
-    const next = [...rows]; const [moved] = next.splice(from, 1); next.splice(to, 0, moved); write(next, false)
+    const next = [...rows]; const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
+    next.splice(to, 0, moved); write(next, false)
     setOpenIdx((cur) => (cur === from ? to : cur))
   }
   const patch = (i: number, p: Partial<BoxShadow>, live: boolean) => write(rows.map((r, j) => (j === i ? { ...r, item: { ...r.item, ...p } } : r)), live)
@@ -962,14 +990,20 @@ function BoxShadowsRow({ props }: { props: Props }) {
         onRemove={remove}
         isHidden={(i) => rows[i]?.hidden ?? false}
         onToggleHidden={toggle}
-        renderRow={(i) => ({
-          preview: <span className="embed-editor_bg-layer-preview" style={{ background: `linear-gradient(${shadows[i].color}, ${shadows[i].color}), conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px` }} aria-hidden="true" />,
-          label: boxShadowLabel(shadows[i]),
-        })}
+        renderRow={(i) => {
+          const shadow = shadows[i]
+          if (shadow === undefined) {throw new Error(`Box shadow ${i} is missing`)}
+          return {
+            preview: <span className="embed-editor_bg-layer-preview" style={{ background: `linear-gradient(${shadow.color}, ${shadow.color}), conic-gradient(#8883 25%, transparent 0 50%, #8883 0 75%, transparent 0) 0 0 / 10px 10px` }} aria-hidden="true" />,
+            label: boxShadowLabel(shadow),
+          }
+        }}
       />
       {openIdx != null && anchorEl && shadows[openIdx] ? (
         <LayerPopover anchorEl={anchorEl} ariaLabel="Box shadow" onClose={() => setOpenIdx(null)}>
-          <BoxShadowEditor shadow={shadows[openIdx]} busy={busy} onChange={(p, live) => patch(openIdx!, p, live)} />
+          <BoxShadowEditor shadow={shadows[openIdx]} busy={busy} onChange={(p, live) => {
+            if (openIdx !== null) {patch(openIdx, p, live)}
+          }} />
         </LayerPopover>
       ) : null}
     </div>
@@ -1094,7 +1128,7 @@ function ClipPathRow({ props }: { props: Props }) {
 }
 
 export default function EffectsSection(props: Props) {
-  const { read, busy, setProp, liveSetProp } = props
+  const { read, busy, setProp } = props
   const outline = displayOf(read('outline-style'))
   const outlineColor = displayOf(read('outline-color'))
   const events = displayOf(read('pointer-events'))

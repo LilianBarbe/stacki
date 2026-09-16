@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Native Webflow class styles — the responsive/breakpoint model + the pure
 // helpers that project a NativeModel (read in webflow.ts) into the resolved
 // style panel. Class styles are read/written through the Designer Style API
@@ -31,6 +29,10 @@ export const BREAKPOINTS: readonly BreakpointDef[] = [
   { id: 'small', label: 'Mobile (L)', media: '(max-width: 767px)' },
   { id: 'tiny', label: 'Mobile', media: '(max-width: 479px)' },
 ]
+
+function isBreakpointId(value: string): value is BreakpointId {
+  return BREAKPOINTS.some((breakpoint) => breakpoint.id === value)
+}
 
 // No breakpoint is listed for its own sake. Tablet, Mobile (L) and Mobile used
 // to be, because a Webflow project always has them; an Astro one does not, and
@@ -123,7 +125,8 @@ export function nativeBreakpointsWithValues(model: NativeModel | null): Set<Brea
   if (!model) {return out}
   for (const style of model.styles) {
     for (const [key, props] of style.propsByContext) {
-      if (props.size) {out.add(key.split('|')[0] as BreakpointId)}
+      const breakpoint = key.split('|')[0]
+      if (props.size && breakpoint && isBreakpointId(breakpoint)) {out.add(breakpoint)}
     }
   }
   return out
@@ -221,7 +224,13 @@ export function breakpointCascade(target: BreakpointId): BreakpointId[] {
   if (t < 0 || t === m) {return ['main']}
   const chain: BreakpointId[] = ['main']
   const step = t > m ? 1 : -1
-  for (let i = m + step; i !== t + step; i += step) {chain.push(BREAKPOINTS[i].id)}
+  for (let i = m + step; i !== t + step; i += step) {
+    const breakpoint = BREAKPOINTS[i]
+    if (breakpoint === undefined) {
+      throw new Error(`Breakpoint cascade index ${i} is outside its bounds`)
+    }
+    chain.push(breakpoint.id)
+  }
   return chain
 }
 
@@ -339,7 +348,11 @@ export function selectedNativeIndexFor(model: NativeModel | null, selectedTokens
     if (i + 1 !== pickedSet.size) {continue}
     const chain = new Set(applied.slice(0, i + 1).map((style) => style.className))
     if (chain.size === pickedSet.size && [...pickedSet].every((name) => chain.has(name))) {
-      return model.styles.indexOf(applied[i])
+      const style = applied[i]
+      if (style === undefined) {
+        throw new Error(`Applied style index ${i} is outside its bounds`)
+      }
+      return model.styles.indexOf(style)
     }
   }
 

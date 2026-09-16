@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
@@ -14,7 +12,7 @@ import ProvenanceList from './ProvenanceList'
 import { blankLayer, colorOverlayImage, colorOverlayOf, layerKind, layerLabel, parseLayers, serializeLayers, splitBackgroundShorthand, splitTopLevelSpaces, type BgLayer, type LayerKind } from './lib/background'
 import LayerList from './LayerList'
 import VariableConnect from './VariableConnect'
-import { blankGradientOf, parseGradient, serializeGradient } from './lib/gradient'
+import { blankGradientOf, parseGradient, serializeGradient, type GradientType } from './lib/gradient'
 import { requestAsset } from '../assetPick.js'
 import { assetValueFor } from '../assetPath.js'
 import { srcCandidates } from '../ui/AssetThumb.jsx'
@@ -89,9 +87,9 @@ function BgLabel({ label, prop, d, contributors, busy, scrubProps, onClear, onPr
       onReset={onClear}
       resetLabel="Clear"
       tooltip={<PropTip props={[prop]} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => <ProvenanceList contributors={contributors} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
-      scrubProps={scrubProps}
+      {...(scrubProps === undefined ? {} : { scrubProps })}
     >
       {label}
     </FieldLabel>
@@ -246,7 +244,7 @@ function LayerLonghandField({ layers, index, field, prop, label, placeholder, bu
 
   const listFor = (text: string): string => {
     const next = layers.map((l, i) => (i === index ? { ...l, [field]: text } : l))
-    return serializeLayers(next)[field === 'image' ? 'image' : field] as string
+    return serializeLayers(next)[field === 'image' ? 'image' : field]
   }
   const commit = (live: boolean, text = draft) => {
     const value = listFor(text.trim())
@@ -358,7 +356,7 @@ function BgPartInput({ value, placeholder, label, busy, disabled, onLive, onComm
   useEffect(() => { if (!focused.current) {setDraft(value)} }, [value])
   const scrub = useScrub({
     value: draft,
-    disabled: busy || disabled,
+    disabled: busy || disabled === true,
     onPreview: setDraft,
     onInput: (text) => onLive(text.trim()),
     onCommit: (text) => { setDraft(text); onCommit(text.trim()) },
@@ -511,7 +509,7 @@ const FIXED_OPTIONS: ReadonlyArray<SegmentedOption<string>> = [
 // ── Image: thumbnail + name + dimensions + Choose image (asset picker) ──
 function imageUrlOf(image: string): string | null {
   const m = image.match(/url\(\s*['"]?([^'")]+?)['"]?\s*\)/i)
-  return m ? m[1] : null
+  return m ? (m[1] ?? null) : null
 }
 
 // Where on disk a CSS url points.
@@ -529,7 +527,7 @@ function imageUrlOf(image: string): string | null {
 // AssetThumb already uses for its two url schemes.
 function assetSrcCandidates(url: string | null): string[] {
   if (!url) {return []}
-  const clean = url.split(/[?#]/)[0]
+  const clean = url.split(/[?#]/)[0] ?? ''
   // Hosted elsewhere, or inline: not a file, and shown from where it points.
   if (/^(https?:)?\/\//.test(clean) || clean.startsWith('data:')) {return [clean]}
   const root = getHost().projectPath
@@ -560,7 +558,7 @@ function FallbackImg({ srcs, alt = '', onLoad }: { srcs: string[]; alt?: string;
 function LayerImageField({ layers, index, busy, applyLayers }: { layers: BgLayer[]; index: number; busy: boolean; applyLayers: (l: BgLayer[]) => void }) {
   const image = layers[index]?.image ?? ''
   const url = imageUrlOf(image)
-  const name = url ? (url.split('?')[0].split(/[\\/]/).pop() || url) : ''
+  const name = url ? ((url.split('?')[0] ?? '').split(/[\\/]/).pop() || url) : ''
   const [dims, setDims] = useState('')
   const srcs = assetSrcCandidates(url)
   useEffect(() => { setDims('') }, [url])
@@ -682,8 +680,9 @@ function LayerEditor({ layers, index, busy, setProp, clearProp, liveSetProp, app
     // an angle is a direction for a linear gradient and nothing at all for a
     // radial one, and a centre point is the reverse. Each kind starts on its
     // own defaults and keeps the colours.
-    const GRADIENTS = ['linear', 'radial', 'conic']
-    if (GRADIENTS.includes(next) && GRADIENTS.includes(displayKind)) {
+    const isGradientType = (value: LayerKind): value is GradientType =>
+      value === 'linear' || value === 'radial' || value === 'conic'
+    if (isGradientType(next) && isGradientType(displayKind)) {
       const current = parseGradient(layer.image)
       if (current?.stops?.length) {
         const carried = serializeGradient({
@@ -857,6 +856,7 @@ export default function BackgroundSection(props: Props) {
     if (from === to) {return}
     const next = [...layers]
     const [moved] = next.splice(from, 1)
+    if (moved === undefined) {return}
     next.splice(to, 0, moved)
     applyLayers(next)
     setOpenLayer((cur) => (cur === from ? to : cur))
@@ -880,15 +880,18 @@ export default function BackgroundSection(props: Props) {
         onOpen={(i) => setOpenLayer((cur) => (cur === i ? null : i))}
         onReorder={reorder}
         onRemove={removeLayer}
-        renderRow={(i) => ({
-          preview: (() => {
-            const u = imageUrlOf(layers[i].image)
+        renderRow={(i) => {
+          const layer = layers[i]
+          if (layer === undefined) {throw new Error(`Background layer ${i} is missing`)}
+          return {
+            preview: (() => {
+            const u = imageUrlOf(layer.image)
             // A gradient is CSS this window paints as it stands.
             if (!u) {
               return (
                 <span
                   className="embed-editor_bg-layer-preview"
-                  style={{ background: layers[i].image, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                  style={{ background: layer.image, backgroundSize: 'cover', backgroundPosition: 'center' }}
                   aria-hidden="true"
                 />
               )
@@ -903,9 +906,10 @@ export default function BackgroundSection(props: Props) {
                 <FallbackImg srcs={assetSrcCandidates(u)} />
               </span>
             )
-          })(),
-          label: layerLabel(layers[i].image),
-        })}
+            })(),
+            label: layerLabel(layer.image),
+          }
+        }}
       />
 
       {openLayer != null && layers[openLayer] ? (

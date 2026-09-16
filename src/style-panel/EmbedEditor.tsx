@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react'
@@ -32,8 +30,8 @@ import FlexChildSection from './FlexChildSection'
 import EffectsSection from './EffectsSection'
 import ProvenanceList, { ProvenanceEmbedNav } from './ProvenanceList'
 import VariableConnect, { useSharedVars } from './VariableConnect'
-import { computeRuleModel, type DeclStatus, type MatchedRule, type RuleModel } from './lib/cascade'
-import { groupDeclarations, groupProps } from './lib/sections'
+import { computeRuleModel, type RuleModel } from './lib/cascade'
+import { groupProps } from './lib/sections'
 import { defaultSelectorTokens, selectorToClassTokens, snapshotTokens, tokensToSelector } from './lib/element-tokens'
 import { resolveStyle, indexContexts, contextKeyOf, listMatchedSelectors, selectorKey, selectorsMatch, stateForSelector, STATES, type ContextInfo, type ContextKey, type MatchedSelector, type ResolvedProp, type ResolvedStyle, type SourceKey, type StateKey, type StyleContext } from './lib/resolved'
 import { breakpointTier, buildStyleContexts, mediaParamsForBreakpoint, nativeContribsFor, nativeHasValues, nativeSelectorChips, optionsFor, selectedNativeIndexFor, type NativeStyleOptions } from './lib/native-styles'
@@ -52,19 +50,16 @@ import {
   listAtRuleBlocks,
   parseNestedInput,
   type NestStep,
-  removeDeclaration,
   removeRule,
   removeRuleIfEmpty,
   renameAtRuleQuery,
   atRuleQueryText,
   queryKey,
   splitQuery,
-  reorderDeclarations,
   replaceRuleCss,
-  setDeclarationValue,
   splitRuleSelectorAt,
 } from './lib/css'
-import { canonicalCompound, compareSpecificity, formatSpecificity, parseSelectorList, type MatchTarget } from './lib/selectors'
+import { canonicalCompound, compareSpecificity, parseSelectorList, type MatchTarget } from './lib/selectors'
 import { findNode, getHost, onHostChange, propText } from './lib/host'
 import {
   applyNativePropertyAt,
@@ -116,6 +111,11 @@ type ScanState = {
 
 type Phase = 'idle' | 'scanning' | 'ready' | 'no-selection' | 'unsupported'
 
+function isBreakpointId(value: unknown): value is BreakpointId {
+  return value === 'xxl' || value === 'xl' || value === 'large' || value === 'main' ||
+    value === 'medium' || value === 'small' || value === 'tiny'
+}
+
 // Placeholder resolved-style so the panel frame (chips, selectors, sections) can
 // render immediately while embeds are still scanning — every section shows unset
 // and fills in the moment the real resolved model arrives.
@@ -124,28 +124,10 @@ const EMPTY_RULE_MODEL: RuleModel = { base: [], conditional: [], matchedRuleCoun
 
 // ─────────────────────────── Value helpers ───────────────────────────
 
-function fullValue(decl: ParsedDeclaration): string {
-  return decl.important ? `${decl.value} !important` : decl.value
-}
-
 function parseImportant(input: string): { value: string; important: boolean } {
   const match = input.match(/!\s*important\s*$/i)
   if (match) {return { value: input.slice(0, match.index).trim(), important: true }}
   return { value: input.trim(), important: false }
-}
-
-function headerLabel(snapshot: ElementSnapshot | undefined): string {
-  if (!snapshot) {return 'None'}
-  const id = snapshot.id ? `#${snapshot.id}` : ''
-  // Show classes in their Webflow CSS form, de-duplicated (the snapshot keeps the raw
-  // display name too — e.g. `Div Block` alongside `div-block` — for matching).
-  const formatted = [...new Set(snapshot.classes.map(webflowClassToCss).filter(Boolean))]
-  const classes = formatted.length ? `.${formatted.slice(0, 5).join('.')}` : ''
-  // This line reads as a selector, so it only shows what really is one. A
-  // component instance has no tag; writing its kind there would spell
-  // `component.card`, implying a `<component>` element exists.
-  const tag = snapshot.tag ?? ''
-  return `${tag}${id}${classes}` || snapshot.webflowType || 'Element'
 }
 
 // A selector Webflow can represent as one base class without an element carrying it.
@@ -153,7 +135,7 @@ function headerLabel(snapshot: ElementSnapshot | undefined): string {
 // an embed because the Style API has no standalone selector object for them.
 function standaloneNativeClass(selector: string): string | null {
   const match = selector.trim().match(/^\.([_a-z-][\w-]*)(?::(?:hover|focus|active))?$/i)
-  return match ? webflowClassToCss(match[1]) : null
+  return match ? webflowClassToCss(match[1] ?? '') : null
 }
 
 // ─────────────────────────── Query scaffolds ───────────────────────────
@@ -208,13 +190,6 @@ function PencilIcon() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true" width="13" height="13">
       <path d="M11.5 2.5l2 2L6 12l-2.5.5L4 10l7.5-7.5z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-    </svg>
-  )
-}
-function TrashIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" width="13" height="13">
-      <path d="M3.5 4.5h9M6.5 4V2.8h3V4M5 4.5l.5 8h5l.5-8" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -333,7 +308,10 @@ function breakpointIcon(id: BreakpointId | null): ReactNode {
     case 'medium': return <TabletBreakpointIcon />
     case 'small': return <MobileLandscapeBreakpointIcon />
     case 'tiny': return <MobileBreakpointIcon />
-    default: return undefined
+    case 'xxl':
+    case 'xl':
+    case 'large':
+    case null: return undefined
   }
 }
 
@@ -360,9 +338,9 @@ const ValueField = forwardRef<HTMLTextAreaElement, {
   // Keep the local ref (used for sizing/caret work) and hand the same node to
   // whoever wrapped us.
   const attachRef = (el: HTMLTextAreaElement | null) => {
-    ;(ref as { current: HTMLTextAreaElement | null }).current = el
+    Reflect.set(ref, 'current', el)
     if (typeof forwardedRef === 'function') {forwardedRef(el)}
-    else if (forwardedRef) {(forwardedRef as { current: HTMLTextAreaElement | null }).current = el}
+    else if (forwardedRef) {Reflect.set(forwardedRef, 'current', el)}
   }
   const liveTimer = useRef<number | null>(null)
 
@@ -452,95 +430,6 @@ const ValueField = forwardRef<HTMLTextAreaElement, {
   )
 })
 
-function DeclRow({
-  decl,
-  status,
-  busy,
-  reorderable = true,
-  draggable,
-  dragging,
-  dropTarget,
-  onGrab,
-  onUngrab,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-  onCommitValue,
-  onLiveCommitValue,
-  onRemove,
-}: {
-  decl: ParsedDeclaration
-  status: DeclStatus | undefined
-  busy: boolean
-  /** When false the label isn't a drag handle (fixed canonical order sections). */
-  reorderable?: boolean
-  draggable: boolean
-  dragging: boolean
-  dropTarget: boolean
-  onGrab: () => void
-  onUngrab: () => void
-  onDragStart: () => void
-  onDragOver: () => void
-  onDrop: () => void
-  onDragEnd: () => void
-  onCommitValue: (value: string, important: boolean) => void
-  onLiveCommitValue: (value: string, important: boolean) => void
-  onRemove: () => void
-}) {
-  const overridden = status && !status.winning
-  // `display` always uses the dedicated control — it handles custom values too.
-  const isDisplay = decl.prop.toLowerCase() === 'display'
-
-  return (
-    <div
-      className={`embed-editor_decl ${isDisplay ? 'is-control' : ''} ${overridden ? 'is-overridden' : ''} ${dragging ? 'is-dragging' : ''} ${dropTarget ? 'is-drop-target' : ''}`}
-      draggable={draggable}
-      onDragStart={(event) => {
-        event.dataTransfer.effectAllowed = 'move'
-        event.dataTransfer.setData('text/plain', decl.declId)
-        onDragStart()
-      }}
-      onDragOver={(event) => { event.preventDefault(); onDragOver() }}
-      onDrop={(event) => { event.preventDefault(); onDrop() }}
-      onDragEnd={onDragEnd}
-      // A press that never became a drag (a plain click) disarms here so the row
-      // doesn't stay draggable — the click still bubbles to the label's menu.
-      onMouseUp={onUngrab}
-    >
-      {/* The label is the drag handle: press-and-drag reorders, a plain click
-          opens the menu to remove the declaration (Option-click removes at once). */}
-      <FieldLabel
-        className="embed-editor_prop-label"
-        active
-        disabled={busy}
-        onReset={onRemove}
-        resetLabel="Remove property"
-        title={
-          overridden
-            ? `Overridden by ${status?.overriddenBy ?? 'a stronger rule'}${reorderable ? ' · drag to reorder' : ''}`
-            : reorderable ? 'Drag to reorder · click for options' : 'Click for options'
-        }
-        onMouseDown={busy || !reorderable ? undefined : onGrab}
-      >
-        {decl.prop}
-      </FieldLabel>
-      {isDisplay ? (
-        <DisplayControl value={decl.value} important={decl.important} busy={busy} onCommit={onCommitValue} />
-      ) : (
-        <VariableConnect
-          ariaLabel={`Connect ${decl.prop} to a variable`}
-          disabled={busy}
-          prop={decl.prop}
-          onPick={(binding) => onCommitValue(binding, decl.important)}
-        >
-          <ValueField value={decl.value} important={decl.important} busy={busy} onCommit={onCommitValue} onLiveCommit={onLiveCommitValue} />
-        </VariableConnect>
-      )}
-    </div>
-  )
-}
-
 // ─────────────────────────── Add-property row ───────────────────────────
 
 // The property-name field with an autocomplete of every CSS property. The suggestion
@@ -592,8 +481,8 @@ function PropertyCombobox({ value, custom, busy, onChange, onPick, onEnter, onEs
   // Keep the highlighted option scrolled into view during keyboard nav.
   useEffect(() => {
     if (!open) {return}
-    const el = listRef.current?.children[active] as HTMLElement | undefined
-    el?.scrollIntoView({ block: 'nearest' })
+    const element = listRef.current?.children[active]
+    if (element instanceof HTMLElement) {element.scrollIntoView({ block: 'nearest' })}
   }, [active, open])
 
   const choose = (prop: string) => { onPick(prop); setOpen(false) }
@@ -799,7 +688,7 @@ function ProvenancePopover({ prop, anchor, resolved, onClose, onAnchorReclick, o
   // after the opening click, so that click can't immediately close it.
   useEffect(() => {
     const onDown = (event: PointerEvent) => {
-      if (ref.current?.contains(event.target as Node)) {return}
+      if (event.target instanceof Node && ref.current?.contains(event.target)) {return}
       // Pressing back on the label that opened this popover toggles it closed —
       // flag it so that label's click doesn't immediately re-open it.
       if (
@@ -872,7 +761,7 @@ function ResolvedRow({ prop, resolved, busy, setProp, clearProp, liveSetProp, on
           disabled={busy}
           onReset={() => clearProp(prop)}
           resetLabel="Remove property"
-          title={resolved.overridden ? `Overridden by ${resolved.winner.selectorText}` : undefined}
+          {...(resolved.overridden ? { title: `Overridden by ${resolved.winner.selectorText}` } : {})}
           menuNote={(close) => <ProvenanceList contributors={resolved.contributors} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
         >
           {prop}
@@ -1010,7 +899,7 @@ function VerticalAlignRow({ resolved, dimmed, busy, setProp, clearProp, onProven
           onReset={() => clearProp(prop)}
           resetLabel="Remove property"
           tooltip={<PropTip props={[prop]} />}
-          title={overridden ? `Overridden by ${resolved.winner.selectorText}` : undefined}
+          {...(overridden ? { title: `Overridden by ${resolved.winner.selectorText}` } : {})}
           menuNote={(close) => <ProvenanceList contributors={resolved.contributors} prop={prop} onSelect={(sel, p) => { onSelectSelector(sel, p); close() }} />}
         >
           Align Y
@@ -1434,8 +1323,9 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
 
   // Keep the highlighted row visible while arrowing through a long list.
   useEffect(() => {
-    if (!showList || highlight < 0) {return
-    ;}(listRef.current?.children[highlight] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' })
+    if (!showList || highlight < 0) {return}
+    const element = listRef.current?.children[highlight]
+    if (element instanceof HTMLElement) {element.scrollIntoView({ block: 'nearest' })}
   }, [highlight, showList])
 
   // Focus the input once it's revealed by a well click (it may have just mounted).
@@ -1447,7 +1337,8 @@ export function SelectorPicker({ selectors, suggestions, activeSelector, activeP
   // chip (select/deselect), the input, or the suggestion list are left alone.
   const onWellMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (busy) {return}
-    const target = event.target as HTMLElement
+    const target = event.target
+    if (!(target instanceof HTMLElement)) {return}
     // Clicking a chip selects/deselects it — don't let the input's blur restore the
     // previously-active selector over that choice.
     if (target.closest('.embed-editor_selector-chip')) { restoreRef.current = null; return }
@@ -1694,8 +1585,9 @@ function QueryCombo({ draft, setDraft, onSubmit, onCancel, suggestions, ariaLabe
   }, [suggestions, q, initial])
   const showList = open && filtered.length > 0
   useEffect(() => {
-    if (!showList || highlight < 0) {return
-    ;}(listRef.current?.children[highlight] as HTMLElement | undefined)?.scrollIntoView({ block: 'nearest' })
+    if (!showList || highlight < 0) {return}
+    const element = listRef.current?.children[highlight]
+    if (element instanceof HTMLElement) {element.scrollIntoView({ block: 'nearest' })}
   }, [highlight, showList])
 
   const submit = (text: string) => { const t = text.trim(); if (t && t !== '@') {onSubmit(t)} }
@@ -1848,7 +1740,6 @@ function EditQueryForm({ query, uses, sourceLabel, suggestions, onRename, onCanc
 function StyleCard({
   snapshot,
   selectedNames,
-  selectedSelector,
   activePicked,
   onSelectNames,
   resolved,
@@ -1871,7 +1762,6 @@ function StyleCard({
   sourceOptions,
   onSourceChange,
   sourceNote,
-  nativeStyleName,
   loading,
   resolving,
   busy,
@@ -1884,7 +1774,6 @@ function StyleCard({
   rawOpen,
   onToggleRaw,
   onSaveRaw,
-  onRemoveRule,
 }: {
   snapshot: ElementSnapshot | undefined
   selectedNames: string[]
@@ -1952,12 +1841,6 @@ function StyleCard({
   const suppressProvenanceReopen = useCallback((prop: string) => { suppressProvenance.current = prop }, [])
   const [rawDraft, setRawDraft] = useState('')
 
-  const beginRaw = () => {
-    if (!selectedRule) {return}
-    setRawDraft(selectedRule.node.toString())
-    onToggleRaw()
-  }
-
   // Always show Layout + Size so the panel is consistent across elements, not
   // only those that already set a property in that section.
   const groups = groupProps([...resolved.props.keys()], ['flex-child', 'layout', 'position', 'spacing', 'size', 'typography', 'backgrounds', 'borders', 'effects', 'other'])
@@ -1990,9 +1873,9 @@ function StyleCard({
                   label: ctx.label,
                   icon: breakpointIcon(ctx.breakpoint),
                   marked: contextInfos.find((info) => info.key === ctx.key)?.hasStyles ?? false,
-                  action: uses > 0
-                    ? { icon: <PencilIcon />, label: `Edit ${query}`, onSelect: () => { setAddingQuery(false); setEditingQuery(query) } }
-                    : undefined,
+                  ...(uses > 0
+                    ? { action: { icon: <PencilIcon />, label: `Edit ${query}`, onSelect: () => { setAddingQuery(false); setEditingQuery(query) } } }
+                    : {}),
                 }
               }),
               { value: ADD_QUERY, label: 'Add query', icon: <PlusIcon /> },
@@ -2066,9 +1949,9 @@ function StyleCard({
               value: opt.value,
               label: opt.label,
               marked: opt.heading ? false : (opt.marked ?? false),
-              heading: opt.heading,
-              indent: opt.indent,
-              triggerLabel: opt.triggerLabel,
+              ...(opt.heading === undefined ? {} : { heading: opt.heading }),
+              ...(opt.indent === undefined ? {} : { indent: opt.indent }),
+              ...(opt.triggerLabel === undefined ? {} : { triggerLabel: opt.triggerLabel }),
               icon: opt.heading ? <ComponentIcon /> : <EmbedIcon />,
               // Trigger tag: component embeds show the component icon in green,
               // page-level embeds the embed icon in blue.
@@ -2302,7 +2185,7 @@ function chainPrefixDepth(classes: string[], classList: string[]): number {
   if (!k || k > classList.length) {return 0}
   const set = new Set(classes)
   if (set.size !== k) {return 0}
-  for (let i = 0; i < k; i += 1) {if (!set.has(classList[i])) {return 0}}
+  for (let i = 0; i < k; i += 1) {if (!set.has(classList[i] ?? '')) {return 0}}
   return k
 }
 
@@ -2357,7 +2240,8 @@ function styledSelectorsFor(
     const inContext = context.breakpoint ? ns.inContext : false
     const existing = byKey.get(key)
     if (existing) { if (inContext) {existing.inContext = true;} continue }
-    byKey.set(key, { text: ns.text, specificity: [0, ns.classDepth, 0] as Specificity, state: ns.state, simple: true, key, inContext })
+    const specificity: Specificity = [0, ns.classDepth, 0]
+    byKey.set(key, { text: ns.text, specificity, state: ns.state, simple: true, key, inContext })
   }
   return [...byKey.values()].sort(
     (a, b) => compareSpecificity(a.specificity, b.specificity) || a.text.localeCompare(b.text),
@@ -2539,14 +2423,14 @@ export default function EmbedEditor() {
   const [quickSnapshot, setQuickSnapshot] = useState<ElementSnapshot | null>(restoredRef.current?.quick ?? null)
   // Classes removed since the panel last resolved — hidden from the chips at once.
   const removedClasses = useRemovedClasses()
-  const [status, setStatus] = useState('Select an element to inspect its embed styles.')
+  const [, setStatus] = useState('Select an element to inspect its embed styles.')
   const [busy, setBusy] = useState(false)
   // Last save failure (surfaced by the header save indicator, not as body text).
   const [saveError, setSaveError] = useState<string | null>(null)
   // When a native (Webflow class) write can't apply and we fall back to an embed,
   // the reason — surfaced inline so the fallback isn't silent.
   const [nativeFallback, setNativeFallback] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
+  const [, setRefreshing] = useState(false)
   // True between showing page-level rules and the component embeds finishing.
   const [scanningMore, setScanningMore] = useState(false)
   const [rawRuleId, setRawRuleId] = useState<string | null>(null)
@@ -2807,8 +2691,8 @@ export default function EmbedEditor() {
     // classes ran at runtime; the source tree can't see either. One question
     // covers both halves (identity + which selectors match), so the chips wait
     // out a single round trip rather than two back to back.
-    const asked = await askCanvasAbout(serializeElementId(element as never), content.rules)
-    const { target, rootSnapshot } = await resolveTarget(element as never, content.scan, asked)
+    const asked = await askCanvasAbout(serializeElementId(element), content.rules)
+    const { target, rootSnapshot } = await resolveTarget(element, content.scan, asked)
     if (seq !== seqRef.current) {return}
     targetRef.current = target
     await primeDomMatches(target, content.rules, asked)
@@ -2870,7 +2754,7 @@ export default function EmbedEditor() {
     try {
       const content = await rebuildAndStore()
       const element = selectedRef.current
-      if (element && scanHasElement(content.scan, element as never)) {
+      if (element && scanHasElement(content.scan, element)) {
         await applyResolve(element, content, seqRef.current, true)
       }
     } catch {
@@ -2895,21 +2779,21 @@ export default function EmbedEditor() {
     if (typeof document !== 'undefined' && document.hidden) {return}
     const element = selectedRef.current
     const content = contentRef.current
-    if (!element || !content || !scanHasElement(content.scan, element as never)) {return}
+    if (!element || !content || !scanHasElement(content.scan, element)) {return}
     let target: MatchTarget
     let snap: ElementSnapshot
     let native: NativeModel
     let asked: Awaited<ReturnType<typeof askCanvasAbout>>
     try {
-      asked = await askCanvasAbout(serializeElementId(element as never), content.rules)
-      const resolved = await resolveTarget(element as never, content.scan, asked)
+      asked = await askCanvasAbout(serializeElementId(element), content.rules)
+      const resolved = await resolveTarget(element, content.scan, asked)
       target = resolved.target
       snap = resolved.rootSnapshot
       // Read from the RESOLVED identity element (as refreshNative and the load effect
       // do), NOT the raw selection — reading the raw element yields a different model
       // for in-component selections, so its signature would never match the displayed
       // one and the poll would re-render every tick.
-      const identity = await resolveIdentityElement(element as never)
+      const identity = await resolveIdentityElement(element)
       native = await readNativeStyles(identity, STATES)
     } catch {
       return // transient read failure — try again next tick
@@ -2955,7 +2839,7 @@ export default function EmbedEditor() {
     // A new element must not inherit the previous one's picked selector. Reset the
     // moment the SELECTED ELEMENT changes (not when its token signature does — those
     // can collide across elements), then the tokens effect re-defaults it.
-    const elKey = element ? serializeElementId((element as { id?: unknown }).id) : ''
+    const elKey = element ? serializeElementId(element) : ''
     if (elKey !== selectedElementKeyRef.current) {
       selectedElementKeyRef.current = elKey
       setSelectedSelectorText(null)
@@ -3015,12 +2899,12 @@ export default function EmbedEditor() {
 
     // Read a fast snapshot (tag + classes) straight off the element so the chips
     // render right away, before the (slower) embed scan produces the full model.
-    void buildSnapshot(element as never)
+    void buildSnapshot(element)
       .then((snap) => { if (seq === seqRef.current) {setQuickSnapshot(snap)} })
       .catch(() => {})
 
     const cached = contentRef.current
-    const canReuse = !opts.force && cached != null && scanHasElement(cached.scan, element as never)
+    const canReuse = !opts.force && cached != null && scanHasElement(cached.scan, element)
 
     if (canReuse && cached) {
       // Instant: re-match against cached content, then refresh in the background.
@@ -3100,7 +2984,7 @@ export default function EmbedEditor() {
     void getCurrentBreakpoint().then(setCurrentBreakpoint)
     const unsubscribe = api.subscribe?.('selectedelement', (el) => void refresh(el))
     const unsubBreakpoint = api.subscribe?.('mediaquery', (bp) =>
-      setCurrentBreakpoint((typeof bp === 'string' ? bp : 'main') as BreakpointId),
+      setCurrentBreakpoint(isBreakpointId(bp) ? bp : 'main'),
     )
     return () => {
       seqRef.current += 1
@@ -3233,7 +3117,7 @@ export default function EmbedEditor() {
     }
     const remap = (decl: ParsedDeclaration): ParsedDeclaration => {
       const i = origNodes.indexOf(decl.node)
-      return i >= 0 ? editRule.declarations[i] : decl
+      return i >= 0 ? (editRule.declarations[i] ?? decl) : decl
     }
     return { rule: editRule, remap }
   }, [])
@@ -3275,36 +3159,6 @@ export default function EmbedEditor() {
     }
   }, [clearPending, docByKey, markPending, refreshDerived])
 
-  const onCommitValue = useCallback((rule: ParsedRule, decl: ParsedDeclaration, value: string, important: boolean) => {
-    void applyEdit(rule, () => setDeclarationValue(splitForEdit(rule).remap(decl), value, important))
-  }, [applyEdit, splitForEdit])
-
-  // Live (debounced) write while typing/scrubbing: push the value straight to the
-  // AST node + embed so the canvas updates in real time. Deliberately skips the
-  // busy flag (so the field stays editable) and the model refresh (values don't
-  // change the cascade) — blur runs the authoritative commit via onCommitValue.
-  const onLiveCommitValue = useCallback((rule: ParsedRule, decl: ParsedDeclaration, value: string, important: boolean) => {
-    // A grouped-splittable selector must split first (on blur, via onCommitValue) so
-    // a live write doesn't mutate the whole group. Skip the live preview for it.
-    if (isGroupedSplittable(rule)) {return}
-    const doc = docByKey.get(rule.embedKey)
-    if (!doc) {return}
-    decl.node.value = value
-    decl.node.important = important
-    void writeEmbedDoc(doc, true).then((res) => {
-      if (!res.ok && inComponentRef.current && !doc.source.fromComponent) {markPending(doc.source.key)}
-    })
-  }, [docByKey, markPending, isGroupedSplittable])
-  const onAdd = useCallback((rule: ParsedRule, prop: string, value: string, important: boolean) => {
-    void applyEdit(rule, () => addDeclaration(splitForEdit(rule).rule, prop, value, important))
-  }, [applyEdit, splitForEdit])
-  const onRemove = useCallback((rule: ParsedRule, decl: ParsedDeclaration) => {
-    void applyEdit(rule, () => {
-      const { rule: editRule, remap } = splitForEdit(rule)
-      removeDeclaration(remap(decl))
-      removeRuleIfEmpty(editRule)
-    })
-  }, [applyEdit, splitForEdit])
   // Property-addressed writes for always-rendered controls. We look up nodes in
   // the live postcss AST (not rule.declarations) so these stay correct after a
   // live edit appended a node the model hasn't rebuilt yet — otherwise a blur
@@ -3312,7 +3166,7 @@ export default function EmbedEditor() {
   const lastDeclFor = (rule: ParsedRule, prop: string): Declaration | null => {
     const key = prop.toLowerCase()
     const matches = directDecls(rule.node).filter((d) => d.prop.trim().toLowerCase() === key)
-    return matches.length ? matches[matches.length - 1] : null
+    return matches.length ? (matches[matches.length - 1] ?? null) : null
   }
   const onSetProp = useCallback((rule: ParsedRule, prop: string, value: string, important: boolean) => {
     void applyEdit(rule, () => {
@@ -3331,6 +3185,7 @@ export default function EmbedEditor() {
       if (!targets.length) {return false}
       targets.forEach((decl) => decl.remove())
       removeRuleIfEmpty(editRule)
+      return
     })
   }, [applyEdit, splitForEdit])
   // What a live write overwrote, per property — captured on the FIRST live write since
@@ -3381,9 +3236,6 @@ export default function EmbedEditor() {
       if (!res.ok && inComponentRef.current && !doc.source.fromComponent) {markPending(doc.source.key)}
     })
   }, [docByKey, markPending])
-  const onReorder = useCallback((rule: ParsedRule, ids: string[]) => {
-    void applyEdit(rule, () => reorderDeclarations(splitForEdit(rule).rule, ids))
-  }, [applyEdit, splitForEdit])
   const onRemoveRule = useCallback((rule: ParsedRule) => {
     void applyEdit(rule, () => removeRule(splitForEdit(rule).rule))
   }, [applyEdit, splitForEdit])
@@ -3395,38 +3247,6 @@ export default function EmbedEditor() {
       return true
     })
   }, [applyEdit])
-
-  // Scaffold: create the rule inside its query, then persist — mirrors applyEdit's
-  // optimistic-refresh + deferred-save-in-component behavior.
-  const onAddToPlaceholder = useCallback((placeholder: Placeholder, prop: string, value: string, important: boolean) => {
-    const doc = docByKey.get(placeholder.embedKey)
-    if (!doc) { setStatus('Lost track of the source embed — try Rescan.'); return }
-    void (async () => {
-      setBusyBoth(true)
-      setStatus('Saving…')
-      try {
-        if (!createRuleInAtRule(placeholder.atRuleNode, placeholder.selector, prop, value, important)) {
-          setStatus('Nothing to save.')
-          return
-        }
-        const res = await writeEmbedDoc(doc)
-        await refreshDerived()
-        if (!res.ok) {
-          if (inComponentRef.current && !doc.source.fromComponent) {
-            markPending(doc.source.key)
-            setStatus('Held — this rule lives in the page, so the canvas shows it once you leave the component.')
-            return
-          }
-          setSaveError(res.error)
-          return
-        }
-        clearPending(doc.source.key)
-        setStatus(`Added ${placeholder.selector} to ${placeholder.atContext[placeholder.atContext.length - 1] ?? 'the query'}.`)
-      } finally {
-        setBusyBoth(false)
-      }
-    })()
-  }, [clearPending, docByKey, markPending, refreshDerived, setBusyBoth])
 
   // Select the source embed on the Webflow canvas (from a provenance embed chip).
   // Component embeds carry no page instance, so pass the current page's instances
@@ -3572,7 +3392,7 @@ export default function EmbedEditor() {
     // Read native styles from the RESOLVED identity element (a component instance's
     // root), not the raw selection — the instance wrapper carries no classes of its
     // own, so reading it directly yields nothing outside the component.
-    void resolveIdentityElement(el as never)
+    void resolveIdentityElement(el)
       .then((identity) => readNativeStyles(identity, STATES, onPartial))
       .then((model) => {
         if (cancelled) {return}
@@ -3675,9 +3495,9 @@ export default function EmbedEditor() {
       !canon.pseudoElement &&
       canon.pseudoClasses.length === 0 &&
       canon.tokens.length === 1 &&
-      canon.tokens[0].startsWith('class:')
+      (canon.tokens[0] ?? '').startsWith('class:')
     ) {
-      getHost().addClass?.(canon.tokens[0].slice('class:'.length))
+      getHost().addClass?.((canon.tokens[0] ?? '').slice('class:'.length))
       // The element itself changed, so the matches the canvas gave us for these
       // same selectors no longer hold — ask again on the next refresh.
       primedRef.current = null
@@ -3734,8 +3554,7 @@ export default function EmbedEditor() {
     const raf = requestAnimationFrame(() => {
       const el = rootRef.current?.querySelector<HTMLElement>(`[data-prop="${focusProp}"]`)
       el?.focus()
-      const field = el as HTMLInputElement | HTMLTextAreaElement | null
-      if (field && typeof field.select === 'function') {field.select()}
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {el.select()}
       setFocusProp(null)
     })
     return () => cancelAnimationFrame(raf)
@@ -3928,7 +3747,7 @@ export default function EmbedEditor() {
   // first edit. `creatableClass` is that class's display name.
   const creatableClass = useMemo<string | null>(() => {
     if (nativeIndex != null || selectedTokens.length !== 1) {return null}
-    const token = selectedTokens[0]
+    const token = selectedTokens[0] ?? ''
     return token.startsWith('class:') ? token.slice('class:'.length) : null
   }, [nativeIndex, selectedTokens])
   // …but only when a native styling system exists. Without one (a plain CSS
@@ -4006,7 +3825,9 @@ export default function EmbedEditor() {
         contribs: nativeContribs,
         selectedIndex: selectedNativeIndex,
         selectedEmbedKey,
-        currentTier: currentContext.breakpoint ? breakpointTier(currentContext.breakpoint) : undefined,
+        ...(currentContext.breakpoint
+          ? { currentTier: breakpointTier(currentContext.breakpoint) }
+          : {}),
       },
     ),
     [model, currentContext, activeSelector, effectiveSource, nativeContribs, selectedNativeIndex, selectedEmbedKey],
@@ -4076,8 +3897,10 @@ export default function EmbedEditor() {
         const s = entry.s
         // In a query context, show the display with an `@` at the query position;
         // on Base / other contexts show the plain nested display.
-        const inQuery = !!currentContext.embedAtContext && s.inContext !== false && !!s.queryDisplay
-        return inQuery ? { ...s, display: s.queryDisplay } : s
+        if (currentContext.embedAtContext && s.inContext !== false && s.queryDisplay) {
+          return { ...s, display: s.queryDisplay }
+        }
+        return s
       })
   }, [model, nativeModel, currentContext, activeSelector, selectedSelectorText, tokens, snapshot, removedClasses])
 
@@ -4113,7 +3936,8 @@ export default function EmbedEditor() {
       .filter((s) => s.inContext !== false && !isGlobalSelector(s.text))
     if (!styled.length) {return}
     if (activeSelector && styled.some((s) => selectorsMatch(s.text, activeSelector))) {return}
-    selectActiveSelector(styled[styled.length - 1].text)
+    const strongest = styled[styled.length - 1]
+    if (strongest !== undefined) {selectActiveSelector(strongest.text)}
   }, [styleContexts, model, nativeModel, activeSelector, selectActiveSelector])
 
   // On selecting a new element, upgrade the raw all-classes default to the strongest
@@ -4170,7 +3994,8 @@ export default function EmbedEditor() {
         compareSpecificity(a.s.specificity, b.s.specificity) || a.s.text.localeCompare(b.s.text))
       .map((e) => e.s)
     const firstAfterTag = inChipOrder.find((s) => selectorOrder(s.text, classList)[0] > 0)
-    selectActiveSelector((primaryStyled ?? firstAfterTag ?? inChipOrder[0] ?? local[local.length - 1]).text)
+    const initial = primaryStyled ?? firstAfterTag ?? inChipOrder[0] ?? local[local.length - 1]
+    if (initial !== undefined) {selectActiveSelector(initial.text)}
   }, [model, nativeModel, context, styleContexts, tokens, elementIdentity, snapshot, selectActiveSelector])
 
   // ── Native (Webflow class style) writes ──
@@ -4186,7 +4011,7 @@ export default function EmbedEditor() {
       return
     }
     nativeModelCache.clear() // a class edit can change any element that uses it
-    const identity = await resolveIdentityElement(el as never)
+    const identity = await resolveIdentityElement(el)
     const model = await readNativeStyles(identity, STATES)
     nativeModelRef.current = model
     setNativeModel(model)
@@ -4206,7 +4031,7 @@ export default function EmbedEditor() {
     const resync = () => {
       // Don't fight an in-progress write or an active edit inside the panel.
       if (busyRef.current) {return}
-      const active = document.activeElement as HTMLElement | null
+      const active = document.activeElement instanceof HTMLElement ? document.activeElement : null
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {return}
       if (timer != null) {return}
       timer = window.setTimeout(() => {
@@ -4389,7 +4214,9 @@ export default function EmbedEditor() {
   // property/value (storing unsupported ones as custom properties), so "regular"
   // and "custom property" are one call; we verify it actually applied and, if not,
   // move the property to custom code (an embed) — the try-native-else-custom-code chain.
-  const nativeHandle = () => (nativeModel && selectedNativeIndex != null ? nativeModel.styles[selectedNativeIndex].style : null)
+  const nativeHandle = () => (nativeModel && selectedNativeIndex != null
+    ? (nativeModel.styles[selectedNativeIndex]?.style ?? null)
+    : null)
   // Where a property's edit goes: the layer that currently holds its editable
   // value (native when the class sets it, the picked embed when it fell back);
   // a brand-new property defaults to native-first when the selection allows it.
@@ -4580,7 +4407,7 @@ export default function EmbedEditor() {
   // The name to badge when editing a native class style.
   const nativeStyleName = effectiveSource === 'native'
     ? (selectedNativeIndex != null && nativeModel
-        ? (nativeModel.styles[selectedNativeIndex].displayName || nativeModel.styles[selectedNativeIndex].className)
+        ? (nativeModel.styles[selectedNativeIndex]?.displayName || nativeModel.styles[selectedNativeIndex]?.className || '')
         : creatableClass)
     : null
   const sourceNote: string | null = null

@@ -1,10 +1,21 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { colorMode, formatColor, formatHex, hsvaToRgba, parseColor, rgbaToHsl, rgbaToHsva, type ColorMode, type HSVA, type RGBA } from '../shared/color'
 import { dragNote, endDragNotes } from '../../ui/sound.js'
 import { registerPopupLayer } from '../lib/popup-layer'
+import type { CSSProperties } from 'react'
+
+type EyeDropperConstructor = new () => { open: () => Promise<{ sRGBHex: string }> }
+
+function isEyeDropperConstructor(candidate: unknown): candidate is EyeDropperConstructor {
+  return typeof candidate === 'function'
+}
+
+function readEyeDropper(): EyeDropperConstructor | null {
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'EyeDropper')
+  const candidate: unknown = descriptor?.value
+  return isEyeDropperConstructor(candidate) ? candidate : null
+}
 
 // A Webflow-style color chooser popover: a saturation/brightness square, hue and
 // alpha sliders, an eyedropper, and hex / RGB / HSB inputs. Portaled to <body> and
@@ -25,6 +36,10 @@ type Props = {
 const CHECKER = 'repeating-conic-gradient(#808080 0% 25%, #a0a0a0 0% 50%) 50% / 10px 10px'
 const HUE_BAR = 'linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%)'
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n))
+
+function checkerStyle(): CSSProperties & { readonly '--picker-checker': string } {
+  return { '--picker-checker': CHECKER }
+}
 
 // Track the pointer across a drag on `el`, reporting a 0..1 fraction of its width
 // (and, for the 2D square, height). Live during the drag; committed on release.
@@ -195,8 +210,10 @@ export default function ColorPicker({ value, anchor, trigger, onChange, onClose 
   // Close on outside pointerdown / Escape.
   useEffect(() => {
     const onDown = (e: PointerEvent) => {
-      const t = e.target as Node
-      if (!rootRef.current?.contains(t) && !trigger?.contains(t)) {onClose()}
+      const target = e.target
+      if (!(target instanceof Node) || (!rootRef.current?.contains(target) && !trigger?.contains(target))) {
+        onClose()
+      }
     }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
     window.addEventListener('pointerdown', onDown, true)
@@ -221,9 +238,9 @@ export default function ColorPicker({ value, anchor, trigger, onChange, onClose 
     onChange(formatColor(c, notation), live)
   }
   const eyedrop = () => {
-    const ED = (window as unknown as { EyeDropper?: new () => { open: () => Promise<{ sRGBHex: string }> } }).EyeDropper
-    if (!ED) {return}
-    new ED().open().then((r) => setFromColor(r.sRGBHex, false)).catch(() => {})
+    const EyeDropper = readEyeDropper()
+    if (!EyeDropper) {return}
+    new EyeDropper().open().then((result) => setFromColor(result.sRGBHex, false)).catch(() => {})
   }
 
   const setNum = (key: 'h' | 's' | 'v' | 'a', raw: string, max: number) => {
@@ -262,12 +279,16 @@ export default function ColorPicker({ value, anchor, trigger, onChange, onClose 
       </div>
 
       <div className="u-color-sliders">
-        <button type="button" className={`u-color-eyedrop ${typeof (window as { EyeDropper?: unknown }).EyeDropper === 'function' ? '' : 'is-hidden'}`} onClick={eyedrop} title="Pick a color from the screen" aria-label="Eyedropper"><EyedropperIcon /></button>
+        <button type="button" className={`u-color-eyedrop ${readEyeDropper() ? '' : 'is-hidden'}`} onClick={eyedrop} title="Pick a color from the screen" aria-label="Eyedropper"><EyedropperIcon /></button>
         <div className="u-color-slider-stack">
           <div className="u-color-slider" style={{ background: HUE_BAR }} onPointerDown={(e) => { e.preventDefault(); dragHue(e.currentTarget, e) }}>
             <span className="u-color-slider-thumb" style={{ left: `${(hsva.h / 360) * 100}%` }} />
           </div>
-          <div className="u-color-slider u-color-alpha" style={{ ['--picker-checker' as string]: CHECKER }} onPointerDown={(e) => { e.preventDefault(); dragAlpha(e.currentTarget, e) }}>
+          <div
+            className="u-color-slider u-color-alpha"
+            style={checkerStyle()}
+            onPointerDown={(e) => { e.preventDefault(); dragAlpha(e.currentTarget, e) }}
+          >
             <span className="u-color-alpha-fill" style={{ background: `linear-gradient(to right, transparent, ${hueColorWithSat(hsva)})` }} />
             <span className="u-color-slider-thumb" style={{ left: `${alphaPct}%` }} />
           </div>
@@ -279,7 +300,7 @@ export default function ColorPicker({ value, anchor, trigger, onChange, onClose 
         <Field label="HEX" wide value={formatHex(rgba)} onChange={(v) => setFromColor(v, false)} />
         <div className="u-color-channels">
           {chLabels.map((lab, i) => (
-            <Field key={i} label={lab} value={chVals[i]} onChange={(v) => setCh(i, v)} />
+            <Field key={i} label={lab} value={chVals[i] ?? ''} onChange={(v) => setCh(i, v)} />
           ))}
         </div>
         <Field label="A" value={String(alphaPct)} onChange={(v) => setNum('a', v, 100)} />

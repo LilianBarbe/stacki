@@ -70,11 +70,12 @@ export default function LayerPopover({ anchorEl, onClose, ariaLabel, children }:
       window.setTimeout(() => document.removeEventListener('click', eat, true), 400)
     }
     const onDown = (e: MouseEvent) => {
-      const t = e.target as Node
+      const target = e.target
+      if (!(target instanceof Node)) {return}
       // A popup this one opened (the colour picker from a swatch in here) is drawn
       // through a portal, so `contains` says outside — see lib/popup-layer.
-      if (inOwnedPopup(t, ref.current)) {return}
-      if (ref.current?.contains(t) || anchorEl.contains(t)) {return}
+      if (inOwnedPopup(target, ref.current)) {return}
+      if (ref.current?.contains(target) || anchorEl.contains(target)) {return}
       // The anchor row is excluded above: pressing it toggles the popover shut
       // through its own handler, which is a press meant for it.
       swallowNextClick()

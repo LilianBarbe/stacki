@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // The `transition` property is a comma-separated list of transitions, each
 // `<property> <duration> <timing-function> <delay>` (property first, the two times
 // in order). We parse it into an ordered list (index 0 = first) and serialize back,
@@ -77,12 +75,18 @@ export function parseTransitions(value: string): Transition[] {
     // output always leads with it; external CSS may omit it (defaults to `all`).
     let property = 'all'
     let rest = tokens
-    if (tokens.length && !isTime(tokens[0]) && !isTiming(tokens[0])) { property = tokens[0]; rest = tokens.slice(1) }
+    const firstToken = tokens[0]
+    if (firstToken !== undefined && !isTime(firstToken) && !isTiming(firstToken)) {
+      property = firstToken; rest = tokens.slice(1)
+    }
     // Next comes the duration — a <time>, or a typed keyword/var() we keep verbatim.
     // (An easing keyword here means the duration was omitted.) After the duration, a
     // <time> is the delay and anything else is the easing.
     let duration = '0s'
-    if (rest.length && !isTiming(rest[0])) { duration = rest[0]; rest = rest.slice(1) }
+    const firstRest = rest[0]
+    if (firstRest !== undefined && !isTiming(firstRest)) {
+      duration = firstRest; rest = rest.slice(1)
+    }
     let timing = ''
     let delay = ''
     for (const t of rest) { if (isTime(t)) {delay = t;} else {timing = t} }
@@ -133,7 +137,7 @@ export function easingToBezier(timing: string): [number, number, number, number]
   }
   if (named[v]) {return named[v]}
   const m = v.match(/^cubic-bezier\(\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*,\s*([\d.-]+)\s*\)$/)
-  if (m) {return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]), parseFloat(m[4])]}
+  if (m) {return [parseFloat(m[1] ?? ''), parseFloat(m[2] ?? ''), parseFloat(m[3] ?? ''), parseFloat(m[4] ?? '')]}
   return [0.25, 0.1, 0.25, 1] // fall back to ease
 }
 

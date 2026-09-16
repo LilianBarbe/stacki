@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Color parsing + conversion for the color picker. Parsing leans on a shared
 // canvas 2d context (the browser normalizes ANY CSS color — named, hex, rgb(),
 // hsl(), transparent — to rgb/rgba), so we never ship a 148-name table.
@@ -48,8 +46,9 @@ function parseNormalized(s: string): RGBA | null {
   }
   const m = /rgba?\(([^)]+)\)/i.exec(s)
   if (!m) {return null}
-  const parts = m[1].split(',').map((p) => p.trim())
-  return { r: round(parseFloat(parts[0])), g: round(parseFloat(parts[1])), b: round(parseFloat(parts[2])), a: parts[3] != null ? clamp(parseFloat(parts[3]), 0, 1) : 1 }
+  const parts = (m[1] ?? '').split(',').map((p) => p.trim())
+  if (parts.length < 3) {return null}
+  return { r: round(parseFloat(parts[0] ?? '')), g: round(parseFloat(parts[1] ?? '')), b: round(parseFloat(parts[2] ?? '')), a: parts[3] != null ? clamp(parseFloat(parts[3]), 0, 1) : 1 }
 }
 
 // A minimal fallback for non-DOM contexts (tests) — hex + rgb/rgba only.
@@ -61,7 +60,7 @@ function parseColorFallback(value: string): RGBA | null {
   if (value.toLowerCase() === 'transparent') {return { r: 0, g: 0, b: 0, a: 0 }}
   const hex = /^#([0-9a-f]{3,8})$/i.exec(value)
   if (hex) {
-    let h = hex[1]
+    let h = hex[1] ?? ''
     if (h.length === 3 || h.length === 4) {h = h.split('').map((c) => c + c).join('')}
     return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16), a: h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1 }
   }

@@ -1,12 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import ColorSwatch from './components/ColorSwatch'
-import useScrub from './components/useScrub'
-import VariableConnect from './VariableConnect'
-import { handleArrowStep } from './lib/number-step'
 import { angleToDegrees, degreesToAngle, gradientCenter, serializeGradient, stopPercent, stopsBarCss, type Gradient, type GradientStop } from './lib/gradient'
 import { commitInPlace } from './lib/commit-in-place'
 import { PositionGrid, NumField } from './components/PositionGrid'
+
+function tooltipArrowStyle(arrowRight: number): CSSProperties & { readonly '--tip-arrow-right': string } {
+  return { '--tip-arrow-right': `${arrowRight}px` }
+}
+
+function gradientBarStyle(image: string): CSSProperties & { readonly '--grad-image': string } {
+  return { '--grad-image': image }
+}
+
+function stopStyle(left: number, color: string): CSSProperties & { readonly '--stop-color': string } {
+  return { left: `${left}%`, '--stop-color': color }
+}
 
 // Webflow-style visual gradient editor: a position grid + size presets (radial),
 // an angle dial (linear/conic), a draggable stops bar, a repeat toggle, and the
@@ -110,7 +119,7 @@ function RadialSizeControl({ value, busy, onChange }: { value: string; busy: boo
         )
       })}
       {hovered && tip ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={{ '--tip-arrow-right': `${arrowRight}px` } as CSSProperties}>
+        <div className="u-segmented-tooltip" role="tooltip" style={tooltipArrowStyle(arrowRight)}>
           {tip}
           <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
         </div>
@@ -209,7 +218,7 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
     setSelected(i)
     dragStop.current = i
     editing.current = true
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    e.currentTarget.setPointerCapture(e.pointerId)
   }
   const onHandleMove = (e: React.PointerEvent) => {
     const i = dragStop.current
@@ -224,7 +233,7 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
     if (i == null) {return}
     dragStop.current = null
     editing.current = false
-    ;(e.target as HTMLElement).releasePointerCapture?.(e.pointerId)
+    e.currentTarget.releasePointerCapture(e.pointerId)
     sortStops(i)
   }
 
@@ -259,7 +268,7 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (busy || (e.key !== 'Delete' && e.key !== 'Backspace')) {return}
-      const el = document.activeElement as HTMLElement | null
+      const el = document.activeElement instanceof HTMLElement ? document.activeElement : null
       if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) {return}
       if (sel < 0 || sel >= stops.length || stops.length <= 2) {return}
       e.preventDefault()
@@ -327,7 +336,7 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
       <div
         ref={barRef}
         className="embed-editor_grad-bar"
-        style={{ ['--grad-image' as string]: stopsBarCss(stops) }}
+        style={gradientBarStyle(stopsBarCss(stops))}
         onClick={onBarClick}
         onPointerMove={onHandleMove}
         onPointerUp={onHandleUp}
@@ -337,7 +346,7 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
             key={i}
             type="button"
             className={`embed-editor_grad-handle ${i === sel ? 'is-active' : ''}`}
-            style={{ left: `${stopPercent(stops, i)}%`, ['--stop-color' as string]: s.color.trim() || 'transparent' }}
+            style={stopStyle(stopPercent(stops, i), s.color.trim() || 'transparent')}
             disabled={busy}
             aria-label={`Stop ${i + 1} at ${stopPercent(stops, i)}%`}
             onClick={(e) => { e.stopPropagation(); setSelected(i) }}
@@ -355,7 +364,10 @@ export default function GradientEditor({ gradient, busy, onChange }: Props) {
         </label>
         <button type="button" className="embed-editor_icon-btn" disabled={busy} title="Reverse stops"
           aria-label="Reverse gradient stops"
-          onClick={() => patchStops([...stops].reverse().map((s, i, arr) => ({ ...s, pos: s.pos.trim() ? `${100 - stopPercent(stops, stops.length - 1 - i)}%` : '' })))}>
+          onClick={() => patchStops([...stops].reverse().map((s, i) => ({
+            ...s,
+            pos: s.pos.trim() ? `${100 - stopPercent(stops, stops.length - 1 - i)}%` : '',
+          })))}>
           <RepeatIcon />
         </button>
       </div>

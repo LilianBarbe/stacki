@@ -202,8 +202,8 @@ export default function useScrub({ value, disabled = false, onPreview, onInput, 
   const onInputPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     if (disabledRef.current || event.button !== 0) {return}
     if (!event.altKey && !event.shiftKey) {return} // a bare drag is still a text selection
-    const el = event.currentTarget as HTMLInputElement | HTMLTextAreaElement
-    if (typeof el.value !== 'string') {return}
+    const el = event.currentTarget
+    if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLTextAreaElement)) {return}
     const run = findScrubTarget(el.value, caretAtX(el, event.clientX))
     if (!run) {return}
     // Stops the caret from moving and the selection from starting. It also drops the

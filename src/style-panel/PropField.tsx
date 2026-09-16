@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import FieldLabel from './components/FieldLabel'
 import useScrub from './components/useScrub'
 import { useFieldDraft } from './lib/field-draft'

@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import { displayOf, GroupLabel, PropLabel } from './TypographySection'
 import useScrub from './components/useScrub'
@@ -38,7 +36,7 @@ const GAP_PROPS = [ROW, COL, ROW_LEGACY, COL_LEGACY, SHORTHAND]
 function shorthandPart(value: string, axis: 'row' | 'col'): string {
   const parts = splitTopLevelSpaces(value).filter(Boolean)
   if (!parts.length) {return ''}
-  return axis === 'row' ? parts[0] : (parts[1] ?? parts[0])
+  return axis === 'row' ? (parts[0] ?? '') : (parts[1] ?? parts[0] ?? '')
 }
 
 type Axis = {
@@ -194,7 +192,6 @@ export default function GapControl({ show, read, busy, setProp, clearProp, liveS
   const colRes = colAxis.resolved
   const row = rowAxis.value
   const col = colAxis.value
-  const important = rowAxis.important || colAxis.important
   const [linkOverride, setLinkOverride] = useState<boolean | null>(null)
   const linked = linkOverride ?? (row === col)
 

@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Resolved style model — re-projects the already-matched rules (from
 // computeRuleModel) for ONE context (base / a query), ONE state (:hover/…), and
 // ONE selected selector (the picked element tokens). It answers, per property:
@@ -55,6 +53,10 @@ export type NativeContribution = {
 
 export const STATES: readonly StateKey[] = ['', ':hover', ':focus', ':active']
 const INTERACTION_STATES = new Set<string>([':hover', ':focus', ':active'])
+
+function isStateKey(value: string): value is Exclude<StateKey, ''> {
+  return INTERACTION_STATES.has(value)
+}
 
 // Native class styles are ordered before any embed rule so embed CSS (injected
 // into the page after Webflow's compiled stylesheet) wins on a cascade tie.
@@ -146,7 +148,7 @@ export function contextKeyOf(rule: ParsedRule): ContextKey {
 /** The interaction state a selector targets (from its subject pseudo-classes). */
 function stateOf(pseudoClasses: string[]): StateKey {
   for (const pseudo of pseudoClasses) {
-    if (INTERACTION_STATES.has(pseudo)) {return pseudo as StateKey}
+    if (isStateKey(pseudo)) {return pseudo}
   }
   return ''
 }
@@ -276,7 +278,17 @@ export function listMatchedSelectors(model: RuleModel, context: ContextKey): Mat
       }
       return
     }
-    byKey.set(key, { text, specificity, state, simple, key, inContext, order: order++, display, queryDisplay })
+    byKey.set(key, {
+      text,
+      specificity,
+      state,
+      simple,
+      key,
+      inContext,
+      order: order++,
+      ...(display === undefined ? {} : { display }),
+      ...(queryDisplay === undefined ? {} : { queryDisplay }),
+    })
   }
 
   for (const matched of all) {
@@ -444,7 +456,11 @@ export function resolveStyle(
   const props = new Map<string, ResolvedProp>()
   byProp.forEach((list, prop) => {
     list.sort((a, b) => compareCascade(a, b, a.order, b.order))
-    list[0].winning = true
+    const winner = list[0]
+    if (winner === undefined) {
+      throw new Error(`Resolved style invariant failed: ${prop} has no contributors`)
+    }
+    winner.winning = true
     // The editable (blue) contributor depends on the chosen source: the picked
     // native style when editing natively, else the picked embed selector. A native
     // value only counts as "set here" at the current breakpoint tier — a value
@@ -466,11 +482,13 @@ export function resolveStyle(
     props.set(prop, {
       prop,
       source: selected ? 'selected' : 'other',
-      selectedOrigin: selected?.origin,
-      selectedValue: selected ? { value: selected.value, important: selected.important } : undefined,
-      winner: list[0],
+      ...(selected === undefined ? {} : { selectedOrigin: selected.origin }),
+      ...(selected === undefined
+        ? {}
+        : { selectedValue: { value: selected.value, important: selected.important } }),
+      winner,
       // The picked selector sets it, but a more specific selector wins the cascade.
-      overridden: !!selected && list[0] !== selected,
+      overridden: selected !== undefined && winner !== selected,
       contributors: list,
     })
   })

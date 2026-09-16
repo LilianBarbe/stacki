@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // The settings behind the transform list: where a transform pivots, whether the
 // back of a turned element shows, and the two perspectives.
 //
@@ -36,7 +34,7 @@ function splitSpaces(value: string): string[] {
   let depth = 0
   let cur = ''
   for (let i = 0; i < value.length; i++) {
-    const ch = value[i]
+    const ch = value[i] ?? ''
     if (ch === '(') {depth++}
     else if (ch === ')') {depth--}
     if (depth === 0 && /\s/.test(ch)) { if (cur.trim()) {out.push(cur.trim());} cur = ''; continue }
@@ -60,17 +58,20 @@ export function parseOrigin(value: string): Origin {
   const lower = parts.map((p) => p.toLowerCase())
 
   if (parts.length === 1) {
-    const w = lower[0]
-    if (w in Y_WORD && !(w in X_WORD)) {return { x: '50%', y: Y_WORD[w], z: '' }}
-    if (w in X_WORD) {return { x: X_WORD[w], y: '50%', z: '' }}
-    return { x: parts[0], y: '50%', z: '' }
+    const w = lower[0] ?? ''
+    if (w in Y_WORD && !(w in X_WORD)) {return { x: '50%', y: Y_WORD[w] ?? '50%', z: '' }}
+    if (w in X_WORD) {return { x: X_WORD[w] ?? '50%', y: '50%', z: '' }}
+    return { x: parts[0] ?? '50%', y: '50%', z: '' }
   }
 
   // Two keywords may be written either way round (`top left` is a corner, not a
   // nonsense x of `top`), so the y-only words decide the order.
-  const swapped = (lower[0] in Y_WORD && !(lower[0] in X_WORD)) || (lower[1] in X_WORD && !(lower[1] in Y_WORD))
-  const rawX = swapped ? parts[1] : parts[0]
-  const rawY = swapped ? parts[0] : parts[1]
+  const firstLower = lower[0] ?? ''
+  const secondLower = lower[1] ?? ''
+  const swapped = (firstLower in Y_WORD && !(firstLower in X_WORD)) ||
+    (secondLower in X_WORD && !(secondLower in Y_WORD))
+  const rawX = (swapped ? parts[1] : parts[0]) ?? '50%'
+  const rawY = (swapped ? parts[0] : parts[1]) ?? '50%'
   return {
     x: X_WORD[rawX.toLowerCase()] ?? rawX,
     y: Y_WORD[rawY.toLowerCase()] ?? rawY,
@@ -128,25 +129,25 @@ export function takeSelfPerspective(value: string): { distance: string; rest: st
       i = close === -1 ? text.length : close + 2
       continue
     }
-    const ch = text[i]
+    const ch = text[i] ?? ''
     if (ch === '(') { depth++; i++; continue }
     if (ch === ')') { depth--; i++; continue }
     if (depth === 0 && /[a-z]/i.test(ch)) {
       const at = /^perspective\s*\(/i.exec(text.slice(i))
       // A name boundary, so `my-perspective(…)` is left alone.
-      if (at && (i === 0 || !/[\w-]/.test(text[i - 1]))) {
+      if (at && (i === 0 || !/[\w-]/.test(text[i - 1] ?? ''))) {
         let j = i + at[0].length
         let d = 1
         while (j < text.length && d > 0) {
-          if (text[j] === '(') {d++}
-          else if (text[j] === ')') {d--}
+          if ((text[j] ?? '') === '(') {d++}
+          else if ((text[j] ?? '') === ')') {d--}
           j++
         }
         const distance = text.slice(i + at[0].length, j - 1).trim()
         const rest = `${text.slice(0, i)} ${text.slice(j)}`.replace(/\s+/g, ' ').trim()
         return { distance, rest }
       }
-      while (i < text.length && /[\w-]/.test(text[i])) {i++}
+      while (i < text.length && /[\w-]/.test(text[i] ?? '')) {i++}
       continue
     }
     i++

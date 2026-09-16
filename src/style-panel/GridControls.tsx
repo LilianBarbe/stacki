@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { GroupLabel } from './TypographySection'
@@ -8,7 +6,6 @@ import { PropTip } from './components/PropTip'
 import Select, { type SelectOption } from './components/Select'
 import SegmentedControl, { HoverTooltip, type SegmentedOption } from './components/SegmentedControl'
 import GridSettings from './GridSettings'
-import VariableConnect from './VariableConnect'
 import type { ResolvedProp } from './lib/resolved'
 import { useHighlight } from './lib/computed-style'
 import { commitInPlace } from './lib/commit-in-place'
@@ -91,7 +88,7 @@ const LABELS: Record<string, string> = {
   'space-between': 'Space between', 'space-around': 'Space around', 'space-evenly': 'Space evenly',
   start: 'Start', end: 'End', center: 'Center', stretch: 'Stretch',
 }
-const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
+const cap = (s: string) => (s ? (s[0] ?? '').toUpperCase() + s.slice(1) : s)
 
 // ── content-distribution glyphs (justify-content = Columns, align-content = Rows) ──
 // Webflow's grid content icons: Column variants for justify-content, Row variants for
@@ -171,6 +168,7 @@ const CONTENT_PATHS: Record<string, { col: string[]; row: string[] }> = {
 }
 function ContentIcon({ value, vertical }: { value: string; vertical: boolean }) {
   const set = CONTENT_PATHS[value] ?? CONTENT_PATHS['space-around']
+  if (set === undefined) {return null}
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
       {(vertical ? set.row : set.col).map((d, i) => (
@@ -212,7 +210,7 @@ function countTracks(value: string): number {
   for (const t of splitTracks(v)) {
     if (t.startsWith('[')) {continue}
     const rep = t.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/i)
-    if (rep) {count += parseInt(rep[1], 10) * Math.max(1, splitTracks(rep[2]).filter((x) => !x.startsWith('[')).length)}
+    if (rep) {count += parseInt(rep[1] ?? '0', 10) * Math.max(1, splitTracks(rep[2] ?? '').filter((x) => !x.startsWith('[')).length)}
     else {count += 1}
   }
   return count
@@ -262,33 +260,10 @@ const isUniformTracks = (value: string) => {
   const t = splitTracks(value.trim()).filter((x) => !x.startsWith('['))
   if (t.length === 0) {return false}
   if (t.length === 1) {
-    const rep = t[0].match(/^repeat\(\s*\d+\s*,(.*)\)$/i)
-    if (rep) {return splitTracks(rep[1]).filter((x) => !x.startsWith('[')).length === 1}
+    const rep = (t[0] ?? '').match(/^repeat\(\s*\d+\s*,(.*)\)$/i)
+    if (rep) {return splitTracks(rep[1] ?? '').filter((x) => !x.startsWith('[')).length === 1}
   }
   return t.every((x) => x === t[0])
-}
-
-// A raw grid-template field (custom mode): commit the typed track list on blur/Enter.
-function TemplateField({ value, busy, ariaLabel, onCommit }: { value: string; busy: boolean; ariaLabel: string; onCommit: (v: string) => void }) {
-  const [text, setText] = useState(value)
-  const focused = useRef(false)
-  useEffect(() => { if (!focused.current) {setText(value)} }, [value])
-  return (
-    <VariableConnect code ariaLabel={`Connect ${ariaLabel} to a variable`} disabled={busy} prop="grid-template-columns" onPick={(binding) => onCommit(binding)}>
-      <input
-        className="u-input embed-editor_size-input"
-        value={text}
-        spellCheck={false}
-        disabled={busy}
-        aria-label={ariaLabel}
-        placeholder="1fr 1fr"
-        onChange={(e) => setText(e.target.value)}
-        onFocus={() => { focused.current = true }}
-        onBlur={() => { focused.current = false; onCommit(text.trim()) }}
-        onKeyDown={(e) => { if (e.key === 'Enter') {commitInPlace(e.currentTarget)} }}
-      />
-    </VariableConnect>
-  )
 }
 
 // grid-auto-flow is a preset when every token is row / column / dense; anything else
@@ -325,7 +300,9 @@ function GridDirectionControl({ value, busy, onSet, onCommitCustom }: {
 
   useEffect(() => {
     if (!open) {return}
-    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) {setOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -420,7 +397,9 @@ function GridContentControl({ value, prop, vertical, ariaLabel, busy, onSet, onC
 
   useEffect(() => {
     if (!open) {return}
-    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) {setOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -629,7 +608,11 @@ function GridAlignAxis({ axis, prop, value, busy, read, onSet, onPreview, onClea
   const shownAlign = useHighlight('', present ? '' : prop, GRID_ITEM_ALIGN, 'stretch')
   const labels = axis === 'X' ? X_ALIGN_LABELS : Y_ALIGN_LABELS
   const icons = axis === 'X' ? X_ALIGN_ICONS : Y_ALIGN_ICONS
-  const options: SelectOption<string>[] = GRID_ITEM_ALIGN.map((v) => ({ value: v, label: labels[v], icon: <GridAlignIcon paths={icons[v]} /> }))
+  const options: SelectOption<string>[] = GRID_ITEM_ALIGN.map((v) => ({
+    value: v,
+    label: labels[v] ?? cap(v),
+    icon: <GridAlignIcon paths={icons[v] ?? []} />,
+  }))
   options.push({ value: AXIS_CUSTOM, label: 'Custom' })
   const pick = (v: string) => {
     if (v === AXIS_CUSTOM) { setForceCustom(true); onSet('unset'); return }

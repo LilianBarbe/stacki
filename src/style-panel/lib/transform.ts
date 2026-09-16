@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // `transform` is a SPACE-separated list of functions (translate/scale/rotate/skew).
 // We model each as one editable layer with up to three axes and parse/serialize back,
 // splitting on TOP-LEVEL spaces/commas only so calc()/var() with inner separators
@@ -44,8 +42,10 @@ export function parseTransforms(value: string): Transform[] {
   const out: Transform[] = []
   let i = 0
   while (i < fns.length) {
-    const name = fnName(fns[i])
-    const args = fnArgs(fns[i])
+    const fn = fns[i]
+    if (fn === undefined) {break}
+    const name = fnName(fn)
+    const args = fnArgs(fn)
     if (name.startsWith('translate')) {
       const t: Transform = { type: 'move', x: '0px', y: '0px', z: '0px' }
       if (name === 'translatex') {t.x = args[0] ?? '0px'}
@@ -65,8 +65,9 @@ export function parseTransforms(value: string): Transform[] {
     } else if (name.startsWith('rotate')) {
       // Fold a consecutive run of rotateX/Y/Z (how we serialize) into one layer.
       const t: Transform = { type: 'rotate', x: '0deg', y: '0deg', z: '0deg' }
-      while (i < fns.length && fnName(fns[i]).startsWith('rotate')) {
-        const rn = fnName(fns[i]); const ra = fnArgs(fns[i])
+      while (i < fns.length && fnName(fns[i] ?? '').startsWith('rotate')) {
+        const rotateFn = fns[i] ?? ''
+        const rn = fnName(rotateFn); const ra = fnArgs(rotateFn)
         if (rn === 'rotatex') {t.x = ra[0] ?? '0deg'}
         else if (rn === 'rotatey') {t.y = ra[0] ?? '0deg'}
         else if (rn === 'rotatez' || rn === 'rotate') {t.z = ra[0] ?? '0deg'}

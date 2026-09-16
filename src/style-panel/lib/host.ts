@@ -175,9 +175,9 @@ export function getHost(): HostState {
   return state
 }
 
-export function onHostChange(fn: () => void) {
+export function onHostChange(fn: () => void): () => void {
   listeners.add(fn)
-  return () => listeners.delete(fn)
+  return () => {listeners.delete(fn)}
 }
 
 // Depth-first walk of the page model.

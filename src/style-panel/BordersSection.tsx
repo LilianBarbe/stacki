@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import FieldLabel from './components/FieldLabel'
@@ -89,7 +87,7 @@ function PropLabel({ label, prop, clearProps, className = '', read, busy, clearP
       onReset={() => clearProp(clearProps ?? prop)}
       resetLabel="Clear"
       tooltip={<PropTip props={tip} />}
-      title={d.overridden ? `Overridden by ${d.winnerSelector}` : undefined}
+      {...(d.overridden ? { title: `Overridden by ${d.winnerSelector}` } : {})}
       menuNote={(close) => (
         <>
           {d.overridden ? <OverrideNote selector={d.winnerSelector} onSelect={() => { onSelectSelector(d.winnerSelector, prop); close() }} /> : null}
@@ -153,7 +151,7 @@ type Corners = { tl: string; tr: string; bl: string; br: string }
 // dropped). 1–4 values expand per spec: 1 → all; 2 → tl/br=a, tr/bl=b;
 // 3 → tl=a, tr/bl=b, br=c; 4 → tl tr br bl.
 function parseRadius(shorthand: string): Corners {
-  const p = splitTopLevelSpaces(stripImportant(shorthand).split('/')[0]).filter(Boolean)
+  const p = splitTopLevelSpaces(stripImportant(shorthand).split('/')[0] ?? '').filter(Boolean)
   return {
     tl: p[0] ?? '',
     tr: p[1] ?? p[0] ?? '',
@@ -234,8 +232,7 @@ function RadiusControl(props: Props) {
 
 // ─────────────────────────── Border side + style/width/color ───────────────────────────
 
-const SIDES = ['all', 'top', 'right', 'bottom', 'left'] as const
-type Side = (typeof SIDES)[number]
+type Side = 'all' | 'top' | 'right' | 'bottom' | 'left'
 type Facet = 'style' | 'width' | 'color'
 const EDGES = ['top', 'right', 'bottom', 'left'] as const
 
@@ -361,7 +358,9 @@ function StyleControl({ value, prop, busy, write, clear }: {
 
   useEffect(() => {
     if (!open) {return}
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -481,7 +480,7 @@ export function ColorVariableInput({
         prop={prop}
         onLive={onLive}
         onCommit={onCommit}
-        onVariablePick={onVariablePick}
+        {...(onVariablePick === undefined ? {} : { onVariablePick })}
       />
     </div>
   )

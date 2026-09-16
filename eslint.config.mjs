@@ -5,11 +5,7 @@
 // and adding the meta package means a fresh full-graph resolution the tree
 // isn't ready for. Same rules, same shape.
 //
-// Two ratchets, both scheduled for removal by docs/ts-migration-plan.md Phase 3:
-// 1. src/style-panel/** is the legacy zone: it fails the type-aware and
-//    assertion rules (the same 44 files as the tsc @ts-nocheck list). Rules
-//    land at error level everywhere else; the zone is held by conversion.
-// 2. max-lines-per-function and prefer-readonly are warnings until the
+// max-lines-per-function and prefer-readonly remain warnings until the
 //    oversized legacy functions are split.
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
@@ -70,10 +66,24 @@ export default [
       ...tsPlugin.configs['eslint-recommended'].rules,
       ...tsPlugin.configs.recommended.rules,
       // AGENTS.md non-negotiables.
-      // @ts-nocheck headers carry a description; require it rather than ban the directive.
-      '@typescript-eslint/ban-ts-comment': ['error', { 'ts-nocheck': 'allow-with-description' }],
+      // The migration ratchet is zero, so unchecked files cannot re-enter the tree.
+      '@typescript-eslint/ban-ts-comment': ['error', { 'ts-nocheck': true }],
       '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/consistent-type-assertions': ['error', { assertionStyle: 'never' }],
+      // `as const` is the canonical way to keep literal unions (§5). Reject all
+      // other assertion syntax while allowing that one language construct.
+      '@typescript-eslint/consistent-type-assertions': 'off',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "TSAsExpression:not([typeAnnotation.typeName.name='const'])",
+          message: 'Type assertions must be replaced with validation and narrowing.',
+        },
+        {
+          selector: 'TSTypeAssertion',
+          message: 'Type assertions must be replaced with validation and narrowing.',
+        },
+      ],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       curly: ['error', 'all'],
       // Hooks deps were the author's own suppressed warnings; keep them visible.
       'react-hooks/exhaustive-deps': 'warn',
@@ -96,21 +106,31 @@ export default [
     files: ['shared/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/consistent-type-assertions': 'off',
+      'no-restricted-syntax': 'off',
     },
   },
   {
-    // Legacy zone — same 44 files as the tsc @ts-nocheck ratchet. These rules
-    // land as errors the moment each file converts; the zone block then shrinks.
-    files: ['src/style-panel/**/*.{ts,tsx}'],
+    // These adapters validate values from PostCSS, DOM storage, and the host
+    // bridge before constructing trusted application values. AGENTS.md §2
+    // permits assertions inside validated constructors and type guards.
+    files: [
+      'src/style-panel/lib/css.ts',
+      'src/style-panel/lib/host.ts',
+      'src/style-panel/lib/webflow.ts',
+      'src/style-panel/shared/dom-safety.ts',
+      'src/style-panel/shared/tool-prefs.ts',
+    ],
     rules: {
-      '@typescript-eslint/consistent-type-assertions': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-member-access': 'off',
-      '@typescript-eslint/no-unsafe-call': 'off',
-      '@typescript-eslint/no-unsafe-return': 'off',
-      '@typescript-eslint/switch-exhaustiveness-check': 'off',
-      '@typescript-eslint/no-unused-vars': 'warn',
-      'react-hooks/rules-of-hooks': 'warn',
+      'no-restricted-syntax': 'off',
+    },
+  },
+  {
+    // These entrypoints compile to CommonJS because Electron Builder loads its
+    // afterPack hook with require. Import assignments also keep direct Node
+    // execution in CommonJS so __dirname and require.main have one meaning.
+    files: ['scripts/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 ];

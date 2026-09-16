@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // CSS parsing and write-back for embed `<style>` blocks.
 //
 // Strategy: we hold the live postcss Root for each `<style>` region. Reads flow
@@ -106,6 +104,7 @@ export function renderEmbed(segments: string[], regions: StyleRegion[]): string 
   let out = segments[0] ?? ''
   for (let i = 0; i < regions.length; i += 1) {
     const region = regions[i]
+    if (region === undefined) {throw new Error(`Style region ${i} is missing`)}
     out += region.root ? region.root.toString() : region.css
     out += segments[i + 1] ?? ''
   }
@@ -216,7 +215,7 @@ function setDeclDirect(node: Rule | AtRule, prop: string, value: string, importa
  *  the context dropdown), so a nested chip reads as the code the user is editing. */
 function renderNestedPath(parts: string[], isRoot = true): string {
   if (!parts.length) {return ''}
-  const [head, ...rest] = parts
+  const [head = '', ...rest] = parts
   if (head === '@') {return rest.length ? `@ ${renderNestedPath(rest, false)}` : '@'}
   const restStr = renderNestedPath(rest, false)
   // Braces when this selector wraps another selector, or when it's the outermost
@@ -395,6 +394,7 @@ export function createNestedRule(
     }
   }
   const leaf = path[path.length - 1]
+  if (leaf === undefined) {return false}
   if (leaf.kind === 'selector') {
     ;(container as Rule).append({ prop: cleanProp, value: cleanValue, important })
     ;(container as Rule).raws.semicolon = true
@@ -529,8 +529,8 @@ export function createRuleInQuery(
   for (const seg of segments) {
     const m = /^@(\w+)\s*([\s\S]*)$/.exec(seg)
     if (!m) {return false}
-    const name = m[1].toLowerCase()
-    const params = m[2].trim()
+    const name = (m[1] ?? '').toLowerCase()
+    const params = (m[2] ?? '').trim()
     let found: AtRule | null = null
     container.each((n) => {
       if (!found && n.type === 'atrule'
@@ -585,8 +585,8 @@ export function ensureQueryBlock(region: StyleRegion, atContextKey: string): boo
   for (const seg of segments) {
     const m = /^@(\w+)\s*([\s\S]*)$/.exec(seg)
     if (!m) {return false}
-    const name = m[1].toLowerCase()
-    const params = m[2].trim()
+    const name = (m[1] ?? '').toLowerCase()
+    const params = (m[2] ?? '').trim()
     let found: AtRule | null = null
     container.each((n) => {
       if (!found && n.type === 'atrule'
@@ -684,8 +684,8 @@ function buildRule(
     regionIndex: ctx.regionIndex,
     node,
     selectorText,
-    nestedDisplay,
-    queryDisplay,
+    ...(nestedDisplay === undefined ? {} : { nestedDisplay }),
+    ...(queryDisplay === undefined ? {} : { queryDisplay }),
     atContext,
     selectors: parseSelectorList(selectorText),
     declarations,
@@ -729,8 +729,8 @@ export function removeRule(rule: ParsedRule) {
 export function splitRuleSelectorAt(node: Rule, index: number): Rule | null {
   const selectors = node.selectors
   if (index < 0 || index >= selectors.length || selectors.length <= 1) {return null}
-  const clone = node.clone() as Rule
-  clone.selector = selectors[index]
+  const clone = node.clone()
+  clone.selector = selectors[index] ?? ''
   // Ensure the new rule starts on its own line (clone inherits the original's
   // leading whitespace, which may be empty for the first rule → `}.a {`).
   if (!clone.raws.before?.includes('\n')) {clone.raws.before = `\n${clone.raws.before ?? ''}`}
@@ -825,7 +825,7 @@ export function queryKey(query: string): string {
 export function splitQuery(query: string): { name: string; params: string } | null {
   const match = /^@([a-zA-Z-]+)\s*([\s\S]*)$/.exec(query.trim())
   if (!match) {return null}
-  return { name: match[1], params: match[2].trim() }
+  return { name: match[1] ?? '', params: (match[2] ?? '').trim() }
 }
 
 /** How many at-rules in the region are spelled `query`. */

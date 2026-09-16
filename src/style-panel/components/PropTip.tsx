@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { HoverTooltip } from './SegmentedControl'
@@ -60,7 +58,9 @@ export function useHoverTip<T extends HTMLElement>(content: ReactNode) {
     if (!open) {return undefined}
     const away = (event: Event) => {
       const el = ref.current
-      if (!el || !el.isConnected || !el.contains(event.target as Node)) {hide()}
+      if (!el || !el.isConnected || !(event.target instanceof Node) || !el.contains(event.target)) {
+        hide()
+      }
     }
     const close = () => hide()
     document.addEventListener('pointermove', away, true)
@@ -111,7 +111,12 @@ export function ProvenanceLabel({ label, props, className = 'embed-editor_size-l
         className={`${className} embed-editor_prop-orange`}
         disabled={busy}
         {...hoverProps}
-        onClick={(event) => { hide(); onProvenance(anchorProp ?? props[0], event.currentTarget.getBoundingClientRect()) }}
+        onClick={(event) => {
+          const property = anchorProp ?? props[0]
+          if (property === undefined) {return}
+          hide()
+          onProvenance(property, event.currentTarget.getBoundingClientRect())
+        }}
       >
         {label}
       </button>

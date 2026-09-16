@@ -8,10 +8,14 @@ import { FILTER_GROUPS, FILTER_META, retypeFilter, type Filter, type FilterType 
 // shadow's X / Y / Blur / Color. Reuses the shadow number/color rows (value + unit shown
 // inline, any unit accepted) and the gradient angle control.
 
-const TYPE_OPTIONS: SelectOption<string>[] = FILTER_GROUPS.flatMap((g) => [
-  { value: `__h_${g.heading}`, label: g.heading, heading: true } as SelectOption<string>,
-  ...g.types.map((t) => ({ value: t, label: FILTER_META[t].label, indent: true } as SelectOption<string>)),
+const TYPE_OPTIONS = FILTER_GROUPS.flatMap<SelectOption<string>>((group) => [
+  { value: `__h_${group.heading}`, label: group.heading, heading: true },
+  ...group.types.map((type) => ({ value: type, label: FILTER_META[type].label, indent: true })),
 ])
+
+function isFilterType(value: string): value is FilterType {
+  return value in FILTER_META
+}
 
 export default function FilterEditor({ filter, busy, onChange }: {
   filter: Filter
@@ -24,7 +28,14 @@ export default function FilterEditor({ filter, busy, onChange }: {
     <div className="embed-editor_filter-editor">
       <div className="embed-editor_size-row">
         <span className="embed-editor_size-label embed-editor_bg-caption">Filter</span>
-        <Select value={filter.type} options={TYPE_OPTIONS} onChange={(v) => onChange(retypeFilter(v as FilterType), false)} ariaLabel="Filter type" disabled={busy} searchable />
+        <Select
+          value={filter.type}
+          options={TYPE_OPTIONS}
+          onChange={(value) => {if (isFilterType(value)) {onChange(retypeFilter(value), false)}}}
+          ariaLabel="Filter type"
+          disabled={busy}
+          searchable
+        />
       </div>
 
       {meta.control === 'amount' ? (

@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Project-backed replacement for the Webflow Designer integration.
 //
 // The panel above this module is unchanged from moden: it asks for "embeds"
@@ -34,6 +32,9 @@ import type {
 } from './types'
 import type { MatchTarget, TreeView } from './selectors'
 import { hasCanvas, queryCanvas } from '../../canvasQuery.js'
+import { listAssetEntries } from '../../assetBridge'
+import { readAstroStyleFiles, readStyleFiles } from '../../stylePanelBridge'
+import { variableEdit } from '../../panels/variableEdits'
 import type { NativeStyleOptions } from './native-styles'
 
 type AnyEl = unknown
@@ -43,8 +44,7 @@ type AnyEl = unknown
 export function serializeElementId(id: unknown): string {
   if (id == null) {return ''}
   if (typeof id === 'string') {return id}
-  const n = id as HostNode
-  if (n && typeof n === 'object' && typeof n.id === 'string') {return n.id}
+  if (typeof id === 'object' && 'id' in id && typeof id.id === 'string') {return id.id}
   try {
     return JSON.stringify(id)
   } catch {
@@ -117,8 +117,9 @@ const literalClasses = (node: HostNode | null, name: string): string[] => {
   if (!prop || prop.type !== 'expr') {return []}
   const out: string[] = []
   for (const [, quote, body] of String(prop.value ?? '').matchAll(/(['"`])([^'"`]*)\1/g)) {
-    if (quote === '`' && body.includes('${')) {continue}
-    for (const tok of body.split(/\s+/)) {if (CLASS_RE.test(tok)) {out.push(tok)}}
+    const literalBody = body ?? ''
+    if (quote === '`' && literalBody.includes('${')) {continue}
+    for (const tok of literalBody.split(/\s+/)) {if (CLASS_RE.test(tok)) {out.push(tok)}}
   }
   return out
 }
@@ -154,8 +155,8 @@ export async function buildSnapshot(el: AnyEl): Promise<ElementSnapshot> {
     else if (v && v.type === 'bare') {attributes[k] = ''}
   }
   const id = propText(node, 'id')
-  if (id) {attributes.id = id}
-  if (classes.length) {attributes.class = classes.join(' ')}
+  if (id) {attributes['id'] = id}
+  if (classes.length) {attributes['class'] = classes.join(' ')}
   return {
     // A component instance renders markup we can't see from here, so it has
     // no tag of its own — selectors match it by class only.
@@ -226,7 +227,7 @@ export function dedupeByKey(sources: EmbedSource[]): EmbedSource[] {
 
 // Webflow appended a suffix so two embeds couldn't scaffold the same class
 // name. Sources here are files and nodes with distinct identities already.
-export function embedSourceClassSuffix(): string {
+export function embedSourceClassSuffix(_source?: EmbedSource): string {
   return ''
 }
 
@@ -363,8 +364,8 @@ function docForSource(source: EmbedSource, code: string): EmbedDoc {
       if (!isGlobalRegion(region)) {continue}
       try {
         region.root = postcss.parse(region.css)
-      } catch (err) {
-        region.parseError = String((err as Error)?.message || err)
+      } catch (error: unknown) {
+        region.parseError = error instanceof Error ? error.message : String(error)
       }
     }
     return { source, code, segments, regions }
@@ -372,16 +373,16 @@ function docForSource(source: EmbedSource, code: string): EmbedDoc {
   const region: StyleRegion = { start: 0, end: code.length, css: code, root: null }
   try {
     region.root = postcss.parse(code)
-  } catch (err) {
-    region.parseError = String((err as Error)?.message || err)
+  } catch (error: unknown) {
+    region.parseError = error instanceof Error ? error.message : String(error)
   }
   return { source, code, segments: ['', ''], regions: [region] }
 }
 
 async function readSource(source: EmbedSource): Promise<string> {
   if (source.origin.kind === 'file' || source.origin.kind === 'astro') {
-    const res = await window.avb.readStyleFile(source.origin.path)
-    return res?.css ?? ''
+    const result = await variableEdit('readStyleFile', source.origin.path)
+    return result.ok ? (result.css ?? '') : ''
   }
   const node = nodeById(source.origin.nodeId)
   return String(node?.inner ?? '')
@@ -406,20 +407,26 @@ function serializeDoc(doc: EmbedDoc): string {
 export async function loadEmbedDocs(
   sources: EmbedSource[],
   onDoc?: (doc: EmbedDoc) => void,
-): Promise<{ docs: EmbedDoc[]; errors: Array<{ label: string; error: string }> }> {
+): Promise<{ docs: EmbedDoc[]; errors: Array<{ label: string; message: string }> }> {
   const loaded = await Promise.all(
     sources.map(async (source) => {
       try {
         const doc = docForSource(source, await readSource(source))
         onDoc?.(doc)
         return { doc, error: null }
-      } catch (err) {
-        return { doc: null, error: { label: source.label, error: String((err as Error)?.message || err) } }
+      } catch (error: unknown) {
+        return {
+          doc: null,
+          error: {
+            label: source.label,
+            message: error instanceof Error ? error.message : String(error),
+          },
+        }
       }
     }),
   )
   const docs: EmbedDoc[] = []
-  const errors: Array<{ label: string; error: string }> = []
+  const errors: Array<{ label: string; message: string }> = []
   for (const entry of loaded) {
     if (entry.doc) {docs.push(entry.doc)}
     if (entry.error) {errors.push(entry.error)}
@@ -523,6 +530,7 @@ export function rebuildRules(docs: EmbedDoc[]): ParsedRule[] {
 // so there is nothing to navigate to.
 export async function navigateToEmbed(
   source: EmbedSource,
+  _pageInstances?: unknown,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (source.origin.kind === 'astro') {
     return { ok: false, error: `These styles live in ${source.label} — open that component to see them in the tree.` }
@@ -604,7 +612,12 @@ export async function askCanvasAbout(rootKey: string, rules: ParsedRule[]): Prom
   if (!path || !hasCanvas()) {return null}
   const askedFor = askableSelectors(rules)
   const answer = await queryCanvas(path, [...askedFor.keys()])
-  return { answer, askedFor }
+  return {
+    answer: answer === null
+      ? null
+      : { identity: answer.identity ?? null, matched: { ...answer.matched } },
+    askedFor,
+  }
 }
 
 /**
@@ -690,8 +703,8 @@ export async function resolveTarget(
   }
   if (identity) {
     const attributes = { ...identity.attributes }
-    delete attributes.class
-    if (identity.classes.length) {attributes.class = identity.classes.join(' ')}
+    delete attributes['class']
+    if (identity.classes.length) {attributes['class'] = identity.classes.join(' ')}
     rootSnapshot = {
       ...rootSnapshot,
       tag: identity.tag,
@@ -750,25 +763,58 @@ export async function readNativeStyles(
   return EMPTY_NATIVE
 }
 
-export async function readNativeStyleByName(): Promise<NativeModel> {
+export async function readNativeStyleByName(
+  _className: string,
+  _states: readonly StateKey[],
+): Promise<NativeModel> {
   return EMPTY_NATIVE
 }
 
-const NO_NATIVE = { ok: false as const, error: 'This project styles with CSS — write to a stylesheet.' }
+const NO_NATIVE: {
+  readonly ok: false
+  readonly applied: false
+  readonly error: string
+} = {
+  ok: false,
+  applied: false,
+  error: 'This project styles with CSS — write to a stylesheet.',
+}
 
-export async function applyNativePropertyAt(): Promise<{ ok: false; error: string }> {
+export async function applyNativePropertyAt(
+  _element: AnyEl,
+  _target: NativeWriteTarget,
+  _prop: string,
+  _value: string,
+  _options?: NativeStyleOptions,
+): Promise<typeof NO_NATIVE> {
   return NO_NATIVE
 }
 
-export async function removeNativePropertyAt(): Promise<{ ok: false; error: string }> {
+export async function removeNativePropertyAt(
+  _element: AnyEl,
+  _target: NativeWriteTarget,
+  _props: readonly string[],
+  _options?: NativeStyleOptions,
+): Promise<typeof NO_NATIVE> {
   return NO_NATIVE
 }
 
-export async function applyNativeToNewBaseClass(): Promise<{ ok: false; error: string }> {
+export async function applyNativeToNewBaseClass(
+  _element: AnyEl,
+  _className: string,
+  _prop: string,
+  _value: string,
+  _options?: NativeStyleOptions,
+): Promise<typeof NO_NATIVE> {
   return NO_NATIVE
 }
 
-export async function liveSetNativeProperty(): Promise<{ ok: false; error: string }> {
+export async function liveSetNativeProperty(
+  _handle: unknown,
+  _prop: string,
+  _value: string,
+  _options?: NativeStyleOptions,
+): Promise<typeof NO_NATIVE> {
   return NO_NATIVE
 }
 
@@ -832,7 +878,7 @@ function resolveAlias(value: string, values: Map<string, string>, depth = 0): st
   const v = value.trim()
   const m = depth > 8 ? null : ALIAS_RE.exec(v)
   if (!m) {return v}
-  const target = values.get(m[1].slice(2))
+  const target = values.get((m[1] ?? '').slice(2))
   if (target != null) {return resolveAlias(target, values, depth + 1)}
   const fallback = m[2]?.trim()
   return fallback ? resolveAlias(fallback, values, depth + 1) : v
@@ -850,8 +896,8 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
   let files = host.files
   if (!files.length && host.projectPath) {
     try {
-      const res = await window.avb.listStyleFiles(host.projectPath)
-      files = res?.files || []
+      const result = await readStyleFiles(host.projectPath)
+      files = result.ok ? [...result.value] : []
     } catch {
       files = []
     }
@@ -863,8 +909,8 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
   const read = await Promise.all(
     files.map(async (f) => {
       try {
-        const res = await window.avb.readStyleFile(f.path)
-        return { label: f.rel, css: res?.css ?? '' }
+        const result = await variableEdit('readStyleFile', f.path)
+        return { label: f.rel, css: result.ok ? (result.css ?? '') : '' }
       } catch {
         return null // unreadable — skip it rather than fail the whole scan
       }
@@ -876,8 +922,8 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
   let astro = host.astroFiles
   if (!astro.length && host.projectPath) {
     try {
-      const res = await window.avb.listAstroStyleFiles(host.projectPath)
-      astro = res?.files || []
+      const result = await readAstroStyleFiles(host.projectPath)
+      astro = result.ok ? [...result.value] : []
     } catch {
       astro = []
     }
@@ -885,8 +931,8 @@ async function readAllProjectCss(): Promise<Array<{ label: string; css: string }
   const readAstro = await Promise.all(
     astro.map(async (f) => {
       try {
-        const res = await window.avb.readStyleFile(f.path)
-        return { name: f.name, css: res?.css ?? '' }
+        const result = await variableEdit('readStyleFile', f.path)
+        return { name: f.name, css: result.ok ? (result.css ?? '') : '' }
       } catch {
         return null // unreadable — skip it rather than fail the whole scan
       }
@@ -1003,10 +1049,11 @@ export async function getImageAssets(): Promise<ImageAsset[]> {
   const host = getHost()
   if (!host.projectPath) {return []}
   try {
-    const { entries } = await window.avb.listAssets(host.projectPath)
-    return (entries || [])
-      .filter((e: { isDir: boolean; name: string }) => !e.isDir && /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(e.name))
-      .map((e: { rel: string; name: string }) => ({ id: e.rel, name: e.name, url: `/${e.rel}` }))
+    const result = await listAssetEntries(host.projectPath)
+    if (!result.ok) {return []}
+    return result.value
+      .filter((entry) => !entry.isDir && /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(entry.name))
+      .map((entry) => ({ id: entry.rel, name: entry.name, url: `/${entry.rel}` }))
   } catch {
     return []
   }
@@ -1029,28 +1076,30 @@ export function parseFlexShorthand(value: string): Record<string, string> | null
   if (tokens.length > 3) {return null}
   let grow: string, shrink: string, basis: string
   if (tokens.length === 1) {
-    if (isFlexNumber(tokens[0])) {
-      grow = tokens[0]
+    const first = tokens[0] ?? ''
+    if (isFlexNumber(first)) {
+      grow = first
       shrink = '1'
       basis = '0'
     } else {
       grow = '1'
       shrink = '1'
-      basis = tokens[0]
+      basis = first
     }
   } else if (tokens.length === 2) {
-    grow = tokens[0]
-    if (isFlexNumber(tokens[1])) {
-      shrink = tokens[1]
+    grow = tokens[0] ?? ''
+    const second = tokens[1] ?? ''
+    if (isFlexNumber(second)) {
+      shrink = second
       basis = '0'
     } else {
       shrink = '1'
-      basis = tokens[1]
+      basis = second
     }
   } else {
-    grow = tokens[0]
-    shrink = tokens[1]
-    basis = tokens[2]
+    grow = tokens[0] ?? ''
+    shrink = tokens[1] ?? ''
+    basis = tokens[2] ?? ''
   }
   if (!isFlexNumber(grow) || !isFlexNumber(shrink)) {return null}
   return { 'flex-grow': grow, 'flex-shrink': shrink, 'flex-basis': basis }

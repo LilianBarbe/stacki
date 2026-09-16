@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import { useHighlight } from './lib/computed-style'
 import type { ReactNode } from 'react'
@@ -95,7 +93,9 @@ export default function SegmentedField({ value, important, options, prop, fallba
 
   useEffect(() => {
     if (!open) {return}
-    const onDown = (e: MouseEvent) => { if (!rootRef.current?.contains(e.target as Node)) {setOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)

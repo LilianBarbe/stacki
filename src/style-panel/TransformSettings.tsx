@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import SegmentedControl, { type SegmentedOption } from './components/SegmentedControl'
 import DragSlider from './components/DragSlider'
@@ -42,7 +40,7 @@ const val = (read: Read, prop: string): string => {
 
 const pxNumber = (value: string): number | null => {
   const m = value.trim().match(/^(-?\d*\.?\d+)\s*px$/i)
-  return m ? parseFloat(m[1]) : null
+  return m ? parseFloat(m[1] ?? '') : null
 }
 
 /** A section heading, with the properties it writes on hover. */

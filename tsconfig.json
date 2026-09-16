@@ -1,5 +1,5 @@
 {
-  "//": "AGENTS.md mandates this strict flag set. Application sources are fully converted; JavaScript test harnesses remain outside the checked program by design.",
+  "//": "AGENTS.md mandates this strict flag set. Runtime scripts use their own CommonJS tsconfig; JavaScript test harnesses remain outside the checked program by design.",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -23,6 +23,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "electron/**/*", "scripts/**/*", "test/**/*", "shared/**/*", "vite.config.mjs"],
+  "include": ["src/**/*", "electron/**/*", "test/**/*", "shared/**/*", "vite.config.mjs"],
   "exclude": ["dist"]
 }

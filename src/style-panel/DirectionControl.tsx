@@ -1,9 +1,11 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import SegmentPill from './components/SegmentPill'
 import { commitInPlace } from './lib/commit-in-place'
+
+function tooltipArrowStyle(arrowRight: number): CSSProperties & { readonly '--tip-arrow-right': string } {
+  return { '--tip-arrow-right': `${arrowRight}px` }
+}
 
 // The flex Direction / flow control — shown only when `display` is flex. Two fixed
 // segments (→ single row, ↓ single column) plus a third slot that shows whichever
@@ -109,10 +111,15 @@ const GROUPS: ReadonlyArray<{ header: string; options: Flow[] }> = [
   ] },
 ]
 const ALL = GROUPS.flatMap((group) => group.options)
-const ROW = ALL.find((f) => f.value === 'row')!
-const COLUMN = ALL.find((f) => f.value === 'column')!
+function requiredFlow(value: string): Flow {
+  const result = ALL.find((candidate) => candidate.value === value)
+  if (result === undefined) {throw new Error(`Missing direction flow: ${value}`)}
+  return result
+}
+const ROW = requiredFlow('row')
+const COLUMN = requiredFlow('column')
 const NONSTANDARD = ALL.filter((f) => !f.primary)
-const DEFAULT_THIRD = NONSTANDARD[0] // Left to right, wrap down
+const DEFAULT_THIRD = requiredFlow('row wrap')
 
 const TOOLTIP_DELAY_MS = 500
 
@@ -184,7 +191,9 @@ export default function DirectionControl({ value, rawDirection, important, busy,
 
   useEffect(() => {
     if (!open) {return}
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -311,7 +320,11 @@ export default function DirectionControl({ value, rawDirection, important, busy,
       ) : null}
 
       {tip ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={{ '--tip-arrow-right': `${tip.arrowRight}px` } as CSSProperties}>
+        <div
+          className="u-segmented-tooltip"
+          role="tooltip"
+          style={tooltipArrowStyle(tip.arrowRight)}
+        >
           {tip.text}
           <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
         </div>

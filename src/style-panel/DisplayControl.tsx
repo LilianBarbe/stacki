@@ -1,9 +1,11 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import SegmentPill from './components/SegmentPill'
 import { commitInPlace } from './lib/commit-in-place'
+
+function tooltipArrowStyle(arrowRight: number): CSSProperties & { readonly '--tip-arrow-right': string } {
+  return { '--tip-arrow-right': `${arrowRight}px` }
+}
 
 // The value editor for `display`. For values we can represent it shows a
 // segmented bar (Block / Flex / Grid + a 4th slot for the inline set, None and
@@ -155,7 +157,7 @@ export default function DisplayControl({
   // — contents, unset, var(--x), or a supported token made !important — is custom.
   const segmented = isDisplayValueSupported(current) && !important
   const customMode = !segmented
-  const isPrimary = (PRIMARY as readonly string[]).includes(current)
+  const isPrimary = PRIMARY.some((value) => value === current)
   // The 4th segment shows the chosen inline/none value, or None as the default.
   const fourth = isPrimary ? 'none' : current
 
@@ -168,7 +170,7 @@ export default function DisplayControl({
   useEffect(() => {
     if (!open) {return}
     const onDown = (event: MouseEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) {return}
+      if (event.target instanceof Node && rootRef.current?.contains(event.target)) {return}
       setOpen(false)
     }
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
@@ -285,22 +287,22 @@ export default function DisplayControl({
               ))}
               <div className="embed-editor_display-menu-divider" />
               {INLINE.map((option) => (
-                <MenuItem key={option} label={FULL[option]} selected={current === option} onClick={() => pick(option)} />
+                <MenuItem key={option} label={FULL[option] ?? cap(option)} selected={current === option} onClick={() => pick(option)} />
               ))}
               <div className="embed-editor_display-menu-divider" />
               {BOXLESS.map((option) => (
-                <MenuItem key={option} label={FULL[option]} selected={current === option} onClick={() => pick(option)} />
+                <MenuItem key={option} label={FULL[option] ?? cap(option)} selected={current === option} onClick={() => pick(option)} />
               ))}
             </>
           ) : (
             // From the bar: inline values, None, and an escape hatch to Custom.
             <>
               {INLINE.map((option) => (
-                <MenuItem key={option} label={FULL[option]} selected={current === option} onClick={() => pick(option)} />
+                <MenuItem key={option} label={FULL[option] ?? cap(option)} selected={current === option} onClick={() => pick(option)} />
               ))}
               <div className="embed-editor_display-menu-divider" />
               {BOXLESS.map((option) => (
-                <MenuItem key={option} label={FULL[option]} selected={current === option} onClick={() => pick(option)} />
+                <MenuItem key={option} label={FULL[option] ?? cap(option)} selected={current === option} onClick={() => pick(option)} />
               ))}
               <div className="embed-editor_display-menu-divider" />
               <MenuItem label="Custom" selected={false} onClick={enterCustom} />
@@ -310,7 +312,11 @@ export default function DisplayControl({
       ) : null}
 
       {hoveredValue && TOOLTIPS[hoveredValue] ? (
-        <div className="u-segmented-tooltip" role="tooltip" style={{ '--tip-arrow-right': `${arrowRight}px` } as CSSProperties}>
+        <div
+          className="u-segmented-tooltip"
+          role="tooltip"
+          style={tooltipArrowStyle(arrowRight)}
+        >
           {TOOLTIPS[hoveredValue]}
           <span className="u-segmented-tooltip-arrow" aria-hidden="true" />
         </div>

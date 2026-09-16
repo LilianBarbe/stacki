@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Cascade resolution → a rule-centric, editable model.
 //
 // We surface each matching rule as its own card (selector + its declaration
@@ -150,6 +148,9 @@ export async function computeRuleModel(rules: ParsedRule[], target: MatchTarget)
   })
   byProp.forEach((list, prop) => {
     const winner = [...list].sort((a, b) => compareCascade(a, b, a.seq, b.seq))[0]
+    if (winner === undefined) {
+      throw new Error(`Cascade invariant failed: ${prop} has no contributions`)
+    }
     winners.set(prop, { declId: winner.declId, selectorText: winner.selectorText })
   })
 

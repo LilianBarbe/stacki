@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // `filter` / `backdrop-filter` are a SPACE-separated list of filter functions
 // (blur/brightness/…/drop-shadow). We model each as one editable layer and
 // parse/serialize back, splitting on TOP-LEVEL spaces so drop-shadow()'s inner
@@ -38,6 +36,10 @@ export const FILTER_GROUPS: ReadonlyArray<{ heading: string; types: FilterType[]
   { heading: 'Color effects', types: ['grayscale', 'invert', 'sepia'] },
 ]
 
+function isFilterType(value: string): value is FilterType {
+  return value in FILTER_META
+}
+
 const DROP_DEFAULT = { x: '0px', y: '2px', blur: '5px', color: 'rgba(0, 0, 0, 0.7)' }
 const round = (n: number) => Math.round(n * 100) / 100
 
@@ -55,7 +57,7 @@ function normalizeAmount(type: FilterType, inner: string): string {
   const meta = FILTER_META[type]
   const m = inner.trim().match(/^(-?[\d.]+)(%|px|deg|rad|turn|grad|em|rem)?$/i)
   if (!m) {return inner.trim()}
-  let n = parseFloat(m[1]); const unit = (m[2] || '').toLowerCase()
+  let n = parseFloat(m[1] ?? ''); const unit = (m[2] || '').toLowerCase()
   if (meta.unit === '%') {return `${round(unit === '%' ? n : n * 100)}%`}
   if (meta.unit === 'deg') {
     if (unit === 'turn') {n *= 360}
@@ -72,8 +74,8 @@ export function parseFilters(value: string): Filter[] {
   if (!v || v.toLowerCase() === 'none') {return []}
   const out: Filter[] = []
   for (const fn of splitTopLevelSpaces(v).filter((f) => f.includes('('))) {
-    const name = fnName(fn) as FilterType
-    if (!(name in FILTER_META)) {continue}
+    const name = fnName(fn)
+    if (!isFilterType(name)) {continue}
     if (name === 'drop-shadow') {
       const lens: string[] = []; let color = ''
       for (const p of splitTopLevelSpaces(fnInner(fn))) {

@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Turn a selected element's identity into pickable tokens: its HTML tag (first),
 // then its classes, then its data attributes — the set of things an embed
 // selector can target. Used by the header ClassPicker.
@@ -50,7 +48,7 @@ export function snapshotTokens(snapshot: ElementSnapshot | undefined): ClassToke
 export function selectorToClassTokens(selectorText: string, tokens: ClassToken[]): string[] | null {
   // The subject is the last compound (after any descendant / combinator).
   const subject = selectorText.split(/\s+|[>+~]/).filter(Boolean).pop() ?? ''
-  const wanted = new Set([...subject.matchAll(/\.([\w-]+)/g)].map((m) => m[1].toLowerCase()))
+  const wanted = new Set([...subject.matchAll(/\.([\w-]+)/g)].map((m) => (m[1] ?? '').toLowerCase()))
   if (!wanted.size) {return null}
   const picked: string[] = []
   const matched = new Set<string>()
@@ -81,10 +79,10 @@ export function selectorToClassTokens(selectorText: string, tokens: ClassToken[]
  */
 export function defaultSelectorTokens(tokens: ClassToken[]): string[] {
   const classes = tokens.filter((token) => token.kind === 'class')
-  if (classes.length) {return [classes[0].name]}
+  if (classes.length) {return [classes[0]?.name ?? '']}
   const attrs = tokens.filter((token) => token.kind === 'attribute')
-  if (attrs.length) {return [attrs[attrs.length - 1].name]}
-  return tokens.length ? [tokens[0].name] : []
+  if (attrs.length) {return [attrs[attrs.length - 1]?.name ?? '']}
+  return tokens.length ? [tokens[0]?.name ?? ''] : []
 }
 
 /** Compose a CSS selector from selected token names, honoring token order. */

@@ -42,7 +42,7 @@ export default function HelpPopover({ title, children, label = 'Help', className
   useEffect(() => {
     if (!open) {return}
     const onDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)}
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
     }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {setOpen(false)}

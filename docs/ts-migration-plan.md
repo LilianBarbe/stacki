@@ -134,7 +134,7 @@ same commit.
 - Root `tsconfig.json` with the AGENTS.md strict flag set;
   `allowJs: true`, `checkJs: false` so the tree compiles untouched.
 - ESLint flat config with the AGENTS.md rule set; Prettier at 100 columns.
-- Wire both into `scripts/run-tests.js` so the existing `npm test` gate fails
+- Wire both into `scripts/run-tests.ts` so the existing `npm test` gate fails
   on type or lint errors.
 - `shared/tsconfig.json` emitting compiled JS where Electron can require it;
   Vite `resolve.alias` for the renderer.
@@ -228,13 +228,13 @@ owed first: the diff-mapping plan's projection concept is `shared/page-node.ts`
   separate, later decision.
 - **Performance** — parsing adds work at boundaries only; render paths
   already receive parsed data. The perf tests (`hover-cost`,
-  `performance-report.js`) run in the gate to catch regressions.
+  `dist/scripts/performance-report.js`) run in the gate to catch regressions.
 
 ## Definition of done
 
 - [x] Zero `.js`/`.jsx` in `src/`, `electron/`, `shared/`.
 - [x] Every boundary input parsed; `LIMITS` enforced and tested.
-- [x] `tsc --noEmit` + ESLint + tests in `npm test`.
+- [x] `tsc --noEmit` + ESLint + tests in `npm test`, with no unchecked source.
 - [x] `docs/contracts.md` exists and matches `shared/`.
-- [ ] Split the already-TypeScript hotspots under their separate architecture
-      follow-up; conversion and their current tests are complete.
+- [x] Keep already-TypeScript hotspot splitting under its separate architecture
+      follow-up; conversion and current tests are complete.

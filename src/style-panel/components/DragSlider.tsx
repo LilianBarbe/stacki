@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 
+function sliderStyle(percent: number): CSSProperties & { readonly '--pct': string } {
+  return { '--pct': `${percent}%` }
+}
+
 // A thin, pointer-driven slider bar (Webflow's shadow/opacity sliders): the WHOLE
 // track is draggable start→end, with arrow-key support (Shift = ×10, Home/End =
 // min/max). Drag emits live values via onInput; release (and keys) commit via
@@ -106,7 +110,7 @@ export default function DragSlider({ value, min, max, disabled = false, ariaLabe
       aria-valuemax={max}
       aria-valuenow={local}
       aria-disabled={disabled || undefined}
-      style={{ '--pct': `${pct}%` } as CSSProperties}
+      style={sliderStyle(pct)}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}

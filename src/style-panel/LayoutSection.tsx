@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import { useGapHover, type GapAxis } from './lib/gap-hover'
 import FieldLabel from './components/FieldLabel'
@@ -124,8 +122,8 @@ function UnlockedIcon() {
 function parseGap(value: string): { row: string; col: string } {
   const parts = splitTopLevelSpaces(value).filter(Boolean)
   if (parts.length === 0) {return { row: '', col: '' }}
-  if (parts.length === 1) {return { row: parts[0], col: parts[0] }}
-  return { row: parts[0], col: parts[1] }
+  if (parts.length === 1) {return { row: parts[0] ?? '', col: parts[0] ?? '' }}
+  return { row: parts[0] ?? '', col: parts[1] ?? '' }
 }
 
 // A length field with live-as-you-type updates, a commit on blur, and ↑/↓ number
@@ -281,7 +279,7 @@ function countTracks(value: string): number {
   for (const t of splitTracks(v)) {
     if (t.startsWith('[')) {continue}
     const rep = t.match(/^repeat\(\s*(\d+)\s*,(.*)\)$/i)
-    if (rep) {count += parseInt(rep[1], 10) * Math.max(1, splitTracks(rep[2]).filter((x) => !x.startsWith('[')).length)}
+    if (rep) {count += parseInt(rep[1] ?? '0', 10) * Math.max(1, splitTracks(rep[2] ?? '').filter((x) => !x.startsWith('[')).length)}
     else {count += 1}
   }
   return count
@@ -462,8 +460,8 @@ export default function LayoutSection({ rule, busy, onSetProp, onClearProp, onLi
 
       {isGrid ? (
         <>
-          <GridTracksRow rule={rule} busy={busy} onSetProp={onSetProp} onClearProp={onClearProp} onLiveSetProp={onLiveSetProp} />
-          <GridDirectionRow rule={rule} busy={busy} onSetProp={onSetProp} onClearProp={onClearProp} onLiveSetProp={onLiveSetProp} />
+          <GridTracksRow rule={rule} busy={busy} onSetProp={onSetProp} onClearProp={onClearProp} />
+          <GridDirectionRow rule={rule} busy={busy} onSetProp={onSetProp} onClearProp={onClearProp} />
           <GridAlignRow rule={rule} busy={busy} onSetProp={onSetProp} onClearProp={onClearProp} onLiveSetProp={onLiveSetProp} />
           <GapControl rule={rule} busy={busy} onSetProp={onSetProp} onClearProp={onClearProp} onLiveSetProp={onLiveSetProp} />
           <SelectRow rule={rule} busy={busy} prop="justify-content" label="Justify content" values={GRID_CONTENT} onSetProp={onSetProp} onClearProp={onClearProp} onLiveSetProp={onLiveSetProp} />

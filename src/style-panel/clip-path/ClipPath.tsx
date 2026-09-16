@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CodeEditor, type CodeEditorTokenHighlight } from '../components/CodeEditor'
@@ -18,7 +16,6 @@ type InsetShape = { kind: 'inset'; top: number; right: number; bottom: number; l
 type ShapeFunctionShape = { kind: 'shape'; value: string; fillRule?: 'evenodd' | 'nonzero'; pathData?: string }
 type CssUnitValue = { value: number; unit: string }
 type CssCoordinateValue = CssUnitValue | { expression: string }
-type CssUnitPoint = { x: CssUnitValue; y: CssUnitValue }
 type CssCoordinatePoint = { x: CssCoordinateValue; y: CssCoordinateValue }
 type RawEditableClipPath =
   | { kind: 'polygon'; points: CssCoordinatePoint[]; fillRule?: 'evenodd' | 'nonzero' }
@@ -95,6 +92,7 @@ type WebflowBreakpointApi = {
     (event: 'mediaquery', callback: (breakpoint: BreakpointId) => void): (() => void) | undefined
   }
 }
+type WebflowApi = WebflowStyleEditor & WebflowSelectionApi & WebflowBreakpointApi
 type StylePropertyRead = { value: string; breakpoint: BreakpointId }
 type StyleLookupDiagnostic = {
   candidate: string | string[]
@@ -150,6 +148,12 @@ type ShapeScaleOptions = {
   offsetLeftVariableName?: string
   offsetTopVariableName?: string
 }
+type ShapeScaleOptionOverrides = {
+  readonly useVariable?: boolean
+  readonly variableName?: string
+  readonly offsetLeftVariableName?: string
+  readonly offsetTopVariableName?: string
+}
 type ShapeOffsetCoordinate = {
   axis: 'x' | 'y'
   u: number
@@ -196,6 +200,32 @@ type PastedShapeSvgCache = {
 }
 type ShortcutHelpItem = { keys: string; description: string }
 type ShortcutHelpGroup = { title: string; items: ShortcutHelpItem[] }
+
+function isDefined<T>(value: T | null | undefined): value is T {
+  return value !== undefined && value !== null
+}
+
+function parseFillRule(value: string | undefined): ShapeFunctionShape['fillRule'] {
+  const normalized = value?.toLowerCase()
+  if (normalized === 'evenodd' || normalized === 'nonzero') {return normalized}
+  return undefined
+}
+
+function isWebflowApi(candidate: unknown): candidate is WebflowApi {
+  if (typeof candidate !== 'object' || candidate === null) {return false}
+  if (!('getSelectedElement' in candidate)) {return false}
+  return typeof candidate.getSelectedElement === 'function'
+}
+
+function isElementStyleSource(candidate: unknown): candidate is ElementStyleSource {
+  return typeof candidate === 'object' && candidate !== null
+}
+
+function readWebflowApi(): WebflowApi | null {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'webflow')
+  const candidate: unknown = descriptor?.value
+  return isWebflowApi(candidate) ? candidate : null
+}
 
 const BREAKPOINT_LABELS: Record<BreakpointId, string> = {
   xxl: '1920px and up',
@@ -302,10 +332,6 @@ function formatCssCoordinateValue(value: CssCoordinateValue) {
 function formatCssCoordinateValueForPreview(value: CssCoordinateValue, axis?: 'x' | 'y', size?: CanvasSize) {
   const formatted = formatCssCoordinateValue(value)
   return axis && size ? previewCssCoordinateToken(formatted, axis, size) : addPreviewVariableFallbacks(formatted)
-}
-
-function formatCssUnitPoint(point: CssUnitPoint) {
-  return `${formatCssUnitValue(point.x)} ${formatCssUnitValue(point.y)}`
 }
 
 function formatCssCoordinatePoint(point: CssCoordinatePoint) {
@@ -608,8 +634,8 @@ function polygonHandleDisplayPoint(
   if (!point) {return { point: { x: 0, y: 0 }, projection: null }}
   if (!bounds || pointInBounds(point, bounds)) {return { point, projection: null }}
 
-  const prev = points[(index - 1 + points.length) % points.length]
-  const next = points[(index + 1) % points.length]
+  const prev = points[(index - 1 + points.length) % points.length] ?? point
+  const next = points[(index + 1) % points.length] ?? point
   const sides = outsideBoundsSides(point, bounds)
   const incomingIntersections = segmentBoundsIntersections(prev, point, bounds)
   const outgoingIntersections = segmentBoundsIntersections(point, next, bounds)
@@ -815,7 +841,12 @@ function cornerLabel(corner: CornerName) {
 
 function pointsClose(a: Point[], b: Point[]) {
   if (a.length !== b.length) {return false}
-  return a.every((pt, i) => Math.abs(pt.x - b[i].x) < 1 && Math.abs(pt.y - b[i].y) < 1)
+  return a.every((point, index) => {
+    const other = b[index]
+    return other !== undefined &&
+      Math.abs(point.x - other.x) < 1 &&
+      Math.abs(point.y - other.y) < 1
+  })
 }
 
 function shapesClose(a: ClipShape, b: ClipShape) {
@@ -847,7 +878,10 @@ function shapesClose(a: ClipShape, b: ClipShape) {
 
 function pointsEqual(a: Point[], b: Point[]) {
   if (a.length !== b.length) {return false}
-  return a.every((pt, index) => pt.x === b[index].x && pt.y === b[index].y)
+  return a.every((point, index) => {
+    const other = b[index]
+    return other !== undefined && point.x === other.x && point.y === other.y
+  })
 }
 
 function radiiEqual(a: CornerRadii, b: CornerRadii) {
@@ -922,7 +956,7 @@ function handleFromDragTarget(target: DragTarget): HandleTarget {
   return { kind: target.kind }
 }
 
-const HANDLE_COLOR_CLASSES = [
+const HANDLE_COLOR_CLASSES: readonly [string, string, string, string, string, string, string, string] = [
   'clip-path_color-a',
   'clip-path_color-b',
   'clip-path_color-c',
@@ -934,18 +968,25 @@ const HANDLE_COLOR_CLASSES = [
 ]
 
 function handleColorClass(handle: HandleTarget) {
-  if (handle.kind === 'polygon-point') {return HANDLE_COLOR_CLASSES[handle.index % HANDLE_COLOR_CLASSES.length]}
+  if (handle.kind === 'polygon-point') {
+    return HANDLE_COLOR_CLASSES[handle.index % HANDLE_COLOR_CLASSES.length] ?? 'clip-path_color-a'
+  }
   if (handle.kind === 'circle-center' || handle.kind === 'ellipse-center') {return 'clip-path_color-center'}
   if (handle.kind === 'circle-radius' || handle.kind === 'ellipse-rx' || handle.kind === 'inset-top') {return 'clip-path_color-a'}
   if (handle.kind === 'ellipse-ry' || handle.kind === 'inset-right') {return 'clip-path_color-b'}
   if (handle.kind === 'inset-bottom') {return 'clip-path_color-c'}
   if (handle.kind === 'inset-left') {return 'clip-path_color-d'}
-  if (handle.kind === 'inset-radius') {return HANDLE_COLOR_CLASSES[(CORNERS.indexOf(handle.corner) + 4) % HANDLE_COLOR_CLASSES.length]}
+  if (handle.kind === 'inset-radius') {
+    return HANDLE_COLOR_CLASSES[(CORNERS.indexOf(handle.corner) + 4) % HANDLE_COLOR_CLASSES.length] ??
+      'clip-path_color-a'
+  }
   return 'clip-path_color-a'
 }
 
 function polygonPointColorClass(index: number, colorClasses: string[] = []) {
-  return colorClasses[index] || HANDLE_COLOR_CLASSES[index % HANDLE_COLOR_CLASSES.length]
+  return colorClasses[index] ||
+    HANDLE_COLOR_CLASSES[index % HANDLE_COLOR_CLASSES.length] ||
+    'clip-path_color-a'
 }
 
 function normalizePolygonPointColors(count: number, colors: string[] = []) {
@@ -956,14 +997,20 @@ function nextPolygonPointColor(colors: string[], insertIndex: number) {
   const blocked = new Set([colors[insertIndex - 1], colors[insertIndex]].filter(Boolean))
   const unusedColor = HANDLE_COLOR_CLASSES.find((colorClass) => !colors.includes(colorClass) && !blocked.has(colorClass))
   if (unusedColor) {return unusedColor}
-  return HANDLE_COLOR_CLASSES.find((colorClass) => !blocked.has(colorClass)) || HANDLE_COLOR_CLASSES[0]
+  return HANDLE_COLOR_CLASSES.find((colorClass) => !blocked.has(colorClass)) ||
+    HANDLE_COLOR_CLASSES[0]
 }
 
 function shorthandGroups<T>(items: T[], count = items.length) {
-  if (count <= 1) {return items.length ? [[items[0], items[1], items[2], items[3]].filter(Boolean) as T[]] : []}
-  if (count === 2) {return [[items[0], items[2]], [items[1], items[3]]]}
-  if (count === 3) {return [[items[0]], [items[1], items[3]], [items[2]]]}
-  return [[items[0]], [items[1]], [items[2]], [items[3]]]
+  const first = items[0]
+  if (first === undefined) {return []}
+  const second = items[1] ?? first
+  const third = items[2] ?? first
+  const fourth = items[3] ?? second
+  if (count <= 1) {return [[first, second, third, fourth]]}
+  if (count === 2) {return [[first, third], [second, fourth]]}
+  if (count === 3) {return [[first], [second, fourth], [third]]}
+  return [[first], [second], [third], [fourth]]
 }
 
 const PRESETS: Record<string, ClipShape> = {
@@ -995,27 +1042,6 @@ function formatShapeValueFromPoints(points: Point[]) {
   ].join(', ')
 }
 
-function formatShapeValueFromLoops(loops: Point[][]) {
-  const [firstLoop, ...restLoops] = loops
-  if (!firstLoop?.length) {return DEFAULT_SHAPE_VALUE}
-
-  const loopCommands = (points: Point[], isFirstLoop: boolean) => {
-    const [firstPoint, ...restPoints] = points
-    if (!firstPoint) {return []}
-
-    return [
-      `${isFirstLoop ? 'from' : 'move to'} ${formatPercent(firstPoint.x)} ${formatPercent(firstPoint.y)}`,
-      ...restPoints.map((point) => `line to ${formatPercent(point.x)} ${formatPercent(point.y)}`),
-      'close',
-    ]
-  }
-
-  return [
-    ...loopCommands(firstLoop, true),
-    ...restLoops.flatMap((loop) => loopCommands(loop, false)),
-  ].join(', ')
-}
-
 function formatShapeCssPoint(point: ShapeCssPoint) {
   return `${point.x} ${point.y}`
 }
@@ -1030,7 +1056,7 @@ function mapShapeSubpathsToCss(subpaths: SvgShapeSubpath[], mapPoint: (point: Po
           kind: 'curve' as const,
           to: mapPoint(command.to),
           control1: mapPoint(command.control1),
-          control2: command.control2 ? mapPoint(command.control2) : undefined,
+          ...(command.control2 ? { control2: mapPoint(command.control2) } : {}),
         }
       }
       return command
@@ -1084,21 +1110,6 @@ function formatPathDataFromPoints(points: Point[]) {
   ].join('')
 }
 
-function formatPathDataFromLoops(loops: Point[][]) {
-  const commands = loops.flatMap((points) => {
-    const [firstPoint, ...restPoints] = points
-    if (!firstPoint) {return []}
-
-    return [
-      `M${firstPoint.x} ${firstPoint.y}`,
-      ...restPoints.map((point) => `L${point.x} ${point.y}`),
-      'Z',
-    ]
-  })
-
-  return commands.length ? commands.join('') : DEFAULT_SHAPE_PATH_DATA
-}
-
 function formatPathDataFromSubpaths(subpaths: SvgShapeSubpath[]) {
   const pathData = subpaths.flatMap((subpath) => [
     `M${subpath.start.x} ${subpath.start.y}`,
@@ -1124,69 +1135,23 @@ function shapeFromPolygonPoints(points: Point[]): ShapeFunctionShape {
   }
 }
 
-function shapeFromPointLoops(loops: Point[][]): ShapeFunctionShape {
-  const normalizedLoops = loops.map(simplifySvgContour).filter((loop) => loop.length >= 3)
-  if (!normalizedLoops.length) {return shapeFromPolygonPoints([])}
-
-  return {
-    kind: 'shape',
-    value: formatShapeValueFromLoops(normalizedLoops),
-    fillRule: normalizedLoops.length > 1 ? 'evenodd' : undefined,
-    pathData: formatPathDataFromLoops(normalizedLoops),
-  }
-}
-
 function shapeFromSvgSubpaths(subpaths: SvgShapeSubpath[], fillRule?: ShapeFunctionShape['fillRule']): ShapeFunctionShape {
   if (!subpaths.length) {return shapeFromPolygonPoints([])}
 
   return {
     kind: 'shape',
     value: formatShapeValueFromSubpaths(subpaths),
-    fillRule,
+    ...(fillRule ? { fillRule } : {}),
     pathData: formatPathDataFromSubpaths(subpaths),
   }
 }
 
-function fitPointsToPercentBox(points: Point[]) {
-  if (!points.length) {return null}
-
-  const minX = Math.min(...points.map((point) => point.x))
-  const maxX = Math.max(...points.map((point) => point.x))
-  const minY = Math.min(...points.map((point) => point.y))
-  const maxY = Math.max(...points.map((point) => point.y))
-  const width = maxX - minX
-  const height = maxY - minY
-  if (width <= SVG_POINT_EPSILON || height <= SVG_POINT_EPSILON) {return null}
-
-  return points.map((point) => ({
-    x: ((point.x - minX) / width) * 100,
-    y: ((point.y - minY) / height) * 100,
-  }))
-}
-
-function fitPointLoopsToPercentBox(loops: Point[][]) {
-  const points = loops.flat()
-  if (!points.length) {return null}
-
-  const minX = Math.min(...points.map((point) => point.x))
-  const maxX = Math.max(...points.map((point) => point.x))
-  const minY = Math.min(...points.map((point) => point.y))
-  const maxY = Math.max(...points.map((point) => point.y))
-  const width = maxX - minX
-  const height = maxY - minY
-  if (width <= SVG_POINT_EPSILON || height <= SVG_POINT_EPSILON) {return null}
-
-  return loops.map((loop) => loop.map((point) => ({
-    x: ((point.x - minX) / width) * 100,
-    y: ((point.y - minY) / height) * 100,
-  })))
-}
-
 function svgShapeCommandPoints(command: SvgShapeCommand) {
   if (command.kind === 'close') {return []}
-  return command.kind === 'curve'
-    ? [command.to, command.control1, command.control2].filter(Boolean) as Point[]
-    : [command.to]
+  if (command.kind === 'curve') {
+    return [command.to, command.control1, command.control2].filter(isDefined)
+  }
+  return [command.to]
 }
 
 function svgShapeSubpathPoints(subpaths: SvgShapeSubpath[]) {
@@ -1227,10 +1192,10 @@ function mapSvgShapeCommandPoints(command: SvgShapeCommand, mapper: (point: Poin
   if (command.kind === 'close') {return command}
   if (command.kind === 'line') {return { ...command, to: mapper(command.to) }}
   return {
-    ...command,
+    kind: 'curve',
     to: mapper(command.to),
     control1: mapper(command.control1),
-    control2: command.control2 ? mapper(command.control2) : undefined,
+    ...(command.control2 ? { control2: mapper(command.control2) } : {}),
   }
 }
 
@@ -1418,6 +1383,7 @@ function previewCssLengthPercentageToken(token: string, axis: 'x' | 'y', size: C
   if (!Number.isFinite(value)) {return token}
 
   const unit = match[2]
+  if (unit === undefined) {return token}
   const axisSize = previewAxisSize(axis, size)
   if (axisSize <= 0) {return token}
   const percent = unit === '%'
@@ -1509,27 +1475,27 @@ function formatShapeFunctionForPreview(shape: ShapeFunctionShape, size: CanvasSi
 
 function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
   const polygonMatch = value.match(/^polygon\s*\((.*)\)$/is)
-  if (polygonMatch) {
+  if (polygonMatch?.[1]) {
     const parts = splitShapeCommandList(polygonMatch[1])
     const fillRule = /^(evenodd|nonzero)$/i.test(parts[0] || '') ? parts[0] : null
     const pointParts = fillRule ? parts.slice(1) : parts
     const points = pointParts.map((part) => {
       const tokens = splitTopLevelWhitespace(part)
       return tokens.length === 2
-        ? `${previewCssCoordinateToken(tokens[0], 'x', size)} ${previewCssCoordinateToken(tokens[1], 'y', size)}`
+        ? `${previewCssCoordinateToken(tokens[0] ?? '', 'x', size)} ${previewCssCoordinateToken(tokens[1] ?? '', 'y', size)}`
         : part
     })
     return `polygon(${[fillRule, ...points].filter(Boolean).join(', ')})`
   }
 
   const circleMatch = value.match(/^circle\s*\((.*)\)$/is)
-  if (circleMatch) {
+  if (circleMatch?.[1]) {
     const [radiusPart, centerPart] = splitTopLevelKeyword(circleMatch[1], 'at')
     const radiusTokens = splitTopLevelWhitespace(radiusPart)
     const centerTokens = centerPart ? splitTopLevelWhitespace(centerPart) : []
     const radius = radiusTokens[0] ? previewCssCoordinateToken(radiusTokens[0], 'x', size) : radiusPart
     const center = centerTokens.length === 2
-      ? ` at ${previewCssCoordinateToken(centerTokens[0], 'x', size)} ${previewCssCoordinateToken(centerTokens[1], 'y', size)}`
+      ? ` at ${previewCssCoordinateToken(centerTokens[0] ?? '', 'x', size)} ${previewCssCoordinateToken(centerTokens[1] ?? '', 'y', size)}`
       : centerPart
         ? ` at ${centerPart}`
         : ''
@@ -1537,15 +1503,15 @@ function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
   }
 
   const ellipseMatch = value.match(/^ellipse\s*\((.*)\)$/is)
-  if (ellipseMatch) {
+  if (ellipseMatch?.[1]) {
     const [radiiPart, centerPart] = splitTopLevelKeyword(ellipseMatch[1], 'at')
     const radii = splitTopLevelWhitespace(radiiPart)
     const centerTokens = centerPart ? splitTopLevelWhitespace(centerPart) : []
     const previewRadii = radii.length === 2
-      ? `${previewCssCoordinateToken(radii[0], 'x', size)} ${previewCssCoordinateToken(radii[1], 'y', size)}`
+      ? `${previewCssCoordinateToken(radii[0] ?? '', 'x', size)} ${previewCssCoordinateToken(radii[1] ?? '', 'y', size)}`
       : radiiPart
     const center = centerTokens.length === 2
-      ? ` at ${previewCssCoordinateToken(centerTokens[0], 'x', size)} ${previewCssCoordinateToken(centerTokens[1], 'y', size)}`
+      ? ` at ${previewCssCoordinateToken(centerTokens[0] ?? '', 'x', size)} ${previewCssCoordinateToken(centerTokens[1] ?? '', 'y', size)}`
       : centerPart
         ? ` at ${centerPart}`
         : ''
@@ -1553,7 +1519,7 @@ function formatRawClipPathStringForPreview(value: string, size: CanvasSize) {
   }
 
   const insetMatch = value.match(/^inset\s*\((.*)\)$/is)
-  if (insetMatch) {
+  if (insetMatch?.[1]) {
     const [insetPart, roundPart] = splitTopLevelKeyword(insetMatch[1], 'round')
     const sides = splitTopLevelWhitespace(insetPart)
     const previewSides = sides.length >= 1 && sides.length <= 4
@@ -1675,9 +1641,16 @@ type ClipPathCodeHighlight = CodeEditorTokenHighlight & {
 function buildClipPathCodeHighlights(shape: ClipShape, value: string, polygonPointColors: string[] = []): ClipPathCodeHighlight[] {
   const ranges = clipPathValueTokenRanges(value, shape)
   const highlights: ClipPathCodeHighlight[] = []
-  const addHighlight = (range: { from: number; to: number } | undefined, handles: HandleTarget[], colorClass = handleColorClass(handles[0])) => {
-    if (!range) {return}
-    highlights.push({ ...range, handles, colorClass, className: codeTokenClassName(colorClass) })
+  const addHighlight = (range: { from: number; to: number } | undefined, handles: HandleTarget[], colorClass?: string) => {
+    const firstHandle = handles[0]
+    if (!range || !firstHandle) {return}
+    const resolvedColorClass = colorClass ?? handleColorClass(firstHandle)
+    highlights.push({
+      ...range,
+      handles,
+      colorClass: resolvedColorClass,
+      className: codeTokenClassName(resolvedColorClass),
+    })
   }
 
   if (shape.kind === 'raw' && shape.editable) {
@@ -1815,7 +1788,7 @@ function buildClipPathCodeHighlights(shape: ClipShape, value: string, polygonPoi
 function parsePercent(value: string): number | null {
   if (value.trim() === '0') {return 0}
   const m = value.trim().match(/^(-?\d+(?:\.\d+)?)\s*%$/)
-  return m ? parseFloat(m[1]) : null
+  return m?.[1] ? parseFloat(m[1]) : null
 }
 
 function splitTopLevelWhitespace(value: string) {
@@ -1828,7 +1801,7 @@ function splitTopLevelWhitespace(value: string) {
     if (char === '(') {depth += 1}
     if (char === ')') {depth = Math.max(0, depth - 1)}
 
-    if (/\s/.test(char) && depth === 0) {
+    if (char !== undefined && /\s/.test(char) && depth === 0) {
       if (start !== null) {
         tokens.push(value.slice(start, index))
         start = null
@@ -1926,7 +1899,7 @@ function parseCssUnitList(value: string, min: number, max: number) {
   const tokens = splitTopLevelWhitespace(value)
   if (tokens.length < min || tokens.length > max) {return null}
   const values = tokens.map(parseCssUnitValue)
-  return values.every(Boolean) ? values as CssUnitValue[] : null
+  return values.every(isDefined) ? values.filter(isDefined) : null
 }
 
 function validLengthPercentageList(value: string, min: number, max: number) {
@@ -1941,14 +1914,15 @@ function validRawCenter(value: string | undefined) {
 function parsePolygon(value: string): Point[] | null {
   if (!value) {return null}
   const m = value.match(/polygon\s*\(([^)]+)\)/i)
-  if (!m) {return null}
-  const parts = m[1].split(',')
+  const content = m?.[1]
+  if (!content) {return null}
+  const parts = content.split(',')
   const points: Point[] = []
   for (const part of parts) {
     const tokens = part.trim().split(/\s+/)
     if (tokens.length !== 2) {return null}
-    const x = parsePercent(tokens[0])
-    const y = parsePercent(tokens[1])
+    const x = parsePercent(tokens[0] ?? '')
+    const y = parsePercent(tokens[1] ?? '')
     if (x === null || y === null) {return null}
     points.push({ x, y })
   }
@@ -1958,15 +1932,16 @@ function parsePolygon(value: string): Point[] | null {
 function parseCenter(value: string): Point | null {
   const tokens = value.trim().split(/\s+/)
   if (tokens.length !== 2) {return null}
-  const x = parsePercent(tokens[0])
-  const y = parsePercent(tokens[1])
+  const x = parsePercent(tokens[0] ?? '')
+  const y = parsePercent(tokens[1] ?? '')
   return x === null || y === null ? null : { x, y }
 }
 
 function parseCircle(value: string): CircleShape | null {
   const m = value.match(/^circle\s*\((.*)\)$/i)
-  if (!m) {return null}
-  const [radiusPart, centerPart] = m[1].split(/\s+at\s+/i).map((part) => part.trim())
+  const content = m?.[1]
+  if (!content) {return null}
+  const [radiusPart = '', centerPart] = content.split(/\s+at\s+/i).map((part) => part.trim())
   const radius = parsePercent(radiusPart)
   if (radius === null) {return null}
   const center = centerPart ? parseCenter(centerPart) : { x: 50, y: 50 }
@@ -1975,12 +1950,13 @@ function parseCircle(value: string): CircleShape | null {
 
 function parseEllipse(value: string): EllipseShape | null {
   const m = value.match(/^ellipse\s*\((.*)\)$/i)
-  if (!m) {return null}
-  const [radiiPart, centerPart] = m[1].split(/\s+at\s+/i).map((part) => part.trim())
+  const content = m?.[1]
+  if (!content) {return null}
+  const [radiiPart = '', centerPart] = content.split(/\s+at\s+/i).map((part) => part.trim())
   const radii = radiiPart.split(/\s+/)
   if (radii.length !== 2) {return null}
-  const rx = parsePercent(radii[0])
-  const ry = parsePercent(radii[1])
+  const rx = parsePercent(radii[0] ?? '')
+  const ry = parsePercent(radii[1] ?? '')
   if (rx === null || ry === null) {return null}
   const center = centerPart ? parseCenter(centerPart) : { x: 50, y: 50 }
   return center ? { kind: 'ellipse', rx, ry, cx: center.x, cy: center.y } : null
@@ -1989,23 +1965,24 @@ function parseEllipse(value: string): EllipseShape | null {
 function expandRadiusValues(values: number[]): [number, number, number, number] | null {
   if (values.length < 1 || values.length > 4) {return null}
   const topLeft = values[0]
-  const topRight = values[1] ?? values[0]
-  const bottomRight = values[2] ?? values[0]
-  const bottomLeft = values[3] ?? values[1] ?? values[0]
+  if (topLeft === undefined) {return null}
+  const topRight = values[1] ?? topLeft
+  const bottomRight = values[2] ?? topLeft
+  const bottomLeft = values[3] ?? values[1] ?? topLeft
   return [topLeft, topRight, bottomRight, bottomLeft]
 }
 
 function parseRadiusList(value: string): [number, number, number, number] | null {
   const values = value.trim().split(/\s+/).filter(Boolean).map(parsePercent)
   if (values.length < 1 || values.length > 4 || values.some((item) => item === null)) {return null}
-  return expandRadiusValues(values as number[])
+  return expandRadiusValues(values.filter(isDefined))
 }
 
 function parseInsetRadii(value: string | undefined): CornerRadii | null {
   if (!value) {return makeInsetRadii(0)}
   const parts = value.split(/\s*\/\s*/)
   if (parts.length > 2) {return null}
-  const horizontal = parseRadiusList(parts[0])
+  const horizontal = parseRadiusList(parts[0] ?? '')
   if (!horizontal) {return null}
   const vertical = parts[1] ? parseRadiusList(parts[1]) : horizontal
   if (!vertical) {return null}
@@ -2020,15 +1997,17 @@ function parseInsetRadii(value: string | undefined): CornerRadii | null {
 
 function parseInset(value: string): InsetShape | null {
   const m = value.match(/^inset\s*\((.*)\)$/i)
-  if (!m) {return null}
-  const [insetPart, roundPart] = m[1].split(/\s+round\s+/i)
+  const content = m?.[1]
+  if (!content) {return null}
+  const [insetPart = '', roundPart] = content.split(/\s+round\s+/i)
   const values = insetPart.trim().split(/\s+/).map(parsePercent)
   if (values.length < 1 || values.length > 4 || values.some((item) => item === null)) {return null}
-  const nums = values as number[]
+  const nums = values.filter(isDefined)
   const top = nums[0]
-  const right = nums[1] ?? nums[0]
-  const bottom = nums[2] ?? nums[0]
-  const left = nums[3] ?? nums[1] ?? nums[0]
+  if (top === undefined) {return null}
+  const right = nums[1] ?? top
+  const bottom = nums[2] ?? top
+  const left = nums[3] ?? nums[1] ?? top
   const radii = parseInsetRadii(roundPart)
   return radii ? { kind: 'inset', top, right, bottom, left, radii } : null
 }
@@ -2047,18 +2026,17 @@ function validRawInsetRadii(value: string | undefined) {
   const parts = splitTopLevelChar(value, '/')
   return parts.length >= 1 &&
     parts.length <= 2 &&
-    validLengthPercentageList(parts[0], 1, 4) &&
+    validLengthPercentageList(parts[0] ?? '', 1, 4) &&
     (!parts[1] || validLengthPercentageList(parts[1], 1, 4))
 }
 
 function parseRawPolygon(value: string): RawClipPathShape | null {
   const m = value.match(/^polygon\s*\((.*)\)$/is)
-  if (!m) {return null}
+  const content = m?.[1]
+  if (!content) {return null}
 
-  const parts = splitShapeCommandList(m[1])
-  const fillRule = /^(evenodd|nonzero)$/i.test(parts[0] || '')
-    ? parts[0].toLowerCase() as 'evenodd' | 'nonzero'
-    : undefined
+  const parts = splitShapeCommandList(content)
+  const fillRule = parseFillRule(parts[0])
   const pointParts = fillRule ? parts.slice(1) : parts
   if (pointParts.length < 3) {return null}
 
@@ -2074,42 +2052,47 @@ function parseRawPolygon(value: string): RawClipPathShape | null {
     return tokens.length === 2 && tokens.every(isCssLengthPercentageToken)
   })
 
-  return valid
-    ? {
-      kind: 'raw',
-      value: value.trim(),
-      preset: 'Polygon',
-      editable: parsedPoints.length === pointParts.length ? { kind: 'polygon', points: parsedPoints, fillRule } : undefined,
-    }
-    : null
+  if (!valid) {return null}
+  const editable = parsedPoints.length === pointParts.length
+    ? { kind: 'polygon' as const, points: parsedPoints, ...(fillRule ? { fillRule } : {}) }
+    : undefined
+  return {
+    kind: 'raw',
+    value: value.trim(),
+    preset: 'Polygon',
+    ...(editable ? { editable } : {}),
+  }
 }
 
 function parseRawCircle(value: string): RawClipPathShape | null {
   const m = value.match(/^circle\s*\((.*)\)$/is)
-  if (!m) {return null}
+  const content = m?.[1]
+  if (!content) {return null}
 
-  const [radiusPart, centerPart] = splitTopLevelKeyword(m[1], 'at')
+  const [radiusPart, centerPart] = splitTopLevelKeyword(content, 'at')
   const radiusTokens = splitTopLevelWhitespace(radiusPart)
-  const validRadius = radiusTokens.length === 1 && isCssRadiusToken(radiusTokens[0])
+  const validRadius = radiusTokens.length === 1 && isCssRadiusToken(radiusTokens[0] ?? '')
   if (!validRadius || !validRawCenter(centerPart)) {return null}
 
   const centerTokens = centerPart ? splitTopLevelWhitespace(centerPart) : []
-  const radius = parseCssUnitValue(radiusTokens[0])
+  const radius = parseCssUnitValue(radiusTokens[0] ?? '')
   const cx = centerPart ? parseCssUnitValue(centerTokens[0] || '') : { value: 50, unit: '%' }
   const cy = centerPart ? parseCssUnitValue(centerTokens[1] || '') : { value: 50, unit: '%' }
+  const editable = radius && cx && cy ? { kind: 'circle' as const, radius, cx, cy } : undefined
   return {
     kind: 'raw',
     value: value.trim(),
     preset: 'Circle',
-    editable: radius && cx && cy ? { kind: 'circle', radius, cx, cy } : undefined,
+    ...(editable ? { editable } : {}),
   }
 }
 
 function parseRawEllipse(value: string): RawClipPathShape | null {
   const m = value.match(/^ellipse\s*\((.*)\)$/is)
-  if (!m) {return null}
+  const content = m?.[1]
+  if (!content) {return null}
 
-  const [radiiPart, centerPart] = splitTopLevelKeyword(m[1], 'at')
+  const [radiiPart, centerPart] = splitTopLevelKeyword(content, 'at')
   if (!validRawRadiusList(radiiPart, 2, 2) || !validRawCenter(centerPart)) {return null}
 
   const radii = splitTopLevelWhitespace(radiiPart)
@@ -2118,19 +2101,21 @@ function parseRawEllipse(value: string): RawClipPathShape | null {
   const ry = parseCssUnitValue(radii[1] || '')
   const cx = centerPart ? parseCssUnitValue(center[0] || '') : { value: 50, unit: '%' }
   const cy = centerPart ? parseCssUnitValue(center[1] || '') : { value: 50, unit: '%' }
+  const editable = rx && ry && cx && cy ? { kind: 'ellipse' as const, rx, ry, cx, cy } : undefined
   return {
     kind: 'raw',
     value: value.trim(),
     preset: 'Ellipse',
-    editable: rx && ry && cx && cy ? { kind: 'ellipse', rx, ry, cx, cy } : undefined,
+    ...(editable ? { editable } : {}),
   }
 }
 
 function parseRawInset(value: string): RawClipPathShape | null {
   const m = value.match(/^inset\s*\((.*)\)$/is)
-  if (!m) {return null}
+  const content = m?.[1]
+  if (!content) {return null}
 
-  const [insetPart, roundPart] = splitTopLevelKeyword(m[1], 'round')
+  const [insetPart, roundPart] = splitTopLevelKeyword(content, 'round')
   if (!validLengthPercentageList(insetPart, 1, 4) || !validRawInsetRadii(roundPart)) {return null}
 
   const sideValues = parseCssUnitList(insetPart, 1, 4)
@@ -2148,11 +2133,18 @@ function parseRawInset(value: string): RawClipPathShape | null {
       right,
       bottom,
       left,
-      radii: horizontal ? { horizontal, vertical: vertical || undefined } : undefined,
+      ...(horizontal
+        ? { radii: { horizontal, ...(vertical ? { vertical } : {}) } }
+        : {}),
     }
     : undefined
 
-  return { kind: 'raw', value: value.trim(), preset: 'Inset', editable }
+  return {
+    kind: 'raw',
+    value: value.trim(),
+    preset: 'Inset',
+    ...(editable ? { editable } : {}),
+  }
 }
 
 function parseRawBasicClipPath(value: string): RawClipPathShape | null {
@@ -2173,17 +2165,20 @@ function parseCustomClipPath(value: string): RawClipPathShape | null {
 
 function parseShape(value: string): ShapeFunctionShape | null {
   const m = value.match(/^shape\s*\((.*)\)$/is)
-  if (!m) {return null}
+  const initialContent = m?.[1]
+  if (!initialContent) {return null}
 
-  let content = m[1].trim()
+  let content = initialContent.trim()
   let fillRule: ShapeFunctionShape['fillRule']
   const fillRuleMatch = content.match(/^(evenodd|nonzero)\s+(from\b.*)$/is)
   if (fillRuleMatch) {
-    fillRule = fillRuleMatch[1].toLowerCase() as ShapeFunctionShape['fillRule']
-    content = fillRuleMatch[2].trim()
+    fillRule = parseFillRule(fillRuleMatch[1])
+    content = fillRuleMatch[2]?.trim() ?? ''
   }
 
-  return /^from\b/i.test(content) ? { kind: 'shape', value: content, fillRule } : null
+  return /^from\b/i.test(content)
+    ? { kind: 'shape', value: content, ...(fillRule ? { fillRule } : {}) }
+    : null
 }
 
 function splitShapeCommandList(value: string) {
@@ -2420,7 +2415,7 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
 
   for (const command of splitShapeCommandList(value)) {
     const moveMatch = command.match(/^(from|move\s+to)\s+(.+)$/i)
-    if (moveMatch) {
+    if (moveMatch?.[2]) {
       const start = parseShapeCssPoint(moveMatch[2])
       if (!start) {return null}
       activeSubpath = { start, commands: [] }
@@ -2431,7 +2426,7 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
     if (!activeSubpath) {return null}
 
     const lineMatch = command.match(/^line\s+to\s+(.+)$/i)
-    if (lineMatch) {
+    if (lineMatch?.[1]) {
       const to = parseShapeCssPoint(lineMatch[1])
       if (!to) {return null}
       activeSubpath.commands.push({ kind: 'line', to })
@@ -2439,12 +2434,12 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
     }
 
     const curveMatch = command.match(/^curve\s+to\s+(.+)$/i)
-    if (curveMatch) {
+    if (curveMatch?.[1]) {
       const to = readShapeCssPoint(curveMatch[1])
       if (!to) {return null}
 
       const withMatch = to.rest.match(/^with\s+(.+)$/i)
-      if (!withMatch) {return null}
+      if (!withMatch?.[1]) {return null}
 
       const control1 = readShapeCssPoint(withMatch[1])
       if (!control1) {return null}
@@ -2456,7 +2451,7 @@ function parseShapeCssSubpaths(value: string): ShapeCssSubpath[] | null {
       }
 
       const control2Match = controlRest.match(/^\/\s*(.+)$/)
-      const control2 = control2Match ? parseShapeCssPoint(control2Match[1]) : null
+      const control2 = control2Match?.[1] ? parseShapeCssPoint(control2Match[1]) : null
       if (!control2) {return null}
 
       activeSubpath.commands.push({ kind: 'curve', to: to.point, control1: control1.point, control2 })
@@ -2480,7 +2475,7 @@ function collectShapeCssPoints(subpaths: ShapeCssSubpath[]) {
     ...subpath.commands.flatMap((command) => {
       if (command.kind === 'close') {return []}
       if (command.kind === 'line') {return [command.to]}
-      return [command.to, command.control1, command.control2].filter(Boolean) as ShapeCssPoint[]
+      return [command.to, command.control1, command.control2].filter(isDefined)
     }),
   ])
 }
@@ -2495,7 +2490,7 @@ function mapShapeCssSubpathPoints(subpaths: ShapeCssSubpath[], mapper: (point: S
           kind: 'curve' as const,
           to: mapper(command.to),
           control1: mapper(command.control1),
-          control2: command.control2 ? mapper(command.control2) : undefined,
+          ...(command.control2 ? { control2: mapper(command.control2) } : {}),
         }
       }
       return command
@@ -2767,7 +2762,7 @@ function parseClipPathInput(value: string): ClipShape | null {
   if (!trimmed) {return null}
 
   const declarationMatch = trimmed.match(/(?:^|[;{\s])(?:-webkit-)?clip-path\s*:\s*([^;}]+)/i)
-  const clipPathValue = declarationMatch ? declarationMatch[1] : trimmed
+  const clipPathValue = declarationMatch?.[1] ?? trimmed
   return parseClipPath(clipPathValue.trim().replace(/;$/, ''))
 }
 
@@ -2798,7 +2793,7 @@ function svgStyleValue(element: Element, property: string) {
   if (!style) {return null}
 
   const match = style.match(new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, 'i'))
-  return match?.[1].trim() || null
+  return match?.[1]?.trim() || null
 }
 
 function inheritedSvgAttribute(element: Element, attribute: string) {
@@ -2857,8 +2852,13 @@ function hasSvgTransform(element: Element) {
 
 function parseSvgViewBox(svg: Element, contours: Point[][]): SvgViewBox | null {
   const viewBoxValues = parseSvgNumberList(svg.getAttribute('viewBox'))
-  if (viewBoxValues.length === 4 && viewBoxValues[2] > 0 && viewBoxValues[3] > 0) {
-    return { x: viewBoxValues[0], y: viewBoxValues[1], width: viewBoxValues[2], height: viewBoxValues[3] }
+  const [x, y, widthViewBox, heightViewBox] = viewBoxValues
+  if (
+    x !== undefined && y !== undefined &&
+    widthViewBox !== undefined && heightViewBox !== undefined &&
+    viewBoxValues.length === 4 && widthViewBox > 0 && heightViewBox > 0
+  ) {
+    return { x, y, width: widthViewBox, height: heightViewBox }
   }
 
   const width = parseSvgNumber(svg.getAttribute('width'))
@@ -2895,7 +2895,9 @@ function simplifySvgContour(points: Point[]) {
     return unique
   }, [])
 
-  if (withoutDuplicates.length > 1 && svgPointsAlmostEqual(withoutDuplicates[0], withoutDuplicates[withoutDuplicates.length - 1])) {
+  const firstPoint = withoutDuplicates[0]
+  const lastPoint = withoutDuplicates[withoutDuplicates.length - 1]
+  if (firstPoint && lastPoint && withoutDuplicates.length > 1 && svgPointsAlmostEqual(firstPoint, lastPoint)) {
     withoutDuplicates.pop()
   }
 
@@ -2906,7 +2908,9 @@ function simplifySvgContour(points: Point[]) {
     simplified = simplified.filter((point, index, list) => {
       const previous = list[(index - 1 + list.length) % list.length]
       const next = list[(index + 1) % list.length]
-      const keep = !isSvgPointCollinear(previous, point, next)
+      const keep = previous !== undefined && next !== undefined
+        ? !isSvgPointCollinear(previous, point, next)
+        : false
       if (!keep) {changed = true}
       return keep
     })
@@ -2921,7 +2925,10 @@ function parseSvgPoints(value: string | null | undefined) {
 
   const points: Point[] = []
   for (let index = 0; index < values.length; index += 2) {
-    points.push({ x: values[index], y: values[index + 1] })
+    const x = values[index]
+    const y = values[index + 1]
+    if (x === undefined || y === undefined) {return null}
+    points.push({ x, y })
   }
 
   return simplifySvgContour(points)
@@ -2933,9 +2940,14 @@ function parseClosedSvgPolyline(value: string | null | undefined) {
 
   const points: Point[] = []
   for (let index = 0; index < values.length; index += 2) {
-    points.push({ x: values[index], y: values[index + 1] })
+    const x = values[index]
+    const y = values[index + 1]
+    if (x === undefined || y === undefined) {return null}
+    points.push({ x, y })
   }
-  if (!svgPointsAlmostEqual(points[0], points[points.length - 1])) {return null}
+  const firstPoint = points[0]
+  const lastPoint = points[points.length - 1]
+  if (!firstPoint || !lastPoint || !svgPointsAlmostEqual(firstPoint, lastPoint)) {return null}
 
   return simplifySvgContour(points)
 }
@@ -3102,9 +3114,14 @@ function parseSvgPolygonShape(element: Element, requireClosed = true) {
 
   const points: Point[] = []
   for (let index = 0; index < values.length; index += 2) {
-    points.push({ x: values[index], y: values[index + 1] })
+    const x = values[index]
+    const y = values[index + 1]
+    if (x === undefined || y === undefined) {return null}
+    points.push({ x, y })
   }
-  if (requireClosed && points.length >= 2 && !svgPointsAlmostEqual(points[0], points[points.length - 1])) {return null}
+  const firstPoint = points[0]
+  const lastPoint = points[points.length - 1]
+  if (requireClosed && (!firstPoint || !lastPoint || !svgPointsAlmostEqual(firstPoint, lastPoint))) {return null}
 
   const simplified = simplifySvgContour(points)
   const [start, ...rest] = simplified
@@ -3135,10 +3152,13 @@ function parseSimpleSvgPath(element: Element) {
   let closed = false
   const points: Point[] = []
 
-  const hasNumber = () => index < tokens.length && !isSvgPathCommand(tokens[index])
+  const hasNumber = () => {
+    const token = tokens[index]
+    return token !== undefined && !isSvgPathCommand(token)
+  }
   const readNumber = () => {
     if (!hasNumber()) {return null}
-    const value = Number(tokens[index])
+    const value = Number(tokens[index] ?? '')
     index += 1
     return Number.isFinite(value) ? value : null
   }
@@ -3148,8 +3168,9 @@ function parseSimpleSvgPath(element: Element) {
   }
 
   while (index < tokens.length) {
-    if (isSvgPathCommand(tokens[index])) {
-      command = tokens[index]
+    const token = tokens[index]
+    if (token !== undefined && isSvgPathCommand(token)) {
+      command = token
       index += 1
     }
     if (!command) {return null}
@@ -3205,7 +3226,9 @@ function parseSimpleSvgPath(element: Element) {
     }
   }
 
-  if (!closed && points.length > 1 && !svgPointsAlmostEqual(points[0], points[points.length - 1])) {
+  const firstPoint = points[0]
+  const lastPoint = points[points.length - 1]
+  if (!closed && firstPoint && lastPoint && points.length > 1 && !svgPointsAlmostEqual(firstPoint, lastPoint)) {
     return null
   }
 
@@ -3280,7 +3303,6 @@ function svgArcToCubicCurves(from: Point, rawRx: number, rawRy: number, rotation
   for (let segment = 0; segment < segments; segment += 1) {
     const nextAngle = startAngle + segmentAngle
     const alpha = (4 / 3) * Math.tan((nextAngle - startAngle) / 4)
-    const p1 = { x: rx * Math.cos(startAngle), y: ry * Math.sin(startAngle) }
     const p2 = { x: rx * Math.cos(nextAngle), y: ry * Math.sin(nextAngle) }
     const c1 = {
       x: rx * (Math.cos(startAngle) - alpha * Math.sin(startAngle)),
@@ -3319,10 +3341,13 @@ function parseSvgPathShape(element: Element) {
   let previousCommand = ''
   const subpaths: SvgShapeSubpath[] = []
 
-  const hasNumber = () => index < tokens.length && !isSvgPathCommand(tokens[index])
+  const hasNumber = () => {
+    const token = tokens[index]
+    return token !== undefined && !isSvgPathCommand(token)
+  }
   const readNumber = () => {
     if (!hasNumber()) {return null}
-    const value = Number(tokens[index])
+    const value = Number(tokens[index] ?? '')
     index += 1
     return Number.isFinite(value) ? value : null
   }
@@ -3349,8 +3374,9 @@ function parseSvgPathShape(element: Element) {
   }
 
   while (index < tokens.length) {
-    if (isSvgPathCommand(tokens[index])) {
-      command = tokens[index]
+    const token = tokens[index]
+    if (token !== undefined && isSvgPathCommand(token)) {
+      command = token
       index += 1
     }
     if (!command) {return null}
@@ -3513,14 +3539,17 @@ function parseSvgPathShape(element: Element) {
 function isAxisAlignedSvgContour(points: Point[]) {
   return points.every((point, index) => {
     const next = points[(index + 1) % points.length]
-    return Math.abs(point.x - next.x) < SVG_POINT_EPSILON || Math.abs(point.y - next.y) < SVG_POINT_EPSILON
+    return next !== undefined && (
+      Math.abs(point.x - next.x) < SVG_POINT_EPSILON ||
+      Math.abs(point.y - next.y) < SVG_POINT_EPSILON
+    )
   })
 }
 
 function polygonArea(points: Point[]) {
   return points.reduce((area, point, index) => {
     const next = points[(index + 1) % points.length]
-    return area + point.x * next.y - next.x * point.y
+    return next ? area + point.x * next.y - next.x * point.y : area
   }, 0) / 2
 }
 
@@ -3529,6 +3558,7 @@ function pointInsidePolygon(point: Point, polygon: Point[]) {
   for (let index = 0, previousIndex = polygon.length - 1; index < polygon.length; previousIndex = index, index += 1) {
     const current = polygon[index]
     const previous = polygon[previousIndex]
+    if (!current || !previous) {continue}
     const crossesY = current.y > point.y !== previous.y > point.y
     if (!crossesY) {continue}
 
@@ -3558,8 +3588,9 @@ function traceSvgBoundary(edges: SvgBoundaryEdge[]) {
   const loops: Point[][] = []
 
   while (unused.size) {
-    let edge = unused.values().next().value as SvgBoundaryEdge | undefined
-    if (!edge) {break}
+    const first = unused.values().next()
+    if (first.done) {break}
+    let edge: SvgBoundaryEdge | undefined = first.value
 
     const startKey = edge.from
     const loop: Point[] = [edge.fromPoint]
@@ -3594,7 +3625,8 @@ function rotateClosedSvgContour(points: Point[], startIndex: number) {
     ...points.slice(startIndex),
     ...points.slice(0, startIndex),
   ]
-  return [...rotated, rotated[0]]
+  const firstPoint = rotated[0]
+  return firstPoint ? [...rotated, firstPoint] : []
 }
 
 function closestSvgLoopPair(source: Point[], targets: Point[][]): SvgLoopPair | null {
@@ -3602,10 +3634,13 @@ function closestSvgLoopPair(source: Point[], targets: Point[][]): SvgLoopPair | 
 
   for (let sourceIndex = 0; sourceIndex < source.length; sourceIndex += 1) {
     const sourcePoint = source[sourceIndex]
+    if (!sourcePoint) {continue}
     for (let targetLoopIndex = 0; targetLoopIndex < targets.length; targetLoopIndex += 1) {
       const target = targets[targetLoopIndex]
+      if (!target) {continue}
       for (let targetIndex = 0; targetIndex < target.length; targetIndex += 1) {
         const targetPoint = target[targetIndex]
+        if (!targetPoint) {continue}
         const distance = distanceSquared(sourcePoint, targetPoint)
         if (!best || distance < best.distance) {
           best = { sourceIndex, targetLoopIndex, targetIndex, distance }
@@ -3622,8 +3657,10 @@ function closestSvgPointToLoop(point: Point, targets: Point[][]): SvgLoopPoint |
 
   for (let targetLoopIndex = 0; targetLoopIndex < targets.length; targetLoopIndex += 1) {
     const target = targets[targetLoopIndex]
+    if (!target) {continue}
     for (let targetIndex = 0; targetIndex < target.length; targetIndex += 1) {
       const targetPoint = target[targetIndex]
+      if (!targetPoint) {continue}
       const distance = distanceSquared(point, targetPoint)
       if (!best || distance < best.distance) {
         best = { targetLoopIndex, targetIndex, distance }
@@ -3644,6 +3681,7 @@ function connectSvgBoundaryLoops(loops: Point[][]) {
     return boundsA.minY - boundsB.minY || boundsA.minX - boundsB.minX
   })
   const [firstLoop, ...restLoops] = sortedLoops
+  if (!firstLoop) {return null}
   const firstBridge = closestSvgLoopPair(firstLoop, restLoops)
   if (!firstBridge) {return null}
 
@@ -3657,6 +3695,7 @@ function connectSvgBoundaryLoops(loops: Point[][]) {
     if (!restLoops.length) {break}
 
     const currentPoint = currentLoop[currentIndex]
+    if (!currentPoint) {return null}
     const nextBridge = closestSvgPointToLoop(currentPoint, restLoops)
     if (!nextBridge) {return null}
 
@@ -3680,10 +3719,14 @@ function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | 
 
   for (let xIndex = 0; xIndex < xs.length - 1; xIndex += 1) {
     for (let yIndex = 0; yIndex < ys.length - 1; yIndex += 1) {
-      const center = {
-        x: (xs[xIndex] + xs[xIndex + 1]) / 2,
-        y: (ys[yIndex] + ys[yIndex + 1]) / 2,
+      const xStart = xs[xIndex]
+      const xEnd = xs[xIndex + 1]
+      const yStart = ys[yIndex]
+      const yEnd = ys[yIndex + 1]
+      if (xStart === undefined || xEnd === undefined || yStart === undefined || yEnd === undefined) {
+        return null
       }
+      const center = { x: (xStart + xEnd) / 2, y: (yStart + yEnd) / 2 }
       if (contours.some((contour) => pointInsidePolygon(center, contour))) {
         filled.add(cellKey(xIndex, yIndex))
       }
@@ -3706,10 +3749,17 @@ function unionAxisAlignedSvgContours(contours: Point[][]): SvgClipPathOutline | 
     for (let yIndex = 0; yIndex < ys.length - 1; yIndex += 1) {
       if (!isFilled(xIndex, yIndex)) {continue}
 
-      const topLeft = { x: xs[xIndex], y: ys[yIndex] }
-      const topRight = { x: xs[xIndex + 1], y: ys[yIndex] }
-      const bottomRight = { x: xs[xIndex + 1], y: ys[yIndex + 1] }
-      const bottomLeft = { x: xs[xIndex], y: ys[yIndex + 1] }
+      const xStart = xs[xIndex]
+      const xEnd = xs[xIndex + 1]
+      const yStart = ys[yIndex]
+      const yEnd = ys[yIndex + 1]
+      if (xStart === undefined || xEnd === undefined || yStart === undefined || yEnd === undefined) {
+        return null
+      }
+      const topLeft = { x: xStart, y: yStart }
+      const topRight = { x: xEnd, y: yStart }
+      const bottomRight = { x: xEnd, y: yEnd }
+      const bottomLeft = { x: xStart, y: yEnd }
 
       if (!isFilled(xIndex, yIndex - 1)) {addEdge(topLeft, topRight)}
       if (!isFilled(xIndex + 1, yIndex)) {addEdge(topRight, bottomRight)}
@@ -3799,7 +3849,9 @@ function parseSvgClipPathOutline(value: string): SvgClipPathOutline | null {
   if (!contours.length) {return null}
 
   const outline = contours.length === 1
-    ? { points: contours[0], loops: [contours[0]] }
+    ? contours[0]
+      ? { points: contours[0], loops: [contours[0]] }
+      : null
     : contours.every(isAxisAlignedSvgContour)
       ? unionAxisAlignedSvgContours(contours)
       : null
@@ -3855,7 +3907,7 @@ function parseSvgClipPathShape(
       ? {
           kind: 'shape',
           value: formatShapeValueFromCssSubpaths(contained),
-          fillRule,
+          ...(fillRule ? { fillRule } : {}),
           pathData: formatPathDataFromSubpaths(fitted),
         }
       : null
@@ -4075,13 +4127,6 @@ function expandCssUnitValues(values: CssUnitValue[], fallback: CssUnitValue = { 
   ]
 }
 
-function cssUnitPointToCanvasPoint(point: CssUnitPoint, canvas: HTMLElement): Point {
-  return {
-    x: cssUnitValueToCanvasPercent(point.x, 'x', canvas),
-    y: cssUnitValueToCanvasPercent(point.y, 'y', canvas),
-  }
-}
-
 function cssCoordinateExpressionToCanvasPercent(expression: string, axis: 'x' | 'y', canvas: HTMLElement) {
   const rect = canvas.getBoundingClientRect()
   const axisSize = axis === 'x' ? rect.width : rect.height
@@ -4116,12 +4161,6 @@ function cssCoordinateValueToCanvasPercent(value: CssCoordinateValue, axis: 'x' 
   return isCssUnitValue(value)
     ? cssUnitValueToCanvasPercent(value, axis, canvas)
     : cssCoordinateExpressionToCanvasPercent(value.expression, axis, canvas)
-}
-
-function cssCoordinatePointToCanvasPoint(point: CssCoordinatePoint, canvas: HTMLElement): Point | null {
-  const x = cssCoordinateValueToCanvasPercent(point.x, 'x', canvas)
-  const y = cssCoordinateValueToCanvasPercent(point.y, 'y', canvas)
-  return x === null || y === null ? null : { x, y }
 }
 
 function partialCssCoordinatePointToCanvasPoint(point: CssCoordinatePoint, canvas: HTMLElement): Point | null {
@@ -4203,8 +4242,11 @@ function rawEditableHandlePoint(editable: RawEditableClipPath, handle: HandleTar
     const horizontal = expandCssUnitValues(editable.radii.horizontal)
     const vertical = expandCssUnitValues(editable.radii.vertical || editable.radii.horizontal)
     const index = CORNERS.indexOf(handle.corner)
-    const radiusX = cssUnitValueToCanvasPercent(horizontal[index], 'x', canvas)
-    const radiusY = cssUnitValueToCanvasPercent(vertical[index], 'y', canvas)
+    const horizontalRadius = horizontal[index]
+    const verticalRadius = vertical[index]
+    if (!horizontalRadius || !verticalRadius) {return null}
+    const radiusX = cssUnitValueToCanvasPercent(horizontalRadius, 'x', canvas)
+    const radiusY = cssUnitValueToCanvasPercent(verticalRadius, 'y', canvas)
     if (handle.corner === 'topLeft') {return { x: box.x0 + radiusX, y: box.y0 + radiusY }}
     if (handle.corner === 'topRight') {return { x: box.x1 - radiusX, y: box.y0 + radiusY }}
     if (handle.corner === 'bottomRight') {return { x: box.x1 - radiusX, y: box.y1 - radiusY }}
@@ -4248,6 +4290,7 @@ function rawEditableHandleCssPoint(editable: RawEditableClipPath, handle: Handle
     const index = CORNERS.indexOf(handle.corner)
     const radiusX = horizontal[index]
     const radiusY = vertical[index]
+    if (!radiusX || !radiusY) {return null}
     if (handle.corner === 'topLeft') {return { x: cssUnitCalcToken(editable.left, '+', radiusX), y: cssUnitCalcToken(editable.top, '+', radiusY) }}
     if (handle.corner === 'topRight') {return { x: `calc(100% - ${cssUnitValueToken(editable.right)} - ${cssUnitValueToken(radiusX)})`, y: cssUnitCalcToken(editable.top, '+', radiusY) }}
     if (handle.corner === 'bottomRight') {return { x: `calc(100% - ${cssUnitValueToken(editable.right)} - ${cssUnitValueToken(radiusX)})`, y: `calc(100% - ${cssUnitValueToken(editable.bottom)} - ${cssUnitValueToken(radiusY)})` }}
@@ -4495,19 +4538,29 @@ function updateShapeForDrag(
           : Math.max(0, y - box.y0)
         const nextHorizontal = [...horizontal]
         const nextVertical = [...vertical]
-        const radiusX = canvasPercentToCssUnitValue(localXPercent, 'x', horizontal[cornerIndex].unit, canvas)
-        const radiusY = canvasPercentToCssUnitValue(localYPercent, 'y', vertical[cornerIndex].unit, canvas)
+        const currentHorizontal = horizontal[cornerIndex]
+        const currentVertical = vertical[cornerIndex]
+        if (!currentHorizontal || !currentVertical) {return shape}
+        const radiusX = canvasPercentToCssUnitValue(localXPercent, 'x', currentHorizontal.unit, canvas)
+        const radiusY = canvasPercentToCssUnitValue(localYPercent, 'y', currentVertical.unit, canvas)
         const unlocked = options.insetRadiusUnlocked
         const radius = unlocked
           ? { x: radiusX, y: radiusY }
           : {
             x: radiusX,
-            y: { value: radiusX.value, unit: vertical[cornerIndex].unit },
+            y: { value: radiusX.value, unit: currentVertical.unit },
           }
         const setRadius = (corner: CornerName) => {
           const index = CORNERS.indexOf(corner)
-          nextHorizontal[index] = index === cornerIndex ? radius.x : { value: radius.x.value, unit: nextHorizontal[index].unit }
-          nextVertical[index] = index === cornerIndex ? radius.y : { value: radius.y.value, unit: nextVertical[index].unit }
+          const horizontalValue = nextHorizontal[index]
+          const verticalValue = nextVertical[index]
+          if (!horizontalValue || !verticalValue) {return}
+          nextHorizontal[index] = index === cornerIndex
+            ? radius.x
+            : { value: radius.x.value, unit: horizontalValue.unit }
+          nextVertical[index] = index === cornerIndex
+            ? radius.y
+            : { value: radius.y.value, unit: verticalValue.unit }
         }
         const mode = options.insetRadiusMode || 'single'
         if (mode === 'all') {
@@ -4745,16 +4798,29 @@ function updateShapeForKeyboard(
     const target: DragTarget = {
       ...handle,
       before: shape,
-      polygonPointIndexes: isPolygonPointHandle(handle) ? options.polygonPointIndexes : undefined,
+      ...(isPolygonPointHandle(handle) && options.polygonPointIndexes
+        ? { polygonPointIndexes: options.polygonPointIndexes }
+        : {}),
+    }
+    const dragOptions = {
+      canvas: options.canvas,
+      ...(options.insetRadiusMode ? { insetRadiusMode: options.insetRadiusMode } : {}),
+      ...(options.insetRadiusUnlocked !== undefined
+        ? { insetRadiusUnlocked: options.insetRadiusUnlocked }
+        : {}),
+      ...(options.insetSideMode ? { insetSideMode: options.insetSideMode } : {}),
+      ...(options.ellipseScaleProportional !== undefined
+        ? { ellipseScaleProportional: options.ellipseScaleProportional }
+        : {}),
     }
     return {
-      shape: updateShapeForDrag(shape, target, currentPoint.x + delta.x, currentPoint.y + delta.y, {
-        canvas: options.canvas,
-        insetRadiusMode: options.insetRadiusMode,
-        insetRadiusUnlocked: options.insetRadiusUnlocked,
-        insetSideMode: options.insetSideMode,
-        ellipseScaleProportional: options.ellipseScaleProportional,
-      }),
+      shape: updateShapeForDrag(
+        shape,
+        target,
+        currentPoint.x + delta.x,
+        currentPoint.y + delta.y,
+        dragOptions,
+      ),
     }
   }
 
@@ -5006,8 +5072,8 @@ async function readOptionalWithTimeout<T>(reader: (() => Promise<T> | undefined)
 }
 
 function selectedElementKey(element: unknown) {
-  if (!element || typeof element !== 'object') {return null}
-  const id = (element as ElementStyleSource).id
+  if (!isElementStyleSource(element)) {return null}
+  const id = element.id
   if (!id) {return null}
   if (typeof id === 'string') {return id}
 
@@ -5030,7 +5096,8 @@ function addStyleHandles(
 }
 
 async function getElementPrimaryStyleHandles(element: unknown) {
-  const source = element as ElementStyleSource
+  if (!isElementStyleSource(element)) {return []}
+  const source = element
   const styles: StyleHandle[] = []
   const seenRefs = new Set<StyleHandle>()
   const seenIds = new Set<string>()
@@ -5076,7 +5143,8 @@ async function addClassNamesFromStyleHandles(classNames: Set<string>, styles: Ar
 }
 
 async function getElementClassNames(element: unknown, styles?: Array<StyleHandle | null> | null) {
-  const source = element as ElementStyleSource
+  if (!isElementStyleSource(element)) {return []}
+  const source = element
   const classNames = new Set<string>()
   await addClassNamesFromStyleHandles(classNames, styles)
   if (classNames.size) {return [...classNames]}
@@ -5184,7 +5252,10 @@ async function lookupStyleByNameCandidate(webflowApi: WebflowStyleLookup, candid
 }
 
 async function getClassStyleHandlesWithDiagnostics(classNames: string[], webflowApi: WebflowStyleLookup) {
-  if (!classNames.length) {return { styles: [], diagnostics: [] as StyleLookupDiagnostic[] }}
+  if (!classNames.length) {
+    const diagnostics: StyleLookupDiagnostic[] = []
+    return { styles: [], diagnostics }
+  }
 
   const styles: StyleHandle[] = []
   const seenRefs = new Set<StyleHandle>()
@@ -5198,9 +5269,9 @@ async function getClassStyleHandlesWithDiagnostics(classNames: string[], webflow
       diagnostics.push({
         candidate: result.candidate,
         source: result.source,
-        timedOut: result.timedOut,
         found: result.found,
-        id: result.id,
+        ...(result.timedOut !== undefined ? { timedOut: result.timedOut } : {}),
+        ...(result.id !== undefined ? { id: result.id } : {}),
       })
       if ('style' in result && isStyleHandle(result.style)) {
         addUniqueStyleHandle(styles, result.style, seenRefs, seenIds)
@@ -5222,10 +5293,6 @@ function normalizeStylePropertyValue(value: unknown) {
 
 function hasClipPathDeclaration(value: string | null | undefined) {
   return Boolean(value && value.trim())
-}
-
-function hasClipPathShapeDeclaration(value: string | null | undefined) {
-  return hasClipPathDeclaration(value) && !isNoneClipPathValue(value)
 }
 
 function styleOptionsForBreakpoint(breakpoint: BreakpointId | null | undefined): StyleTargetOptions | undefined {
@@ -5283,10 +5350,6 @@ async function readStylePropertyDeclaration(style: StyleHandle, property: string
 
 async function readClipPathDeclarationWithSource(style: StyleHandle, options?: StyleTargetOptions) {
   return readStylePropertyDeclarationWithSource(style, 'clip-path', options)
-}
-
-async function readClipPathDeclaration(style: StyleHandle, options?: StyleTargetOptions) {
-  return readStylePropertyDeclaration(style, 'clip-path', options)
 }
 
 function parseStoredShapeVariant(value: string | null | undefined) {
@@ -5393,7 +5456,12 @@ async function resolveWritableClipPathStyleForElement(
 // verify the resolved path before trusting it. Read-only (never creates).
 async function findStyleForClassPath(names: string[], api: WebflowStyleLookup): Promise<StyleHandle | null> {
   if (!names.length) {return null}
-  const existing = await readOptionalWithTimeout(() => api.getStyleByName?.(names.length === 1 ? names[0] : names), STYLE_LOOKUP_TIMEOUT_MS)
+  const candidate = names.length === 1 ? names[0] : names
+  if (!candidate) {return null}
+  const existing = await readOptionalWithTimeout(
+    () => api.getStyleByName?.(candidate),
+    STYLE_LOOKUP_TIMEOUT_MS,
+  )
   if (!isStyleHandle(existing)) {return null}
   const path = await getStyleNamePath(existing)
   return path.length === names.length && path.every((name, index) => name === names[index]) ? existing : null
@@ -5409,13 +5477,17 @@ async function resolveOrCreateStyleForClassPath(names: string[], api: WebflowSty
   if (!api.createStyle) {return null}
 
   if (names.length === 1) {
-    const created = await readOptional(() => api.createStyle?.(names[0]))
+    const name = names[0]
+    if (!name) {return null}
+    const created = await readOptional(() => api.createStyle?.(name))
     return isStyleHandle(created) ? created : null
   }
 
   const parent = await resolveOrCreateStyleForClassPath(names.slice(0, -1), api)
   if (!isStyleHandle(parent)) {return null}
-  const created = await readOptional(() => api.createStyle?.(names[names.length - 1], { parent }))
+  const name = names[names.length - 1]
+  if (!name) {return null}
+  const created = await readOptional(() => api.createStyle?.(name, { parent }))
   return isStyleHandle(created) ? created : null
 }
 
@@ -5454,7 +5526,9 @@ async function resolveCascadeWinnerClipPathStyle(
   const maxSpecificity = Math.max(...declaring.map((entry) => entry.specificity))
   const topTier = declaring.filter((entry) => entry.specificity === maxSpecificity)
 
-  let winner = topTier[0]
+  const firstWinner = topTier[0]
+  if (!firstWinner) {return null}
+  let winner = firstWinner
   if (topTier.length > 1) {
     // Equal specificity → the one defined latest in the stylesheet wins. Only
     // fetch the (potentially large) full style list when there's a real tie.
@@ -5463,7 +5537,9 @@ async function resolveCascadeWinnerClipPathStyle(
     allStyles.forEach((style, index) => {
       if (style?.id) {orderById.set(style.id, index)}
     })
-    const orderOf = (entry: typeof winner) => (entry.style.id ? (orderById.get(entry.style.id) ?? -1) : -1)
+    const orderOf = (entry: (typeof topTier)[number]) => (
+      entry.style.id ? (orderById.get(entry.style.id) ?? -1) : -1
+    )
     for (const entry of topTier.slice(1)) {
       if (orderOf(entry) > orderOf(winner)) {winner = entry}
     }
@@ -5610,10 +5686,12 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
       let group: ClipPathCodeHighlight[] = []
       const flushGroup = () => {
-        if (!group.length) {return}
-        const from = group[0].from
-        const to = group[group.length - 1].to
-        const colorClass = group[0].colorClass
+        const first = group[0]
+        const last = group[group.length - 1]
+        if (!first || !last) {return}
+        const from = first.from
+        const to = last.to
+        const colorClass = first.colorClass
         const key = `${from}:${to}:${colorClass}`
         if (!seenRanges.has(key)) {
           seenRanges.add(key)
@@ -5688,7 +5766,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }
 
   const currentShapeScaleOptions = (
-    overrides: Partial<ShapeScaleOptions> = {},
+    overrides: ShapeScaleOptionOverrides = {},
   ): ShapeScaleOptions => ({
     useVariable: overrides.useVariable ?? shapeScaleUseVariableRef.current,
     variableName: overrides.variableName ?? shapeScaleVariableNameRef.current,
@@ -6082,6 +6160,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     clearPastedShapeSvgCache()
     historyIndexRef.current -= 1
     const previous = historyRef.current[historyIndexRef.current]
+    if (!previous) {throw new Error('Clip path invariant failed: undo history entry is missing')}
     setShape(previous)
     syncPolygonPointColorsForShape(previous)
     syncPresetForShape(previous)
@@ -6093,6 +6172,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     clearPastedShapeSvgCache()
     historyIndexRef.current += 1
     const next = historyRef.current[historyIndexRef.current]
+    if (!next) {throw new Error('Clip path invariant failed: redo history entry is missing')}
     setShape(next)
     syncPolygonPointColorsForShape(next)
     syncPresetForShape(next)
@@ -6114,6 +6194,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       indexesToDelete.has(selectedHandleRef.current.index)
       ? selectedHandleRef.current.index
       : selectedIndexes[0]
+    if (activeIndex === undefined) {return false}
     const previousOldIndex = previousSurvivingPolygonIndex(current.points.length, indexesToDelete, activeIndex)
     const previousNewIndex = previousOldIndex === null
       ? null
@@ -6191,6 +6272,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   const choosePreset = (name: string) => {
     const preset = PRESETS[name]
+    if (!preset) {return}
     let nextPreset = preset
     markLocalShapeChange()
     clearPastedShapeSvgCache()
@@ -6628,7 +6710,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      choosePreset(PRESET_NAMES[activePresetIndex])
+      const presetName = PRESET_NAMES[activePresetIndex]
+      if (presetName) {choosePreset(presetName)}
       return
     }
 
@@ -7008,7 +7091,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     if (!isPresetOpen) {return}
 
     const onPointerDown = (event: MouseEvent) => {
-      if (presetDropdownRef.current?.contains(event.target as Node)) {return}
+      if (event.target instanceof Node && presetDropdownRef.current?.contains(event.target)) {return}
       closePresetDropdown()
     }
 
@@ -7020,7 +7103,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     if (!isClipPathLabelMenuOpen) {return}
 
     const onPointerDown = (event: MouseEvent) => {
-      if (clipPathLabelRef.current?.contains(event.target as Node)) {return}
+      if (event.target instanceof Node && clipPathLabelRef.current?.contains(event.target)) {return}
       setIsClipPathLabelMenuOpen(false)
     }
 
@@ -7032,7 +7115,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     if (!isShortcutHelpOpen) {return}
 
     const onPointerDown = (event: MouseEvent) => {
-      if (shortcutHelpRef.current?.contains(event.target as Node)) {return}
+      if (event.target instanceof Node && shortcutHelpRef.current?.contains(event.target)) {return}
       setIsShortcutHelpOpen(false)
     }
     const onKeyDown = (event: KeyboardEvent) => {
@@ -7127,7 +7210,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null
+      const target = e.target instanceof HTMLElement ? e.target : null
       if (target && (
         target.tagName === 'INPUT' ||
         target.tagName === 'SELECT' ||
@@ -7206,7 +7289,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       if (handledKeyboardEventsRef.current.has(e)) {return}
       if (e.metaKey || e.ctrlKey || isPresetOpenRef.current) {return}
 
-      const target = e.target as HTMLElement | null
+      const target = e.target instanceof HTMLElement ? e.target : null
       const handle = selectedHandleRef.current
       const shapeSelected = isShapeTransformSelectedRef.current
       const shouldIgnore = shouldIgnoreTarget(target) && !dragTargetRef.current
@@ -7244,7 +7327,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
     const onKeyUp = (e: KeyboardEvent) => {
       if (handledKeyboardEventsRef.current.has(e)) {return}
-      const target = e.target as HTMLElement | null
+      const target = e.target instanceof HTMLElement ? e.target : null
       const isHandleTarget = target instanceof Element && Boolean(target.closest('.clip-path_handle'))
 
       if (isRadiusUnlockKey(e.key, e.code)) {
@@ -7287,11 +7370,9 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }, [])
 
   useEffect(() => {
-    if (typeof webflow === 'undefined') {
-      return
-    }
+    const webflowApi = readWebflowApi()
+    if (!webflowApi) {return}
     let cancelled = false
-    const webflowApi = webflow as unknown as WebflowBreakpointApi
 
     const loadNoneIfChanged = (force: boolean) => {
       styleRef.current = null
@@ -7415,7 +7496,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
               lookupCandidates: getStyleLookupCandidates(classNames),
             })
           }
-          const classLookup = await getClassStyleHandlesWithDiagnostics(classNames, webflow as unknown as WebflowStyleLookup)
+          const classLookup = await getClassStyleHandlesWithDiagnostics(classNames, webflowApi)
           const classStyles = classLookup.styles
           if (cancelled) {return}
           if (readSeq !== selectionReadSeqRef.current) {return}
@@ -7460,7 +7541,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           if (!winnerResolved) {
             winnerResolved = true
             cascadeWinner = hasClipPathDeclaration(selectedStyle?.raw)
-              ? await resolveCascadeWinnerClipPathStyle(classNames, styles, styleOptions, webflow as unknown as WebflowStyleLookup)
+              ? await resolveCascadeWinnerClipPathStyle(classNames, styles, styleOptions, webflowApi)
               : null
           }
           return cascadeWinner
@@ -7496,7 +7577,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           // selection, or the exact combo (`.hero.clip-path`) for several —
           // path-verified so we never grab a combo whose leaf name merely
           // matches, and never the element's own most-specific combo handle.
-          const targetStyle = await findStyleForClassPath(selNames, webflow as unknown as WebflowStyleLookup)
+          const targetStyle = await findStyleForClassPath(selNames, webflowApi)
           if (cancelled) {return}
           if (readSeq !== selectionReadSeqRef.current) {return}
 
@@ -7504,10 +7585,10 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
           if (cancelled) {return}
           if (readSeq !== selectionReadSeqRef.current) {return}
 
-          if (targetStyle && hasClipPathDeclaration(targetDecl?.value)) {
+          if (targetStyle && targetDecl && hasClipPathDeclaration(targetDecl.value)) {
             writeStyleHandle = targetStyle
-            selectedStyle = { style: targetStyle, raw: targetDecl!.value, breakpoint: targetDecl!.breakpoint }
-            appliedNameOverride = { name: selNames[selNames.length - 1] }
+            selectedStyle = { style: targetStyle, raw: targetDecl.value, breakpoint: targetDecl.breakpoint }
+            appliedNameOverride = { name: selNames[selNames.length - 1] ?? null }
           } else if (hasClipPathDeclaration(selectedStyle?.raw)) {
             // Selected class has no clip-path of its own, but the element shows an
             // effective one → inherited. Paint the orange label + the cheap
@@ -7613,7 +7694,12 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
         if (inheritedWinnerRefineKey) {
           const refineKey = inheritedWinnerRefineKey
           void (async () => {
-            const winner = await resolveCascadeWinnerClipPathStyle(classNames, styles, styleOptions, webflow as unknown as WebflowStyleLookup)
+            const winner = await resolveCascadeWinnerClipPathStyle(
+              classNames,
+              styles,
+              styleOptions,
+              webflowApi,
+            )
             if (cancelled || readSeq !== selectionReadSeqRef.current) {return}
             cascadeWinnerCacheRef.current = { key: refineKey, winner }
             const winnerCss = winner ? normalizeClipPathValue(winner.raw).css : null
@@ -7657,7 +7743,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
     const readCurrentSelectedElement = async (options: SelectionReadOptions = {}) => {
       try {
-        await readSelectedElement(await webflow.getSelectedElement(), options)
+        await readSelectedElement(await webflowApi.getSelectedElement?.(), options)
       } catch {
         if (!cancelled && options.force) {loadNoneIfChanged(options.force)}
       }
@@ -7718,7 +7804,8 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
 
   useEffect(() => {
     const style = styleRef.current
-    const canResolveSelectedStyle = typeof webflow !== 'undefined'
+    const webflowApi = readWebflowApi()
+    const canResolveSelectedStyle = webflowApi !== null
     // Embedded mode (onApply): the parent panel owns the write target, so the tool's own
     // ability to reach a Webflow style handle says nothing about whether the value can be
     // written. Without this the gate below returned early every time outside the
@@ -7760,13 +7847,12 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
       try {
         let targetStyle = styleRef.current
         const selNames = selectedClassNamesRef.current
-        if (selNames.length && typeof webflow !== 'undefined' && !canWriteClipPathValue(targetStyle, valueToWrite)) {
+        if (selNames.length && webflowApi && !canWriteClipPathValue(targetStyle, valueToWrite)) {
           // Class-selection mode: write to the exact selected class/combo,
           // creating it if it doesn't exist — never the element's own combo.
-          targetStyle = await resolveOrCreateStyleForClassPath(selNames, webflow as unknown as WebflowStyleEditor)
+          targetStyle = await resolveOrCreateStyleForClassPath(selNames, webflowApi)
           if (targetStyle) {styleRef.current = targetStyle}
-        } else if (!selNames.length && !canWriteClipPathValue(targetStyle, valueToWrite) && typeof webflow !== 'undefined') {
-          const webflowApi = webflow as unknown as WebflowSelectionApi
+        } else if (!selNames.length && !canWriteClipPathValue(targetStyle, valueToWrite) && webflowApi) {
           targetStyle = await resolveWritableClipPathStyleForElement(
             await webflowApi.getSelectedElement?.() || null,
             webflowApi,
@@ -7784,9 +7870,10 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
         if (targetStyle) {
           const shapeSvgCache = matchingPastedSvgCacheForShape(shapeRef.current)
           if (shapeSvgCache) {pastedShapeSvgCacheRef.current = shapeSvgCache}
+          const styleOptions = styleOptionsForBreakpoint(activeBreakpointRef.current)
           await writeClipPathToStyle(targetStyle, valueToWrite, {
-            shapeSvgCache,
-            styleOptions: styleOptionsForBreakpoint(activeBreakpointRef.current),
+            ...(shapeSvgCache ? { shapeSvgCache } : {}),
+            ...(styleOptions ? { styleOptions } : {}),
           })
         }
         lastWrittenRef.current = valueToWrite
@@ -7831,7 +7918,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
   }, [])
 
   const selectedPresetShape = PRESETS[activePreset] || shape
-  const activePresetOptionName = PRESET_NAMES[activePresetIndex] || PRESET_NAMES[0]
+  const activePresetOptionName = PRESET_NAMES[activePresetIndex] || PRESET_NAMES[0] || NONE_PRESET
   const activePresetOptionId = presetOptionId(activePresetOptionName)
   const handleDisplayColorClass = (handle: HandleTarget) => {
     const codeColorClass = codeHandleColorClasses.get(handleKey(handle))
@@ -7967,7 +8054,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     shapeTransformDragRef.current = {
       pointerId: e.pointerId,
       mode,
-      corner,
+      ...(corner ? { corner } : {}),
       start,
       before: currentShape,
       bounds,
@@ -8121,10 +8208,6 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
     clipPathStyleOrigin === 'current' ? 'is-current' : '',
     clipPathStyleOrigin === 'inherited' ? 'is-inherited' : '',
   ].filter(Boolean).join(' ')
-  const activeClassNames = selectedClassNames.length
-    ? selectedClassNames
-    : (appliedClassName ? [appliedClassName] : [])
-  const activeClassNameSet = new Set(activeClassNames)
   const selectedSelector = selectedClassNames.length
     ? selectedClassNames.map((name) => `.${name}`).join('')
     : null
@@ -8244,6 +8327,7 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
             >
               {PRESET_NAMES.map((name, index) => {
                 const optionShape = PRESETS[name]
+                if (!optionShape) {return null}
                 const isSelected = activePreset === name
 
                 return (
@@ -8615,8 +8699,10 @@ export default function ClipPath({ onApply, onClear, hideClassPicker }: {
                 { kind: 'inset-right' },
                 { kind: 'inset-bottom' },
                 { kind: 'inset-left' },
-              ] as HandleTarget[]).map((handle) => {
-                const point = rawEditableHandleCssPoint(shape.editable!, handle)
+              ] satisfies HandleTarget[]).map((handle) => {
+                const editable = shape.editable
+                if (editable?.kind !== 'inset') {return null}
+                const point = rawEditableHandleCssPoint(editable, handle)
                 if (!point) {return null}
                 return (
                   <button

@@ -48,7 +48,13 @@ export function parseSerializeNodes(input: unknown): ParserNode[] {
   if (nodes.length > LIMITS.treeNodesMax) {
     throw new Error('SerializeNodes: node limit');
   }
-  const pending = nodes.map((node) => ({ node, depth: 0 }));
+  if (!nodes.every(isParserNode)) {
+    throw new Error('SerializeNodes: invalid node');
+  }
+  const pending: Array<{ readonly node: unknown; readonly depth: number }> = nodes.map((node) => ({
+    node,
+    depth: 0,
+  }));
   let visited = 0;
   for (let index = 0; index < pending.length; index++) {
     const current = pending[index];
@@ -72,10 +78,7 @@ export function parseSerializeNodes(input: unknown): ParserNode[] {
       }
     }
   }
-  // Every node and every serializer-consumed field was checked above. The
-  // assertion preserves identity and unknown Markdown metadata, not trust.
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  return nodes as ParserNode[];
+  return nodes;
 }
 
 export function parseSerializePage(input: unknown): ParserPageModel {
@@ -170,6 +173,11 @@ function parseSerializeNode(input: unknown): Record<string, unknown> {
       throw new Error('SerializeNode: unknown kind');
   }
   return record;
+}
+
+function isParserNode(input: unknown): input is ParserNode {
+  parseSerializeNode(input);
+  return true;
 }
 
 // Variant-only fields cannot leak into another kind: the constructor below

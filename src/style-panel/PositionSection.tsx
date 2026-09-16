@@ -288,7 +288,7 @@ function InsetPresets({ read, busy, setProp, clearProp }: Props) {
     // `right` stretches between them rather than moving, so a preset that only
     // added sides would give a different result from the one its icon shows.
     const others = INSET_SIDES.filter((side) => !preset.sides.includes(side))
-    if (others.length) {clearProp(others as unknown as string[])}
+    if (others.length) {clearProp([...others])}
     preset.sides.forEach((side) => setProp(side, '0', false))
   }
 
@@ -374,7 +374,9 @@ function SegmentedIconControl({ prop, ariaLabel, segments, current, busy, setPro
 
   useEffect(() => {
     if (!open) {return}
-    const onDown = (event: MouseEvent) => { if (!rootRef.current?.contains(event.target as Node)) {setOpen(false)} }
+    const onDown = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {setOpen(false)}
+    }
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') {setOpen(false)} }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)

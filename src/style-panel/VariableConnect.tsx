@@ -1,34 +1,33 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties, MutableRefObject, ReactElement, ReactNode } from 'react'
+import type { CSSProperties, MutableRefObject, ReactElement, ReactNode, Ref } from 'react'
 import { createPortal, flushSync } from 'react-dom'
 import { streamProjectVariables, type ProjectVariable } from './lib/webflow'
 import { panelBox, panelSpan } from './lib/panel-box'
 import { caretOffset, highlightCss, setCaretOffset, stepNumberAt, stepSize } from './lib/css-code'
 import CustomValue, { doesNotFit } from '../ui/CustomValueEditor.jsx'
 import { insertBinding } from './lib/insert-binding'
-import { inOwnedPopup, registerPopupLayer } from './lib/popup-layer'
+import { isHTMLElementInDocument, isNodeInDocument } from './lib/dom'
+import { registerPopupLayer } from './lib/popup-layer'
 import './embed-editor.css'
 
 // Read the current value out of the wrapped <input> child, so callers don't have to
 // thread it through — children IS the input element, and its `value` is the field draft.
 function childValue(children: ReactNode): string {
-  return isValidElement(children) && typeof (children.props as { value?: unknown }).value === 'string'
-    ? (children.props as { value: string }).value
+  return isValidElement<{ value?: unknown }>(children) && typeof children.props.value === 'string'
+    ? children.props.value
     : ''
 }
 // The wrapped input's placeholder ("Auto", "0", …). The rich field replaces that
 // input on screen, so it has to show the same hint when the value is empty.
 function childPlaceholder(children: ReactNode): string {
-  const p = isValidElement(children) ? (children.props as { placeholder?: unknown }).placeholder : undefined
+  const p = isValidElement<{ placeholder?: unknown }>(children) ? children.props.placeholder : undefined
   return typeof p === 'string' ? p : ''
 }
 
 // A binding's display name — parsed from the custom-property tail (…--<name> → <name>),
 // used as the chip label until the exact variable name resolves from the loaded list.
 function bindingName(binding: string): string {
-  const inner = binding.replace(/^var\(\s*/i, '').replace(/\s*\)\s*$/i, '').split(',')[0].trim()
+  const inner = (binding.replace(/^var\(\s*/i, '').replace(/\s*\)\s*$/i, '').split(',')[0] ?? '').trim()
   const parts = inner.split('--').filter(Boolean)
   return parts[parts.length - 1] ?? inner
 }
@@ -299,13 +298,20 @@ export function VariablePicker({ anchor, vars, loading, prop, selectedBinding, o
   useEffect(() => {
     let swallowClick: ((ev: Event) => void) | null = null
     const onDown = (e: PointerEvent) => {
-      const t = e.target as Node
+      const t = e.target
+      if (!isNodeInDocument(t, anchor.ownerDocument)) {return}
       if (ref.current?.contains(t) || anchor.contains(t)) {return}
       onClose()
       // Consume the dismiss gesture: swallow the click this pointerdown becomes, so the
       // element under the pointer (e.g. a section's collapse toggle) isn't ALSO activated.
-      swallowClick = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); document.removeEventListener('click', swallowClick!, true); swallowClick = null }
-      document.addEventListener('click', swallowClick, true)
+      const click = (event: Event) => {
+        event.stopPropagation()
+        event.preventDefault()
+        document.removeEventListener('click', click, true)
+        swallowClick = null
+      }
+      swallowClick = click
+      document.addEventListener('click', click, true)
       window.setTimeout(() => { if (swallowClick) { document.removeEventListener('click', swallowClick, true); swallowClick = null } }, 300)
     }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') {onClose()} }
@@ -417,7 +423,7 @@ const TOKEN_GLYPH: Record<string, string> = {
   FontFamily:
     '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M8.49945 3.49902L8.50043 3.49805V2.99902L8.88422 3L8.98285 3.37012L10.4116 8.7041C11.6626 9.16833 12.7329 9.8024 13.4955 10.5137L12.8139 11.2451C12.2954 10.7615 11.5854 10.3001 10.7368 9.91699L11.2954 12H10.2602L9.58344 9.47559C9.40836 9.41951 9.22889 9.3663 9.04633 9.31738C8.17518 9.084 7.32862 8.96439 6.55707 8.94629L5.98481 11.085C5.81653 11.7126 5.4687 12.2493 5.01996 12.6016C4.57106 12.9537 3.99165 13.1394 3.4057 12.9824C2.81995 12.8253 2.41134 12.375 2.19867 11.8457C1.98617 11.3163 1.95342 10.6775 2.12152 10.0498C2.31581 9.32507 2.87878 8.80593 3.58344 8.47266C4.19709 8.18251 4.95456 8.01274 5.78656 7.96094L7.01703 3.36914L7.11664 2.99902H8.50043L8.49945 3.49902ZM5.51117 8.98828C4.91768 9.0534 4.40905 9.1879 4.01117 9.37598C3.46964 9.63206 3.18054 9.96113 3.08734 10.3086C2.96987 10.7474 3.00204 11.1626 3.12641 11.4727C3.25078 11.7822 3.45071 11.9592 3.66449 12.0166C3.87841 12.0739 4.14016 12.0205 4.40277 11.8145C4.66552 11.6081 4.90132 11.265 5.01898 10.8262L5.51117 8.98828ZM6.8227 7.95605C7.60256 7.99297 8.43418 8.12006 9.27973 8.34473L8.11664 3.99902H7.88324L6.8227 7.95605Z" fill="currentColor"/></svg>',
 }
-function tokenGlyph(type: string): string { return TOKEN_GLYPH[type] ?? TOKEN_GLYPH.Size }
+function tokenGlyph(type: string): string { return TOKEN_GLYPH[type] ?? TOKEN_GLYPH['Size'] ?? '' }
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -490,9 +496,9 @@ function fieldText(root: HTMLElement): string {
   let out = ''
   const walk = (node: Node) => {
     node.childNodes.forEach((child) => {
-      if (child.nodeType === Node.TEXT_NODE) {out += child.textContent ?? ''}
-      else if (child instanceof HTMLElement && child.dataset.chip != null) {out += CHIP_MARK}
-      else if (child instanceof HTMLElement && child.tagName === 'BR') { /* browser filler */ }
+      if (child.nodeType === 3) {out += child.textContent ?? ''}
+      else if (isHTMLElementInDocument(child, root.ownerDocument) && child.dataset['chip'] != null) {out += CHIP_MARK}
+      else if (isHTMLElementInDocument(child, root.ownerDocument) && child.tagName === 'BR') { /* browser filler */ }
       else {walk(child)}
     })
   }
@@ -504,19 +510,19 @@ function fieldText(root: HTMLElement): string {
  *  repaint so each mark in the text is redrawn as the chip it actually was. */
 function chipsOf(root: HTMLElement): Chip[] {
   return [...root.querySelectorAll<HTMLElement>('[data-chip]')].map((el) => ({
-    text: el.dataset.binding ?? '',
+    text: el.dataset['binding'] ?? '',
     name: el.querySelector('.embed-editor_varconnect-token-name')?.textContent ?? '',
-    type: el.dataset.type ?? 'Size',
+    type: el.dataset['type'] ?? 'Size',
   }))
 }
 
 /** Re-draw the field from `text`, keeping its chips, and put the caret at `at`. */
 function paint(root: HTMLElement, text: string, at: number | null, chips: Chip[]): void {
   const parts = text.split(CHIP_MARK)
-  let html = highlightCss(parts[0])
+  let html = highlightCss(parts[0] ?? '')
   for (let i = 1; i < parts.length; i++) {
     const chip = chips[i - 1]
-    html += (chip ? tokenChipHtml(chip) : '') + highlightCss(parts[i])
+    html += (chip ? tokenChipHtml(chip) : '') + highlightCss(parts[i] ?? '')
   }
   if (html === root.innerHTML) {return}
   root.innerHTML = html
@@ -539,14 +545,14 @@ export function serializeTokens(root: HTMLElement, bare: string, varForm: string
   // label instead of the binding). A chip is atomic — record it, never descend into it.
   const walk = (node: Node) => {
     node.childNodes.forEach((child) => {
-      if (child.nodeType === Node.TEXT_NODE) {
+      if (child.nodeType === 3) {
         const t = child.textContent ?? ''
         out += t
         if (t.replace(/\u200B/g, '').trim() !== '') {hasText = true}
-      } else if (child instanceof HTMLElement && child.dataset.chip != null) {
-        chips.push(child.dataset.binding ?? '')
+      } else if (isHTMLElementInDocument(child, root.ownerDocument) && child.dataset['chip'] != null) {
+        chips.push(child.dataset['binding'] ?? '')
         out += '\u0000' // the variable — resolved below once we know if it stands alone
-      } else if (child instanceof HTMLElement && child.tagName === 'BR') {
+      } else if (isHTMLElementInDocument(child, root.ownerDocument) && child.tagName === 'BR') {
         // ignore line breaks the browser may insert
       } else {
         walk(child)
@@ -738,7 +744,12 @@ function TokenField({
         else if (e.key === 'ArrowLeft' && jumpCaretPastChip(e.currentTarget, 'left')) {e.preventDefault()}
       }}
       onMouseDown={(e) => {
-        if ((e.target as HTMLElement).closest('[data-chip]')) { e.preventDefault(); onChipClick() }
+        if (
+          isHTMLElementInDocument(e.target, e.currentTarget.ownerDocument) &&
+          e.target.closest('[data-chip]')
+        ) {
+          e.preventDefault(); onChipClick()
+        }
       }}
     />
   )
@@ -757,6 +768,34 @@ function setInputValue(input: HTMLInputElement | HTMLTextAreaElement, value: str
   // named, so this doesn't depend on the global being there.
   const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set
   setter?.call(input, value)
+}
+
+type FieldElement = HTMLInputElement | HTMLTextAreaElement
+type ChildFieldProps = {
+  readonly ref?: Ref<FieldElement>
+  readonly className?: string
+  readonly value?: unknown
+  readonly placeholder?: unknown
+  readonly onChange?: (event: unknown) => void
+  readonly onFocus?: (event: unknown) => void
+  readonly onBlur?: (event: unknown) => void
+  readonly onMouseEnter?: (event: unknown) => void
+  readonly onMouseLeave?: (event: unknown) => void
+}
+
+function isFieldRefCallback(value: unknown): value is (element: FieldElement | null) => void {
+  return typeof value === 'function'
+}
+
+function updateChildRef(child: ReactElement<ChildFieldProps>, element: FieldElement | null): void {
+  const childRef: unknown = Object.getOwnPropertyDescriptor(child, 'ref')?.value
+  if (isFieldRefCallback(childRef)) {
+    childRef(element)
+  } else if (childRef !== undefined && childRef !== null && typeof childRef === 'object') {
+    if (!Reflect.set(childRef, 'current', element)) {
+      throw new Error('Child field ref could not be updated')
+    }
+  }
 }
 
 export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel = 'Connect to variable', className, prop, code, stepMin, expanded, children }: {
@@ -838,28 +877,20 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
 
   // Hand the token editor a ref to the real <input> so it can push serialized edits back
   // through the field's own onChange/commit; merge with any ref the child already carries.
-  const child = isValidElement(children) ? children : null
-  const attachRef = (el: HTMLInputElement | HTMLTextAreaElement | null) => {
+  const child = isValidElement<ChildFieldProps>(children) ? children : null
+  const attachRef = (el: FieldElement | null) => {
     inputRef.current = el
-    const r = child ? (child as unknown as { ref?: unknown }).ref : null
-    if (typeof r === 'function') {(r as (n: HTMLInputElement | null) => void)(el)}
-    else if (r && typeof r === 'object') {(r as MutableRefObject<HTMLInputElement | null>).current = el}
+    if (child) {updateChildRef(child, el)}
   }
-  const prepared = child ? cloneElement(child as ReactElement<{ ref?: unknown }>, { ref: attachRef }) : children
-  const childClass = child ? ((child.props as { className?: string }).className ?? 'u-input') : 'u-input'
+  const prepared = child ? cloneElement(child, { ref: attachRef }) : children
+  const childClass = child?.props.className ?? 'u-input'
   // The wrapped input's own focus/blur handlers (draft guard + commit). We call them
   // directly from the token editor rather than dispatching synthetic focus events —
   // React's focusin/focusout delegation isn't a reliable target, and missing the blur
   // would leave the edit uncommitted. On commit we first push the finished value into the
   // input via the native setter (flushSync so the parent's draft state is up to date),
   // then invoke its onBlur so commit() reads the final value.
-  const childHandlers = child?.props as {
-    onChange?: (e: unknown) => void
-    onFocus?: (e: unknown) => void
-    onBlur?: (e: unknown) => void
-    onMouseEnter?: (e: unknown) => void
-    onMouseLeave?: (e: unknown) => void
-  } | undefined
+  const childHandlers = child?.props
   // …but onBlur's commit() closes over the input's `draft`. Our flushSync push re-renders
   // the input with a NEW closure (draft = the serialized value); the handler we captured
   // this render still sees the PRE-edit draft and would commit that (e.g. the bare
@@ -945,7 +976,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
     // they need not be the same variable — so the lengths are read off the
     // chips themselves rather than assumed equal.
     const bindings = Array.from(el.querySelectorAll<HTMLElement>('[data-chip]')).map(
-      (n) => n.dataset.binding ?? ''
+      (n) => n.dataset['binding'] ?? ''
     )
     let len = 0
     let chip = 0
@@ -1024,7 +1055,7 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
           className={`${childClass} embed-editor_varconnect-editor`}
           ariaLabel={ariaLabel}
           placeholder={childPlaceholder(children)}
-          disabled={disabled}
+          {...(disabled === undefined ? {} : { disabled })}
           editorRef={editorRef}
           onFocusField={() => { setActive(true); childHandlers?.onFocus?.(fakeEvent()) }}
           onCommit={(final) => {
@@ -1043,8 +1074,8 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
             setActive(false)
           }}
           onChipClick={() => { if (!disabled) {setOpen(true)} }}
-          code={code}
-          stepMin={stepMin}
+          {...(code === undefined ? {} : { code })}
+          {...(stepMin === undefined ? {} : { stepMin })}
         />
       ) : null}
       {/* The dot is how a value with no variable in it reaches the picker. It
@@ -1081,8 +1112,8 @@ export default function VariableConnect({ onPick, onDraft, disabled, ariaLabel =
           anchor={anchor}
           vars={vars}
           loading={loading}
-          prop={prop}
-          selectedBinding={isVar ? binding : undefined}
+          {...(prop === undefined ? {} : { prop })}
+          {...(!isVar || binding === undefined ? {} : { selectedBinding: binding })}
           // A plain value is replaced; an expression has the variable put in
           // where the caret was, so picking one inside a calc() no longer
           // throws the calc away. See insert-binding.ts.

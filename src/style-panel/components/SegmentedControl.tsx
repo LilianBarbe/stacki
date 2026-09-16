@@ -2,6 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties, ReactNode } from 'react'
 
+function tooltipStyle(
+  style: CSSProperties,
+  arrowLeft: number,
+): CSSProperties & { readonly '--tip-arrow-left': string } {
+  return { ...style, '--tip-arrow-left': `${arrowLeft}px` }
+}
+
 export type SegmentedOption<T extends string> = {
   value: T
   label: ReactNode
@@ -192,7 +199,7 @@ export function HoverTooltip({ anchor, children }: { anchor: HTMLElement; childr
       ref={ref}
       className={`u-segmented-popup ${arrow.above ? 'is-above' : 'is-below'}`}
       role="tooltip"
-      style={{ ...style, '--tip-arrow-left': `${arrow.left}px` } as CSSProperties}
+      style={tooltipStyle(style, arrow.left)}
     >
       {children}
       <span className="u-segmented-popup-arrow" aria-hidden="true" />

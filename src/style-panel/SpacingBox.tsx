@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { HoverTooltip } from './components/SegmentedControl'
@@ -105,7 +103,7 @@ const DRAG_SENSITIVITY = 0.5
 function parseNumUnit(value: string): { num: number; unit: string } {
   const match = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i)
   if (!match) {return { num: 0, unit: '' }}
-  return { num: parseFloat(match[1]), unit: match[2].toLowerCase() }
+  return { num: parseFloat(match[1] ?? ''), unit: (match[2] ?? '').toLowerCase() }
 }
 
 /** How many CSS px one unit spans, so a drag in screen px maps to a value delta. */
@@ -330,7 +328,9 @@ function useSideDrag({
     const a = SIDE_AXIS[side]
     // Outward grows away from centre; inward (padding) drags the opposite way
     // (Webflow flips the resize cursors to match).
-    const sign = (inward ? -a.sign : a.sign) as 1 | -1
+    const sign: 1 | -1 = inward
+      ? a.sign === 1 ? -1 : 1
+      : a.sign
     drag.current = {
       side,
       props: [],
@@ -518,7 +518,7 @@ export function SpacingFill({ frame, propFor, inward = false, read, busy, setPro
         <rect x={f.mask.x} y={f.mask.y} width={f.mask.w} height={f.mask.h} rx={f.ir} ry={f.ir} fill="#000" />
       </mask>
       <g mask={`url(#${maskId})`}>
-        {(['top', 'right', 'bottom', 'left'] as Side[]).map((side) => (
+        {(['top', 'right', 'bottom', 'left'] satisfies Side[]).map((side) => (
           <path
             key={side}
             className={`embed-editor_spacing-tri is-${side}`}
@@ -641,7 +641,7 @@ export function SpacingLabel({
   // The number drags like the band it sits on: `padding-top` → `padding-left`
   // and friends, so Shift and Alt reach the other sides from here too. A few
   // pixels of travel separate a drag from the click that opens the editor.
-  const propForSide = (s: Side) => siblingProps(prop, side, [s])[0]
+  const propForSide = (s: Side) => siblingProps(prop, side, [s])[0] ?? prop
   const { onPointerDown, onPointerMove, onPointerUp, wasDrag } = useSideDrag({
     propFor: propForSide,
     inward: prop.startsWith('padding'),
@@ -827,13 +827,17 @@ export function SpacingEditor({
   // suppresses the compat mousedown + blur (e.g. the drag bands).
   useEffect(() => {
     const onDocDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) {return}
+      const target = event.target
+      if (!(target instanceof Node)) {return}
+      if (rootRef.current?.contains(target)) {return}
       // The variable picker opens from the dot in this popover but portals to the
       // body, so a press in it is a press in here — see lib/popup-layer.
-      if (inOwnedPopup(event.target as Node, rootRef.current)) {return}
+      if (inOwnedPopup(target, rootRef.current)) {return}
       // Pressing this side's own label should net to a close (not reopen): flag it
       // so the label's click doesn't re-open the popover we're about to close.
-      const labelProp = (event.target as Element).closest?.('.embed-editor_spacing-label')?.getAttribute('data-prop')
+      const labelProp = target instanceof Element
+        ? target.closest('.embed-editor_spacing-label')?.getAttribute('data-prop')
+        : null
       if (labelProp === prop) {onSameLabelPress()}
       close()
     }
@@ -876,7 +880,7 @@ export function SpacingEditor({
         <span className="embed-editor_spacing-popover-label" {...scrub.label}>{humanLabel(prop)}</span>
         <VariableConnect
           code
-          stepMin={isNonNegative(prop) ? 0 : undefined}
+          {...(isNonNegative(prop) ? { stepMin: 0 } : {})}
           ariaLabel={`Connect ${humanLabel(prop)} to a variable`}
           disabled={false}
           prop={prop}
@@ -1019,7 +1023,7 @@ export function useSpacingBox(shared: SharedProps, options?: { emptyLabel?: stri
       clearProp={shared.clearProp}
       onEdit={onEdit}
       variables={variables}
-      variableLabels={options?.variableLabels}
+      {...(options?.variableLabels === undefined ? {} : { variableLabels: options.variableLabels })}
       setProp={shared.setProp}
       liveSetProp={shared.liveSetProp}
       onLive={onLive}

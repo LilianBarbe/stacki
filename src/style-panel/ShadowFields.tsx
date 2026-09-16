@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 import { useEffect, useRef, useState } from 'react'
 import DragSlider from './components/DragSlider'
 import ColorSwatch from './components/ColorSwatch'
@@ -27,7 +25,7 @@ export const SHADOW_RANGE: Record<string, { min: number; max: number }> = {
 export function parseLen(value: string): { num: number; unit: string } | null {
   const match = value.trim().match(/^(-?\d*\.?\d+)\s*([a-z%]*)$/i)
   if (!match) {return null}
-  return { num: parseFloat(match[1]), unit: match[2] || 'px' }
+  return { num: parseFloat(match[1] ?? ''), unit: match[2] || 'px' }
 }
 
 // A live text field for a shadow sub-value (length or color): live on type

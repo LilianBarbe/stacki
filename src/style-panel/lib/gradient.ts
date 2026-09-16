@@ -1,5 +1,3 @@
-// @ts-nocheck -- Legacy ratchet (docs/ts-migration-plan.md Phase 3): predates the strict
-// tsconfig and fails the AGENTS.md flag set. Conversion removes this header.
 // Parse / serialize a CSS gradient function into a structured model so the
 // Backgrounds panel can offer Webflow's visual gradient editor (position grid,
 // size presets, a draggable stops bar, a repeat toggle) instead of raw CSS text.
@@ -50,19 +48,20 @@ function parseCenter(text: string): { posX: string; posY: string } {
   const toks = splitTopLevelSpaces(text)
   if (!toks.length) {return { posX: '', posY: '' }}
   if (toks.length === 1) {
-    const v = posValue(toks[0])
+    const first = toks[0] ?? ''
+    const v = posValue(first)
     // A lone vertical keyword sets Y; anything else sets X (center the other axis).
-    if (/^(top|bottom)$/i.test(toks[0])) {return { posX: '50%', posY: v }}
+    if (/^(top|bottom)$/i.test(first)) {return { posX: '50%', posY: v }}
     return { posX: v, posY: '50%' }
   }
-  return { posX: posValue(toks[0]), posY: posValue(toks[1]) }
+  return { posX: posValue(toks[0] ?? ''), posY: posValue(toks[1] ?? '') }
 }
 
 /** Split one stop into color + optional trailing position (handles rgba()/color-mix). */
 function parseStop(part: string): GradientStop {
   const toks = splitTopLevelSpaces(part)
-  if (toks.length > 1 && isLength(toks[toks.length - 1])) {
-    return { pos: toks.pop() as string, color: toks.join(' ') }
+  if (toks.length > 1 && isLength(toks[toks.length - 1] ?? '')) {
+    return { pos: toks.pop() ?? '', color: toks.join(' ') }
   }
   return { color: toks.join(' '), pos: '' }
 }
@@ -92,14 +91,16 @@ function isPrelude(type: GradientType, part: string): boolean {
 export function parseGradient(image: string): Gradient | null {
   const m = GRADIENT_RE.exec(image.trim())
   if (!m) {return null}
-  const type = m[2].toLowerCase() as GradientType
-  const parts = splitTopLevelCommas(m[3]).filter((s) => s.length)
+  const typeText = (m[2] ?? '').toLowerCase()
+  if (typeText !== 'linear' && typeText !== 'radial' && typeText !== 'conic') {return null}
+  const type: GradientType = typeText
+  const parts = splitTopLevelCommas(m[3] ?? '').filter((s) => s.length)
   if (!parts.length) {return null}
 
   const g: Gradient = { type, repeating: !!m[1], angle: '', shape: '', size: '', from: '', posX: '', posY: '', stops: [] }
   let rest = parts
-  if (isPrelude(type, parts[0])) {
-    parsePrelude(g, parts[0])
+  if (isPrelude(type, parts[0] ?? '')) {
+    parsePrelude(g, parts[0] ?? '')
     rest = parts.slice(1)
   }
   g.stops = rest.map(parseStop).filter((s) => s.color)
@@ -112,14 +113,14 @@ function parsePrelude(g: Gradient, prelude: string) {
   if (g.type === 'linear') { g.angle = p; return }
   if (g.type === 'conic') {
     const at = p.split(/\bat\b/i)
-    const fromPart = at[0].replace(/^from\s+/i, '').trim()
+    const fromPart = (at[0] ?? '').replace(/^from\s+/i, '').trim()
     if (fromPart) {g.from = fromPart}
     if (at[1]) { const c = parseCenter(at[1]); g.posX = c.posX; g.posY = c.posY }
     return
   }
   // radial: `<shape?> <size?> at <pos?>`
   const at = p.split(/\bat\b/i)
-  for (const tok of splitTopLevelSpaces(at[0])) {
+  for (const tok of splitTopLevelSpaces(at[0] ?? '')) {
     const lt = tok.toLowerCase()
     if (lt === 'circle' || lt === 'ellipse') {g.shape = lt}
     else if (RADIAL_SIZE_KW.has(lt) || isLength(tok)) {g.size = g.size ? `${g.size} ${tok}` : tok}
@@ -198,7 +199,7 @@ export function stopsBarCss(stops: GradientStop[]): string {
 export function stopPercent(stops: GradientStop[], i: number): number {
   const raw = stops[i]?.pos.trim()
   const m = raw ? /^(-?[\d.]+)%$/.exec(raw) : null
-  if (m) {return Math.max(0, Math.min(100, parseFloat(m[1])))}
+  if (m) {return Math.max(0, Math.min(100, parseFloat(m[1] ?? '')))}
   return stops.length > 1 ? (i / (stops.length - 1)) * 100 : 0
 }
 
@@ -217,12 +218,13 @@ export function angleToDegrees(angle: string): number {
   if (!t) {return 180}
   const m = t.match(/^(-?[\d.]+)(deg|grad|rad|turn)$/)
   if (m) {
-    const n = parseFloat(m[1])
+    const n = parseFloat(m[1] ?? '')
     switch (m[2]) {
       case 'turn': return n * 360
       case 'grad': return n * 0.9
       case 'rad': return (n * 180) / Math.PI
-      default: return n
+      case 'deg': return n
+      case undefined: return n
     }
   }
   if (t.startsWith('to ')) {
@@ -246,7 +248,7 @@ function parseColor(input: string): RGBA | null {
   const c = input.trim().toLowerCase()
   const hex = c.match(/^#([0-9a-f]{3,8})$/i)
   if (hex) {
-    let h = hex[1]
+    let h = hex[1] ?? ''
     if (h.length === 3 || h.length === 4) {h = h.split('').map((x) => x + x).join('')}
     if (h.length === 6) {h += 'ff'}
     if (h.length !== 8) {return null}
@@ -254,9 +256,10 @@ function parseColor(input: string): RGBA | null {
   }
   const rgb = c.match(/^rgba?\(([^)]+)\)$/)
   if (rgb) {
-    const p = rgb[1].split(',').map((s) => parseFloat(s.trim()))
+    const p = (rgb[1] ?? '').split(',').map((s) => parseFloat(s.trim()))
     if (p.length < 3 || p.slice(0, 3).some((n) => Number.isNaN(n))) {return null}
-    return [p[0], p[1], p[2], p[3] == null || Number.isNaN(p[3]) ? 1 : p[3]]
+    const [red = 0, green = 0, blue = 0, alpha] = p
+    return [red, green, blue, alpha == null || Number.isNaN(alpha) ? 1 : alpha]
   }
   return null
 }
@@ -280,13 +283,24 @@ export function colorAt(stops: GradientStop[], p: number): string {
   if (!stops.length) {return 'transparent'}
   const last = stops.length - 1
   const pct = stops.map((_, i) => stopPercent(stops, i))
-  if (p <= pct[0]) {return stops[0].color}
-  if (p >= pct[last]) {return stops[last].color}
+  const firstStop = stops[0]
+  const lastStop = stops[last]
+  if (firstStop === undefined || lastStop === undefined) {
+    throw new Error('Gradient stop invariant failed')
+  }
+  if (p <= (pct[0] ?? 0)) {return firstStop.color}
+  if (p >= (pct[last] ?? 100)) {return lastStop.color}
   for (let i = 0; i < last; i += 1) {
-    if (p >= pct[i] && p <= pct[i + 1]) {
-      const span = pct[i + 1] - pct[i]
-      return mixColors(stops[i].color, stops[i + 1].color, span === 0 ? 0 : (p - pct[i]) / span)
+    const leftPercent = pct[i]
+    const rightPercent = pct[i + 1]
+    const leftStop = stops[i]
+    const rightStop = stops[i + 1]
+    if (leftPercent === undefined || rightPercent === undefined) {continue}
+    if (leftStop === undefined || rightStop === undefined) {continue}
+    if (p >= leftPercent && p <= rightPercent) {
+      const span = rightPercent - leftPercent
+      return mixColors(leftStop.color, rightStop.color, span === 0 ? 0 : (p - leftPercent) / span)
     }
   }
-  return stops[last].color
+  return lastStop.color
 }

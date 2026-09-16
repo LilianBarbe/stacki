@@ -52,18 +52,18 @@ interface ProjectEsbuild {
   build(options: Record<string, unknown>): Promise<{ metafile?: { inputs?: Record<string, unknown> } }>;
 }
 
+function isProjectEsbuild(input: unknown): input is ProjectEsbuild {
+  const candidate = toRecord(input);
+  return candidate !== undefined && candidate !== null && typeof candidate['build'] === 'function';
+}
+
 function esbuildOf(projectPath: string): ProjectEsbuild | null {
   const req = createRequire(path.join(projectPath, 'package.json'));
   for (const spec of ['esbuild', 'vite/node_modules/esbuild']) {
     try {
       const mod: unknown = req(spec);
-      const candidate = toRecord(mod);
-      if (candidate && typeof candidate['build'] === 'function') {
-        // Validated above: build is a function on the module. The assertion is
-        // the boundary between the project's untyped copy of esbuild and the
-        // one-method surface this module uses.
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        return mod as ProjectEsbuild;
+      if (isProjectEsbuild(mod)) {
+        return mod;
       }
     } catch {
       /* try the next */
