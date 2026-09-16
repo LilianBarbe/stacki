@@ -128,7 +128,7 @@ function withSource(value, path) {
 
   // The chip is a mark over text, so the value never contains anything but the
   // expression itself.
-  const expr = require('fs').readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ExprInput.jsx'), 'utf8');
+  const expr = require('fs').readFileSync(path.join(__dirname, '..', 'src', 'ui', 'ExprInput.tsx'), 'utf8');
   check('the chip is a mark, not a widget', /Decoration\.mark\(\{ class: 'cm-chip' \}\)/.test(expr));
   check('and clicking it is handled', /closest\('\.cm-chip, \.expr-chip'\)/.test(expr));
   check(

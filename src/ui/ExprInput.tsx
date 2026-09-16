@@ -1,0 +1,369 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  EditorView,
+  keymap,
+  drawSelection,
+  placeholder as cmPlaceholder,
+  Decoration,
+  WidgetType,
+} from '@codemirror/view';
+import type { MutableRefObject } from 'react';
+import type { DecorationSet, KeyBinding } from '@codemirror/view';
+import type { Extension, Range } from '@codemirror/state';
+import type { Completion, CompletionContext } from '@codemirror/autocomplete';
+import type { TemplateHole } from '../bindings';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
+import { EditorState, StateEffect, StateField } from '@codemirror/state';
+import { javascript } from '@codemirror/lang-javascript';
+import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
+import { autocompletion, completionKeymap } from '@codemirror/autocomplete';
+import { appTheme, appHighlight } from './CodeEditor.jsx';
+
+// The data inside an expression, drawn as chips. They are marks, not widgets:
+// the text underneath stays text, so the value is always exactly what is typed
+// and everything around a chip — `.filter(…)`, `[1]`, a whole ternary — is
+// ordinary code in an ordinary field. Clicking one opens whatever picker the
+// caller gave it.
+//
+// Which text is a chip is the caller's to say: a loop's Data field marks the
+// name at the front (the list being looped over), a prop's code field marks
+// every `${…}` hole in it. So what arrives here is a function from the text to
+// the ranges, re-run on every edit rather than mapped through it — a chip whose
+// name is typed away stops being a chip, which is the honest answer.
+export type ChipsOf = (text: string) => readonly TemplateHole[] | null;
+const setChips = StateEffect.define<ChipsOf | null>();
+
+const chipMark = Decoration.mark({ class: 'cm-chip' });
+
+// A chip drawn INSTEAD of its text, for a range that is more than the name it
+// means: `${maxWidth}` is one value, and the `${`/`}` around it is the syntax
+// that puts it in a template, not part of what it names. It wears `expr-chip`,
+// the class every other chip in the app wears, so it is the same object rather
+// than something that resembles one.
+//
+// The text stays in the document underneath — the value written to the file is
+// still `${maxWidth}` — and the range is atomic, so the caret steps over the
+// chip as one thing instead of into the middle of a name.
+class ChipWidget extends WidgetType {
+  constructor(private readonly label: string) {
+    super();
+  }
+  override eq(other: ChipWidget) {
+    return other.label === this.label;
+  }
+  override toDOM() {
+    const span = document.createElement('span');
+    span.className = 'expr-chip';
+    span.textContent = this.label;
+    return span;
+  }
+  // The press has to reach the editor's own handler, which is what opens the
+  // picker.
+  override ignoreEvent() {
+    return false;
+  }
+}
+
+// The function itself, kept in state so the decorations can be rebuilt from any
+// transaction — including ones that only changed the document.
+const chipFnField = StateField.define<ChipsOf | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setChips)) {
+        return effect.value || null;
+      }
+    }
+    return value;
+  },
+});
+
+// Two kinds, decided by the range itself. A range whose text IS the path stays
+// a mark over live text: that is a loop's source, where what follows the name is
+// typed right next to it and the name has to stay typeable. A range carrying
+// syntax around the path is drawn as the path alone, the way a chip is drawn
+// everywhere else.
+function chipSets(state: EditorState): {
+  readonly deco: DecorationSet;
+  readonly atomic: DecorationSet;
+} {
+  const ranges = state.field(chipFnField);
+  if (!ranges) {
+    return { deco: Decoration.none, atomic: Decoration.none };
+  }
+  const doc = state.doc.toString();
+  const deco: Range<Decoration>[] = [];
+  const atomic: Range<Decoration>[] = [];
+  const chips = ranges(doc) || [];
+  assert(chips.length <= LIMITS.treeNodesMax, 'ExprInput: chip limit exceeded');
+  for (const range of chips) {
+    const { from, to, path } = range;
+    // A range that no longer fits the document is one the text moved out from
+    // under; dropping it is better than throwing.
+    if (!(from >= 0 && to > from && to <= doc.length)) {
+      continue;
+    }
+    if (doc.slice(from, to) === path) {
+      deco.push(chipMark.range(from, to));
+      continue;
+    }
+    const replace = Decoration.replace({ widget: new ChipWidget(path) });
+    deco.push(replace.range(from, to));
+    atomic.push(replace.range(from, to));
+  }
+  return { deco: Decoration.set(deco, true), atomic: Decoration.set(atomic, true) };
+}
+
+const chipField = StateField.define({
+  create: (state) => chipSets(state),
+  update(value, tr) {
+    if (!tr.docChanged && !tr.effects.some((effect) => effect.is(setChips))) {
+      return value;
+    }
+    return chipSets(tr.state);
+  },
+  provide: (field) => EditorView.decorations.from(field, (sets) => sets.deco),
+});
+
+// The facet wants a function of the view, not a set — so it can't come from
+// `provide` above, which hands over the value itself.
+const chipsAreAtomic = EditorView.atomicRanges.of((view) => view.state.field(chipField).atomic);
+
+/** Ranges for a single piece of text — what a field with one chip in it wants. */
+const findOne =
+  (text: string): ChipsOf =>
+  (doc) => {
+    const at = text ? doc.indexOf(text) : -1;
+    return at < 0 ? [] : [{ from: at, to: at + text.length, path: text }];
+  };
+
+// A field that holds JavaScript — highlighted, but shaped like an input:
+// it grows with its content and Enter commits instead of adding a line.
+//
+// Uncontrolled after mount (like StyleEditor): the parent may reformat what
+// it stores, and feeding that back would fight every keystroke. External
+// changes are applied through `syncValue`, which only replaces the document
+// when the text genuinely differs from what's on screen.
+export interface ExprInputAPI {
+  readonly replaceRange: (from: number, to: number, text: string) => string | null;
+  readonly insert: (text: string) => string | null;
+}
+export interface ExprInputProps {
+  readonly value?: string | null;
+  readonly onChange?: ((text: string) => void) | undefined;
+  readonly onCommit?: ((text: string) => void) | undefined;
+  readonly placeholder?: string;
+  readonly autoFocus?: boolean;
+  readonly syncValue?: string | null;
+  readonly invalid?: boolean;
+  readonly multiline?: boolean;
+  readonly wrap?: boolean;
+  readonly className?: string;
+  readonly chip?: string;
+  readonly chipsOf?: ChipsOf | null;
+  readonly onChipClick?: (range: TemplateHole | null) => void;
+  readonly apiRef?: MutableRefObject<ExprInputAPI | null>;
+  readonly completions?: readonly Completion[];
+}
+interface ExprRefs {
+  readonly latest: MutableRefObject<ExprInputProps>;
+  readonly view: MutableRefObject<EditorView | null>;
+  readonly touched: MutableRefObject<boolean>;
+}
+
+export default function ExprInput(props: ExprInputProps) {
+  const { syncValue, chip = '', chipsOf, invalid, className = '' } = props;
+  const hostRef = useRef<HTMLDivElement>(null);
+  const view = useRef<EditorView | null>(null);
+  const touched = useRef(false);
+  const latest = useRef(props);
+  latest.current = props;
+  const [initial] = useState(() => props);
+  useEffect(() => {
+    const parent = hostRef.current;
+    assert(parent !== null, 'ExprInput: mounted host exists');
+    assert(view.current === null, 'ExprInput: only one editor owns the host');
+    const editor = exprCreate(parent, initial, { latest, view, touched });
+    view.current = editor;
+    if (initial.autoFocus) {
+      editor.focus();
+    }
+    return () => {
+      editor.destroy();
+      view.current = null;
+    };
+  }, [initial]);
+  useExprAPI(props.apiRef, { latest, view, touched });
+  // External edits replace the document, so they also invalidate chip ranges.
+  useEffect(() => {
+    view.current?.dispatch({ effects: setChips.of(chipsOf || (chip ? findOne(chip) : null)) });
+  }, [chip, chipsOf, syncValue]);
+  useEffect(() => {
+    const editor = view.current;
+    if (!editor || syncValue == null) {
+      return;
+    }
+    const current = editor.state.doc.toString();
+    if (syncValue !== current) {
+      editor.dispatch({ changes: { from: 0, to: current.length, insert: syncValue } });
+    }
+  }, [syncValue]);
+  return <div ref={hostRef} className={`expr-input ${invalid ? 'invalid' : ''} ${className}`} />;
+}
+
+function exprCreate(parent: HTMLElement, initial: ExprInputProps, refs: ExprRefs): EditorView {
+  return new EditorView({
+    parent,
+    state: EditorState.create({
+      doc: initial.value ?? '',
+      extensions: [
+        history(),
+        drawSelection(),
+        keymap.of(exprKeys(initial, refs)),
+        javascript(),
+        // Scope is read at request time: frontmatter can change while this editor stays mounted.
+        autocompletion({
+          override: [(context) => exprCompletions(context, refs.latest.current)],
+          icons: false,
+          defaultKeymap: false,
+        }),
+        keymap.of(completionKeymap),
+        chipFnField,
+        chipField,
+        chipsAreAtomic,
+        appTheme,
+        appHighlight,
+        ...((initial.wrap ?? true) ? [EditorView.lineWrapping] : []),
+        cmPlaceholder(initial.placeholder ?? ''),
+        exprEvents(refs),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            refs.latest.current.onChange?.(update.state.doc.toString());
+          }
+        }),
+      ],
+    }),
+  });
+}
+
+function exprKeys(initial: ExprInputProps, refs: ExprRefs): readonly KeyBinding[] {
+  if (initial.multiline) {
+    return [...defaultKeymap, ...historyKeymap];
+  }
+  return [
+    {
+      key: 'Enter',
+      run: () => {
+        refs.latest.current.onCommit?.(refs.view.current?.state.doc.toString() ?? '');
+        return true;
+      },
+    },
+    ...defaultKeymap.filter((binding) => binding.key !== 'Enter'),
+    ...historyKeymap,
+  ];
+}
+
+function exprCompletions(context: CompletionContext, props: ExprInputProps) {
+  const list = props.completions;
+  if (!list?.length) {
+    return null;
+  }
+  assert(list.length <= LIMITS.treeNodesMax, 'ExprInput: completion limit exceeded');
+  const before = context.matchBefore(/[\w$.]*/);
+  if (!before || (before.from === before.to && !context.explicit)) {
+    return null;
+  }
+  const dot = before.text.lastIndexOf('.');
+  const prefix = dot >= 0 ? before.text.slice(0, dot + 1) : '';
+  // After a dot, offer the property rather than repeating the complete path.
+  const options = list
+    .filter((entry) => entry.label.startsWith(prefix) && entry.label !== prefix)
+    .map((entry) => ({
+      label: entry.label.slice(prefix.length),
+      ...(entry.detail ? { detail: entry.detail } : {}),
+      ...(entry.info ? { info: entry.info } : {}),
+      type: entry.type || 'variable',
+    }));
+  if (!options.length) {
+    return null;
+  }
+  return { from: before.from + prefix.length, options, validFor: /^[\w$]*$/ };
+}
+
+function exprEvents(refs: ExprRefs): Extension {
+  return EditorView.domEventHandlers({
+    mousedown: (event, view) => {
+      const ElementType = view.dom.ownerDocument.defaultView?.Element;
+      if (!ElementType || !(event.target instanceof ElementType)) {
+        return false;
+      }
+      if (!event.target.closest('.cm-chip, .expr-chip')) {
+        return false;
+      }
+      event.preventDefault();
+      const position = view.posAtCoords({ x: event.clientX, y: event.clientY });
+      const ranges = view.state.field(chipFnField)?.(view.state.doc.toString()) || [];
+      assert(ranges.length <= LIMITS.treeNodesMax, 'ExprInput: chip limit exceeded');
+      const hit =
+        position == null
+          ? null
+          : ranges.find((range) => position >= range.from && position <= range.to);
+      refs.latest.current.onChipClick?.(hit || null);
+      return true;
+    },
+    focus: () => {
+      refs.touched.current = true;
+      return false;
+    },
+    blur: () => {
+      refs.latest.current.onCommit?.(refs.view.current?.state.doc.toString() ?? '');
+      return false;
+    },
+  });
+}
+
+function useExprAPI(apiRef: ExprInputProps['apiRef'], refs: ExprRefs): void {
+  useEffect(() => {
+    if (!apiRef) {
+      return;
+    }
+    apiRef.current = {
+      replaceRange: (from, to, text) => exprReplace(refs.view.current, from, to, text),
+      insert: (text) => {
+        const view = refs.view.current;
+        if (!view) {
+          return null;
+        }
+        const end = view.state.doc.length;
+        const { from, to } = refs.touched.current
+          ? view.state.selection.main
+          : { from: end, to: end };
+        const value = exprReplace(view, from, to, text);
+        view.focus();
+        return value;
+      },
+    };
+    return () => {
+      apiRef.current = null;
+    };
+  });
+}
+
+function exprReplace(
+  view: EditorView | null,
+  from: number,
+  to: number,
+  text: string,
+): string | null {
+  if (!view) {
+    return null;
+  }
+  assert(Number.isSafeInteger(from), 'ExprInput: range start is an integer');
+  assert(Number.isSafeInteger(to), 'ExprInput: range end is an integer');
+  assert(from >= 0, 'ExprInput: range starts inside the document');
+  assert(to >= from, 'ExprInput: range is ordered');
+  assert(to <= view.state.doc.length, 'ExprInput: range ends inside the document');
+  view.dispatch({ changes: { from, to, insert: text }, selection: { anchor: from + text.length } });
+  return view.state.doc.toString();
+}

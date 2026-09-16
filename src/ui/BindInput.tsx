@@ -1,0 +1,279 @@
+import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import type { Part } from '../bindings';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
+import { deleteChipAtCaret } from './chipKeys.js';
+
+// A prop's value as a field you can type in, with the data in it shown as
+// chips: `Posted ` · [post.data.pubDate] · ` in London`. The chip is atomic —
+// the caret steps over it, backspace takes the whole thing — so a binding
+// can't be half-edited into something that doesn't resolve, while the text
+// either side stays ordinary text.
+//
+// Uncontrolled after mount, like the other editors here: it is a
+// contenteditable, and rewriting its HTML under a live caret would fight every
+// keystroke. Outside changes (undo, a different node) are applied only while
+// it isn't focused.
+
+const esc = (text: string | undefined) =>
+  String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// `data-expr` is what the chip WRITES; `data-full` is what it MEANS. They are
+// the same for an ordinary chip, and differ for one reached through a `?`:
+// `featured?.data.title` is drawn as `featured` · "?" · `.data.title`, and that
+// last chip writes `.data.title` while standing for `featured.data.title`. The
+// picker needs the second one to know which value is the current one.
+const chipHtml = (path: string, full?: string) =>
+  `<span class="expr-chip" contenteditable="false" data-expr="${esc(path)}"${
+    full && full !== path ? ` data-full="${esc(full)}"` : ''
+  }>${esc(path)}</span>`;
+
+const partsToHtml = (parts: readonly Part[] | null | undefined): string => {
+  assert((parts?.length ?? 0) <= LIMITS.treeNodesMax, 'BindInput: part limit exceeded');
+  // The path the chip before this one stood for, so a `.field` tail can be
+  // read as the whole thing it names.
+  let last: string | null = null;
+  let afterQuestion = false;
+  return (parts || [])
+    .map((p) => {
+      if (p.expr === undefined) {
+        afterQuestion = last !== null && p.text === '?';
+        return esc(p.text);
+      }
+      const full = afterQuestion && p.expr.startsWith('.') ? last + p.expr : p.expr;
+      last = full;
+      afterQuestion = false;
+      return chipHtml(p.expr, full);
+    })
+    .join('');
+};
+
+// What is in the field now. Chips report the path they hold rather than the
+// text they show, and everything else is text.
+function readParts(host: HTMLElement): Part[] {
+  assert(host.childNodes.length <= LIMITS.treeNodesMax, 'BindInput: child limit exceeded');
+  const out: Part[] = [];
+  for (const node of host.childNodes) {
+    if (node.nodeType === 3) {
+      if (node.nodeValue) {
+        out.push({ text: node.nodeValue });
+      }
+    } else if (isChip(node)) {
+      out.push({ expr: node.getAttribute('data-expr') || node.textContent || '' });
+    } else if (node.nodeName === 'BR') {
+      // A browser's own line break in a one-line field — nothing to keep.
+    } else if (node.textContent) {
+      // Pasted markup: keep what it said, drop what it was.
+      out.push({ text: node.textContent });
+    }
+  }
+  return out;
+}
+
+export interface BindInputHandle {
+  readonly insert: (path: string) => void;
+  readonly replace: (chip: Element | null, path: string) => void;
+  readonly focus: () => void;
+}
+interface BindInputProps {
+  readonly parts?: readonly Part[] | null;
+  readonly placeholder?: string;
+  readonly onChange?: (parts: Part[]) => void;
+  readonly onChipClick?: (chip: Element) => void;
+  readonly onFocus?: React.FocusEventHandler<HTMLDivElement>;
+  readonly onBlur?: React.FocusEventHandler<HTMLDivElement>;
+}
+const BindInput = forwardRef<BindInputHandle, BindInputProps>(function BindInput(props, ref) {
+  const { placeholder, onChipClick, onFocus, onBlur } = props;
+  const state = useBindInput(props);
+  const { hostRef, saveRange, emit } = state;
+  useImperativeHandle(ref, () => bindHandle(state));
+  return (
+    <div
+      ref={hostRef}
+      className="bind-input"
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      role="textbox"
+      data-placeholder={placeholder || ''}
+      onInput={emit}
+      onKeyUp={saveRange}
+      onMouseUp={saveRange}
+      onFocus={onFocus}
+      onBlur={(e) => {
+        saveRange();
+        onBlur?.(e);
+      }}
+      onKeyDown={(e) => {
+        // One line: Enter commits rather than splitting the value in two.
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          hostRef.current?.blur();
+          return;
+        }
+        // Backspace against a chip takes that chip, and only that chip.
+        if (deleteChipAtCaret(hostRef.current, e)) {
+          e.preventDefault();
+          emit();
+        }
+      }}
+      // Plain text only — a paste from a page would otherwise bring its markup
+      // (and its own chips' styling) into a prop value.
+      onPaste={(e) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain').replace(/\s*\n\s*/g, ' ');
+        document.execCommand('insertText', false, text);
+      }}
+      onMouseDown={(e) => {
+        const ElementType = e.currentTarget.ownerDocument.defaultView?.Element;
+        const chip =
+          ElementType && e.target instanceof ElementType ? e.target.closest('.expr-chip') : null;
+        if (!chip) {
+          return;
+        }
+        // The caret must not land inside a chip: it is one thing, and half of
+        // a path is not a value.
+        e.preventDefault();
+        onChipClick?.(chip);
+      }}
+    />
+  );
+});
+
+export default BindInput;
+
+function useBindInput({ parts, onChange }: BindInputProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const lastHtmlRef = useRef('');
+  // Where the caret was when focus left — the picker's search box takes it, so
+  // inserting has to put the chip back where the caret actually was.
+  const rangeRef = useRef<Range | null>(null);
+
+  const emit = () => {
+    const host = hostRef.current;
+    if (!host) {
+      return;
+    }
+    lastHtmlRef.current = host.innerHTML;
+    onChange?.(readParts(host));
+  };
+
+  const saveRange = () => {
+    const host = hostRef.current;
+    const sel = window.getSelection();
+    if (!host || !sel?.rangeCount) {
+      return;
+    }
+    const r = sel.getRangeAt(0);
+    if (host.contains(r.commonAncestorContainer)) {
+      rangeRef.current = r.cloneRange();
+    }
+  };
+
+  const initialParts = useRef(parts);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) {
+      return;
+    }
+    const html = partsToHtml(initialParts.current);
+    lastHtmlRef.current = html;
+    host.innerHTML = html;
+    // Mount only: everything after comes through the sync below.
+  }, []);
+
+  // Outside edits — undo, a reset, the same field now editing another node.
+  // Never while focused: what's on screen is then the newer of the two.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || document.activeElement === host) {
+      return;
+    }
+    const html = partsToHtml(parts);
+    if (html !== lastHtmlRef.current) {
+      lastHtmlRef.current = html;
+      host.innerHTML = html;
+    }
+  });
+
+  return { hostRef, rangeRef, emit, saveRange };
+}
+
+type BindState = ReturnType<typeof useBindInput>;
+function bindHandle(state: BindState): BindInputHandle {
+  const { hostRef, rangeRef, saveRange, emit } = state;
+  return {
+    // Drop a chip in at the caret — or at the end, which is where a field
+    // nobody has clicked into yet leaves it.
+    insert(path: string) {
+      const host = hostRef.current;
+      if (!host) {
+        return;
+      }
+      host.focus();
+      const sel = window.getSelection();
+      const saved = rangeRef.current;
+      const range = document.createRange();
+      if (saved && host.contains(saved.commonAncestorContainer)) {
+        range.setStart(saved.startContainer, saved.startOffset);
+        range.setEnd(saved.endContainer, saved.endOffset);
+      } else {
+        range.selectNodeContents(host);
+        range.collapse(false);
+      }
+      if (!sel) {
+        return;
+      }
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('insertHTML', false, chipHtml(path));
+      saveRange();
+      emit();
+    },
+    // Same chip, different data: the one already in the field is repointed
+    // rather than replaced, so the text around it never moves.
+    replace: (chip, path) => bindReplace(chip, path, emit),
+    focus() {
+      hostRef.current?.focus();
+    },
+  };
+}
+
+function bindReplace(chip: Element | null, path: string, emit: () => void): void {
+  if (!chip) {
+    return;
+  }
+  const full = chip.getAttribute('data-full');
+  if (full) {
+    // A chip reached through a `?` writes only its tail. Repointing it
+    // somewhere under the same value keeps the chain — the `?` is how the
+    // author chose to reach it and isn't ours to remove.
+    const base = full.slice(0, full.length - (chip.getAttribute('data-expr') || '').length);
+    if (path.startsWith(`${base}.`)) {
+      const tail = path.slice(base.length);
+      chip.setAttribute('data-expr', tail);
+      chip.setAttribute('data-full', path);
+      chip.textContent = tail;
+      emit();
+      return;
+    }
+    // Somewhere else entirely: the chain it was reached through goes with
+    // it, or the field would read `featured?other.thing`.
+    const punct = chip.previousSibling;
+    const baseChip = punct?.previousSibling;
+    if (punct?.nodeType === 3 && (punct.nodeValue || '').trim() === '?' && isChip(baseChip)) {
+      punct.remove();
+      baseChip.remove();
+    }
+  }
+  chip.removeAttribute('data-full');
+  chip.setAttribute('data-expr', path);
+  chip.textContent = path;
+  emit();
+}
+
+function isChip(node: Node | null | undefined): node is Element {
+  const ElementType = node?.ownerDocument?.defaultView?.Element;
+  return !!ElementType && node instanceof ElementType && node.classList.contains('expr-chip');
+}

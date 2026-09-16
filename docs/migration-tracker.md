@@ -177,7 +177,7 @@ confirmation order, cancellation, trunk protection, parking/restoration and
 conflict handoff. All scheduled root `.js` leaves are now converted.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
-### src/ui — 33 converted, 5 remaining ⏳
+### src/ui — 36 converted, 2 remaining ⏳
 
 `Icons` 969, `RichContent` 606, `WelcomeBackground` 433, `ClassInput` 344,
 `ExprInput` 336, `DataPicker` 308, `Dropdown` 303, `FileBrowser` 277,
@@ -225,6 +225,14 @@ comparisons pass; the full gate passes 132/132 commands (95.4s). Picker trees,
 binding paths, and component lists have tested bounds, including cycles and deep
 nesting. Existing binding, item-field, and ranking tests remain green; their
 source-reading checks now follow the renamed modules.
+
+UI input batch: `BindInput`, `ExprInput`, and `ClassInput`. Nine old/new
+markup comparisons, 110 binding checks, 30 loop-source checks, and 15 chip-edit
+checks pass. The full gate passes 132/132 commands (95.3s). Caret insertion,
+per-chip replacement, external synchronization, completion scope, and family
+preview/revert behavior retain their existing contracts. No new unchecked types
+or lint warnings were introduced; only `RichContent` and `WelcomeBackground`
+remain in the UI queue.
 
 ### src/panels — 20 files, 13,990 lines ⬜
 
