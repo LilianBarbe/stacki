@@ -82,6 +82,7 @@
   "test:fluid": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON test/fluid.js",
   "test:varsview": "node test/vars-view.js",
   "test:varsrowheight": "node test/vars-row-height.js",
+  "test:variablecore": "node test/variable-core.js",
   "test:varsdrop": "node test/vars-drop.js",
   "test:customvalue": "node test/custom-value.js",
   "test:codeprop": "node test/code-prop.js",

@@ -316,6 +316,13 @@ watcher/project-switch regression pass. The full gate passes 137/137 commands
 (99.6s). Added PropsPanel assertion tests pin schema, layout, attribute, and child
 limits. Sixteen original panels remain; continue with VariablesView.
 
+VariablesView row/scroll checkpoint: `variableRows.ts` types row/heading drops,
+renames, and sheet slot construction with explicit collection/index bounds.
+All 416 old/new row comparisons and 33 existing drop checks pass. Scroll peers
+are bounded and disposal cancels the echo frame; regression tests cover stale
+cleanup callbacks and reuse. The full gate passes 138/138 commands (99.8s).
+VariablesView remains JSX; continue with cell/editor hooks and mutation boundaries.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -389,7 +396,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 137/137 (99.6s), exit 0. No quarantined tests remain.
+- Gate green at last run: 138/138 (99.8s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.

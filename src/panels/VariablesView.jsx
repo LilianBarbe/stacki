@@ -1,3 +1,7 @@
+import {dropPlan,stemOf,sectionPrefix,rowRenames,buildSheetSlots} from './variableRows';
+import {createScrollSync} from './variableScroll';
+export {dropPlan,movesForDrop} from './variableRows';
+export {createScrollSync} from './variableScroll';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CloseIcon, CheckIcon, CopyIcon, DragIcon, EaseIcon, MoreIcon, PencilIcon, PlusIcon, TrashIcon } from '../ui/Icons.jsx';
@@ -764,43 +768,13 @@ export default function VariablesView({ project, selected, hidden, onClose, show
 // `selection`'s light one. They move together. A group with a different number
 // of columns is a different width, has nothing to line up with, and is left
 // where it is.
-export function createScrollSync() {
-  const byColumns = new Map();
-  // Assigning scrollLeft fires a scroll event of its own, which arrives back
-  // here looking exactly like someone scrolling. Unguarded, that is answered
-  // with another round of assignments.
-  let echoing = false;
-  const release = () => {
-    echoing = false;
-  };
 
-  return {
-    register(count, el) {
-      if (!el) {return undefined;}
-      const peers = byColumns.get(count) || new Set();
-      peers.add(el);
-      byColumns.set(count, peers);
-      return () => {
-        peers.delete(el);
-        if (!peers.size) {byColumns.delete(count);}
-      };
-    },
-    broadcast(count, from, left) {
-      if (echoing) {return;}
-      echoing = true;
-      for (const el of byColumns.get(count) || []) {
-        // Compared before writing: an assignment that changes nothing still
-        // costs a layout, and there is one per group per scroll event.
-        if (el !== from && Math.abs(el.scrollLeft - left) > 0.5) {el.scrollLeft = left;}
-      }
-      // Next frame, by which time the echoes have arrived and been ignored.
-      if (typeof requestAnimationFrame === 'function') {requestAnimationFrame(release);}
-      else {setTimeout(release, 0);}
-    },
-  };
+
+function useScrollSync() {
+const sync=useMemo(createScrollSync,[]);
+useEffect(()=>()=>sync.dispose(),[sync]);
+return sync;
 }
-
-const useScrollSync = () => useMemo(createScrollSync, []);
 
 // The two stacks' tracks. Fixed, not fractions, so every table starts its
 // columns at the same x however many it has — and so the sheet's headings sit
@@ -814,11 +788,7 @@ const valueTracks = (count) => `repeat(${count}, var(--vars-col))`;
 // What a new name in this group starts with: everything its rows' names have in
 // front of the label they show. `--selection-background` shown as `background`
 // leaves `--selection-`; a plain list leaves `--`.
-function stemOf(block) {
-  const row = block.rows.find((r) => r.name);
-  if (!row) {return '--';}
-  return row.name.slice(0, row.name.length - row.label.length) || '--';
-}
+
 
 // The heading's own menu.
 //
@@ -858,59 +828,9 @@ function SectionMenu({ onRename, onDuplicate, onDelete }) {
 // One move per column: a row in a table of modes is one name declared in
 // several rules, and it has to move in each of them or the modes fall out of
 // step with each other.
-export function dropPlan(slots, from, to) {
-  const source = slots?.[from];
-  if (!source) {return null;}
-  // Where it lands: in front of the next real row at or after the drop point.
-  let landing = null;
-  for (let at = to; at < slots.length; at++) {
-    if (slots[at].kind === 'row') { landing = slots[at]; break; }
-  }
-  if (source.kind === 'heading') {
-    // A heading that has not actually moved: it is already the thing directly
-    // above `landing`.
-    const here = slots.indexOf(source);
-    if (to === here || to === here + 1) {return null;}
-    return { kind: 'heading', block: source.block, before: landing ? landing.row.name : null };
-  }
-  if (source.kind !== 'row') {return null;}
-  return { kind: 'rows', moves: movesForDrop(slots, from, to) };
-}
 
-export function movesForDrop(slots, from, to) {
-  const source = slots?.[from];
-  if (!source || source.kind !== 'row') {return [];}
-  // The next thing in the sheet that is a line in the file: a variable, or a
-  // HEADING. Headings count, and this is the whole of the bug they fix — a group
-  // ends at its next comment, so a drop at the end of a group that lands "in
-  // front of the next variable" steps over that comment and into the group
-  // after it. Dropped into an empty group, the variable went somewhere else
-  // entirely.
-  let landing = null;
-  for (let at = to; at < slots.length; at++) {
-    if (slots[at].kind === 'row' || slots[at].kind === 'heading') { landing = slots[at]; break; }
-  }
-  if (landing?.kind === 'row' && landing.row === source.row) {return [];}
-  return source.row.cells
-    .map((cell, index) => {
-      if (!cell) {return null;}
-      // A heading is a place in the text rather than a name to land in front of.
-      // Only a heading the panel read out of a comment HAS such a place; the
-      // headings of a modes table are shared name prefixes, and a run there is
-      // bounded by declarations, so the name is the right answer.
-      if (landing?.kind === 'heading') {
-        if (typeof landing.block.titleStart === 'number') {
-          return { file: cell.file, selector: cell.selector, name: cell.name, at: landing.block.titleStart };
-        }
-        const firstRow = landing.block.rows.find((row) => row.cells[index]);
-        return { file: cell.file, selector: cell.selector, name: cell.name, target: firstRow ? firstRow.cells[index].name : null };
-      }
-      const target = landing ? landing.row.cells[index] : null;
-      // Landing in front of nothing is the end of the rule.
-      return { file: cell.file, selector: cell.selector, name: cell.name, target: target ? target.name : null };
-    })
-    .filter(Boolean);
-}
+
+
 
 // A name you can rename by clicking it.
 //
@@ -1001,26 +921,7 @@ function Sheet({ blocks, group, onSave, onMove, onMoveGroup, onAdd, onRename, on
   // A heading is in the list too, and drags on its own: moving a comment up
   // past three variables is how those three come to be under it. So the slots
   // are, per group: its heading, its rows, and one at its end.
-  const slots = useMemo(() => {
-    const list = [];
-    blocks.forEach((block, bi) => {
-      if (block.title != null) {list.push({ kind: 'heading', block, bi });}
-      block.rows.forEach((row) => list.push({ kind: 'row', block, row, bi }));
-      list.push({ kind: 'end', block, bi });
-    });
-    return list;
-  }, [blocks]);
-  // Where each group's slots begin, and where its rows begin inside that.
-  const slotOffsets = useMemo(() => {
-    const out = [];
-    let at = 0;
-    blocks.forEach((block) => {
-      const head = block.title != null ? 1 : 0;
-      out.push({ head: at, rows: at + head });
-      at += head + block.rows.length + 1;
-    });
-    return out;
-  }, [blocks]);
+  const {slots,offsets:slotOffsets} = useMemo(()=>buildSheetSlots(blocks),[blocks]);
   const rowsDrag = useListReorder({
     count: slots.length,
     onMove: (from, to) => onMove?.(slots, from, to),
@@ -1178,30 +1079,12 @@ function NewVariable({ block, columns, onAdd, template, slotProps, dropping }) {
 // renaming that is editing a comment, which is a different thing from renaming
 // a variable. Only a heading every row is actually named after can be renamed
 // here.
-function sectionPrefix(block) {
-  const title = block.title;
-  if (!title || block.kind === 'matrix') {return null;}
-  const rows = block.rows.filter((r) => r.name);
-  if (!rows.length) {return null;}
-  return rows.every((r) => r.name.startsWith(`--${title}-`)) ? title : null;
-}
+
 
 // Renaming one row: in a table of modes the row is one name declared in several
 // rules, so it is a single rename; in a matrix the row is one property of every
 // column (`--h1-size`, `--h2-size`), so it is one rename per column.
-function rowRenames(block, row, typed) {
-  const next = typed.trim().replace(/^--/, '');
-  if (!next) {return [];}
-  if (block.kind === 'matrix') {
-    return row.cells
-      .filter(Boolean)
-      .map((cell) => ({ from: cell.name, to: `--${cell.name.slice(2, cell.name.length - row.label.length - 1)}-${next}` }))
-      .filter((r) => r.from !== r.to);
-  }
-  if (!row.name) {return [];}
-  const to = `${stemOf(block)}${next}`;
-  return to === row.name ? [] : [{ from: row.name, to }];
-}
+
 
 function Table({ block, group, onSave, onAdd, onRename, onRetitle, onDuplicateSection, onDeleteSection, fluidOf, onDraft, sectionDrag, scrollSync, rowsDrag, slotOffset = 0, showHead = true }) {
   // A matrix carries its own columns (the family's prefixes); everything else
