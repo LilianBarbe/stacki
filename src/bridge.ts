@@ -6,9 +6,10 @@
 //
 // New and converted code imports from here, not from window.avb.
 
-import { toProjectPath, toFilePath } from '../shared/dist/brand.js';
-import { parseScanResult, type ScanResult } from '../shared/dist/scan.js';
-import { parsePageReadResult, type ParsePageResult } from '../shared/dist/page-node.js';
+// Vite consumes the ESM sources; shared/dist is CommonJS for Electron and Node.
+import { toProjectPath, toFilePath } from '../shared/brand';
+import { parseScanResult, type ScanResult } from '../shared/scan';
+import { parsePageReadResult, type ParsePageResult } from '../shared/page-node';
 import {
   parseSymbolReadResult,
   parseResolvePathResult,
@@ -16,7 +17,7 @@ import {
   parseOkResult,
   type SymbolReadResult,
   type ResolvePathResult,
-} from '../shared/dist/ipc.js';
+} from '../shared/ipc';
 
 // The untyped preload surface. Only this module may touch it.
 declare global {

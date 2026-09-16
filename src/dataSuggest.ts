@@ -3,7 +3,7 @@
 // reading object literals — the keys nested inside them, so `service`
 // suggests `service.tags` without executing any code.
 
-import { toRecord, toArray } from '../shared/dist/record.js';
+import { toRecord, toArray } from '../shared/record';
 
 function skipString(code: string, i: number): number {
   const q = code.charAt(i);

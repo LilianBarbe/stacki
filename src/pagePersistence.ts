@@ -1,8 +1,8 @@
 // Serialize writes and drain edits made while a write is pending. A successful
 // write acknowledges its exact state object, never a newer edit or another file.
 
-import { LIMITS } from '../shared/dist/limits.js';
-import type { ScanResult } from '../shared/dist/scan.js';
+import { LIMITS } from '../shared/limits';
+import type { ScanResult } from '../shared/scan';
 
 /** The page state as the saver needs it: a dirty flag on an object whose
  * identity is the ack token (the WeakSet tracks exact state objects). */

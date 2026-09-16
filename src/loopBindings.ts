@@ -6,8 +6,8 @@
 // rewriting, since the children hold code as strings.
 // ---------------------------------------------------------------------------
 
-import { LIMITS } from '../shared/dist/limits.js';
-import { assert } from '../shared/dist/assert.js';
+import { LIMITS } from '../shared/limits';
+import { assert } from '../shared/assert';
 
 // The live tree as the loop tools need it: the mutable in-session shape.
 // Boundary code uses the readonly PageNode contract; this local mirror exists

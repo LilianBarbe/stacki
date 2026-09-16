@@ -11,7 +11,7 @@ import { createPreviewWatch } from './previewRecovery.js';
 import { tellCanvas } from './canvasQuery.js';
 import { renameAttr } from './attrOrder.js';
 import { scanProject } from './bridge';
-import { LIMITS } from '../shared/dist/limits.js';
+import { LIMITS } from '../shared/limits';
 import PreviewPane from './panels/PreviewPane.jsx';
 import GitChip from './panels/GitChip.jsx';
 import HistoryPanel, { relativeTime } from './panels/HistoryPanel.jsx';
