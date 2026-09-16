@@ -306,6 +306,17 @@ async function switchBranch(git, { projectPath, branch, create, parkFirst, park,
     // branch change that never happened.
     if (parked && unpark) await unpark(from);
     const detail = String(err.stderr || err.message || '');
+    // "already used by worktree at '/path'", and on newer git "already checked
+    // out at '/path'". The switcher leaves those branches out (see
+    // branchesElsewhere in gitHistory.js), so this is reached by a name typed
+    // by hand or by a list read before another folder took the branch — and
+    // git's own sentence names a worktree, which is not a word the app uses.
+    const taken = detail.match(/already (?:used by worktree|checked out) at '([^']+)'/i);
+    if (taken) {
+      throw new Error(
+        `“${branch}” is open in another folder — ${taken[1]}. A branch can only be checked out in one place at a time.`
+      );
+    }
     if (/would be overwritten|Please commit your changes|overwritten by/i.test(detail)) {
       const files = detail
         .split('\n')

@@ -87,7 +87,15 @@ const check = (what, condition, detail) => {
   check('with the reason shown while it waits', /branchError && <div className="git-hint">/.test(chip));
   check(
     'checked against the branches that exist',
-    /branchNameError\(newBranch, info\.branches \|\| \[\]\)/.test(chip)
+    /branchNameError\(newBranch, \[\s*\.\.\.\(info\.branches \|\| \[\]\),/.test(chip)
+  );
+  // The branches another folder has open are not rows in the switcher — see
+  // branchesElsewhere in electron/gitHistory.js — and git refuses to create a
+  // second branch by one of those names all the same. Left out of the check,
+  // the field would call a taken name free and hand the refusal to git.
+  check(
+    'and against the ones open in another folder',
+    /\.\.\.Object\.keys\(info\.elsewhere \|\| \{\}\),/.test(chip)
   );
 
   if (failures.length) {

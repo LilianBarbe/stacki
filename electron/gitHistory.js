@@ -27,6 +27,9 @@
 // "Home" needs the project's routing, which lives in main.js — so that
 // translation happens at the IPC edge, and this module stays about git.
 
+const fs = require('fs');
+const path = require('path');
+
 // Field and record separators: git will happily put anything in a subject
 // line, including newlines and tabs, so the format is delimited by bytes a
 // commit message cannot contain.
@@ -240,12 +243,21 @@ async function fileAt(git, { projectPath, ref, path: filePath }) {
 /** Every worktree of this repository, the main one first. */
 async function worktrees(git, { projectPath }) {
   const { stdout } = await git(projectPath, ['worktree', 'list', '--porcelain', '-z']);
-  // NUL separators keep spaces, Unicode and newlines in paths intact.
+  // NUL-separated records of "key value" lines — NUL keeps spaces, Unicode and
+  // newlines in paths intact. `detached` and `bare` are bare keys with no
+  // value; `prunable` carries git's reason as its own.
   return stdout
     .split('\0\0')
     .filter(Boolean)
     .map((rec) => {
-      const out = { path: null, head: null, branch: null, detached: false, bare: false };
+      const out = {
+        path: null,
+        head: null,
+        branch: null,
+        detached: false,
+        bare: false,
+        prunable: false,
+      };
       for (const line of rec.split('\0')) {
         const sp = line.indexOf(' ');
         const key = sp === -1 ? line : line.slice(0, sp);
@@ -255,11 +267,59 @@ async function worktrees(git, { projectPath }) {
         else if (key === 'branch') out.branch = value.replace(/^refs\/heads\//, '');
         else if (key === 'detached') out.detached = true;
         else if (key === 'bare') out.bare = true;
-        else if (key === 'prunable') out.prunable = true;
+        else if (key === 'prunable') out.prunable = value || true;
       }
       return out;
     })
     .filter((w) => w.path);
+}
+
+// Two paths to the same folder have to compare equal: macOS hands out both
+// /var and /private/var for one directory, and git and the app can each be
+// holding a different one of them.
+const samePlace = (p) => {
+  const abs = path.resolve(String(p || ''));
+  try {
+    return fs.realpathSync(abs);
+  } catch {
+    // Gone from disk, so there is nothing to resolve it against — the literal
+    // path is the best answer available, and it still compares.
+    return abs;
+  }
+};
+
+/**
+ * Where this project's OTHER folders are, as `{ branch: path }`.
+ *
+ * A branch is checked out in one place at a time. While another folder holds
+ * one, git refuses to switch to it here — so a switcher that lists it is
+ * offering a row that can only fail. And these are no longer rare: an agent
+ * runner makes a folder per task, each on its own branch, and a week of them
+ * buries the two or three branches the person actually chose between.
+ *
+ * So they come out of the branch list. They are a different thing — a place
+ * the project is open, not a version of it — and the history panel already
+ * lists them as places.
+ *
+ * `here` is this checkout's own root, which is what `git rev-parse
+ * --show-toplevel` says and not necessarily the folder that was opened. Get
+ * that wrong and no worktree matches this one, which hides the branch you are
+ * standing on.
+ *
+ * A worktree whose folder has been deleted counts too. Git marks the record
+ * prunable and goes on refusing the branch until someone runs `git worktree
+ * prune`, so the row would be a row that fails — and pointing at a folder that
+ * is no longer there while it failed. The history panel says that part.
+ */
+function branchesElsewhere(list, here) {
+  const home = samePlace(here);
+  const out = {};
+  for (const w of list || []) {
+    if (!w || !w.branch) continue;
+    if (samePlace(w.path) === home) continue;
+    out[w.branch] = w.path;
+  }
+  return out;
 }
 
 // --- Saying what a file is -------------------------------------------------
@@ -333,6 +393,7 @@ module.exports = {
   status,
   fileAt,
   worktrees,
+  branchesElsewhere,
   parseNameStatus,
   describeFile,
   describeFiles,
