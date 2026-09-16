@@ -1,3 +1,5 @@
+import { AttributesSection, ObjectAttrsField, parseObjectLiteral,
+  serializeObjectLiteral } from './propAttributes';
 import { referencedName, SourceEditButton, ExprValueField, ConditionField, BindHandle,
   FieldDataPicker, BindField, ValueCodeEditor } from './propBindings';
 export { BindField } from './propBindings';
@@ -1049,130 +1051,13 @@ function CommentField({ value, onCommit }) {
 }
 
 // Displayable text for an attribute value; '' means a bare attribute.
-const decodeAttr = (v) =>
-  v == null || v.type === 'bare' ? '' : v.type === 'expr' ? `{${v.value}}` : String(v.value);
+
 // Inverse: '' → bare, "{...}" → expression, anything else → string.
-const encodeAttr = (text) => {
-  if (text === '') {return { type: 'bare' };}
-  const m = text.match(/^\{([\s\S]*)\}$/);
-  if (m) {return { type: 'expr', value: m[1].trim() };}
-  return { type: 'string', value: text };
-};
+
 
 // Free-form attribute list for elements and ...rest components: + adds,
 // hover-trash deletes, clicking a row opens a name/value editor.
-function AttributesSection({ node, names, projectPath, bindCtx, onSetProp, onSetProps, onRenameProp }) {
-  const [editor, setEditor] = useState(null); // {attr: string|null, top}
-  const listRef = useRef(null);
 
-  const openEditor = (attr) => {
-    const rect = listRef.current?.getBoundingClientRect();
-    setEditor({
-      attr,
-      top: Math.min((rect?.bottom ?? 200) + 6, window.innerHeight - 150),
-      left: rect?.left ?? 0,
-      width: rect?.width ?? 240,
-    });
-  };
-
-  return (
-    <div className="props-field" ref={listRef}>
-      {/* Not a <label onClick={noLabelActivation}>: a click anywhere inside one activates the control it
-          holds, so the whole row — icon, word and all — acted as the button. */}
-      <div className="props-label-row">
-        <span className="prop-label">
-          <BracesIcon size={12} className="prop-label-icon" />
-          Attributes
-        </span>
-        <button className="ghost" title="Add attribute" onClick={() => openEditor(null)}>
-          <PlusIcon size={12} />
-        </button>
-      </div>
-
-      {names.length > 0 && (
-        <div className="attrs-list">
-          {names.map((name) => (
-            <div
-              key={name}
-              className={`attr-row ${editor?.attr === name ? 'editing' : ''}`}
-              onClick={() => openEditor(name)}
-            >
-              <span className="attr-name">{name}</span>
-              <span className="attr-eq">=</span>
-              <span className="attr-value">{decodeAttr(node.props[name])}</span>
-              <button
-                className="row-action"
-                title="Delete attribute"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (editor?.attr === name) {setEditor(null);}
-                  onSetProp(name, undefined, true);
-                }}
-              >
-                <TrashIcon size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {editor && (
-        <AttrEditor
-          key={editor.attr ?? '__new'}
-          pos={editor}
-          projectPath={projectPath}
-          bindCtx={bindCtx}
-          dataCtx={bindCtx}
-          name={editor.attr ?? ''}
-          value={editor.attr ? decodeAttr(node.props[editor.attr]) : ''}
-          isNew={editor.attr === null}
-          existingNames={names}
-          onCommitName={(newName) => {
-            const clean = newName.trim();
-            if (editor.attr === null) {
-              // New attribute: created once a valid name exists.
-              if (clean && !node.props?.[clean]) {
-                onSetProp(clean, { type: 'bare' }, true);
-                setEditor((e) => ({ ...e, attr: clean }));
-              }
-            } else if (clean && clean !== editor.attr) {
-              onRenameProp(editor.attr, clean);
-              setEditor((e) => ({ ...e, attr: clean }));
-            }
-          }}
-          onChangeValue={(text) => {
-            if (editor.attr) {onSetProp(editor.attr, encodeAttr(text));}
-          }}
-          // Pasting `id="hero"` fills both boxes at once — the attribute is
-          // created and given its value in one go rather than needing the
-          // name committed first.
-          onCommitPair={(attrName, text) => {
-            const clean = attrName.trim();
-            if (!clean) {return;}
-            if (editor.attr && editor.attr !== clean) {onRenameProp(editor.attr, clean);}
-            onSetProp(clean, encodeAttr(text), true);
-            setEditor((e) => ({ ...e, attr: clean }));
-          }}
-          // Several pairs pasted at once — written together so it is one undo,
-          // and the editor closes because there is no single attribute left
-          // for it to be editing.
-          onCommitMany={(pairs) => {
-            const patch = {};
-            for (const { name: attrName, value: text } of pairs) {
-              const clean = attrName.trim();
-              if (clean) {patch[clean] = encodeAttr(text);}
-            }
-            if (!Object.keys(patch).length) {return;}
-            if (onSetProps) {onSetProps(node.id, patch);}
-            else {for (const [k, v] of Object.entries(patch)) {onSetProp(k, v, true);}}
-            setEditor(null);
-          }}
-          onClose={() => setEditor(null)}
-        />
-      )}
-    </div>
-  );
-}
 
 // Attribute markup pasted into the name box — `id="hero"`, `id=hero`, or a
 // whole run of them — split into the pairs it describes. Copying attributes
@@ -1182,247 +1067,12 @@ function AttributesSection({ node, names, projectPath, bindCtx, onSetProp, onSet
 // Deliberately looser than the .astro parser: HTML allows an unquoted value
 // (`id=hero`), and that is exactly what someone types from memory. A brace
 // value keeps its braces so encodeAttr reads it as an expression.
-const ATTR_PASTE_RE =
-  /([\w@:.-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\{(?:[^{}]|\{[^{}]*\})*\})|([^\s]+)))?/g;
 
-function parseAttrPaste(text) {
-  const out = [];
-  ATTR_PASTE_RE.lastIndex = 0;
-  let m;
-  while ((m = ATTR_PASTE_RE.exec(text)) !== null) {
-    if (!m[0].trim()) {continue;}
-    const value = m[2] ?? m[3] ?? m[4] ?? m[5];
-    out.push({ name: m[1], value: value === undefined ? '' : value });
-  }
-  return out;
-}
+
+
 
 // Floating name/value editor for one attribute.
-function AttrEditor({ pos, name, value, isNew, projectPath, bindCtx, dataCtx, onCommitName, onCommitPair, onCommitMany, onChangeValue, onClose }) {
-  const [draftName, setDraftName] = useState(name);
-  const [draftValue, setDraftValue] = useState(value);
-  const ref = useRef(null);
-  // Where the purple dot's picker sits, and the field's own insert-at-the-caret
-  // handle — the same pair every schema-driven field uses (see PropField).
-  const [insertAt, setInsertAt] = useState(null);
-  // Where the bigger value editor sits, when `=` has asked for one.
-  const [bigAt, setBigAt] = useState(null);
-  // What this value can name, for the completions and the chips — the same list
-  // the picker beside the field offers.
-  const scope = scopeCompletions(bindCtx || {});
-  const scopeNames = new Set(scope.map((c) => c.label.split('.')[0]));
-  const chipsInScope = (text) => scopeChips(text, scopeNames);
-  const bindApiRef = useRef(null);
 
-  // Whether the value is an {expression} is settled when the popover opens,
-  // so the field can't change shape halfway through typing one. The name is
-  // read as typed: renaming style → styles turns the CSS editor back into a
-  // plain input right away.
-  const [isExpr] = useState(() => /^\{[\s\S]*\}$/.test(value));
-  const isStyleName = draftName.trim().toLowerCase() === 'style';
-
-  // The asset picker is always one click away, and starts on when the value
-  // already names a file in public/ — that's the case where the plain text
-  // field is never what you wanted.
-  const [assetMode, setAssetMode] = useState(() => !isStyleName && looksLikeAssetPath(value));
-
-  const isStyleValue = isStyleName && !isExpr && !assetMode;
-
-  // Only the field that mounts with the popover takes focus. Renaming swaps
-  // the value field, and a freshly mounted one grabbing focus there would
-  // pull the caret out of the name box mid-word.
-  const mounted = useRef(false);
-  useEffect(() => {
-    mounted.current = true;
-  }, []);
-  const focusValue = !isNew && !mounted.current;
-
-  useEffect(() => {
-    const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {onClose();}
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') {onClose();}
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [onClose]);
-
-  const commitName = () => onCommitName(draftName);
-
-  return (
-    <div
-      ref={ref}
-      className="attr-editor"
-      style={{ top: pos.top, left: pos.left, width: pos.width }}
-    >
-      <div className="attr-editor-row">
-        <span>Name</span>
-        <input
-          autoFocus={isNew}
-          value={draftName}
-          placeholder="data-attribute"
-          spellCheck={false}
-          onPaste={(e) => {
-            const text = e.clipboardData.getData('text');
-            // Only when it actually looks like markup — a plain name paste
-            // must keep behaving like a paste into a text box.
-            if (!text || !/=/.test(text)) {return;}
-            const pairs = parseAttrPaste(text);
-            if (!pairs.length) {return;}
-            e.preventDefault();
-            if (pairs.length === 1) {
-              setDraftName(pairs[0].name);
-              setDraftValue(pairs[0].value);
-              onCommitPair(pairs[0].name, pairs[0].value);
-            } else {
-              onCommitMany(pairs);
-            }
-          }}
-          onChange={(e) => setDraftName(e.target.value.replace(/[^\w@:.-]/g, ''))}
-          onBlur={commitName}
-          onKeyDown={(e) => e.key === 'Enter' && (commitName(), e.currentTarget.blur())}
-        />
-      </div>
-      {/* The field sits beside its label like the name row, whichever kind it
-          is; `top` just stops the label and toggle from centring against a
-          tall field. */}
-      <div className={`attr-editor-row ${isStyleValue || assetMode ? 'top' : ''}`}>
-        <span>Value</span>
-        {isStyleValue ? (
-          // A style attribute is CSS, so edit it as CSS — one declaration per
-          // line, highlighted. An {expression} value stays a plain field:
-          // it's JavaScript, and the CSS mode would mangle it.
-          <StyleEditor
-            value={draftValue}
-            autoFocus={focusValue}
-            onChange={(text) => {
-              const flat = collapseDeclarations(text);
-              setDraftValue(flat);
-              onChangeValue(flat);
-            }}
-          />
-        ) : assetMode ? (
-          <div className="attr-asset">
-            <AssetField
-              value={draftValue}
-              initialMode="asset"
-              showModeToggle={false}
-              mediaKind={mediaKindFor(draftValue)}
-              projectPath={projectPath}
-              onChange={(v) => {
-                setDraftValue(v);
-                onChangeValue(v);
-              }}
-            />
-          </div>
-        ) : (
-          // The same field a schema-driven prop gets: text with data in it shown
-          // as chips, and real code edited as code — JavaScript, highlighted. A
-          // hand-added attribute used to be the one value in the panel typed into
-          // a bare box, with `{expression}` as a placeholder and no way to reach
-          // the data it would name. The editor round-trips text, so the value
-          // object is made on the way in and unmade on the way out.
-          <div
-            className="attr-value-field"
-            // Captured: what's inside is CodeMirror (or a contenteditable), and both
-            // would take the key first. `=` is a character a JS value can want —
-            // typing `a === b` inline is the trade — but the box this opens is where
-            // an expression that needs one is worth writing anyway.
-            onKeyDownCapture={(e) => {
-              if (e.key !== '=' || e.metaKey || e.ctrlKey || e.altKey || bigAt) {return;}
-              e.preventDefault();
-              e.stopPropagation();
-              // Kept on screen: the field sits deep in a right-hand panel, so a box
-              // wider than it and anchored to its left edge runs off the window.
-              const r = e.currentTarget.getBoundingClientRect();
-              const width = Math.min(Math.max(r.width, 320), window.innerWidth - 16);
-              setBigAt({
-                left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)),
-                top: Math.max(8, Math.min(r.top, window.innerHeight - 320)),
-                width,
-              });
-            }}
-          >
-          <BindField
-            // An empty attribute is `{type:'bare'}`, which as a VALUE reads as no
-            // value at all rather than an empty one — the field would show the word
-            // "undefined". Empty text is an empty string here; encodeAttr still
-            // stores it as bare on the way out.
-            value={draftValue === '' ? { type: 'string', value: '' } : encodeAttr(draftValue)}
-            placeholder="Type, or insert data"
-            bindCtx={bindCtx}
-            dataCtx={dataCtx}
-            apiRef={bindApiRef}
-            onChange={(next) => {
-              const text = decodeAttr(next);
-              setDraftValue(text);
-              onChangeValue(text);
-            }}
-          />
-          {/* The dot belongs to the FIELD, and lives inside its box: hanging it off
-              the row put it above the row's own edge, so hovering it left the row —
-              which hid it, which put the pointer back on the row, which showed it
-              again. A dot that flickers under the pointer. */}
-          <BindHandle
-            active={!!insertAt}
-            onOpen={(host) => {
-              if (insertAt) { setInsertAt(null); return; }
-              const r = (host || ref.current)?.getBoundingClientRect();
-              if (!r) {return;}
-              setInsertAt({
-                left: r.left,
-                top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 340)),
-                width: Math.max(r.width, 240),
-              });
-            }}
-          />
-          </div>
-        )}
-        {bigAt ? (
-          <ValueCodeEditor
-            pos={bigAt}
-            name={draftName || 'value'}
-            value={draftValue}
-            scope={scope}
-            chipsOf={chipsInScope}
-            bindCtx={bindCtx}
-            onChange={(text) => { setDraftValue(text); onChangeValue(text); }}
-            onClose={() => setBigAt(null)}
-          />
-        ) : null}
-        {insertAt ? (
-          <FieldDataPicker
-            pos={insertAt}
-            bindCtx={bindCtx}
-            onPick={(path) => {
-              setInsertAt(null);
-              // Into the caret when the field has one, so a chip lands beside
-              // what is already typed; otherwise this is the value's first
-              // binding and it becomes the whole of it.
-              if (bindApiRef.current?.insert) { bindApiRef.current.insert(path); return; }
-              const text = `{${path}}`;
-              setDraftValue(text);
-              onChangeValue(text);
-            }}
-            onClose={() => setInsertAt(null)}
-          />
-        ) : null}
-        <button
-          className={`attr-asset-toggle ${assetMode ? 'on' : ''}`}
-          title={assetMode ? 'Edit as a plain value' : 'Choose a file from public/'}
-          onClick={() => setAssetMode((v) => !v)}
-        >
-          <ElementImageIcon size={12} />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // Shallow object literal ({ id: "x", tabindex: 3 }) ↔ ordered entries.
 // Returns null for nesting/spreads the row editor can't represent (the
@@ -1439,136 +1089,19 @@ function isHrefName(name) {
   return words[words.length - 1] === 'href';
 }
 
-function parseObjectLiteral(src) {
-  const t = String(src ?? '').trim();
-  const m = t.match(/^\{([\s\S]*)\}$/);
-  if (!m) {return t === '' ? [] : null;}
-  const inner = m[1].trim();
-  if (!inner) {return [];}
-  if (/[{}]|\.\.\./.test(inner)) {return null;}
-  const entries = [];
-  const re =
-    /\s*(?:"([^"]*)"|'([^']*)'|([\w$@:.-]+))\s*:\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`|[^,]+?)\s*(?:,|$)/y;
-  let pos = 0;
-  while (pos < inner.length) {
-    re.lastIndex = pos;
-    const em = re.exec(inner);
-    if (!em) {return null;}
-    entries.push({ key: em[1] ?? em[2] ?? em[3], raw: em[4].trim() });
-    pos = re.lastIndex;
-  }
-  return entries;
-}
 
-function serializeObjectLiteral(entries) {
-  const body = entries
-    .map((e) => `${/^[A-Za-z_$][\w$]*$/.test(e.key) ? e.key : JSON.stringify(e.key)}: ${e.raw}`)
-    .join(', ');
-  return `{ ${body} }`;
-}
+
+
 
 // Row display/edit encoding: quoted strings edit as plain text, anything
 // else as {expression}; an empty value means `true`.
-const decodeRaw = (raw) => {
-  const m = String(raw).match(/^"((?:[^"\\]|\\.)*)"$|^'((?:[^'\\]|\\.)*)'$/);
-  if (m) {return (m[1] ?? m[2]).replace(/\\(.)/g, '$1');}
-  return raw === 'true' ? '' : `{${raw}}`;
-};
-const encodeRaw = (text) => {
-  if (text === '') {return 'true';}
-  const m = text.match(/^\{([\s\S]*)\}$/);
-  if (m) {return m[1].trim() || 'true';}
-  return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-};
+
+
 
 // Attributes-object props (containerAttrs = {} etc.): entries edit like
 // element attributes and serialize back to a shallow { key: value } literal.
 // Removing the last row resets the prop to its default.
-function ObjectAttrsField({ pill, menu, entries, bindCtx, projectPath, onCommit }) {
-  const [editor, setEditor] = useState(null); // {index: number|null, top, left, width}
-  const listRef = useRef(null);
 
-  const openEditor = (index) => {
-    const rect = listRef.current?.getBoundingClientRect();
-    setEditor({
-      index,
-      top: Math.min((rect?.bottom ?? 200) + 6, window.innerHeight - 150),
-      left: rect?.left ?? 0,
-      width: rect?.width ?? 240,
-    });
-  };
-
-  return (
-    <div className="props-field" ref={listRef}>
-      <div className="props-label-row">
-        {pill}
-        <button className="ghost" title="Add attribute" onClick={() => openEditor(null)}>
-          <PlusIcon size={12} />
-        </button>
-        {menu}
-      </div>
-
-      {entries.length > 0 && (
-        <div className="attrs-list">
-          {entries.map((en, i) => (
-            <div
-              key={`${en.key}-${i}`}
-              className={`attr-row ${editor?.index === i ? 'editing' : ''}`}
-              onClick={() => openEditor(i)}
-            >
-              <span className="attr-name">{en.key}</span>
-              <span className="attr-eq">=</span>
-              <span className="attr-value">{decodeRaw(en.raw)}</span>
-              <button
-                className="row-action"
-                title="Delete attribute"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (editor?.index === i) {setEditor(null);}
-                  onCommit(entries.filter((_, j) => j !== i));
-                }}
-              >
-                <TrashIcon size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {editor && (
-        <AttrEditor
-          key={editor.index ?? '__new'}
-          pos={editor}
-          projectPath={projectPath}
-          bindCtx={bindCtx}
-          dataCtx={bindCtx}
-          name={editor.index != null ? entries[editor.index]?.key ?? '' : ''}
-          value={editor.index != null ? decodeRaw(entries[editor.index]?.raw ?? '') : ''}
-          isNew={editor.index == null}
-          onCommitName={(newName) => {
-            const clean = newName.trim();
-            if (!clean) {return;}
-            if (editor.index == null) {
-              if (entries.some((en) => en.key === clean)) {return;}
-              onCommit([...entries, { key: clean, raw: 'true' }]);
-              setEditor((ed) => ({ ...ed, index: entries.length }));
-            } else if (clean !== entries[editor.index].key) {
-              onCommit(entries.map((en, i) => (i === editor.index ? { ...en, key: clean } : en)));
-            }
-          }}
-          onChangeValue={(text) => {
-            if (editor.index != null) {
-              onCommit(
-                entries.map((en, i) => (i === editor.index ? { ...en, raw: encodeRaw(text) } : en))
-              );
-            }
-          }}
-          onClose={() => setEditor(null)}
-        />
-      )}
-    </div>
-  );
-}
 
 // Parses a loop head like `service.tags.map((tag) => (` or
 // `items.filter(i => i.on).map((item, index) => (` into friendly fields.

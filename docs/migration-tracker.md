@@ -274,6 +274,14 @@ All 17 old/new markup comparisons match; binding/chip/source/loop interaction
 checks pass, and the full gate passes 135/135 commands (99.9s). Continue with the
 attribute editors and the remaining PropsPanel body; it is not yet fully typed.
 
+PropsPanel attribute checkpoint: `propAttributes.tsx` types element/object
+attribute rows, their floating editor, and literal/paste parsers. Helpers meet
+the size limit and lint without warnings. Object rows now provide both paste
+callbacks (previously a single or bulk paste threw); real paste tests pin rename,
+merge, append, and oversized-input behavior. Twelve old/new literal comparisons
+and 17 rendered comparisons match. The gate passes 136/136 commands (102.5s).
+Continue with `PropField`, asset resolution, and the remaining panel dispatcher.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.jsx`                                                                                     | 3,819 — hotspot, convert-then-split, no split in same commit |
@@ -347,7 +355,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 135/135 (99.9s), exit 0. No quarantined tests remain.
+- Gate green at last run: 136/136 (102.5s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.
