@@ -13,7 +13,7 @@ import { renameAttr } from './attrOrder.js';
 import { scanProject } from './bridge';
 import { LIMITS } from '../shared/limits';
 import PreviewPane from './panels/PreviewPane.jsx';
-import GitChip from './panels/GitChip.jsx';
+import GitChip from './panels/GitChip';
 import HistoryPanel, { relativeTime } from './panels/HistoryPanel.jsx';
 import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog.jsx';
 import { mergeBranchAction, deleteBranchAction } from './gitActions.js';

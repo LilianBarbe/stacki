@@ -130,7 +130,7 @@ test('GitChip transport failures are values and malformed replies throw', async 
 });
 
 test('GitChip routes every direct Git operation through the parsed bridge', () => {
-  const source = fs.readFileSync(path.join(__dirname, '../src/panels/GitChip.jsx'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../src/panels/GitChip.tsx'), 'utf8');
   assert.doesNotMatch(source, /window\.avb\.git(?:Info|Status|Checkout|Commit|Init|Push|ResolveMerge)/);
   for (const operation of [
     'readGitInfo',

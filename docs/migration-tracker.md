@@ -12,7 +12,8 @@ conversion** are complete. `electron/main.ts` now emits `dist/electron/main.js`,
 the package entry. The invoke inventory is complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
 **The Electron, root renderer, and UI queues are complete. Continue through
-`src/panels` (PropsPanel, VariablesPanel, VariablesView, and CmsView are complete; GitChip in progress), then `src/App.jsx`.**
+`src/panels` (PropsPanel, VariablesPanel, VariablesView, CmsView, and GitChip are
+complete), then `src/App.jsx`.**
 
 Build-output checkpoint: all generated code now lives under the root `dist/`:
 `dist/electron` for main/preload/preview modules, `dist/shared` for contracts,
@@ -22,8 +23,7 @@ scripts use the new layout. Removed per-file ignore rules and the last tracked
 compiler artifact (`electron/git.js`). New layout regressions pass; contracts
 now total 159 tests. The full gate passes 138/138 commands (102.8s), the real
 Electron/Astro lifecycle passes, and an unsigned macOS arm64 package contains the
-complete runtime with a working unpacked parser. Resume GitChip's publish flow;
-the panel counts below are unchanged.
+complete runtime with a working unpacked parser.
 
 Main verification: 26 old/new handler and output comparisons matched, including
 byte-identical generated Astro config, preview page, and both API endpoints.
@@ -254,7 +254,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 6/20 original files converted ⏳
+### src/panels — 7/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -438,12 +438,21 @@ error path. A source-level regression prevents raw Git IPC from returning to
 the component. The full gate passes 138/138 commands (104.6s). Convert and split
 the remaining JSX root next.
 
+GitChip is fully converted to `GitChip.tsx`. Loading, initialization, and active
+repository states now render through separate typed components, while the dropdown
+is split into `GitChipView.tsx`. Checkout replies are narrowed by their `ok`
+discriminant, optional trunk and upstream data stay explicit, and stale project
+info cannot replace the current project. Operating failures reopen the dropdown's
+visible error state. Branch, bridge, publish, action, and conflict checks pass;
+the full gate passes 138/138 commands (104.8s), and both new modules lint without
+warnings. Thirteen original panels remain; continue with `ContentView.jsx`.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
 | `VariablesView.tsx`                                                                                  | ✅ converted with typed edits, history, and refreshes |
 | `CmsView.tsx`                                                                                        | ✅ converted with per-file saves and parsed contracts                                                        |
-| `GitChip.jsx`                                                                                        | 1,044                                                        |
+| `GitChip.tsx`                                                                                        | ✅ converted with typed repository states and split dropdown |
 | `ContentView.jsx`                                                                                    | 1,001                                                        |
 | `StructurePanel.jsx`                                                                                 | 793                                                          |
 | `PreviewPane.jsx`                                                                                    | 727                                                          |

@@ -81,13 +81,13 @@ const check = (what, condition, detail) => {
   check('and an empty field is never valid', !ok('', existing) && !ok('   ', existing));
 
   // --- the field really asks ---------------------------------------------------
-  const chip = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'GitChip.jsx'), 'utf8');
-  check('the field cleans what is typed', /onChange=\{\(e\) => setNewBranch\(sanitizeBranchName\(/.test(chip));
-  check('and Enter waits for a name that works', /e\.key === 'Enter' && newBranch\.trim\(\) && !branchError/.test(chip));
+  const chip = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'GitChipView.tsx'), 'utf8');
+  check('the field cleans what is typed', /onChange=\{\(event\) => onNewBranch\(sanitizeBranchName\(/.test(chip));
+  check('and Enter waits for a name that works', /event\.key === 'Enter' && name && !branchError/.test(chip));
   check('with the reason shown while it waits', /branchError && <div className="git-hint">/.test(chip));
   check(
     'checked against the branches that exist',
-    /branchNameError\(newBranch, info\.branches \|\| \[\]\)/.test(chip)
+    /branchNameError\(newBranch, info\.branches\)/.test(chip)
   );
 
   if (failures.length) {
