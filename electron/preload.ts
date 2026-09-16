@@ -1,3 +1,4 @@
+import type { PreloadBridge } from '../shared/dist/preload-api';
 import type { IpcChannel, IpcPayloads } from '../shared/dist/ipc-payloads.js';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
@@ -2123,5 +2124,5 @@ contextBridge.exposeInMainWorld('avb', {
   nativePaste: invoke('native:paste'),
   nativeUndo: invoke('native:undo'),
   nativeRedo: invoke('native:redo'),
-  });
+  } satisfies PreloadBridge);
 }

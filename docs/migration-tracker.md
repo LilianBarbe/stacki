@@ -177,7 +177,7 @@ confirmation order, cancellation, trunk protection, parking/restoration and
 conflict handoff. All scheduled root `.js` leaves are now converted.
 `sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
-### src/ui — 28 converted, 10 remaining ⏳
+### src/ui — 31 converted, 7 remaining ⏳
 
 `Icons` 969, `RichContent` 606, `WelcomeBackground` 433, `ClassInput` 344,
 `ExprInput` 336, `DataPicker` 308, `Dropdown` 303, `FileBrowser` 277,
@@ -211,6 +211,14 @@ All 96 old/new value, ranking, and tree comparisons pass; the full gate passes
 130/130 commands (96.7s). File trees use bounded iterative construction and
 traversal; tests reject oversized paths, collections, depth, and invalid search
 limits. Custom editors retain blur-before-save and portaled-picker focus behavior.
+
+UI asset/link batch: `AssetThumb`, `AssetField`, and `LinkField`. All 38
+old/new markup and path comparisons pass; the full gate passes 131/131 commands
+(95.0s). Asset entries have tested boundary parsers; disk failures return values
+while malformed responses remain loud contract errors. Refresh bursts coalesce,
+font previews and fallback attempts are capped, and stale project reads are ignored.
+A type-only shared preload surface now checks every exposed method against the
+invoke payload inventory; renderer responses remain unknown until parsed.
 
 ### src/panels — 20 files, 13,990 lines ⬜
 
@@ -287,7 +295,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 130/130, exit 0. No quarantined tests remain.
+- Gate green at last run: 131/131, exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.

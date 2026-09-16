@@ -1,3 +1,4 @@
+import type { PreloadBridge } from '../shared/preload-api';
 // The renderer's typed face of window.avb. Raw IPC results are unknown; every
 // call through here is parsed by the contract layer (shared/) before any
 // renderer code sees it. A contract violation throws — a malformed payload is
@@ -19,21 +20,10 @@ import {
   type ResolvePathResult,
 } from '../shared/ipc';
 
-// The untyped preload surface. Only this module may touch it.
+// Raw results stay unknown. Renderer boundary modules parse them before use.
 declare global {
   interface Window {
-    avb: {
-      gitMerge(payload: unknown): Promise<unknown>;
-      gitDeleteBranch(payload: unknown): Promise<unknown>;
-      gitPark(payload: unknown): Promise<unknown>;
-      gitUnpark(payload: unknown): Promise<unknown>;
-      scanProject(payload: unknown): Promise<unknown>;
-      readPage(payload: unknown): Promise<unknown>;
-      readSourceText(payload: unknown): Promise<unknown>;
-      writeSourceText(payload: unknown): Promise<unknown>;
-      readSymbolSource(payload: unknown): Promise<unknown>;
-      resolveSourcePath(payload: unknown): Promise<unknown>;
-    };
+    avb: PreloadBridge;
   }
 }
 
