@@ -126,9 +126,9 @@ formats); seven supporting TypeScript modules bring the checked total to 45.
 No scheduled Electron `.js` conversion remains. The authored content-worker
 `.mjs` files stay outside this conversion queue.
 
-Cleanup owed: `electron/scratch2-7.js` are stray tsc-emitted outputs from the
-cssVars conversion experiments, still tracked in git (198 lines). Delete them
-in a standalone commit; nothing requires them.
+Cleanup complete: removed the six tracked `electron/scratch2-7.js` outputs
+from cssVars conversion experiments (198 lines) in a standalone commit.
+Repository reference search confirmed no module or test imports them.
 
 ### src/ — 38 modules converted ✅
 
@@ -454,7 +454,7 @@ move-blindness.
 | -------------------------------------------------------------------- | ---------------------------- |
 | Complete `IpcContract` invoke inventory (115 channels) | ✅ with `main.ts` |
 | Fix conditional-hook bugs in PropsPanel / VariablesView              | ✅ PropsPanel and VariablesView cell transitions fixed    |
-| Delete stray `electron/scratch2-7.js` (tracked tsc-emit leftovers)   | ⬜ standalone cleanup commit |
+| Delete stray `electron/scratch2-7.js` (tracked tsc-emit leftovers)   | ✅ standalone cleanup commit |
 | `release.sh` → TypeScript (`scripts/*.ts`, per AGENTS §17)           | ⬜                           |
 | Tooling deps declared devDependencies (node_modules-incident repair) | ✅                           |
 | Node_modules incident recorded under Risks in plan                   | ✅                           |
