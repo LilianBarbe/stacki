@@ -54,7 +54,7 @@ export const isExpr = (
 
 // Field types, most specific first. When items disagree about a field (one has
 // a short string, another a paragraph) the earlier type wins.
-const TYPE_RANK = [
+export const CMS_FIELD_TYPES = [
   'code',
   'objects',
   'object',
@@ -71,7 +71,7 @@ const TYPE_RANK = [
   'text',
   'empty',
 ] as const;
-export type FieldType = (typeof TYPE_RANK)[number];
+export type FieldType = (typeof CMS_FIELD_TYPES)[number];
 
 export function inferType(value: unknown): FieldType {
   // A name bound to a picture is a picture. The file says which one — the CMS
@@ -212,7 +212,7 @@ export function fieldsOf(items: readonly unknown[]): readonly CmsField[] {
         const next = inferType(value);
         if (
           next !== 'empty' &&
-          (seen === 'empty' || TYPE_RANK.indexOf(next) < TYPE_RANK.indexOf(seen))
+          (seen === 'empty' || CMS_FIELD_TYPES.indexOf(next) < CMS_FIELD_TYPES.indexOf(seen))
         ) {
           types.set(key, next);
         }

@@ -356,6 +356,17 @@ input preservation, Escape handling, and bounds. All 40 old/new field displays
 match. The full gate passes 138/138 commands (101.2s); the new module has zero
 lint warnings. Continue with CmsView settings, metadata, and its save coordinator.
 
+CmsView settings checkpoint: `CmsSettings.tsx` types nested schema editing and
+new-field dialogs; keyed rows own expansion state, bounding retained state to
+visible fields. `cmsTypes.ts` parses saved field declarations against the shared
+field-type inventory. `cmsBridge.ts` validates CMS read/write, metadata, usage,
+delete, and imported-asset contracts. Invalid replies remain programmer errors;
+I/O failures are explicit results. All 475 old/new settings/type comparisons
+match, and new boundary/interaction tests cover malformed data, size limits,
+paths, dialog state, and failed deletion. The full gate passes 138/138 commands
+(101.3s), with zero warnings in converted modules. Finish CmsView's root and
+its debounced save lifetime.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
