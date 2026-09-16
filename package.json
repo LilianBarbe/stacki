@@ -72,6 +72,7 @@
   "test:fields": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON test/content-fields.js",
   "test:view": "node test/content-view.js",
   "test:panel": "node test/cms-panel.js",
+  "test:cmspanelbridge": "node --test test/cms-panel-bridge.test.js",
   "test:dropdown": "node test/dropdown.js",
   "test:injectedroutes": "node test/injected-routes.js",
   "test:csscode": "node test/css-code.js",

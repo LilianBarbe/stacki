@@ -254,7 +254,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 10/20 original files converted ⏳
+### src/panels — 11/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -476,6 +476,16 @@ messages, stale frames, refresh resets, pointer cancellation, and cleanup. The
 full gate passes 141/141 commands (106.5s), with no warnings in the converted
 module. Ten original panels remain.
 
+CmsPanel is converted to `CmsPanel.tsx`. JSON files and Astro content collections
+now cross `cmsPanelBridge.ts` independently, with bounded paths, data, counts,
+loader fields, and covered-path inventories. A failure in either source leaves
+the other visible, while malformed replies remain loud contract errors. Project
+changes and unmounts discard stale reads. New fixture-independent tests cover
+valid, invalid, bounded, and transport-failure paths; the optional real-project
+panel test still exercises grouping when its fixture is present. Nine original
+panels remain. The full gate passes 142/142 commands (104.4s), with no warnings
+in the converted modules. Continue with `StructurePanel.jsx`.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -483,6 +493,7 @@ module. Ten original panels remain.
 | `CmsView.tsx`                                                                                        | ✅ converted with per-file saves and parsed contracts                                                        |
 | `GitChip.tsx`                                                                                        | ✅ converted with typed repository states and split dropdown |
 | `ContentView.tsx`                                                                                    | ✅ converted with typed fields, saves, and rename boundaries |
+| `CmsPanel.tsx`                                                                                       | ✅ converted with independent parsed content inventories     |
 | `StructurePanel.jsx`                                                                                 | 793                                                          |
 | `PreviewPane.jsx`                                                                                    | 727                                                          |
 | `AssetsPanel` 473 · `PalettePanel` 455 · `PagesPanel` 442 · `HistoryPanel` 392 · `WelcomeScreen` 391 | small                                                        |

@@ -70,7 +70,7 @@ function listCms(root) {
   fs.mkdirSync(buildDir, { recursive: true });
   const bundlePath = path.join(buildDir, 'cms-panel.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'CmsPanel.jsx')],
+    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'CmsPanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',
