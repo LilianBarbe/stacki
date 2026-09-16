@@ -27,7 +27,7 @@ import {
   astroAsset as astroAssetDef,
 } from './astroAssets.js';
 import InsertSearch from './ui/InsertSearch.jsx';
-import AssetsPanel from './panels/AssetsPanel.jsx';
+import AssetsPanel from './panels/AssetsPanel';
 import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS, canContainTag } from './elementSchemas.js';
 import { insertTargetFor as placeInsert } from './insertTarget.js';
 import { isInlineOnly } from './ui/RichContent.jsx';

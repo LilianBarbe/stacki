@@ -129,7 +129,7 @@ check(
   'writeWithUndo still takes one file'
 );
 
-const assets = read('src', 'panels', 'AssetsPanel.jsx');
+const assets = read('src', 'panels', 'AssetsPanel.tsx');
 check('the assets panel records a move', /onRecordUndo\?\.\(\{/.test(assets));
 const cms = read('src', 'panels', 'cmsWriter.ts');
 check('and the CMS records a save', /this\.options\.record\(\{/.test(cms));
