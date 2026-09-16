@@ -289,6 +289,13 @@ All 600 old/new control, helper, and rendered comparisons match. The gate passes
 136/136 commands (101.5s), with zero lint warnings in the converted modules.
 Continue with the remaining PropsPanel editors and root dispatcher.
 
+PropsPanel node-editor checkpoint: `propNodeEditors.tsx` types loop source,
+item/index renames, insertion pickers, and tag selection. The unused recursive
+loop-mode calculation is removed; the single expression field needs no mode.
+The loop suite now exercises the actual helpers, with parser and size-bound tests.
+All 32 old/new editor comparisons match. The gate passes 136/136 commands
+(102.2s); the new module has no lint warnings. Finish the root panel conversion.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.jsx`                                                                                     | 3,819 — hotspot, convert-then-split, no split in same commit |
@@ -362,7 +369,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 136/136 (101.5s), exit 0. No quarantined tests remain.
+- Gate green at last run: 136/136 (102.2s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.
