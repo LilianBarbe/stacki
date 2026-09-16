@@ -1,3 +1,10 @@
+import type { Attr } from '../shared/page-node';
+type ClassProps = Readonly<Record<string, Attr>>;
+interface ClassEdit {
+  readonly key: string;
+  readonly value: Attr;
+}
+
 // Putting a class on an element whose classes are not a plain string.
 //
 // Typing `.hero` in the style panel writes a rule for `.hero`, and a rule for a
@@ -17,27 +24,37 @@
 
 const LIST = 'class:list';
 
-const quoted = (name) => `"${name}"`;
+const quoted = (name: string): string => `"${name}"`;
 
 /** Every class name the attribute mentions literally. */
-export function namesIn(prop) {
-  if (!prop) {return [];}
-  if (prop.type === 'string') {return String(prop.value).trim().split(/\s+/).filter(Boolean);}
-  const text = String(prop.value || '');
+export function namesIn(prop: Attr | null | undefined): readonly string[] {
+  if (!prop) {
+    return [];
+  }
+  if (prop.type === 'string') {
+    return String(prop.value).trim().split(/\s+/).filter(Boolean);
+  }
+  const text = String(('value' in prop ? prop.value : '') || '');
   // Quoted strings in an expression, plus the words inside a template literal —
   // the literal parts only, since `${theme}` is not a name until it runs.
   const out = [];
   for (const m of text.matchAll(/"([^"]*)"|'([^']*)'|`([^`]*)`/g)) {
     const inner = m[1] ?? m[2] ?? m[3] ?? '';
-    for (const word of inner.split(/\$\{[^}]*\}|\s+/)) {if (word) {out.push(word);}}
+    for (const word of inner.split(/\$\{[^}]*\}|\s+/)) {
+      if (word) {
+        out.push(word);
+      }
+    }
   }
   return out;
 }
 
 /** Whether the element already carries `name`, however its classes are written. */
-export function hasClass(props, name) {
+export function hasClass(props: ClassProps | null | undefined, name: unknown): boolean {
   const clean = String(name || '').trim();
-  if (!clean) {return true;}
+  if (!clean) {
+    return true;
+  }
   return ['class', LIST].some((key) => namesIn(props?.[key]).includes(clean));
 }
 
@@ -49,14 +66,20 @@ export function hasClass(props, name) {
  * Returns null for "already there" as well: the caller has `hasClass` for
  * telling those apart, and neither is an edit.
  */
-export function withClass(props, name) {
+export function withClass(props: ClassProps | null | undefined, name: unknown): ClassEdit | null {
   const clean = String(name || '').trim();
-  if (!clean || /\s/.test(clean)) {return null;}
-  if (hasClass(props, clean)) {return null;}
+  if (!clean || /\s/.test(clean)) {
+    return null;
+  }
+  if (hasClass(props, clean)) {
+    return null;
+  }
 
   const list = props?.[LIST];
   if (list) {
-    if (list.type !== 'expr') {return null;}
+    if (list.type !== 'expr') {
+      return null;
+    }
     const text = String(list.value || '').trim();
     const at = text.lastIndexOf(']');
     if (!text.startsWith('[') || at < 0) {
@@ -69,22 +92,28 @@ export function withClass(props, name) {
     // Keep the shape it was written in: a list broken over lines gets its own
     // line, indented like the entry above it, trailing comma and all.
     const lines = head.split('\n');
-    const last = lines[lines.length - 1];
+    const last = lines.at(-1) ?? '';
     if (lines.length > 1) {
       const indent = (head.match(/\n([ \t]*)\S/) || [, '  '])[1];
       const comma = /,\s*$/.test(head) ? '' : ',';
-      const gap = /\n\s*$/.test(head) ? '' : '\n';
+      const closingIndent = last.match(/^[ \t]*/)?.[0] ?? '';
+      const opening = `${head.replace(/\s+$/, '')}${comma}\n${indent}${quoted(clean)},`;
       return {
         key: LIST,
-        value: { type: 'expr', value: `${head.replace(/\s+$/, '')}${comma}\n${indent}${quoted(clean)},\n${last.match(/^[ \t]*/)[0]}${tail}` },
+        value: {
+          type: 'expr',
+          value: `${opening}\n${closingIndent}${tail}`,
+        },
       };
     }
     const comma = /\[\s*$/.test(head) ? '' : ', ';
     return { key: LIST, value: { type: 'expr', value: `${head}${comma}${quoted(clean)}${tail}` } };
   }
 
-  const cls = props?.class;
-  if (!cls) {return { key: 'class', value: { type: 'string', value: clean } };}
+  const cls = props?.['class'];
+  if (!cls) {
+    return { key: 'class', value: { type: 'string', value: clean } };
+  }
   if (cls.type === 'string') {
     const words = namesIn(cls);
     return { key: 'class', value: { type: 'string', value: [...words, clean].join(' ') } };

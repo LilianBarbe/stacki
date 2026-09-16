@@ -1,3 +1,17 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
+
+export interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+interface Occurrence {
+  readonly path?: string | null;
+  readonly occ?: number | null;
+}
+
 // One box per place.
 //
 // The page reports a node's boxes as a list — a node inside a loop is on the
@@ -17,7 +31,7 @@
 // "the same" as another is rarely the same to six decimal places.
 const SLACK = 1;
 
-const covers = (a, b) =>
+const covers = (a: Box, b: Box): boolean =>
   b.x >= a.x - SLACK &&
   b.y >= a.y - SLACK &&
   b.x + b.w <= a.x + a.w + SLACK &&
@@ -27,14 +41,17 @@ const covers = (a, b) =>
  * The boxes worth drawing, in the order they were reported — which is document
  * order, so "the second copy" still means the second one down the page.
  */
-export function onePerPlace(boxes) {
+export function onePerPlace<T extends Box>(boxes: readonly T[] | null | undefined): readonly T[] {
+  assert((boxes?.length ?? 0) <= LIMITS.treeNodesMax, 'Outline box count exceeds limit');
   const list = (boxes || []).filter((b) => b && b.w > 0 && b.h > 0);
   // Largest first, so a box is measured against the ones that could contain
   // it rather than the other way round.
   const order = [...list].sort((a, b) => b.w * b.h - a.w * a.h);
-  const kept = [];
+  const kept: T[] = [];
   for (const box of order) {
-    if (!kept.some((k) => covers(k, box))) {kept.push(box);}
+    if (!kept.some((k) => covers(k, box))) {
+      kept.push(box);
+    }
   }
   return list.filter((b) => kept.includes(b));
 }
@@ -53,9 +70,16 @@ export function onePerPlace(boxes) {
  * whichever copy is selected, and a selection from the navigator — which
  * outlines all of them — already covers whichever copy is hovered.
  */
-export function hoverIsSelection(hover, selection) {
-  if (!hover?.path || !selection?.path) {return false;}
-  if (hover.path !== selection.path) {return false;}
+export function hoverIsSelection(
+  hover: Occurrence | null | undefined,
+  selection: Occurrence | null | undefined,
+): boolean {
+  if (!hover?.path || !selection?.path) {
+    return false;
+  }
+  if (hover.path !== selection.path) {
+    return false;
+  }
   return hover.occ == null || selection.occ == null || hover.occ === selection.occ;
 }
 
@@ -79,9 +103,11 @@ export function hoverIsSelection(hover, selection) {
  * carrying a file namespace (`src/Card.astro|0.1`) belongs to that file: a step
  * into another file's markup is not a step within a copy.
  */
-export function sameCopy(from, to) {
-  if (!from || !to || from === to) {return false;}
-  const split = (p) => {
+export function sameCopy(from: string | null | undefined, to: string | null | undefined): boolean {
+  if (!from || !to || from === to) {
+    return false;
+  }
+  const split = (p: string) => {
     const text = String(p);
     const bar = text.lastIndexOf('|');
     return {
@@ -91,12 +117,18 @@ export function sameCopy(from, to) {
   };
   const a = split(from);
   const b = split(to);
-  if (a.file !== b.file) {return false;}
+  if (a.file !== b.file) {
+    return false;
+  }
   const shorter = Math.min(a.trail.length, b.trail.length);
   // A sibling differs only in its last step; an ancestor or descendant agrees
   // the whole way down the shorter of the two.
   const common = a.trail.length === b.trail.length ? shorter - 1 : shorter;
-  for (let i = 0; i < common; i++) {if (a.trail[i] !== b.trail[i]) {return false;}}
+  for (let i = 0; i < common; i++) {
+    if (a.trail[i] !== b.trail[i]) {
+      return false;
+    }
+  }
   return true;
 }
 

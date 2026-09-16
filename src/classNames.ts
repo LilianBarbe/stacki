@@ -1,3 +1,12 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
+
+import type { Attr } from '../shared/page-node';
+export interface ClassNode {
+  readonly name?: string;
+  readonly props?: Readonly<Record<string, Attr>>;
+}
+
 // The class names an element carries, for labelling it in the UI.
 //
 // `class="a b"` is readable straight from the source, but Astro also has
@@ -16,13 +25,14 @@ const QUOTED = /^(['"])(.*)\1$/s;
 
 // Splits an array literal's body on top-level commas — an entry can itself
 // contain commas inside a call or a nested array.
-function topLevelParts(body) {
+function topLevelParts(body: string): readonly string[] {
+  assert(body.length <= LIMITS.nodeValueCharsMax, 'Class expression exceeds size limit');
   const parts = [];
   let depth = 0;
-  let quote = null;
+  let quote: string | null = null;
   let cur = '';
   for (let i = 0; i < body.length; i += 1) {
-    const ch = body[i];
+    const ch = body.charAt(i);
     if (quote) {
       cur += ch;
       if (ch === '\\') {
@@ -56,31 +66,35 @@ function topLevelParts(body) {
 // Class names from a `class:list` (or expression `class`) value. An entry counts
 // only when the WHOLE entry is a quoted string — that rules out a literal that's
 // merely part of a condition, like the `"8"` in `gap !== "8" && ...`.
-function fromExpression(expr) {
+function fromExpression(expr: unknown): readonly string[] {
   const trimmed = String(expr || '').trim();
-  const body = trimmed.startsWith('[') && trimmed.endsWith(']')
-    ? trimmed.slice(1, -1)
-    : trimmed;
+  const body = trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1) : trimmed;
   const out = [];
   for (const part of topLevelParts(body)) {
     const m = QUOTED.exec(part.trim());
     // Unescape: the capture is the raw source between the quotes, so `\"` in
     // the literal would otherwise reach the label with its backslash.
-    if (m) {out.push(...m[2].replace(/\\(.)/g, '$1').split(/\s+/).filter(Boolean));}
+    if (m?.[2] !== undefined) {
+      out.push(...m[2].replace(/\\(.)/g, '$1').split(/\s+/).filter(Boolean));
+    }
   }
   return out;
 }
 
 /** Static class names on a node, in source order. Empty when it has none. */
-export function elementClasses(node) {
+export function elementClasses(node: ClassNode | null | undefined): readonly string[] {
   const props = node?.props || {};
-  const cls = props.class;
+  const cls = props['class'];
   if (cls && cls.type === 'string') {
     return cls.value.trim().split(/\s+/).filter(Boolean);
   }
   const list = props['class:list'];
-  if (list && list.type === 'expr') {return fromExpression(list.value);}
-  if (cls && cls.type === 'expr') {return fromExpression(cls.value);}
+  if (list && list.type === 'expr') {
+    return fromExpression(list.value);
+  }
+  if (cls && cls.type === 'expr') {
+    return fromExpression(cls.value);
+  }
   return [];
 }
 
@@ -89,10 +103,12 @@ export function elementClasses(node) {
  * class, then its tag. Every slot is spelled `slot`, so the name is the only
  * thing that tells one from another.
  */
-export function elementLabel(node) {
+export function elementLabel(node: ClassNode | null | undefined): string {
   if (node?.name === 'slot') {
-    const named = node.props?.name;
-    if (named && named.type === 'string' && named.value.trim()) {return named.value.trim();}
+    const named = node.props?.['name'];
+    if (named && named.type === 'string' && named.value.trim()) {
+      return named.value.trim();
+    }
   }
   return elementClasses(node)[0] || node?.name || '';
 }

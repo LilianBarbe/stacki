@@ -1,3 +1,11 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
+
+export type PasteAction =
+  | { readonly kind: 'text' }
+  | { readonly kind: 'paths'; readonly text: string }
+  | { readonly kind: 'image'; readonly file: File | null };
+
 // Decides what a paste (or drop) into the embedded terminal should do.
 //
 // A pty carries only bytes, so an image can't travel through it, and xterm's
@@ -26,17 +34,22 @@
 // Backslash-escape the way Terminal.app and iTerm do when pasting a copied
 // file, so the path survives a shell prompt and matches the form CLIs already
 // parse from a native drag-drop.
-export function escapePosixPath(p) {
+export function escapePosixPath(p: string): string {
   return p.replace(/[^A-Za-z0-9_\-./]/g, (c) => `\\${c}`);
 }
 
 // Match what Explorer's drag-drop produces. Windows filenames can't contain
 // double quotes, so plain wrapping is safe for PowerShell and CLIs alike.
-export function quoteWindowsPath(p) {
+export function quoteWindowsPath(p: string): string {
   return /[\s&()^%;,=]/.test(p) ? `"${p}"` : p;
 }
 
-export function decideTerminalPaste(items, plainText, getPathForFile, isWindows) {
+export function decideTerminalPaste(
+  items: Iterable<Pick<DataTransferItem, 'type' | 'kind' | 'getAsFile'>>,
+  plainText: string,
+  getPathForFile: ((file: File) => string) | null | undefined,
+  isWindows: boolean,
+): PasteAction {
   // 1. Files copied in Finder/Explorer resolve to absolute paths — paste those,
   //    escaped like a native terminal would. At a shell prompt a full path
   //    beats the bare filename xterm's text flavor would insert, and coding
@@ -45,36 +58,54 @@ export function decideTerminalPaste(items, plainText, getPathForFile, isWindows)
   //    so path resolution comes back empty and it falls to the image branch.
   const paths = [];
   let hasImage = false;
-  let imageFile = null;
+  let imageFile: File | null = null;
+  let count = 0;
   for (const item of items) {
+    assert(++count <= LIMITS.scanEntriesMax, 'Clipboard item count exceeds limit');
     const isImage = item.type.startsWith('image/');
-    if (isImage) {hasImage = true;}
-    if (item.kind !== 'file') {continue;}
+    if (isImage) {
+      hasImage = true;
+    }
+    if (item.kind !== 'file') {
+      continue;
+    }
     const file = item.getAsFile();
-    if (!file) {continue;}
+    if (!file) {
+      continue;
+    }
     // Capture the first image blob's bytes whether or not it's
     // filesystem-backed — screenshots aren't.
-    if (isImage && !imageFile) {imageFile = file;}
-    if (!getPathForFile) {continue;}
+    if (isImage && !imageFile) {
+      imageFile = file;
+    }
+    if (!getPathForFile) {
+      continue;
+    }
     let p = '';
     try {
       p = getPathForFile(file) || '';
     } catch {
       /* in-memory File with no filesystem backing */
     }
-    if (p) {paths.push(p);}
+    if (p) {
+      paths.push(p);
+    }
   }
   if (paths.length > 0) {
     const escape = isWindows ? quoteWindowsPath : escapePosixPath;
     return { kind: 'paths', text: paths.map(escape).join(' ') };
   }
 
-  if (!hasImage) {return { kind: 'text' };}
+  if (!hasImage) {
+    return { kind: 'text' };
+  }
 
   // 2. An image alongside meaningful text (spreadsheet cells and rich browser
   //    copies put both flavors on the clipboard): the text is what a native
   //    terminal pastes — keep it.
-  if (plainText.trim()) {return { kind: 'text' };}
+  if (plainText.trim()) {
+    return { kind: 'text' };
+  }
 
   // 3. Pure image data → persist the bytes and paste the temp file's path.
   return { kind: 'image', file: imageFile };

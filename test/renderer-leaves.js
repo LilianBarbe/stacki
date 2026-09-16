@@ -1,0 +1,81 @@
+// Pin the migration's state lifecycles and limits. Bundle renderer source with
+// esbuild, then exercise real exports with valid values and values at the bounds.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const esbuild = require('esbuild');
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-renderer-leaves-'));
+const load = (name) => {
+  const output = path.join(directory, `${name}.cjs`);
+  esbuild.buildSync({
+    entryPoints: [path.join(__dirname, '..', 'src', `${name}.ts`)],
+    outfile: output,
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    logLevel: 'silent',
+  });
+  return require(output);
+};
+
+try {
+  const { requestAsset, onAssetRequest, clearAssetRequest, getPendingAsset } = load('assetPick');
+  const first = [];
+  const second = [];
+  const unsubscribe = onAssetRequest((request) => first.push(request));
+  onAssetRequest((request) => second.push(request));
+  unsubscribe(); // A stale listener must never unsubscribe its replacement.
+  const request = { mediaKind: 'image', current: '', onPick() {} };
+  requestAsset(request);
+  assert.equal(getPendingAsset(), request);
+  clearAssetRequest();
+  assert.deepEqual(first, []);
+  assert.deepEqual(second, [request, null]);
+  assert.equal(getPendingAsset(), null);
+
+  const { setDrag, getDrag, clearDrag } = load('dragState');
+  setDrag({ kind: 'component', name: 'Card' });
+  assert.deepEqual(getDrag(), { kind: 'component', name: 'Card' });
+  clearDrag();
+  assert.equal(getDrag(), null);
+
+  const { renameAttr } = load('attrOrder');
+  const value = { type: 'expr', value: 'someCall()', metadata: 'preserve' };
+  const node = { props: { old: value }, attrOrder: ['old'] };
+  assert.equal(renameAttr(node, 'old', 'new'), true);
+  assert.equal(node.props.new, value);
+  assert.deepEqual(node.attrOrder, ['new']);
+  assert.throws(() => renameAttr(node, 'new', 'x'.repeat(8193)), /Attribute name exceeds limit/);
+
+  const { checkStatement } = load('jsCheck');
+  assert.equal(checkStatement(' '.repeat(1_000_000)).ok, true);
+  assert.deepEqual(checkStatement(' '.repeat(1_000_001)), {
+    ok: false, message: 'This statement exceeds the editor size limit.',
+  });
+  const { componentNameError } = load('componentName');
+  assert.equal(componentNameError('Card', Array(10_000).fill('Other')), null);
+  assert.throws(() => componentNameError('Card', Array(10_001).fill('Other')), /scan limit/);
+
+  const { onePerPlace } = load('outlineBoxes');
+  const box = { x: 0, y: 0, w: 10, h: 10 };
+  assert.deepEqual(onePerPlace([box, { ...box }, { x: 1, y: 1, w: 2, h: 2 }]), [box]);
+  assert.deepEqual(onePerPlace(Array.from({ length: 20_000 }, () => ({ ...box }))), [box]);
+  assert.throws(() => onePerPlace(Array(20_001).fill(box)), /Outline box count exceeds limit/);
+
+  const { rankInsertItems } = load('insertRank');
+  assert.equal(rankInsertItems(Array(10_000).fill({ name: 'Card' }), '').length, 10_000);
+  assert.throws(() => rankInsertItems(Array(10_001).fill({ name: 'Card' }), ''), /item count/);
+  const { elementClasses } = load('classNames');
+  assert.throws(() => elementClasses({
+    props: { class: { type: 'expr', value: 'x'.repeat(1_000_001) } },
+  }), /Class expression exceeds size limit/);
+
+  const { decideTerminalPaste } = load('terminalPaste');
+  const item = { type: 'text/plain', kind: 'string', getAsFile: () => null };
+  assert.deepEqual(decideTerminalPaste([item], 'hello', null, false), { kind: 'text' });
+  assert.throws(() => decideTerminalPaste(Array(10_001).fill(item), '', null, false), /item count/);
+  console.log('renderer-leaves: state replacement, cancellation, metadata and limits passed');
+} finally {
+  fs.rmSync(directory, { recursive: true, force: true });
+}

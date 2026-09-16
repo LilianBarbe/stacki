@@ -1,3 +1,15 @@
+import type { Attr } from '../shared/page-node';
+import type { BuiltinField } from './elementSchemas';
+export interface AstroAsset {
+  readonly name: string;
+  readonly tag: string;
+  readonly blurb: string;
+  readonly astroAsset: true;
+  readonly hasRest: true;
+  readonly slots: readonly string[];
+  readonly schema: readonly BuiltinField[];
+}
+
 // Astro's built-in image components, from `astro:assets`.
 //
 // <Image> and <Picture> are components, not HTML — they take an imported asset
@@ -18,7 +30,7 @@ export const ASTRO_ASSET_COLOR = '#ff5d01';
 // Shared by both: the source asset and the accessible text. `src` is an expr
 // (an imported ImageMetadata) far more often than a string, but a remote URL is
 // a string — the props panel decides which editor to show from the value.
-const COMMON = [
+const COMMON: readonly BuiltinField[] = [
   { name: 'src', type: 'other' },
   { name: 'alt', type: 'string' },
   { name: 'width', type: 'number' },
@@ -33,7 +45,7 @@ const COMMON = [
   { name: 'class', type: 'string' },
 ];
 
-export const ASTRO_ASSETS = [
+export const ASTRO_ASSETS: readonly AstroAsset[] = [
   {
     name: 'Image',
     // What it renders — used for the icon, so the row shows an image glyph.
@@ -42,7 +54,14 @@ export const ASTRO_ASSETS = [
     astroAsset: true,
     hasRest: true,
     slots: [],
-    schema: [...COMMON, { name: 'format', type: 'enum', options: ['webp', 'avif', 'png', 'jpeg', 'jpg', 'svg', 'gif'] }],
+    schema: [
+      ...COMMON,
+      {
+        name: 'format',
+        type: 'enum',
+        options: ['webp', 'avif', 'png', 'jpeg', 'jpg', 'svg', 'gif'],
+      },
+    ],
   },
   {
     name: 'Picture',
@@ -56,7 +75,11 @@ export const ASTRO_ASSETS = [
       // Picture's plural: the alternate formats to emit sources for, plus the
       // one the fallback <img> uses.
       { name: 'formats', type: 'other' },
-      { name: 'fallbackFormat', type: 'enum', options: ['webp', 'avif', 'png', 'jpeg', 'jpg', 'svg', 'gif'] },
+      {
+        name: 'fallbackFormat',
+        type: 'enum',
+        options: ['webp', 'avif', 'png', 'jpeg', 'jpg', 'svg', 'gif'],
+      },
       { name: 'pictureAttributes', type: 'other' },
     ],
   },
@@ -74,13 +97,15 @@ export const ASTRO_ASSETS = [
 // way an http src would. A string src also has to carry width/height, so those
 // come with it; picking a real image in the props panel replaces the lot.
 export const PLACEHOLDER_SRC =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='400' height='300' fill='%23d8d8d8'/%3E%3C/svg%3E";
-export const PLACEHOLDER_PROPS = {
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'" +
+  " width='400' height='300'%3E%3Crect width='400' height='300'" +
+  " fill='%23d8d8d8'/%3E%3C/svg%3E";
+export const PLACEHOLDER_PROPS: Readonly<Record<string, Attr>> = {
   src: { type: 'string', value: PLACEHOLDER_SRC },
   alt: { type: 'string', value: '' },
   width: { type: 'expr', value: '400' },
   height: { type: 'expr', value: '300' },
 };
 
-export const isAstroAsset = (name) => ASTRO_ASSETS.some((a) => a.name === name);
-export const astroAsset = (name) => ASTRO_ASSETS.find((a) => a.name === name) || null;
+export const isAstroAsset = (name: unknown) => ASTRO_ASSETS.some((a) => a.name === name);
+export const astroAsset = (name: unknown) => ASTRO_ASSETS.find((a) => a.name === name) || null;
