@@ -61,6 +61,14 @@ export default function StructurePanel({
 }) {
   // dropTarget: {parentId, index} for gaps, {intoId} for node rows
   const [dropTarget, setDropTarget] = useState(null);
+  const dragImageRef = useRef(null);
+  useEffect(() => {
+    // A decoded image supplies a bitmap even off-DOM. A detached canvas can
+    // produce no snapshot, making macOS show its fallback drag icon instead.
+    const image = document.createElement('img');
+    image.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    dragImageRef.current = image;
+  }, []);
   // Manual expand/collapse overrides by node id; nodes not in the map use
   // their default (text-only children start collapsed).
   const [toggled, setToggled] = useState(() => new Map());
@@ -284,7 +292,15 @@ export default function StructurePanel({
         </div>
       )}
 
-      <div className="panel-body" ref={bodyRef} onDragLeave={clearDrop}>
+      <div
+        className="panel-body"
+        ref={bodyRef}
+        onDragOver={clearDrop}
+        onDragLeave={(e) => {
+          // Child-to-child transitions also bubble here; only clear on exit.
+          if (!e.currentTarget.contains(e.relatedTarget)) clearDrop();
+        }}
+      >
         <div
           className={`structure-node frontmatter-node ${selectedId === 'frontmatter' ? 'selected' : ''}`}
           style={{ paddingLeft: 6 }}
@@ -318,6 +334,7 @@ export default function StructurePanel({
           isCollapsed={isCollapsed}
           dropTarget={dropTarget}
           setDropTarget={setDropTarget}
+          dragImageRef={dragImageRef}
           isDndPayload={isDndPayload}
           performDrop={performDrop}
           nodeById={(id) => findNodeIn(model.nodes, id)}
@@ -336,6 +353,7 @@ export default function StructurePanel({
             onDragOver={(e) => {
               if (isDndPayload(e)) {
                 e.preventDefault();
+                e.stopPropagation();
                 setDropTarget({ parentId: null, index: 0 });
               }
             }}
@@ -602,9 +620,14 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
           e.stopPropagation();
           e.dataTransfer.setData('avb/node', node.id);
           e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setDragImage(ctx.dragImageRef.current, 0, 0);
           setDrag({ kind: 'node', id: node.id, nodeKind: node.kind, tag: node.name });
+          onSelect(node.id);
         }}
-        onDragEnd={clearDrag}
+        onDragEnd={() => {
+          clearDrag();
+          setDropTarget(null);
+        }}
         onDragOver={(e) => {
           if (canHostChildren && acceptsDrag(node) && isDndPayload(e)) {
             e.preventDefault();
