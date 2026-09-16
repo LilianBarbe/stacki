@@ -1,7 +1,7 @@
 {
   "name": "stacki",
   "productName": "Stacki",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "description": "Stacki \u2014 a visual builder for Astro projects \u2014 pages, layouts, components, props, live preview, and GitHub publishing.",
   "main": "dist/electron/main.js",
   "author": "Timothy Ricks <hello@timothyricks.com>",
