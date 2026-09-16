@@ -1,3 +1,6 @@
+import { createPropRules } from './propRules';
+import { assert } from '../../shared/assert';
+import { LIMITS } from '../../shared/limits';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HTML_TAGS, VOID_TAGS } from '../elementSchemas.js';
 import { elementIcon } from '../ui/Icons.jsx';
@@ -535,217 +538,22 @@ export default function PropsPanel({
   // Values a discriminant switch took away, per node, kept only while the
   // panel is up: flicking variant → full-width → constrained should hand
   // `sizes` back, but reopening the project shouldn't resurrect it.
-  const stashRef = useRef({});
-
+  const stashRef = useRef(new Map());
+  const { appliesNow, branchDefault, narrowOptions, cascade } = createPropRules(
+    schema, node.props || {},
+  );
   const setPropCascading = (fieldName, value, immediate) => {
-    // Setting a prop can move which branch applies, and the props the new
-    // branch forbids have to go — leaving them means the file carries props
-    // the component ignores, and they would reappear on switching back. Same
-    // edit, so it is one undo and the values come back together.
-    const next = { ...(node.props || {}), [fieldName]: value };
-    if (value === undefined) {delete next[fieldName];}
-    // Which props this branch rules out, and every prop the same union covers
-    // — the second set bounds what a switch back is allowed to bring in, so a
-    // value held for one union can't be restored by an edit to another.
-    const forbidden = new Set();
-    const involved = new Set();
-    for (const union of unions) {
-      if (!union.names.includes(fieldName)) {continue;}
-      for (const name of union.names) {involved.add(name);}
-      // How this union decides which branch applies. When the edited prop is
-      // one the branches pin to a literal (variant: "constrained"), the value
-      // just picked settles it on its own — the props the losing branches
-      // allowed are precisely the ones to clear, so they mustn't get a vote.
-      // Otherwise the branch is discriminated by presence (`href?: never`) and
-      // what's set is the only evidence there is.
-      const pinsField = union.branches.some((b) =>
-        Object.prototype.hasOwnProperty.call(b.pins, fieldName)
-      );
-      const pinsMatch = (b) => {
-        for (const [name, want] of Object.entries(b.pins)) {
-          const set = next[name];
-          const have = set ? (set.type === 'bare' ? 'true' : String(set.value ?? ''))
-            : (schema.find((x) => x.name === name)?.default ?? undefined);
-          // `want` is the set of values this branch allows for that prop —
-          // one for `variant: "autofit"`, several for `"autofit" | "autofill"`.
-          if (have !== undefined && !want.includes(String(have))) {return false;}
-        }
-        return true;
-      };
-      const fits = union.branches.filter((b) => {
-        if (!pinsField) {for (const name of b.forbids) {if (next[name] !== undefined) {return false;}}}
-        return pinsMatch(b);
-      });
-      const live = fits.length ? fits : union.branches;
-      for (const name of union.names) {
-        if (name === fieldName) {continue;}
-        if (live.every((b) => b.forbids.includes(name))) {forbidden.add(name);}
-      }
+    const held = stashRef.current.get(node.id);
+    if (!held) {
+      assert(stashRef.current.size < LIMITS.treeNodesMax, 'PropsPanel: stash node limit exceeded');
     }
-
-    const stash = stashRef.current[node.id] || (stashRef.current[node.id] = {});
-    // Writing a prop by hand supersedes whatever was held for it.
-    delete stash[fieldName];
-
-    const patch = { [fieldName]: value };
-    for (const name of forbidden) {
-      if (node.props?.[name] === undefined) {continue;}
-      stash[name] = node.props[name]; // held, so switching back can put it back
-      patch[name] = undefined;
-    }
-    // Switching back: anything set aside that this branch allows again, and
-    // that nothing has written in the meantime, returns exactly as it was.
-    for (const [name, held] of Object.entries(stash)) {
-      if (!involved.has(name) || forbidden.has(name)) {continue;}
-      if (node.props?.[name] !== undefined) {continue;}
-      patch[name] = held;
-      delete stash[name];
-    }
-
+    const { patch, stash } = cascade({ fieldName, value, stash: held || {} });
+    stashRef.current.set(node.id, stash);
     if (Object.keys(patch).length === 1 || !onSetProps) {
       onSetProp(fieldName, value, immediate);
       return;
     }
     onSetProps(node.id, patch);
-  };
-
-  // A union type says which props go together. The panel matches what is
-  // currently set against each branch and shows only the branches that could
-  // still apply — so `type` disappears once `href` is filled, and `sizes` once
-  // the variant is one that forbids it.
-  //
-  // Discrimination is by value (`variant: "fixed"`) or by presence
-  // (`href?: never`); both are the same test here. When more than one branch
-  // still fits — nothing set yet — everything shows, because the type hasn't
-  // ruled anything out.
-  const unions = schema.find((f) => f.unions)?.unions || [];
-  const effective = (name) => {
-    const set = node.props?.[name];
-    if (set) {return set.type === 'bare' ? 'true' : String(set.value ?? '');}
-    const f = schema.find((x) => x.name === name);
-    return f?.default === undefined ? undefined : String(f.default);
-  };
-  // Which branches still fit what is set. One prop can be left out of the
-  // test: asking what a prop may be set to cannot be answered by the branches
-  // its own current value already chose — that reasoning ends with the
-  // variant dropdown offering the variant it is on, and no way back.
-  const branchesFitting = (ignore) =>
-    unions.map((union) => {
-      const fits = union.branches.filter((b) => {
-        // A branch is out if something set on the node is forbidden there…
-        for (const name of b.forbids) {
-          if (name !== ignore && node.props?.[name] !== undefined) {return false;}
-        }
-        // …or if it fixes a prop to a value the node doesn't have.
-        for (const [name, want] of Object.entries(b.pins)) {
-          if (name === ignore) {continue;}
-          const have = effective(name);
-          if (have !== undefined && !want.includes(String(have))) {return false;}
-        }
-        return true;
-      });
-      // No branch fits (the markup is already invalid) — show everything
-      // rather than hide the fields needed to fix it.
-      return fits.length ? fits : union.branches;
-    });
-
-  const liveBranches = branchesFitting(null);
-  // A prop whose fallback differs per branch has no single answer for the
-  // field — `label` reads Play on a play control and Close on a close one —
-  // but the branch in force has one, and the panel already knows which branch
-  // that is. Only claimed when every branch still standing agrees: with the
-  // variant unset, several fit, and the field would otherwise show whichever
-  // was declared first.
-  const branchDefault = (name) => {
-    let found;
-    for (const [i, union] of unions.entries()) {
-      if (!union.names.includes(name)) {continue;}
-      for (const b of liveBranches[i]) {
-        // A branch may answer with a rule rather than a value: "Next, or
-        // Previous when direction is back" turns on a prop this panel is
-        // already holding, so it can be weighed rather than only shown.
-        const rule = b.rules?.[name];
-        const v = rule
-          ? effective(rule.prop) === rule.is
-            ? rule.then
-            : rule.otherwise
-          : b.defaults?.[name];
-        if (v === undefined) {continue;}
-        if (found !== undefined && found !== v) {return undefined;}
-        found = v;
-      }
-    }
-    return found;
-  };
-
-  // A branch may allow fewer values than the prop as a whole: emphasis is
-  // primary, secondary or link on the main button, and only the first two on
-  // a mark, which has no line of text to draw a rule under. The union says so
-  // already and the panel knows which branch is in force, so the list offered
-  // is that branch's rather than the sum of all of them.
-  //
-  // A branch that fixes nothing allows everything, and a value already in the
-  // markup stays in the list whatever the branch says — hiding it would leave
-  // markup the panel disagrees with and no way to see it, let alone fix it.
-  //
-  // The prop that CHOOSES the branch is the exception, and it has to be: the
-  // props a branch allows are its consequences, not its conditions. `pressed`
-  // exists only on a play control, so a paused one has it set — and the close
-  // and arrow branches forbid it, which left the variant list offering main and
-  // play and no way to reach the other two. Nothing was wrong with the markup
-  // and nothing said so; the switch was simply not on offer. It is a switch the
-  // panel already knows how to make: setPropCascading clears what the new
-  // branch forbids and hands it back on the way in.
-  //
-  // A prop chooses the branch when its pinned values name at most one branch
-  // each — pick one and the branch is settled. `emphasis` is pinned in every
-  // branch too, and its sets overlap (primary is allowed on all four variants),
-  // so choosing it settles nothing and it narrows as before.
-  const choosesBranch = (union, name) => {
-    const seen = new Set();
-    let pinning = 0;
-    for (const b of union.branches) {
-      const pinned = b.pins?.[name];
-      if (!pinned) {continue;}
-      pinning++;
-      for (const v of pinned) {
-        if (seen.has(v)) {return false;}
-        seen.add(v);
-      }
-    }
-    return pinning > 1;
-  };
-
-  const narrowOptions = (field) => {
-    if (!field.options?.length) {return field;}
-    let allowed;
-    const fitting = branchesFitting(field.name);
-    for (const [i, union] of unions.entries()) {
-      if (!union.names.includes(field.name)) {continue;}
-      if (choosesBranch(union, field.name)) {continue;}
-      for (const b of fitting[i]) {
-        const pinned = b.pins?.[field.name];
-        if (!pinned) {return field;}
-        allowed = allowed ? [...new Set([...allowed, ...pinned])] : [...pinned];
-      }
-    }
-    if (!allowed) {return field;}
-    const set = node.props?.[field.name];
-    const keep = set && set.type !== 'expr' ? String(set.value ?? '') : undefined;
-    const options = field.options.filter(
-      (o) => allowed.includes(o) || o === keep
-    );
-    return options.length && options.length < field.options.length
-      ? { ...field, options }
-      : field;
-  };
-
-  const appliesNow = (field) => {
-    for (const [i, union] of unions.entries()) {
-      if (!union.names.includes(field.name)) {continue;}
-      if (liveBranches[i].every((b) => b.forbids.includes(field.name))) {return false;}
-    }
-    return true;
   };
 
   // The class field, wherever it came from: the element's schema, a

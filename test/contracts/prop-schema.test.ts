@@ -7,11 +7,16 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePropSchema } from '../../shared/dist/prop-schema.js';
+import { parseField, parsePropSchema } from '../../shared/dist/prop-schema.js';
+import { parsePropSchema as parseAstroSchema } from '../../electron/astroParser.js';
+import { parseScanResult } from '../../shared/dist/scan.js';
 import { LIMITS } from '../../shared/dist/limits.js';
 
 const goodSchema = new Map<string, unknown>([
-  ['title', { name: 'title', type: 'string', optional: false, default: 'Home', doc: 'Page title.' }],
+  [
+    'title',
+    { name: 'title', type: 'string', optional: false, default: 'Home', doc: 'Page title.' },
+  ],
   [
     'level',
     { name: 'level', type: 'number', optional: true, numeric: true, min: 1, max: 6, step: 1 },
@@ -23,9 +28,14 @@ const goodSchema = new Map<string, unknown>([
       name: 'items',
       type: 'ServiceTime[]',
       optional: false,
-      shape: { day: { name: 'day', type: 'string', optional: false } },
+      shape: [{ name: 'day', type: 'string' }],
       shapeIsList: true,
-      unions: [{ variants: ['a', 'b'] }],
+      unions: [
+        {
+          names: ['items'],
+          branches: [{ forbids: [], pins: {}, defaults: {}, rules: {}, docs: {} }],
+        },
+      ],
     },
   ],
 ]);
@@ -54,7 +64,8 @@ test('negative space: wrong container, wrong key, wrong field', () => {
     /type: expected string/,
   );
   assert.throws(
-    () => parsePropSchema(new Map([['title', { name: 'title', type: 'string', optional: 'maybe' }]])),
+    () =>
+      parsePropSchema(new Map([['title', { name: 'title', type: 'string', optional: 'maybe' }]])),
     /optional: expected boolean/,
   );
   assert.throws(
@@ -65,7 +76,8 @@ test('negative space: wrong container, wrong key, wrong field', () => {
     /options: expected string array/,
   );
   assert.throws(
-    () => parsePropSchema(new Map([['n', { name: 'n', type: 'number', optional: true, min: '1' }]])),
+    () =>
+      parsePropSchema(new Map([['n', { name: 'n', type: 'number', optional: true, min: '1' }]])),
     /min: expected number/,
   );
 });
@@ -79,7 +91,142 @@ test('bounds: schema size and option count fail at LIMITS', () => {
   );
   assert.throws(() => parsePropSchema(big), /exceeds \d+ fields/);
   const manyOptions = new Map([
-    ['tag', { name: 'tag', type: 'T', optional: true, options: Array.from({ length: LIMITS.propOptionsMax + 1 }, (_, i) => `o${i}`) }],
+    [
+      'tag',
+      {
+        name: 'tag',
+        type: 'T',
+        optional: true,
+        options: Array.from({ length: LIMITS.propOptionsMax + 1 }, (_, i) => `o${i}`),
+      },
+    ],
   ]);
   assert.throws(() => parsePropSchema(manyOptions), /options exceed \d+/);
+});
+
+// Use the real producer so a synthetic fixture cannot hide dropped renderer metadata.
+test('Astro parser metadata survives the shared boundary', () => {
+  const source = [
+    '---',
+    'type Props =',
+    ' | { variant: "play"; /** Defaults to `Play`, or `Pause` when pressed. */',
+    '     label?: string; pressed?: boolean; }',
+    ' | { variant: "close"; /** Defaults to `Close`. */',
+    '     label?: string; pressed?: never; };',
+    'const { variant = "play", label, pressed } = Astro.props;',
+    '---',
+    '<button>{label}</button>',
+  ].join('\n');
+  const produced = parseAstroSchema(source);
+  const scan = parseScanResult(
+    structuredClone({
+      pages: [],
+      pageFolders: [],
+      layouts: [],
+      components: [
+        { name: 'Button', path: 'src/components/Button.astro', folder: '', schema: produced },
+      ],
+    }),
+  );
+  const fields = scan.components[0]?.schema;
+  assert.ok(fields);
+  const expected = produced.map((field) =>
+    Object.fromEntries(
+      Object.entries(field).filter(([key, value]) => key === 'default' || value !== undefined),
+    ),
+  );
+  assert.deepEqual(fields, expected);
+  const parsed = parsePropSchema(new Map(fields.map((field) => [field.name, field])));
+  assert.ok(parsed.get('label')?.unions?.length);
+});
+
+test('control hints, expression defaults and exclusive bounds are preserved', () => {
+  const field = {
+    name: 'width',
+    type: 'number',
+    optional: true,
+    default: 4,
+    defaultExpr: true,
+    hint: 'inferred',
+    min: 0,
+    max: 10,
+    step: 0.5,
+    minExclusive: true,
+    maxExclusive: true,
+  };
+  assert.deepEqual(parseField(field, 'width'), field);
+  assert.deepEqual(parseField({ ...field, default: undefined }, 'width'), {
+    ...field,
+    default: undefined,
+  });
+});
+
+test('nested schema metadata rejects invalid shapes and values', () => {
+  const base = { name: 'item', type: 'code', optional: true };
+  const branch = { forbids: [], pins: {}, defaults: {}, docs: {}, rules: {} };
+  const invalid: readonly Readonly<Record<string, unknown>>[] = [
+    { shape: {} },
+    { shape: [null] },
+    { shape: [{ name: 'x', type: 3 }] },
+    { unions: [{}] },
+    { unions: [{ names: [false], branches: [] }] },
+    { unions: [{ names: ['x'], branches: [null] }] },
+    { default: {} },
+    { default: null },
+    { default: Infinity },
+    { hint: false },
+    { doc: 0 },
+    { defaultExpr: 1 },
+    { min: NaN },
+    { max: Infinity },
+    { step: -Infinity },
+    { minExclusive: 'true' },
+    { maxExclusive: 1 },
+    { numeric: null },
+  ];
+  for (const metadata of invalid) {
+    assert.throws(() => parseField({ ...base, ...metadata }, 'item'), /PropSchema/);
+  }
+  for (const metadata of [
+    { forbids: [false] },
+    { pins: { x: [3] } },
+    { pins: null },
+    { defaults: { x: true } },
+    { defaults: null },
+    { docs: { x: false } },
+    { rules: { x: { prop: 'pressed', is: 'true', then: 'Pause' } } },
+    { rules: null },
+  ]) {
+    const unions = [{ names: ['x'], branches: [{ ...branch, ...metadata }] }];
+    assert.throws(() => parseField({ ...base, unions }, 'item'), /PropSchema/);
+  }
+});
+
+test('nested schema collections and text have explicit bounds', () => {
+  const base = { name: 'item', type: 'code', optional: true };
+  const longText = 'x'.repeat(LIMITS.attrCharsMax + 1);
+  const tooManyFields = Array.from({ length: LIMITS.propSchemaFieldsMax + 1 }, () => 'x');
+  const tooManyOptions = Array.from({ length: LIMITS.propOptionsMax + 1 }, () => 'x');
+  const branch = { forbids: [], pins: {}, defaults: {}, rules: {}, docs: {} };
+  const metadataCases = [
+    { name: longText },
+    { type: longText },
+    { doc: longText },
+    { hint: longText },
+    { default: longText },
+    { options: [longText] },
+    { shape: tooManyFields.map((name) => ({ name, type: 'string' })) },
+    { unions: tooManyOptions.map(() => ({ names: [], branches: [] })) },
+    { unions: [{ names: tooManyFields, branches: [] }] },
+    { unions: [{ names: [], branches: tooManyOptions.map(() => branch) }] },
+    { unions: [{ names: [], branches: [{ ...branch, forbids: tooManyFields }] }] },
+    { unions: [{ names: [], branches: [{ ...branch, pins: { x: tooManyOptions } }] }] },
+  ];
+  for (const metadata of metadataCases) {
+    assert.throws(() => parseField({ ...base, ...metadata }, 'item'), /exceed/);
+  }
+  assert.equal(
+    parseField({ ...base, doc: 'x'.repeat(LIMITS.attrCharsMax) }, 'item').doc?.length,
+    LIMITS.attrCharsMax,
+  );
 });

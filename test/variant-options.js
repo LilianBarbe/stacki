@@ -264,15 +264,15 @@ const BUTTON = [
   }
 
   // --- the rule, stated where it lives -------------------------------------------
-  const panel = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'PropsPanel.jsx'), 'utf8');
+  const rules = fs.readFileSync(path.join(__dirname, '..', 'src', 'panels', 'propRules.ts'), 'utf8');
   check(
     'narrowing asks whether the prop chooses the branch',
-    /choosesBranch\(union, field\.name\)/.test(panel),
+    /choosesBranch\(union, field\.name\)/.test(rules),
     'narrowOptions no longer excuses the discriminant'
   );
   check(
     'and a prop pinned by one branch alone does not count as choosing',
-    /pinning > 1/.test(panel),
+    /pinning > 1/.test(rules),
     'a single pinned branch would make direction a chooser'
   );
 

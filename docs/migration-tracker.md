@@ -254,6 +254,16 @@ The live Electron 33.4.11 / Astro 5.13.10 lifecycle and built welcome-screen che
 also passed after the final UI batch. Continue with PropsPanel's schema boundary
 and panel conversion; the remaining 18 original panel files are still pending.
 
+PropsPanel schema/rule checkpoint: shared schemas now parse union branches,
+member shapes, expression defaults, hints, and exclusive numeric bounds instead
+of dropping or trusting that metadata. A real Astro-parser-to-scan round trip
+pins the wire shape; the contract suite now has 156 passing tests. `propRules.ts`
+contains typed, immutable visibility/default/option/cascade decisions, with
+bounded restoration state in the panel. All 6,144 old/new comparisons match.
+The full gate passes 134/134 commands (98.0s). PropsPanel itself is still JSX;
+continue its binding/editor extraction and fix its conditional hook order as
+part of that conversion.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.jsx`                                                                                     | 3,819 — hotspot, convert-then-split, no split in same commit |
@@ -327,7 +337,7 @@ move-blindness.
 
 ## Test-suite state
 
-- Gate green at last run: 133/133 (96.6s), exit 0. No quarantined tests remain.
+- Gate green at last run: 134/134 (98.0s), exit 0. No quarantined tests remain.
   The optional external-project corpus sweep still skips without `STACKI_CORPUS`.
 - Contract suite: 152/152. Full-repository lint has 177 existing warnings and no
   errors; the converted parser, main, and their new supporting files have no warnings.
