@@ -254,7 +254,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 11/20 original files converted ⏳
+### src/panels — 12/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -486,6 +486,16 @@ panel test still exercises grouping when its fixture is present. Nine original
 panels remain. The full gate passes 142/142 commands (104.4s), with no warnings
 in the converted modules. Continue with `StructurePanel.jsx`.
 
+StructurePanel is converted to `StructurePanel.tsx`, with recursive row rendering
+and context-menu behavior in `StructureTree.tsx` and bounded visible/raw tree
+queries in `structureModel.ts`. Drop locations are a discriminated union, node
+descriptions are exhaustive over the parsed page-node union, and branch helpers
+preserve their caller's recursive node type. New tests reject oversized, deep,
+and cyclic live trees. Navigator, fragment, condition, insertion, state-marker,
+bridge, panel-sound, and production-build checks pass without warnings in the
+new modules. The full gate passes 142/142 commands (98.8s). Eight original
+panels remain; continue with `PreviewPane.jsx`.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
@@ -494,7 +504,7 @@ in the converted modules. Continue with `StructurePanel.jsx`.
 | `GitChip.tsx`                                                                                        | ✅ converted with typed repository states and split dropdown |
 | `ContentView.tsx`                                                                                    | ✅ converted with typed fields, saves, and rename boundaries |
 | `CmsPanel.tsx`                                                                                       | ✅ converted with independent parsed content inventories     |
-| `StructurePanel.jsx`                                                                                 | 793                                                          |
+| `StructurePanel.tsx`                                                                                 | ✅ converted with typed rows, drops, and bounded traversal   |
 | `PreviewPane.jsx`                                                                                    | 727                                                          |
 | `AssetsPanel` 473 · `PalettePanel` 455 · `PagesPanel` 442 · `HistoryPanel` 392 · `WelcomeScreen` 391 | small                                                        |
 | `StylePanel.tsx`                                                                                     | ✅ converted with parsed stylesheet inventories              |

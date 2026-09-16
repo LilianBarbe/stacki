@@ -48,7 +48,7 @@ async function checkFragment(syntax) {
   fs.mkdirSync(buildDir, { recursive: true });
   await esbuild.build({
     stdin: {
-      contents: "export {default as StructurePanel} from './src/panels/StructurePanel.jsx'; export {liveClassesById} from './src/liveClasses.js'; export {createTreeIndex} from './src/editorTree.js';",
+      contents: "export {default as StructurePanel} from './src/panels/StructurePanel.tsx'; export {liveClassesById} from './src/liveClasses.js'; export {createTreeIndex} from './src/editorTree.js';",
       loader: 'jsx', resolveDir: path.join(__dirname, '..'),
     },
     outfile: path.join(buildDir, 'navigator.js'), bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic',

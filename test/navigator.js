@@ -121,7 +121,7 @@ const WORDS = el('words', 'p', [{ id: 'w-text', kind: 'expr', value: '{heading}'
   // --- the rows ---------------------------------------------------------------
   const bundlePath = path.join(buildDir, 'structure.bundle.js');
   await esbuild.build({
-    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.jsx')],
+    entryPoints: [path.join(__dirname, '..', 'src', 'panels', 'StructurePanel.tsx')],
     outfile: bundlePath,
     bundle: true,
     format: 'cjs',

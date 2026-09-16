@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import WelcomeScreen from './panels/WelcomeScreen.jsx';
 import PagesPanel from './panels/PagesPanel.jsx';
 import PalettePanel from './panels/PalettePanel.jsx';
-import StructurePanel from './panels/StructurePanel.jsx';
+import StructurePanel from './panels/StructurePanel';
 import { isInlineRun, noteIndexAbove, noteText, noteValue, selectionAfterDelete } from './treeSelection.js';
 import { canvasClickAction } from './canvasClick.js';
 import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveClasses.js';

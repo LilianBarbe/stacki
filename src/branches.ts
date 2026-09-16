@@ -17,13 +17,13 @@
 export interface BranchTree {
   readonly kind: string;
   readonly name?: string;
-  readonly children?: readonly BranchTree[] | null;
+  readonly children?: readonly this[] | null;
 }
 
-const branchNamed = (
-  node: BranchTree | null | undefined,
+const branchNamed = <Node extends BranchTree>(
+  node: Node | null | undefined,
   name: 'then' | 'else',
-): BranchTree | null => {
+): Node | null => {
   if (!node || node.kind !== 'cond') {
     return null;
   }
@@ -33,17 +33,19 @@ const branchNamed = (
 };
 
 /** The branch a condition renders when its test holds — never drawn as a row. */
-export function thenBranch(node: BranchTree | null | undefined): BranchTree | null {
+export function thenBranch<Node extends BranchTree>(node: Node | null | undefined): Node | null {
   return branchNamed(node, 'then');
 }
 
 /** The branch it renders when the test doesn't, or null when there isn't one. */
-export function elseBranch(node: BranchTree | null | undefined): BranchTree | null {
+export function elseBranch<Node extends BranchTree>(node: Node | null | undefined): Node | null {
   return branchNamed(node, 'else');
 }
 
 /** The children the tree shows under a row. */
-export function rowChildren(node: BranchTree | null | undefined): readonly BranchTree[] {
+export function rowChildren<Node extends BranchTree>(
+  node: Node | null | undefined,
+): readonly Node[] {
   const then = thenBranch(node);
   if (!then) {
     return node?.children ?? [];
@@ -56,6 +58,8 @@ export function rowChildren(node: BranchTree | null | undefined): readonly Branc
 }
 
 /** Where a child dropped on this row actually goes. */
-export function rowHost(node: BranchTree | null | undefined): BranchTree | null | undefined {
+export function rowHost<Node extends BranchTree>(
+  node: Node | null | undefined,
+): Node | null | undefined {
   return thenBranch(node) || node;
 }
