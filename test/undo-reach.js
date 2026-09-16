@@ -95,12 +95,13 @@ check(
 // inverse; nothing else can work it out afterwards. These are the ones that do,
 // and the check is that they still do — the variables panel had three edits
 // that wrote and said nothing, which is what "undo doesn't work here" was.
-const vars = read('src', 'panels', 'VariablesView.jsx');
+const vars = read('src', 'panels', 'VariablesView.tsx') +
+  read('src', 'panels', 'variableHistory.ts');
 for (const [what, near] of [
   ['a value', "const save = useCallback"],
   ['a new variable', "const add = useCallback"],
   ['a row moved', "const move = useCallback"],
-  ['a group moved', "const moveGroup = useCallback"],
+  ['a group moved', "await writeWithUndo(selectedFile.rel, 'the group'"],
   ['a group added', "const duplicateSection = useCallback"],
   ['a group deleted', "const deleteSection = useCallback"],
   ['a heading renamed', "const retitle = useCallback"],
@@ -124,7 +125,7 @@ check(
 // file an edit touched rather than the first one it happened to name.
 check(
   'a multi-file edit is recorded as all of its files',
-  /const list = \[\.\.\.new Set\(\(Array\.isArray\(rels\) \? rels : \[rels\]\)/.test(vars),
+  /const paths = \[\.\.\.new Set\(typeof files === 'string' \? \[files\] : \(files \?\? \[\]\)\)/.test(vars),
   'writeWithUndo still takes one file'
 );
 

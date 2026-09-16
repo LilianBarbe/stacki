@@ -12,7 +12,7 @@ conversion** are complete. `electron/main.ts` now emits the ignored `main.js`
 package entry. The invoke inventory is complete: **111 main channels + 4 terminal
 channels**, with parsed inputs and compile-checked handler results.
 **The Electron, root renderer, and UI queues are complete. Continue through
-`src/panels` (PropsPanel and VariablesPanel are complete; VariablesView next), then `src/App.jsx`.**
+`src/panels` (PropsPanel, VariablesPanel, and VariablesView are complete; CmsView next), then `src/App.jsx`.**
 
 Main verification: 26 old/new handler and output comparisons matched, including
 byte-identical generated Astro config, preview page, and both API endpoints.
@@ -243,7 +243,7 @@ parses exported components with the existing TypeScript dependency, avoiding
 false matches against private hooks; all 415 bridge checks pass. The entire
 original UI queue is converted, with no new unchecked modules.
 
-### src/panels — 4/20 original files converted ⏳
+### src/panels — 5/20 original files converted ⏳
 
 PropsPanel dependencies: `ListField` and `ObjectField` are now typed. List editor
 and drag state use discriminated unions; field updates construct readonly values.
@@ -338,10 +338,20 @@ missing columns and reversed title ranges. All 24 old/new table comparisons and
 limits. The full gate passes 138/138 commands (100.5s). Finish the remaining
 VariablesView data/mutation coordinator and rename its root to TypeScript.
 
+VariablesView is fully converted to `VariablesView.tsx`. All ten edit methods
+parse outgoing payloads and incoming replies; operating failures remain values.
+Snapshot undo covers every touched stylesheet and stops an edit when the initial
+snapshot cannot be read. Restore failures are reported. The refresh coordinator
+coalesces watcher bursts and ignores replies after disposal; the saved indicator
+owns one timer and clears it on unmount. New tests cover these boundaries and
+lifetimes. All 32 old/new root displays match, 171 sheet interactions pass, and
+the full gate passes 138/138 commands (101.3s). Converted modules have zero lint
+warnings. Fifteen original panels remain; continue with CmsView.
+
 | File                                                                                                 | Lines                                                        |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `PropsPanel.tsx`                                                                                     | ✅ converted with typed controls/editors |
-| `VariablesView.jsx`                                                                                  | 1,418 — holds 15 known conditional-hook bugs (fix them here) |
+| `VariablesView.tsx`                                                                                  | ✅ converted with typed edits, history, and refreshes |
 | `CmsView.jsx`                                                                                        | 1,246                                                        |
 | `GitChip.jsx`                                                                                        | 1,044                                                        |
 | `ContentView.jsx`                                                                                    | 1,001                                                        |
