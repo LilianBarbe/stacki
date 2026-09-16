@@ -6,14 +6,18 @@
 // page-2 comes before page-10.
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
-export function pageRank(name) {
+export function pageRank(name: unknown): 0 | 1 | 2 {
   const base = String(name || '').replace(/\.(astro|mdx?)$/i, '');
-  if (/^index$/i.test(base)) {return 0;}
-  if (/^\d/.test(base)) {return 2;}
+  if (/^index$/i.test(base)) {
+    return 0;
+  }
+  if (/^\d/.test(base)) {
+    return 2;
+  }
   return 1;
 }
 
-export function comparePageNames(a, b) {
+export function comparePageNames(a: unknown, b: unknown): number {
   const an = String(a || '').replace(/\.(astro|mdx?)$/i, '');
   const bn = String(b || '').replace(/\.(astro|mdx?)$/i, '');
   return pageRank(an) - pageRank(bn) || collator.compare(an, bn);
@@ -25,7 +29,7 @@ export function comparePageNames(a, b) {
 // home page is the one at the root. Listed after the folders, as everything
 // used to be, a site's front door sat underneath every other page on the
 // site, which is the one place nobody looks for it.
-export function leadsFolders(name) {
+export function leadsFolders(name: unknown): boolean {
   return pageRank(name) === 0;
 }
 
@@ -34,6 +38,6 @@ export function leadsFolders(name) {
 // generates it once per entry from a collection. Listed with the collection
 // icon and colour instead of the plain page one, so a folder of authored
 // pages and a folder of generated ones read differently at a glance.
-export function isCollectionRoute(name) {
+export function isCollectionRoute(name: unknown): boolean {
   return /\[[^\]]*\]/.test(String(name || ''));
 }

@@ -1,3 +1,6 @@
+import { assert } from '../shared/assert';
+import { LIMITS } from '../shared/limits';
+
 // What a component may be called.
 //
 // A component's name is three things at once: the file on disk
@@ -14,16 +17,18 @@
  * in an identifier, and each is capitalised; the rest of a word is left as
  * typed, so `buttonArrow` becomes `ButtonArrow` rather than `Buttonarrow`.
  */
-export function toComponentName(input) {
-  return String(input ?? '')
-    // é → e, ü → u. Without this an accented word doesn't just lose its marks,
-    // it shatters: "héro" splits into "h" and "ro" and comes out as HRo.
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .split(/[^A-Za-z0-9]+/)
-    .filter(Boolean)
-    .map((word) => word[0].toUpperCase() + word.slice(1))
-    .join('');
+export function toComponentName(input: unknown): string {
+  return (
+    String(input ?? '')
+      // é → e, ü → u. Without this an accented word doesn't just lose its marks,
+      // it shatters: "héro" splits into "h" and "ro" and comes out as HRo.
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .split(/[^A-Za-z0-9]+/)
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join('')
+  );
 }
 
 // Astro's own tag. A component file called Fragment.astro would be imported
@@ -35,18 +40,31 @@ const RESERVED = new Set(['Fragment', 'Astro', 'Component', 'Props', 'Slot']);
  * already spoken for — components and layouts both, since the palette lists
  * them together and an import can only mean one of them.
  */
-export function componentNameError(input, taken = []) {
+export function componentNameError(input: unknown, taken: readonly string[] = []): string | null {
   const raw = String(input ?? '').trim();
-  if (!raw) {return 'Give the component a name.';}
+  if (!raw) {
+    return 'Give the component a name.';
+  }
   const name = toComponentName(raw);
-  if (!name) {return 'Use letters or numbers for the name.';}
-  if (/^[0-9]/.test(name)) {return "A name can't start with a number.";}
-  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) {return 'Use letters and numbers only.';}
-  if (RESERVED.has(name)) {return `${name} already means something in Astro.`;}
+  if (!name) {
+    return 'Use letters or numbers for the name.';
+  }
+  if (/^[0-9]/.test(name)) {
+    return "A name can't start with a number.";
+  }
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) {
+    return 'Use letters and numbers only.';
+  }
+  if (RESERVED.has(name)) {
+    return `${name} already means something in Astro.`;
+  }
   // Case-insensitively: two files whose names differ only in case can't both
   // exist on a Mac, and two imports that differ only in case are a trap even
   // where they can.
+  assert(taken.length <= LIMITS.scanEntriesMax, 'Component list exceeds scan limit');
   const clash = taken.find((other) => String(other).toLowerCase() === name.toLowerCase());
-  if (clash) {return `There's already a component called ${clash}.`;}
+  if (clash) {
+    return `There's already a component called ${clash}.`;
+  }
   return null;
 }

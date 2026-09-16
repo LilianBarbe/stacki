@@ -21,15 +21,29 @@
  *                                       null when the project has no scan of it
  * @returns {boolean} whether to keep the attribute
  */
-export function keepsSlot({ slotName, host, definition }) {
+export function keepsSlot({
+  slotName,
+  host,
+  definition,
+}: {
+  readonly slotName?: string | null;
+  readonly host?: object | null;
+  readonly definition?: { readonly slots?: readonly string[] } | null;
+}): boolean {
   // Nothing to decide: no slot asked for, or one asked for in an expression,
   // whose value this cannot know.
-  if (!slotName) {return true;}
+  if (!slotName) {
+    return true;
+  }
   // Out in the open. Whatever it was addressed to, it is not here.
-  if (!host) {return false;}
+  if (!host) {
+    return false;
+  }
   // A component nobody scanned might well have that slot. Silence is not a
   // denial, and throwing the attribute away on it would lose something the
   // person wrote and cannot see the reason for.
-  if (!definition) {return true;}
+  if (!definition) {
+    return true;
+  }
   return (definition.slots || []).includes(slotName);
 }

@@ -35,24 +35,42 @@
  *   close   — leave the component
  *   nothing — the canvas couldn't say; leave everything as it is
  */
-export function canvasClickAction({ path, outside = false, focusPath, scope = '' }) {
+export function canvasClickAction({
+  path,
+  outside = false,
+  focusPath,
+  scope = '',
+}: {
+  readonly path?: string | null;
+  readonly outside?: boolean;
+  readonly focusPath?: string | null;
+  readonly scope?: string;
+}): { readonly kind: 'inner' | 'select' | 'layout' | 'close' | 'nothing' } {
   if (focusPath) {
     // The open file's own markup is marked in its namespace, so a path in that
     // namespace is a node in the file being edited.
-    if (scope && path && path.startsWith(scope)) {return { kind: 'inner' };}
+    if (scope && path && path.startsWith(scope)) {
+      return { kind: 'inner' };
+    }
     // Nothing to go on. `outside` is the canvas saying it DID find something,
     // just not in this file or this instance — that is somebody looking away.
     // Without it, the click was inside on something the canvas couldn't name,
     // and staying put is the only honest answer.
-    if (!path) {return { kind: outside ? 'close' : 'nothing' };}
+    if (!path) {
+      return { kind: outside ? 'close' : 'nothing' };
+    }
     // The lit instance itself, or something under it: stay.
-    if (path === focusPath || path.startsWith(`${focusPath}.`)) {return { kind: 'nothing' };}
+    if (path === focusPath || path.startsWith(`${focusPath}.`)) {
+      return { kind: 'nothing' };
+    }
     // A node the canvas DID map, somewhere else on the page: done in here.
     return { kind: 'close' };
   }
   // Not in a component. Chrome the layout renders itself — header, footer,
   // anything outside the page's <slot> — carries no page-model marker, so a
   // click there arrives with no path. The layout owns that markup.
-  if (!path) {return { kind: 'layout' };}
+  if (!path) {
+    return { kind: 'layout' };
+  }
   return { kind: 'select' };
 }

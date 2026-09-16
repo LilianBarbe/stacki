@@ -6,16 +6,26 @@
 // never leave this window, so a module-level record is enough.
 //
 // { kind: 'node' | 'component', tag?: string, nodeKind?: string, id?: string }
-let current = null;
+export type Drag =
+  | { readonly kind: 'component'; readonly name: string }
+  | {
+      readonly kind: 'node';
+      readonly id: string;
+      readonly nodeKind: string;
+      readonly tag?: string;
+    };
 
-export function setDrag(info) {
+// One window owns this single slot; null preserves the existing clear protocol.
+let current: Drag | null = null;
+
+export function setDrag(info: Drag | null | undefined): void {
   current = info || null;
 }
 
-export function clearDrag() {
+export function clearDrag(): void {
   current = null;
 }
 
-export function getDrag() {
+export function getDrag(): Drag | null {
   return current;
 }

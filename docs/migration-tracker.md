@@ -130,7 +130,7 @@ Cleanup owed: `electron/scratch2-7.js` are stray tsc-emitted outputs from the
 cssVars conversion experiments, still tracked in git (198 lines). Delete them
 in a standalone commit; nothing requires them.
 
-### src/ — 8 modules converted
+### src/ — 18 modules converted
 
 `editorTree`, `pagePersistence` (WeakSet acks + drain caps),
 `cleanError`, `branchName`, `loopBindings` (minimal-fidelity LiveNode),
@@ -138,15 +138,18 @@ in a standalone commit; nothing requires them.
 (1,117 lines; dataTree split; dead `resolvePath` deleted; fixed dropped
 closing quote in samplePreview).
 
-Remaining src leaves (30 top-level `.js`, 3,306 lines): `contentSchema` 321,
-`cmsSchema` 303, `frontmatterMove` 252, `elementSchemas` 196, `gitActions`
-188, `fluid` 174, `treeSelection` 137, `canvasQuery` 118, `insertRank` 112,
-`instanceProps` 112, `insertTarget` 110, plus 19 smaller (previewRecovery,
-outlineBoxes, classAttr, classNames, extractProps, assetPath, astroAssets,
-spacingBands, terminalPaste, jsCheck, canvasClick, componentName,
-liveClasses, branches, pageOrder, slotAttr, assetPick, attrOrder, dragState).
-The old tracker listed `sound` and `useListReorder`; those files no longer
-exist.
+First renderer continuation batch: `assetPath`, `assetPick`, `attrOrder`,
+`branches`, `canvasClick`, `componentName`, `dragState`, `jsCheck`, `pageOrder`,
+`slotAttr`. All 132 old/new comparisons passed; the full gate passed 125/125
+commands (94.8s), with no lint warnings in these modules. Request cancellation
+and existing null results stay compatible; attribute renames preserve value identity.
+
+Remaining src leaves (20 top-level `.js`): `contentSchema`, `cmsSchema`,
+`frontmatterMove`, `elementSchemas`, `gitActions`, `fluid`, `treeSelection`,
+`canvasQuery`, `insertRank`, `instanceProps`, `insertTarget`, `previewRecovery`,
+`outlineBoxes`, `classAttr`, `classNames`, `extractProps`, `astroAssets`,
+`spacingBands`, `terminalPaste`, `liveClasses`.
+`sound` and `useListReorder` remain under `src/ui`, not the root directory.
 
 ### src/ui — 32 files, 6,457 lines ⬜
 

@@ -14,35 +14,48 @@
 // The model is untouched either way — the branch is still where a drop lands,
 // still what the file writes out. This is only which rows the tree draws.
 
-const branchNamed = (node, isElse) => {
-  if (!node || node.kind !== 'cond') {return null;}
-  const kids = Array.isArray(node.children) ? node.children : [];
-  const found = kids.find((k) => k?.kind === 'branch' && (k.name === 'else') === isElse);
+export interface BranchTree {
+  readonly kind: string;
+  readonly name?: string;
+  readonly children?: readonly BranchTree[] | null;
+}
+
+const branchNamed = (
+  node: BranchTree | null | undefined,
+  name: 'then' | 'else',
+): BranchTree | null => {
+  if (!node || node.kind !== 'cond') {
+    return null;
+  }
+  const kids = node.children ?? [];
+  const found = kids.find((k) => k?.kind === 'branch' && (k.name === 'else') === (name === 'else'));
   return found || null;
 };
 
 /** The branch a condition renders when its test holds — never drawn as a row. */
-export function thenBranch(node) {
-  return branchNamed(node, false);
+export function thenBranch(node: BranchTree | null | undefined): BranchTree | null {
+  return branchNamed(node, 'then');
 }
 
 /** The branch it renders when the test doesn't, or null when there isn't one. */
-export function elseBranch(node) {
-  return branchNamed(node, true);
+export function elseBranch(node: BranchTree | null | undefined): BranchTree | null {
+  return branchNamed(node, 'else');
 }
 
 /** The children the tree shows under a row. */
-export function rowChildren(node) {
+export function rowChildren(node: BranchTree | null | undefined): readonly BranchTree[] {
   const then = thenBranch(node);
-  if (!then) {return Array.isArray(node?.children) ? node.children : [];}
+  if (!then) {
+    return node?.children ?? [];
+  }
   // What the then holds, then the else itself — the one branch worth a row,
   // and it comes after the markup it is the alternative to.
   const otherwise = elseBranch(node);
-  const kids = Array.isArray(then.children) ? then.children : [];
+  const kids = then.children ?? [];
   return otherwise ? [...kids, otherwise] : kids;
 }
 
 /** Where a child dropped on this row actually goes. */
-export function rowHost(node) {
+export function rowHost(node: BranchTree | null | undefined): BranchTree | null | undefined {
   return thenBranch(node) || node;
 }
