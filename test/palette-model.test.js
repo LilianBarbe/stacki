@@ -1,6 +1,6 @@
 // Goal: component usage replies cannot put malformed files or counts into the popup.
 // Methodology: parse valid success/error variants, then exercise nested fields,
-// totals, duplicates, and collection bounds; also pin deterministic grouping.
+// totals, duplicates, and collection bounds; also pin grouping and preview URLs.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const model = require('./renderer-module')('paletteModel.ts');
@@ -11,6 +11,18 @@ const file = {
   kind: 'page',
   count: 2,
 };
+
+test('preview URLs respect the project slash policy and preserve encoded file identity', () => {
+  const component = {
+    name: 'Card', folder: 'Cards & Banners', path: '/project/src/components/Cards & Banners/Card.astro',
+  };
+  for (const mode of ['always', 'never', 'ignore']) {
+    const url = new URL(model.componentPreviewURL('http://localhost:4321/', component, mode));
+    assert.equal(url.pathname, mode === 'always' ? '/__avb/preview/' : '/__avb/preview');
+    assert.equal(url.searchParams.get('c'), 'Card');
+    assert.equal(url.searchParams.get('p'), 'src/components/Cards & Banners/Card.astro');
+  }
+});
 
 test('component usage parser preserves success and operating-error variants', () => {
   assert.deepEqual(model.parseComponentUsage({ files: [file], total: 2 }), {

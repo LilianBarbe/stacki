@@ -1,8 +1,8 @@
 {
   "name": "stacki",
   "productName": "Stacki",
-  "version": "0.1.27",
-  "description": "Stacki \u2014 a visual builder for Astro projects \u2014 pages, layouts, components, props, live preview, and GitHub publishing.",
+  "version": "0.1.28",
+  "description": "Stacki — a visual builder for Astro projects — pages, layouts, components, props, live preview, and GitHub publishing.",
   "main": "dist/electron/main.js",
   "author": "Timothy Ricks <hello@timothyricks.com>",
   "license": "MIT",
@@ -247,6 +247,7 @@
     "asarUnpack": [
       "dist/electron/astroParser.js",
       "dist/electron/astroParser.validation.js",
+      "dist/electron/componentPreview.js",
       "dist/electron/htmlText.js",
       "dist/electron/frontmatter.js",
       "dist/shared/**",

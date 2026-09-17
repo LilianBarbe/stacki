@@ -24,6 +24,7 @@ import HistoryPanel, { relativeTime } from './panels/HistoryPanel';
 import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog';
 import { mergeBranchAction, deleteBranchAction } from './gitActions.js';
 import LeftRail from './ui/LeftRail';
+import { lazyPanel } from './ui/lazyPanel';
 import PageSwitcher from './ui/PageSwitcher';
 import DynamicPicker from './ui/DynamicPicker';
 import {
@@ -177,16 +178,16 @@ import {
   type AppCollection,
 } from './appBridge';
 
-// Optional editors load on first use. App's root suspense boundary keeps each
-// editor mounted after its module arrives, so panel state survives tab changes.
-const PropsPanel = React.lazy(() => import('./panels/PropsPanel'));
-const StylePanel = React.lazy(() => import('./panels/StylePanel'));
-const CodeWindow = React.lazy(() => import('./ui/CodeWindow'));
-const CmsPanel = React.lazy(() => import('./panels/CmsPanel'));
-const CmsView = React.lazy(() => import('./panels/CmsView'));
-const ContentView = React.lazy(() => import('./panels/ContentView'));
-const VariablesPanel = React.lazy(() => import('./panels/VariablesPanel'));
-const VariablesView = React.lazy(() => import('./panels/VariablesView'));
+// Each optional editor owns its loading boundary so opening it keeps the
+// canvas and neighboring panels visible and interactive.
+const PropsPanel = lazyPanel(() => import('./panels/PropsPanel'));
+const StylePanel = lazyPanel(() => import('./panels/StylePanel'));
+const CodeWindow = lazyPanel(() => import('./ui/CodeWindow'));
+const CmsPanel = lazyPanel(() => import('./panels/CmsPanel'));
+const CmsView = lazyPanel(() => import('./panels/CmsView'));
+const ContentView = lazyPanel(() => import('./panels/ContentView'));
+const VariablesPanel = lazyPanel(() => import('./panels/VariablesPanel'));
+const VariablesView = lazyPanel(() => import('./panels/VariablesView'));
 
 let idCounter = 1000;
 const newId = () => nodeId(`c${idCounter++}`);
@@ -4316,6 +4317,7 @@ export default function App() {
               <PalettePanel
                 components={insertables}
                 devUrl={devUrl}
+                trailingSlash={trailingSlash}
                 onInsert={(name) => addComponent(name, null)}
                 onDragBegin={() => setLeftTab('navigator')}
                 createFrom={createFrom}

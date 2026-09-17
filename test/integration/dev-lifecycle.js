@@ -20,6 +20,7 @@ async function orchestrate() {
   }));
   fs.writeFileSync(path.join(project, 'astro.config.mjs'), 'export default { trailingSlash: "always" };\n');
   fs.writeFileSync(path.join(project, 'src', 'pages', 'index.astro'), '<html><body><h1>Lifecycle fixture</h1></body></html>\n');
+  writeHoverComponents(project);
   fs.mkdirSync(path.join(project, 'src', 'data'));
   fs.writeFileSync(path.join(project, 'src', 'data', 'posts.json'), JSON.stringify([{ id: 'hello', title: 'Hello', rank: 1 }]));
   fs.writeFileSync(path.join(project, 'src', 'content.config.ts'), [
@@ -192,6 +193,8 @@ async function inElectron() {
     assert.equal(servers.length, 1, 'concurrent requests spawned one server');
     await fetchPreview(first.url);
     say('PASS concurrent starts share one marked Astro preview');
+    await verifyHoverPreview(first.url);
+    say('PASS hover previews render guarded props and select exact component files');
 
     await invoke('dev:stop');
     await waitForExit([...servers]);
@@ -255,6 +258,42 @@ async function inElectron() {
     }
     for (const win of BrowserWindow.getAllWindows()) {win.destroy();}
   }
+}
+
+function writeHoverComponents(project) {
+  for (const folder of ['Interactive', 'Other']) {
+    fs.mkdirSync(path.join(project, 'src', 'components', folder), { recursive: true });
+  }
+  fs.writeFileSync(path.join(project, 'src/components/Interactive/AccordionItem.astro'), [
+    '---',
+    'type Props = { heading?: string; render?: boolean };',
+    'const { heading, render = true } = Astro.props;',
+    'const content = await Astro.slots.render("default");',
+    '---',
+    '{render && heading && content && (',
+    '  <details><summary>{heading}</summary><p set:html={content} /></details>',
+    ')}',
+  ].join('\n'));
+  fs.writeFileSync(path.join(project, 'src/components/Other/AccordionItem.astro'),
+    '<p>Distinct other component</p>\n');
+}
+
+async function verifyHoverPreview(base) {
+  // Render through the real generated route: supplying schema data is only
+  // useful if Astro passes it through to the guarded component and its slot.
+  const url = new URL('/__avb/preview/', base);
+  url.searchParams.set('c', 'AccordionItem');
+  url.searchParams.set('p', 'src/components/Interactive/AccordionItem.astro');
+  const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
+  const html = await response.text();
+  assert.equal(response.status, 200, html.slice(0, 1000));
+  assert.match(html, /<details[\s>]/, 'the missing heading no longer hides the component');
+  assert.match(html, /<summary[^>]*>[\s\S]*?AccordionItem/);
+  assert.match(html, /<p[^>]*>[\s\S]*?AccordionItem/);
+  url.searchParams.set('p', 'src/components/Other/AccordionItem.astro');
+  const other = await fetch(url, { signal: AbortSignal.timeout(20000) });
+  assert.equal(other.status, 200);
+  assert.match(await other.text(), /Distinct other component/);
 }
 
 if (process.argv.includes('--electron')) {

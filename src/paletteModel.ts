@@ -1,4 +1,5 @@
 import type { ScanComponent } from '../shared/scan';
+import type { TrailingSlash } from './appTypes';
 import { count, list, optional, pathText, record, text } from '../shared/boundary';
 
 export interface ComponentUsageFile {
@@ -67,6 +68,21 @@ export function groupPaletteComponents(
 
 export function prettyComponentName(name: string): string {
   return name.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+}
+
+export function componentPreviewURL(
+  devURL: string,
+  component: ScanComponent,
+  trailingSlash: TrailingSlash,
+): string {
+  // A basename cannot distinguish components in different folders or a layout
+  // from a component. Match the scan's folder convention without exposing an absolute path.
+  const base = component.isLayout ? 'src' : 'src/components';
+  const file = [base, component.folder, `${component.name}.astro`].filter(Boolean).join('/');
+  const query = new URLSearchParams({ c: component.name, p: file });
+  // Astro 5 returns a 404 when an injected page violates the project's slash policy.
+  const route = trailingSlash === 'always' ? '/__avb/preview/' : '/__avb/preview';
+  return `${devURL.replace(/\/+$/, '')}${route}?${query}`;
 }
 
 export function usageFileLabel(file: ComponentUsageFile): string {

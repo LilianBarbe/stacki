@@ -1,11 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ScanComponent } from '../../shared/scan';
+import type { TrailingSlash } from '../appTypes';
 import type { ComponentUsageFile } from '../paletteModel';
 import type { ComponentCreationSource, UsageAnchor, UsagePopup } from './PaletteDialogs';
 import { cleanError } from '../cleanError';
 import { clearDrag, setDrag } from '../dragState';
 import { rankInsertItems } from '../insertRank';
-import { groupPaletteComponents, parseComponentUsage, prettyComponentName } from '../paletteModel';
+import {
+  componentPreviewURL,
+  groupPaletteComponents,
+  parseComponentUsage,
+  prettyComponentName,
+} from '../paletteModel';
 import { ComponentPlusIcon, ElementComponentIcon, LayoutIcon } from '../ui/Icons';
 import useDismiss from '../ui/useDismiss';
 import { CreateComponentModal, InstancesPopup } from './PaletteDialogs';
@@ -16,6 +22,7 @@ const PREVIEW_DELAY_MS = 450;
 interface PalettePanelProps {
   readonly components: readonly ScanComponent[];
   readonly devUrl: string | null;
+  readonly trailingSlash: TrailingSlash;
   readonly onInsert: (name: string) => void;
   readonly onDragBegin?: () => void;
   readonly onCreateComponent: (name: string, options: { readonly withProps: boolean }) => void;
@@ -105,7 +112,7 @@ function useDelayedTooltip() {
 }
 
 function useComponentPreview() {
-  const [value, setValue] = useState<(Point & { readonly name: string }) | null>(null);
+  const [value, setValue] = useState<(Point & { readonly component: ScanComponent }) | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   const schedule = useCallback((component: ScanComponent, anchor: HTMLElement): void => {
@@ -114,7 +121,7 @@ function useComponentPreview() {
     const left = rect.right + 10;
     const top = Math.max(8, Math.min(rect.top, window.innerHeight - 260));
     timer.current = setTimeout(
-      () => setValue({ name: component.name, left, top }),
+      () => setValue({ component, left, top }),
       PREVIEW_DELAY_MS,
     );
   }, []);
@@ -371,10 +378,10 @@ function PalettePopups({
       )}
       {preview && props.devUrl && (
         <div className="comp-preview" style={{ left: preview.left, top: preview.top }}>
-          <div className="comp-preview-title">{prettyComponentName(preview.name)}</div>
+          <div className="comp-preview-title">{prettyComponentName(preview.component.name)}</div>
           <iframe
-            src={`${props.devUrl}/__avb/preview?c=${encodeURIComponent(preview.name)}`}
-            title={`${preview.name} preview`}
+            src={componentPreviewURL(props.devUrl, preview.component, props.trailingSlash)}
+            title={`${preview.component.name} preview`}
           />
         </div>
       )}
