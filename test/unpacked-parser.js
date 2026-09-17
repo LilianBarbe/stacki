@@ -34,7 +34,8 @@ const check = (what, condition, detail) => {
 };
 
 const ROOT = path.join(__dirname, '..');
-const ENTRY = path.join('electron', 'astroParser.js');
+// The preview helper also requires the parser; cover both dependency closures.
+const ENTRY = path.join('electron', 'componentPreview.js');
 
 // Every local file the entry pulls in, transitively. Only relative requires:
 // a bare specifier is a package, which asar handles for the app itself and
