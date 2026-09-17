@@ -9,6 +9,9 @@ import { LIMITS } from '../../shared/limits';
 export const POPUP_GAP = 4;
 const POPUP_EDGE = 8;
 const POPUP_MIN = 120;
+const POPUP_PADDING_HEIGHT = 8;
+const OPTION_HEIGHT = 26;
+const SEARCH_HEIGHT = 36;
 export function popupBox(
   rectangle: Pick<DOMRect, 'top' | 'bottom'>,
   wanted: number,
@@ -187,16 +190,19 @@ function useDropdownActions<T>(props: DropdownProps<T>, state: Selection<T>): Ac
 
 function useDropdownPosition<T>(state: Selection<T>, options: { readonly searchable: boolean }) {
   const [position, setPosition] = useState<PopupPosition | null>(null);
-  const { open, triggerRef, popupRef, visible } = state;
+  const { open, triggerRef, visible } = state;
   const { searchable } = options;
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) {
       return;
     }
     const rectangle = triggerRef.current.getBoundingClientRect();
-    const wanted = popupRef.current
-      ? popupRef.current.scrollHeight
-      : visible.length * 30 + 12 + (searchable ? 34 : 0);
+    // The popup constrains its scrolling list. Measuring the constrained popup
+    // makes a long list alternate between capped and uncapped heights until
+    // React aborts the render loop, so derive its intrinsic height from the
+    // dimensions this component owns instead.
+    const wanted =
+      visible.length * OPTION_HEIGHT + POPUP_PADDING_HEIGHT + (searchable ? SEARCH_HEIGHT : 0);
     const next = {
       left: rectangle.left,
       width: rectangle.width,
@@ -212,7 +218,7 @@ function useDropdownPosition<T>(state: Selection<T>, options: { readonly searcha
         ? previous
         : next,
     );
-  }, [open, triggerRef, popupRef, visible.length, position, searchable]);
+  }, [open, triggerRef, visible.length, searchable]);
   return position;
 }
 
