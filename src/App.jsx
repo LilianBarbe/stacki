@@ -11,15 +11,12 @@ import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveCla
 import { setSoundEnabled } from './ui/sound.js';
 import { createPreviewWatch } from './previewRecovery.js';
 import { tellCanvas } from './canvasQuery.js';
-import PropsPanel from './panels/PropsPanel.jsx';
-import StylePanel from './panels/StylePanel.jsx';
 import PreviewPane from './panels/PreviewPane.jsx';
 import GitChip from './panels/GitChip.jsx';
 import HistoryPanel, { relativeTime } from './panels/HistoryPanel.jsx';
 import { ConfirmHost, confirmDialog } from './ui/ConfirmDialog.jsx';
 import { mergeBranchAction, deleteBranchAction } from './gitActions.js';
 import LeftRail from './ui/LeftRail.jsx';
-import CodeWindow from './ui/CodeWindow.jsx';
 import PageSwitcher from './ui/PageSwitcher.jsx';
 import WorkspaceSwitcher from './ui/WorkspaceSwitcher.jsx';
 import DynamicPicker from './ui/DynamicPicker.jsx';
@@ -31,11 +28,6 @@ import {
 } from './astroAssets.js';
 import InsertSearch from './ui/InsertSearch.jsx';
 import AssetsPanel from './panels/AssetsPanel.jsx';
-import CmsPanel from './panels/CmsPanel.jsx';
-import CmsView from './panels/CmsView.jsx';
-import ContentView from './panels/ContentView.jsx';
-import VariablesPanel from './panels/VariablesPanel.jsx';
-import VariablesView from './panels/VariablesView.jsx';
 import CodePanel from './panels/CodePanel.jsx';
 import AgentPanel from './panels/AgentPanel.jsx';
 import { getElementSchema, GLOBAL_ATTRS, HTML_TAGS, VOID_TAGS, canContainTag } from './elementSchemas.js';
@@ -79,6 +71,17 @@ import {
   ElementComponentIcon,
   TerminalIcon,
 } from './ui/Icons.jsx';
+
+import { lazyPanel } from './ui/lazyPanel.jsx';
+
+const PropsPanel = lazyPanel(() => import('./panels/PropsPanel.jsx'));
+const StylePanel = lazyPanel(() => import('./panels/StylePanel.jsx'));
+const CodeWindow = lazyPanel(() => import('./ui/CodeWindow.jsx'));
+const CmsPanel = lazyPanel(() => import('./panels/CmsPanel.jsx'));
+const CmsView = lazyPanel(() => import('./panels/CmsView.jsx'));
+const ContentView = lazyPanel(() => import('./panels/ContentView.jsx'));
+const VariablesPanel = lazyPanel(() => import('./panels/VariablesPanel.jsx'));
+const VariablesView = lazyPanel(() => import('./panels/VariablesView.jsx'));
 
 let idCounter = 1000;
 const newId = () => `c${idCounter++}`;
@@ -4591,6 +4594,7 @@ export default function App() {
               <PalettePanel
                 components={insertables}
                 devUrl={devUrl}
+                trailingSlash={trailingSlash}
                 onInsert={(name) => addComponent(name, null)}
                 onDragBegin={() => setLeftTab('navigator')}
                 createFrom={createFrom}

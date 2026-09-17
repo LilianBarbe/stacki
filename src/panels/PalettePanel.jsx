@@ -12,6 +12,7 @@ import { rankInsertItems } from '../insertRank.js';
 import { setDrag, clearDrag } from '../dragState.js';
 import { componentNameError, toComponentName } from '../componentName.js';
 import useDismiss from '../ui/useDismiss.js';
+import { componentPreviewUrl } from '../componentPreview.js';
 
 // How long the pointer rests on the create button before its tooltip appears —
 // the same wait the icon rail and the navigator's header use.
@@ -52,6 +53,7 @@ const storeCollapsed = (folders) => {
 export default function PalettePanel({
   components,
   devUrl,
+  trailingSlash,
   onInsert,
   onDragBegin,
   onCreateComponent,
@@ -119,7 +121,7 @@ export default function PalettePanel({
     if (canCreate) setCreating(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createRequest]);
-  const [preview, setPreview] = useState(null); // {name, left, top}
+  const [preview, setPreview] = useState(null); // {component, left, top}
   const hoverTimer = useRef(null);
   useEffect(() => () => clearTimeout(hoverTimer.current), []);
 
@@ -165,7 +167,7 @@ export default function PalettePanel({
     const rect = e.currentTarget.getBoundingClientRect();
     const left = rect.right + 10;
     const top = Math.max(8, Math.min(rect.top, window.innerHeight - 260));
-    hoverTimer.current = setTimeout(() => setPreview({ name: comp.name, left, top }), 450);
+    hoverTimer.current = setTimeout(() => setPreview({ component: comp, left, top }), 450);
   };
 
   const cancelPreview = () => {
@@ -327,10 +329,10 @@ export default function PalettePanel({
 
       {preview && devUrl && (
         <div className="comp-preview" style={{ left: preview.left, top: preview.top }}>
-          <div className="comp-preview-title">{prettyName(preview.name)}</div>
+          <div className="comp-preview-title">{prettyName(preview.component.name)}</div>
           <iframe
-            src={`${devUrl}/__avb/preview?c=${encodeURIComponent(preview.name)}`}
-            title={`${preview.name} preview`}
+            src={componentPreviewUrl(devUrl, preview.component, trailingSlash)}
+            title={`${preview.component.name} preview`}
           />
         </div>
       )}
