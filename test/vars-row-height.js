@@ -139,6 +139,15 @@ const STYLESHEET = `:root {
        const win = new BrowserWindow({ show: false, width: 1000, height: 800 });
        await win.loadFile(${JSON.stringify(path.join(buildDir, 'index.html'))});
        const js = (code) => win.webContents.executeJavaScript(code);
+       const pointerAt = (type, x, y) => js(
+         "(() => { const target = " +
+           (type === 'pointerdown' ? "document.elementFromPoint(" + x + "," + y + ")" : "window") +
+           "; if (!target) return false; target.dispatchEvent(new PointerEvent(" +
+           JSON.stringify(type) +
+           ", { bubbles: true, clientX: " + x + ", clientY: " + y +
+           ", button: 0, buttons: " + (type === 'pointerup' ? 0 : 1) +
+           ", pointerId: 1, pointerType: 'mouse', isPrimary: true })); return true; })()"
+       );
        await new Promise((r) => setTimeout(r, 600));
        const out = {};
        // The invariant the whole sheet rests on: line n of the names and line n
@@ -185,12 +194,13 @@ const STYLESHEET = `:root {
        const grab = await js("(() => { const n = [...document.querySelectorAll('.vars-name .vars-rename')].find((el) => el.textContent === 'light-200'); if (!n) return null; const b = n.getBoundingClientRect(); return { x: Math.round(b.left + 10), y: Math.round(b.top + b.height / 2) } })()");
        const drop = await js("(() => { const tables = [...document.querySelectorAll('.vars-table')]; const t = tables.find((n) => /Palette/.test(n.textContent)); if (!t) return null; const add = t.querySelector('.vars-fixed .vars-add'); const b = add.getBoundingClientRect(); return { x: Math.round(b.left + 40), y: Math.round(b.top + b.height / 2) } })()");
        if (grab && drop) {
-         win.webContents.sendInputEvent({ type: 'mouseDown', x: grab.x, y: grab.y, button: 'left', clickCount: 1 });
+         await pointerAt('pointerdown', grab.x, grab.y);
+         await new Promise((r) => setTimeout(r, 50));
          for (let i = 1; i <= 6; i++) {
-           win.webContents.sendInputEvent({ type: 'mouseMove', x: grab.x, y: Math.round(grab.y + ((drop.y - grab.y) * i) / 6), button: 'left' });
+           await pointerAt('pointermove', grab.x, Math.round(grab.y + ((drop.y - grab.y) * i) / 6));
            await new Promise((r) => setTimeout(r, 25));
          }
-         win.webContents.sendInputEvent({ type: 'mouseUp', x: drop.x, y: drop.y, button: 'left', clickCount: 1 });
+         await pointerAt('pointerup', drop.x, drop.y);
          await new Promise((r) => setTimeout(r, 200));
        }
        out.drag = { grabbed: !!grab, dropped: !!drop, moves: await js('window.__moves || null') };
@@ -202,12 +212,13 @@ const STYLESHEET = `:root {
        // and "after it".
        const dropHead = await js("(() => { const r = [...document.querySelectorAll('.vars-fixed .vars-row')].find((n) => (n.textContent || '').includes('light-200')); if (!r) return null; const b = r.getBoundingClientRect(); return { x: Math.round(b.left + 40), y: Math.round(b.top + 3) } })()");
        if (grabHead && dropHead) {
-         win.webContents.sendInputEvent({ type: 'mouseDown', x: grabHead.x, y: grabHead.y, button: 'left', clickCount: 1 });
+         await pointerAt('pointerdown', grabHead.x, grabHead.y);
+         await new Promise((r) => setTimeout(r, 50));
          for (let i = 1; i <= 6; i++) {
-           win.webContents.sendInputEvent({ type: 'mouseMove', x: grabHead.x, y: Math.round(grabHead.y + ((dropHead.y - grabHead.y) * i) / 6), button: 'left' });
+           await pointerAt('pointermove', grabHead.x, Math.round(grabHead.y + ((dropHead.y - grabHead.y) * i) / 6));
            await new Promise((r) => setTimeout(r, 25));
          }
-         win.webContents.sendInputEvent({ type: 'mouseUp', x: dropHead.x, y: dropHead.y, button: 'left', clickCount: 1 });
+         await pointerAt('pointerup', dropHead.x, dropHead.y);
          await new Promise((r) => setTimeout(r, 200));
        }
        out.headingDrag = { grabbed: !!grabHead, asked: await js('window.__heading || null') };

@@ -138,6 +138,12 @@ const check = (what, condition, detail) => {
          }
          if (!POPUP.includes(label)) {
            await win.webContents.executeJavaScript(\`(() => {
+             if (document.querySelector('.embed-editor_tsettings'))
+               document.querySelector('button[aria-label="Transform settings"]').click();
+             return null;
+           })()\`);
+           await sleep(350);
+           await win.webContents.executeJavaScript(\`(() => {
              const input = document.querySelector('input[aria-label=' + JSON.stringify(\${JSON.stringify(label)}) + ']');
              const editor = input?.closest('.embed-editor_varconnect')
                ?.querySelector('.embed-editor_varconnect-editor');
