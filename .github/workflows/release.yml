@@ -65,7 +65,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-electron-
       - run: npm ci
-      - run: npm run build
+      - run: npm test
+      - name: Validate Windows signing secrets
+        shell: pwsh
+        env:
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK)) {
+            throw 'WIN_CSC_LINK is missing'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_KEY_PASSWORD)) {
+            throw 'WIN_CSC_KEY_PASSWORD is missing'
+          }
       - run: npx electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

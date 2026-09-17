@@ -47,7 +47,17 @@ export function mediaKindFor(value: unknown) {
 
 // Per-segment encoding, so '#', '?' and '%' in a filename survive the trip.
 const encodePath = (abs: string): string =>
-  abs.replace(/\\/g, '/').replace(/^\//, '').split('/').map(encodeURIComponent).join('/');
+  abs
+    .replace(/\\/g, '/')
+    .replace(/^\/(?!\/)/, '')
+    .split('/')
+    .map((segment, index) =>
+      index === 0 && /^[A-Za-z]:$/.test(segment) ? segment : encodeURIComponent(segment),
+    )
+    .join('/');
+
+const fileURL = (encodedPath: string): string =>
+  encodedPath.startsWith('//') ? `file:${encodedPath}` : `file:///${encodedPath}`;
 
 // Served by the main process (see ASSET_SCHEME in electron/main.js). A plain
 // file:// URL only loads when the window itself came from file:// — true of a
@@ -56,7 +66,7 @@ const encodePath = (abs: string): string =>
 // file:// so a packaged build still works if the scheme is unavailable.
 export const srcCandidates = (abs: string): readonly [string, string] => [
   `stacki-asset://local/${encodePath(abs)}`,
-  `file:///${encodePath(abs)}`,
+  fileURL(encodePath(abs)),
 ];
 
 // Formats Chromium can load through FontFace. .eot can't, so it keeps the

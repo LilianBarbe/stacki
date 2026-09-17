@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -101,7 +102,7 @@ function fakeAudio() {
   global.window = { AudioContext: audio.Ctx };
   const { clickNote, dragNote, endDragNotes, hoverNote, noteHzFor, noteToneFor, rowHzFor, setSoundEnabled, soundEnabled } =
     await import(
-    `file://${out}?v=${Date.now()}`
+    `${pathToFileURL(out).href}?v=${Date.now()}`
   );
 
   // --- off until asked for ----------------------------------------------------

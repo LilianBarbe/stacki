@@ -34,9 +34,9 @@ const git = (cwd, args) =>
 // what the real one would leave behind — under the starter's own name, since
 // naming the site after its folder is the app's promise to keep.
 const fakeNpm = (root, name, body) => {
-  const file = path.join(root, name);
+  const script = path.join(root, `${name}.js`);
   fs.writeFileSync(
-    file,
+    script,
     `#!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
@@ -46,7 +46,12 @@ ${body}
 `,
     { mode: 0o755 }
   );
-  return file;
+  if (process.platform !== 'win32') {
+    return script;
+  }
+  const command = path.join(root, `${name}.cmd`);
+  fs.writeFileSync(command, `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`);
+  return command;
 };
 
 const SCAFFOLD = `

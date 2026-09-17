@@ -134,11 +134,13 @@ textarea { font-family: inherit; font-size: 12px; line-height: 1.5; resize: none
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 12px 0 84px; /* room for macOS traffic lights */
+  padding: 0 12px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
 }
+html[data-platform='darwin'] .titlebar { padding-left: 84px; }
+html[data-platform='win32'] .titlebar { padding-right: 148px; }
 .titlebar > * { -webkit-app-region: no-drag; }
 .titlebar .app-title {
   font-weight: 600;

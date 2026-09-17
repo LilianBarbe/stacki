@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -36,7 +37,9 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { comparePageNames, leadsFolders, pageRank } = await import(`file://${orderOut}?v=${Date.now()}`);
+  const { comparePageNames, leadsFolders, pageRank } = await import(
+    `${pathToFileURL(orderOut).href}?v=${Date.now()}`
+  );
 
   check('the folder’s own page leads', leadsFolders('index.astro') === true);
   check('however it is spelled', leadsFolders('index') === true && leadsFolders('Index.astro') === true);

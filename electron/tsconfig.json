@@ -27,6 +27,7 @@
     "serialQueue.ts",
     "selfWrites.ts",
     "windowBounds.ts",
+    "platform.ts",
     "assetRefs.ts",
     "frontmatter.ts",
     "jsCollections.ts",

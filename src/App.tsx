@@ -94,6 +94,8 @@ import type { VariableSelection } from './variablesBridge';
 import type { InsertTarget } from './insertTarget';
 import type { InsertItem } from './ui/InsertSearch';
 import { toRecord } from '../shared/record';
+import { projectRelativePath } from './projectPath.js';
+import { currentDesktopPlatform, shortcutLabel } from './shortcutLabel.js';
 import {
   cloneEditorModel,
   findEditorNodeById as findNodeById,
@@ -3832,7 +3834,11 @@ export default function App() {
 
   const editedRel =
     editStack.length > 1 && project?.path
-      ? editStack[editStack.length - 1]?.path.replace(project.path + '/', '') ?? null
+      ? projectRelativePath(
+          project.path,
+          editStack[editStack.length - 1]?.path ?? '',
+          window.avb.platform,
+        )
       : null;
 
   // The reported classes, keyed by node id — same walk as the render report,
@@ -3850,7 +3856,7 @@ export default function App() {
   const openFileSrcRel = (() => {
     const p = editStack[editStack.length - 1]?.path || currentPage?.path;
     if (!p || !project?.path) {return null;}
-    const rel = p.startsWith(project.path + '/') ? p.slice(project.path.length + 1) : p;
+    const rel = projectRelativePath(project.path, p, window.avb.platform);
     return rel.startsWith('src/') ? rel.slice(4) : rel;
   })();
 
@@ -3978,7 +3984,9 @@ export default function App() {
   // stack, so it's read from the stack rather than parsed out of the key.
   // Through a ref because the menu handler is bound long before this is in scope.
   const relOf = (abs: string | undefined): string | null =>
-    abs && project?.path ? abs.replace(project.path + '/', '') : null;
+    abs && project?.path
+      ? projectRelativePath(project.path, abs, window.avb.platform)
+      : null;
   const openRel = relOf(currentPage?.path);
   const leafPath = selectedId ? tree.path(selectedId) : null;
   selectionKeysRef.current = !openRel
@@ -4215,7 +4223,11 @@ export default function App() {
         <div className="titlebar-actions">
           <button
             className={`titlebar-btn ${termOpen ? 'on' : ''}`}
-            title={termOpen ? 'Hide terminal (⌘J)' : 'Show terminal (⌘J)'}
+            title={`${termOpen ? 'Hide' : 'Show'} terminal (${shortcutLabel(
+              'J',
+              'primary',
+              currentDesktopPlatform(),
+            )})`}
             onClick={() => setTermOpen((v) => !v)}
           >
             <TerminalIcon size={14} />

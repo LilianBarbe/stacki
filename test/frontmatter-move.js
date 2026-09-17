@@ -21,6 +21,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -49,7 +50,7 @@ const check = (what, condition, detail) => {
     unusedDeclarations,
     withStatements,
     withoutDeclarations,
-  } = await import(`file://${out}?v=${Date.now()}`);
+  } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
 
   // --- what a piece of markup reads ------------------------------------------------
   {

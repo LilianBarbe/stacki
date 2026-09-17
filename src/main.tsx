@@ -6,6 +6,7 @@ import './styles.css';
 
 const rootElement = document.getElementById('root');
 assert(rootElement !== null, 'Renderer root element exists.');
+document.documentElement.dataset['platform'] = window.avb.platform;
 
 createRoot(rootElement).render(
   <React.Suspense fallback={null}>

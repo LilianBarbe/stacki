@@ -14,6 +14,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -35,7 +36,7 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { keepsSlot } = await import(`file://${out}?v=${Date.now()}`);
+  const { keepsSlot } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
 
   const wrapper = { kind: 'component', name: 'ContentWrapper' };
   const definition = { name: 'ContentWrapper', slots: ['default', 'column2'] };

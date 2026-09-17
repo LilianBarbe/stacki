@@ -22,6 +22,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -117,7 +118,9 @@ const settle = (ms = 20) => new Promise((r) => setTimeout(r, ms));
     platform: 'node',
     logLevel: 'silent',
   });
-  const { setCanvasFrame, tellCanvas } = await import(`file://${queryBundle}?v=${Date.now()}`);
+  const { setCanvasFrame, tellCanvas } = await import(
+    `${pathToFileURL(queryBundle).href}?v=${Date.now()}`
+  );
   const posted = [];
   setCanvasFrame({ postMessage: (m) => posted.push(m) });
   check('what the app says reaches the frame', tellCanvas({ type: 'avb:patch-now' }) === true);

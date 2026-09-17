@@ -33,6 +33,7 @@ import {
   navigatorChildren,
   navigatorHost,
 } from './structureModel';
+import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel';
 
 export interface StructureTreeContext {
   readonly selectedId: string | null;
@@ -591,17 +592,24 @@ export function ContextMenu({
   useContextDismiss(ref, onClose);
   const left = Math.min(position.left, window.innerWidth - 208);
   const top = Math.min(position.top, window.innerHeight - 130);
+  const shortcut = (key: string): string =>
+    shortcutLabel(key, 'primary', currentDesktopPlatform());
   return (
     <div ref={ref} className="ctx-menu" style={{ left, top, width: 200 }}>
-      <ContextMenuItem action="copy" label="Copy" shortcut="⌘C" onAction={onAction} />
+      <ContextMenuItem action="copy" label="Copy" shortcut={shortcut('C')} onAction={onAction} />
       <ContextMenuItem
         action="paste"
         label="Paste"
-        shortcut="⌘V"
+        shortcut={shortcut('V')}
         disabled={!canPaste}
         onAction={onAction}
       />
-      <ContextMenuItem action="duplicate" label="Duplicate" shortcut="⌘D" onAction={onAction} />
+      <ContextMenuItem
+        action="duplicate"
+        label="Duplicate"
+        shortcut={shortcut('D')}
+        onAction={onAction}
+      />
       <div className="ctx-divider" />
       <ContextMenuItem action="delete" label="Delete" shortcut="⌫" onAction={onAction} />
     </div>

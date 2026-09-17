@@ -18,6 +18,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -39,7 +40,9 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { rendersOwnElement, liveClassesById } = await import(`file://${out}?v=${Date.now()}`);
+  const { rendersOwnElement, liveClassesById } = await import(
+    `${pathToFileURL(out).href}?v=${Date.now()}`
+  );
 
   // --- what renders something of its own ------------------------------------
   check('a div does', rendersOwnElement({ kind: 'element', name: 'div' }) === true);

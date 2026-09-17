@@ -18,6 +18,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -39,7 +40,7 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { canvasClickAction } = await import(`file://${out}?v=${Date.now()}`);
+  const { canvasClickAction } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
 
   // Editing Button.astro, opened from the second instance on the page.
   const COMPONENT = 'src/components/Button.astro|';

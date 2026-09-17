@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -38,7 +39,9 @@ const check = (what, condition, detail) => {
     platform: 'node',
     logLevel: 'silent',
   });
-  const { objectFields, objectText } = await import(`file://${modOut}?v=${Date.now()}`);
+  const { objectFields, objectText } = await import(
+    `${pathToFileURL(modOut).href}?v=${Date.now()}`
+  );
 
   const TAGS = '{ legend: "Ministry Role", options: ["Pastors", "Staff", "Prayer"] }';
   {

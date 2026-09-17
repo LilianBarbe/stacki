@@ -17,6 +17,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -40,7 +41,7 @@ const check = (what, condition, detail) => {
       outfile: out,
       logLevel: 'silent',
     });
-    return import(`file://${out}`);
+    return import(pathToFileURL(out).href);
   };
 
   const { partsFromValue, valueFromParts } = await bundle('src/bindings.js', 'bindings.bundle.mjs');

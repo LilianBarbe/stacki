@@ -5,9 +5,16 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 import { Buffer } from 'node:buffer';
-import { spawn, type PseudoTerminal, type SpawnOptions } from 'node-pty';
+import type { PseudoTerminal, SpawnOptions } from 'node-pty';
 
 import { toRecord } from '../shared/record.js';
+import {
+  isPathWithin,
+  mergeToolPaths,
+  pathEnvironmentValue,
+  setPathEnvironment,
+  staticToolPathGuesses,
+} from './platform.js';
 
 // Embedded terminal — a real login shell in the open project, hosted by
 // node-pty and rendered by xterm in the bottom dock.
@@ -71,6 +78,15 @@ function buildShellEnv(): Record<string, string | undefined> {
   env['COLORTERM'] = 'truecolor';
 
   if (isWin) {
+    const current = pathEnvironmentValue(env);
+    const guesses = staticToolPathGuesses(os.homedir(), env).filter((candidate) => {
+      try {
+        return fs.existsSync(candidate);
+      } catch {
+        return false;
+      }
+    });
+    setPathEnvironment(env, mergeToolPaths(current, guesses));
     return env;
   }
 
@@ -193,11 +209,29 @@ type SpawnResult =
   | { readonly proc: PseudoTerminal; readonly error: null }
   | { readonly proc: null; readonly error: SpawnFields };
 
-async function spawnWithRetry(shell: string, args: readonly string[], options: SpawnOptions): Promise<SpawnResult> {
+type PtySpawn = typeof import('node-pty')['spawn'];
+let ptySpawnPromise: Promise<PtySpawn> | undefined;
+
+function loadPtySpawn(): Promise<PtySpawn> {
+  ptySpawnPromise ??= import('node-pty').then((module) => module.spawn);
+  return ptySpawnPromise;
+}
+
+async function spawnWithRetry(
+  shell: string,
+  args: readonly string[],
+  options: SpawnOptions,
+): Promise<SpawnResult> {
+  let spawnPty: PtySpawn;
+  try {
+    spawnPty = await loadPtySpawn();
+  } catch (error: unknown) {
+    return { proc: null, error: { ...spawnError(error), code: 'PTY_LOAD_FAILED' } };
+  }
   let lastErr: SpawnFields | null = null;
   for (let attempt = 0; attempt <= SPAWN_RETRIES; attempt++) {
     try {
-      return { proc: spawn(shell, [...args], options), error: null };
+      return { proc: spawnPty(shell, [...args], options), error: null };
     } catch (err) {
       lastErr = spawnError(err);
       if (!RETRIABLE_SPAWN_CODES.has(lastErr.code ?? '') || attempt === SPAWN_RETRIES) {
@@ -316,7 +350,7 @@ function registerTerminalHandlers({
     const root = projectRoot();
     const cwd = payload?.cwd;
     const abs = cwd ? path.resolve(cwd) : null;
-    if (!root || !abs || (abs !== root && !(abs + path.sep).startsWith(root + path.sep))) {
+    if (!root || !abs || !isPathWithin(root, abs)) {
       return { ok: false as const, error: 'Terminal can only open inside the current project.' };
     }
     const id = payload?.id ?? '';

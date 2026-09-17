@@ -133,7 +133,7 @@ export function HistoryWorktrees({
               <BranchIcon size={12} />
             </span>
             <span className="label">{worktree.branch ?? 'a single version'}</span>
-            <span className="sub">{worktree.path.split('/').at(-1) ?? worktree.path}</span>
+            <span className="sub">{worktree.path.split(/[\\/]/).at(-1) ?? worktree.path}</span>
           </div>
         ))}
     </HistorySection>

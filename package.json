@@ -35,6 +35,7 @@
     "test:classattr": "node test/class-attr.js",
     "test:gridtracks": "node test/grid-tracks.js",
     "test:windowbounds": "node test/window-bounds.js",
+    "test:platformwindows": "node --test test/platform-windows.test.js",
     "test:transformunits": "node test/transform-units.js",
     "test:popoverdismiss": "node test/popover-dismiss.js",
     "test:nodestates": "node test/node-states.js",
@@ -290,6 +291,7 @@
     },
     "win": {
       "icon": "resources/icon.ico",
+      "forceCodeSigning": true,
       "target": [
         {
           "target": "nsis",

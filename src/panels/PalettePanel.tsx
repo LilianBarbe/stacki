@@ -15,6 +15,7 @@ import {
 import { ComponentPlusIcon, ElementComponentIcon, LayoutIcon } from '../ui/Icons';
 import useDismiss from '../ui/useDismiss';
 import { CreateComponentModal, InstancesPopup } from './PaletteDialogs';
+import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel';
 
 const TOOLTIP_DELAY_MS = 500;
 const PREVIEW_DELAY_MS = 450;
@@ -204,7 +205,9 @@ function PaletteHeader({
       </div>
       {tooltip.value && (
         <div className="rail-tooltip below" style={tooltip.value}>
-          {canCreate ? 'New component (⌘⇧A)' : source.reason}
+          {canCreate
+            ? `New component (${shortcutLabel('A', 'primary-shift', currentDesktopPlatform())})`
+            : source.reason}
         </div>
       )}
     </>

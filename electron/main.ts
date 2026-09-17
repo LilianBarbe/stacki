@@ -3,6 +3,16 @@ import { createIpcRegistrar } from './ipc.js';
 import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds.js';
 import { definedFields } from '../shared/boundary.js';
 import { gitErrorDetail } from './git.js';
+import {
+  commandNeedsShell,
+  isPathDescendant,
+  isPathWithin,
+  mergeToolPaths,
+  pathEnvironmentValue,
+  sameFilesystemPath,
+  setPathEnvironment,
+  staticToolPathGuesses,
+} from './platform.js';
 import { userInfo } from 'os';
 import type {
   BrowserWindow as Window,
@@ -194,14 +204,15 @@ function registerAssetProtocol() {
     } catch {
       return new Response(null, { status: 400 });
     }
-    // stacki-asset://local/Users/… on posix, //local/C:/… on Windows.
+    // stacki-asset://local/Users/… on POSIX, /C:/… for a Windows drive, and
+    // ///server/share/… for a Windows UNC path.
     if (isWin) {
       abs = abs.replace(/^\//, '');
     }
     abs = path.resolve(abs);
     // Preview iframes run the user's own site; keep the scheme from being a
     // general-purpose file reader by serving only the open project's files.
-    if (!openProjectRoot || !(abs + path.sep).startsWith(openProjectRoot + path.sep)) {
+    if (!openProjectRoot || !isPathDescendant(openProjectRoot, abs)) {
       return new Response(null, { status: 403 });
     }
     return serveFile(abs, request);
@@ -257,9 +268,18 @@ function createWindow() {
     ...bounds,
     title: 'Stacki',
     backgroundColor: '#111111',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : isWin ? 'hidden' : 'default',
+    ...(isWin
+      ? {
+          titleBarOverlay: {
+            color: '#171717',
+            symbolColor: '#a8a8a8',
+            height: 40,
+          },
+        }
+      : {}),
     // Windows/Linux taskbar + window chrome; macOS uses the Dock icon above.
-    icon: resource(process.platform === 'darwin' ? 'icon.icns' : 'icon.png'),
+    icon: resource(process.platform === 'darwin' ? 'icon.icns' : isWin ? 'icon.ico' : 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -842,15 +862,7 @@ const cmpVersion = (a: string, b: string) => {
 function nodeDirGuesses() {
   const home = app.getPath('home');
   const dirs = isWin
-    ? [
-        path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'nodejs'),
-        path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'nodejs'),
-        path.join(process.env['APPDATA'] || path.join(home, 'AppData', 'Roaming'), 'npm'),
-        path.join(home, 'AppData', 'Local', 'Volta', 'bin'),
-        path.join(home, 'AppData', 'Roaming', 'fnm'),
-        path.join(home, 'scoop', 'shims'),
-        'C:\\ProgramData\\chocolatey\\bin',
-      ]
+    ? [...staticToolPathGuesses(home, process.env)]
     : [
         '/opt/homebrew/bin', // Homebrew, Apple Silicon
         '/usr/local/bin', // Homebrew on Intel, and the official installer
@@ -899,35 +911,29 @@ function nodeDirGuesses() {
 // child process is about to start.
 let toolPathReady = false;
 function ensureToolPath() {
-  if (toolPathReady || isWin) {
+  if (toolPathReady) {
     return;
   }
   toolPathReady = true;
-  const parts = (process.env['PATH'] || '').split(path.delimiter).filter(Boolean);
-  const seen = new Set(parts);
-  const append = (dir: string) => {
-    if (dir && !seen.has(dir)) {
-      seen.add(dir);
-      parts.push(dir);
-    }
-  };
+  const candidates: string[] = [];
   // Appended, not prepended: the system's own resolution order stays intact,
   // and these directories only ever win for tools the base PATH lacks.
-  for (const dir of shellPathDirs()) {
-    append(dir);
+  if (!isWin) {
+    candidates.push(...shellPathDirs());
   }
   for (const dir of nodeDirGuesses()) {
     if (fs.existsSync(dir)) {
-      append(dir);
+      candidates.push(dir);
     }
   }
-  process.env['PATH'] = parts.join(path.delimiter);
+  const current = pathEnvironmentValue(process.env);
+  setPathEnvironment(process.env, mergeToolPaths(current, candidates));
 }
 
 function resolveNodeBin() {
   ensureToolPath();
   const exe = isWin ? 'node.exe' : 'node';
-  for (const dir of (process.env['PATH'] || '').split(path.delimiter)) {
+  for (const dir of pathEnvironmentValue(process.env).split(path.delimiter)) {
     if (!dir) {
       continue;
     }
@@ -995,7 +1001,7 @@ function run(cmd: string, args: readonly string[], cwd: string, opts: ExecFileOp
     execFile(
       cmd,
       [...args],
-      { cwd, timeout: opts.timeout || 60000, ...opts },
+      { cwd, timeout: opts.timeout || 60000, shell: commandNeedsShell(cmd), ...opts },
       (err, stdout, stderr) => {
         if (err) {
           Object.assign(err, { stdout, stderr });
@@ -1126,7 +1132,8 @@ function readTrailingSlash(projectPath: string) {
   // one running — an adopted external server never loads the marker config,
   // and a file left behind by an earlier run would answer for a config that
   // has since changed.
-  const ours = devServer && devServer.projectPath === projectPath && !devServer.external;
+  const ours =
+    devServer && sameFilesystemPath(devServer.projectPath, projectPath) && !devServer.external;
   try {
     if (!ours) {
       throw new Error('no server of ours');
@@ -1267,7 +1274,7 @@ function hasDependencies(projectPath: string) {
 }
 
 ipcMain.handle('recents:add', async (_e, projectPath) => {
-  const list = readRecents().filter((r) => r.path !== projectPath);
+  const list = readRecents().filter((recent) => !sameFilesystemPath(recent.path, projectPath));
   list.unshift({
     path: projectPath,
     name: path.basename(projectPath),
@@ -1278,7 +1285,9 @@ ipcMain.handle('recents:add', async (_e, projectPath) => {
 });
 
 ipcMain.handle('recents:remove', async (_e, projectPath) => {
-  writeRecents(readRecents().filter((r) => r.path !== projectPath));
+  writeRecents(
+    readRecents().filter((recent) => !sameFilesystemPath(recent.path, projectPath)),
+  );
   // The picture and the note about when it was taken both go.
   thumbs.forget(app.getPath('userData'), projectPath);
   return { ok: true as const };
@@ -1307,7 +1316,7 @@ function captureThumb(projectPath: string) {
 async function doCaptureThumb(projectPath: string) {
   const userData = app.getPath('userData');
   // Already running for this project (it is the one that is open) — use it.
-  if (devServer && devServer.projectPath === projectPath && devServer.url) {
+  if (devServer && sameFilesystemPath(devServer.projectPath, projectPath) && devServer.url) {
     if (await serverAlive(devServer.url)) {
       return thumbs.capture(userData, projectPath, devServer.url + '/');
     }
@@ -1328,7 +1337,7 @@ function spawnAstroServer(projectPath: string, localBin: string, args: readonly 
   const [cmd, argv] = nodeCliCommand(localBin, args);
   return spawn(cmd, argv, {
     cwd: projectPath,
-    shell: isWin && cmd === localBin,
+    shell: commandNeedsShell(cmd),
     // Give descendants their own process group so closing a project can stop
     // Vite and Astro together, including CLIs that launch another process.
     detached: !isWin,
@@ -1399,10 +1408,15 @@ async function withTemporaryServer(
       if (
         lock?.url &&
         new URL(lock.url).port === String(port) &&
-        devServer?.projectPath !== projectPath
+        (!devServer || !sameFilesystemPath(devServer.projectPath, projectPath))
       ) {
         const [stopCmd, stopArgv] = nodeCliCommand(localBin, ['dev', 'stop']);
-        execFile(stopCmd, stopArgv, { cwd: projectPath, timeout: 10000 }, () => {});
+        execFile(
+          stopCmd,
+          stopArgv,
+          { cwd: projectPath, timeout: 10000, shell: commandNeedsShell(stopCmd) },
+          () => {},
+        );
       }
     } catch {
       /* best effort */
@@ -1465,7 +1479,7 @@ let thumbTimer: ReturnType<typeof setTimeout> | undefined;
 function scheduleThumb(projectPath: string, delay: number) {
   clearTimeout(thumbTimer);
   thumbTimer = setTimeout(() => {
-    if (!devServer || devServer.projectPath !== projectPath) {
+    if (!devServer || !sameFilesystemPath(devServer.projectPath, projectPath)) {
       return;
     }
     if (!thumbs.isStale(app.getPath('userData'), projectPath)) {
@@ -1761,7 +1775,7 @@ ipcMain.handle('project:scan', async (_e, projectPath) => {
     comp.instances = allSources.reduce(
       (n, { file, text }) =>
         n +
-        (path.resolve(file) === path.resolve(comp.path)
+        (sameFilesystemPath(file, comp.path)
           ? 0 // a file is not one of its own users
           : instancesIn(text, {
               file,
@@ -2194,7 +2208,7 @@ function assetAbs(projectPath: string, rel: string) {
   }
   const rootAbs = path.resolve(projectPath, root);
   const abs = path.resolve(projectPath, clean);
-  if (abs !== rootAbs && !abs.startsWith(rootAbs + path.sep)) {
+  if (!isPathWithin(rootAbs, abs)) {
     throw new Error('Invalid asset path');
   }
   return abs;
@@ -2293,7 +2307,7 @@ ipcMain.handle('assets:move', async (_e, { projectPath, fromRel, toDirRel }) => 
     return { ok: false as const };
   }
   // Refuse moving a folder into itself/its own subtree.
-  if (fs.statSync(from).isDirectory() && (toDir === from || toDir.startsWith(from + path.sep))) {
+  if (fs.statSync(from).isDirectory() && isPathWithin(from, toDir)) {
     throw new Error('Cannot move a folder into itself.');
   }
   const dest = uniqueDest(toDir, path.basename(from));
@@ -2312,7 +2326,7 @@ ipcMain.handle('assets:rename', async (_e, { projectPath, rel, newName }) => {
   }
   const from = assetAbs(projectPath, rel);
   const dest = path.join(path.dirname(from), clean);
-  if (dest === from) {
+  if (sameFilesystemPath(dest, from)) {
     return { ok: true as const };
   }
   if (fs.existsSync(dest)) {
@@ -2419,7 +2433,7 @@ function splitCmsRel(rel: string) {
 function cmsAbs(projectPath: string, rel: string) {
   const root = path.resolve(projectPath, 'src');
   const abs = path.resolve(root, rel || '');
-  if (abs !== root && !abs.startsWith(root + path.sep)) {
+  if (!isPathWithin(root, abs)) {
     throw new Error('Invalid data path');
   }
   return abs;
@@ -3109,10 +3123,10 @@ ipcMain.handle('page:delete', async (_e, pagePath) => {
 ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   const dest = path.resolve(pagesDir, to);
-  if (!dest.startsWith(pagesDir + path.sep)) {
+  if (!isPathDescendant(pagesDir, dest)) {
     throw new Error('Invalid destination.');
   }
-  if (path.resolve(from) === dest) {
+  if (sameFilesystemPath(from, dest)) {
     return { newPath: dest };
   }
   if (fs.existsSync(dest)) {
@@ -3123,7 +3137,7 @@ ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
   let source = readSource(from);
   const fromDir = path.dirname(from);
   const toDir = path.dirname(dest);
-  if (path.resolve(fromDir) !== path.resolve(toDir)) {
+  if (!sameFilesystemPath(fromDir, toDir)) {
     source = source.replace(
       /(import\s[^'"]*?from\s*['"])(\.\.?\/[^'"]+)(['"])/g,
       (m, pre, spec, post) => {
@@ -3148,7 +3162,7 @@ ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
 const resolvePagesDir = (projectPath: string, rel: string) => {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   const full = path.resolve(pagesDir, rel);
-  if (full !== pagesDir && !full.startsWith(pagesDir + path.sep)) {
+  if (!isPathWithin(pagesDir, full)) {
     throw new Error('Invalid folder.');
   }
   return full;
@@ -3172,7 +3186,7 @@ ipcMain.handle('pagefolder:rename', async (_e, { projectPath, from, to }) => {
 ipcMain.handle('pagefolder:delete', async (_e, { projectPath, dir }) => {
   const full = resolvePagesDir(projectPath, dir);
   const pagesDir = path.join(projectPath, 'src', 'pages');
-  if (full === pagesDir) {
+  if (sameFilesystemPath(full, pagesDir)) {
     throw new Error('Invalid folder.');
   }
   fs.rmSync(full, { recursive: true, force: true });
@@ -3285,7 +3299,7 @@ ipcMain.handle('page:importPathFor', async (_e, { pagePath, targetPath, projectP
   let srcRelative = null;
   if (projectPath) {
     const srcDir = path.join(projectPath, 'src');
-    if (targetPath.startsWith(srcDir + path.sep)) {
+    if (isPathDescendant(srcDir, targetPath)) {
       srcRelative = toPosix(path.relative(srcDir, targetPath));
     }
   }
@@ -3340,7 +3354,7 @@ function selectionTrail(state: IpcPayloads['selection:copy']) {
     }
     // The key's file half is renderer input; keep it inside the project.
     const abs = path.resolve(root, key.slice(0, hash));
-    if (abs !== root && !abs.startsWith(root + path.sep)) {
+    if (!isPathWithin(root, abs)) {
       continue;
     }
     const at = locateSelection(abs, key.slice(hash + 1));
@@ -3385,7 +3399,12 @@ function stopDevServer(cancelPending = true) {
   if (daemon && bin) {
     try {
       const [cmd, argv] = nodeCliCommand(bin, ['dev', 'stop']);
-      execFile(cmd, argv, { cwd: projectPath, timeout: 10000 }, () => {});
+      execFile(
+        cmd,
+        argv,
+        { cwd: projectPath, timeout: 10000, shell: commandNeedsShell(cmd) },
+        () => {},
+      );
     } catch {
       /* best effort */
     }
@@ -3800,7 +3819,7 @@ ipcMain.handle('dev:start', (_e, projectPath) => {
 
 async function doDevStart(projectPath: string, assertActive: () => void) {
   assertActive();
-  if (devServer && devServer.projectPath === projectPath) {
+  if (devServer && sameFilesystemPath(devServer.projectPath, projectPath)) {
     // For adopted external servers, make sure it's still alive.
     if (devServer.external) {
       const current = devServer;
@@ -3884,7 +3903,7 @@ async function doDevStart(projectPath: string, assertActive: () => void) {
 // inside the project that is currently open.
 function assertInProject(filePath: string) {
   const abs = path.resolve(String(filePath || ''));
-  if (!openProjectRoot || !(abs + path.sep).startsWith(openProjectRoot + path.sep)) {
+  if (!openProjectRoot || !isPathDescendant(openProjectRoot, abs)) {
     throw new Error('Refusing to touch a file outside the open project.');
   }
   return abs;
@@ -5001,8 +5020,11 @@ async function spawnDevServerFailureDetail(projectPath: string, localBin: string
   try {
     const [logCmd, logArgs] = nodeCliCommand(localBin, ['dev', 'logs']);
     const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) =>
-      execFile(logCmd, logArgs, { cwd: projectPath, timeout: 10000 }, (err, so) =>
-        err ? reject(err) : resolve({ stdout: so.toString() }),
+      execFile(
+        logCmd,
+        logArgs,
+        { cwd: projectPath, timeout: 10000, shell: commandNeedsShell(logCmd) },
+        (err, so) => (err ? reject(err) : resolve({ stdout: so.toString() })),
       ),
     );
     const tail = stdout.trim().split('\n').slice(-12).join('\n');
@@ -5018,11 +5040,10 @@ async function spawnDevServerFailureDetail(projectPath: string, localBin: string
 async function doDevStartDependencies(projectPath: string, assertActive: () => void) {
   // Without this the failure is the shim's "env: node: No such file or
   // directory", which reads like a broken project rather than a missing tool.
-  if (!resolveNodeBin() && !isWin) {
+  if (!resolveNodeBin()) {
     throw new Error(
-      'Node.js could not be found. Stacki launched from the Dock only sees the system PATH, ' +
-        'so a Node installed by Homebrew, nvm, fnm, or volta has to be on it. Install Node, ' +
-        'or launch Stacki from a terminal, and try again.',
+      'Node.js could not be found. Install a current Node.js release, restart Stacki, and ' +
+        'try again. Stacki checks standard installers and common version managers.',
     );
   }
 

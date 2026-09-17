@@ -3,6 +3,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 
 import { toRecord } from '../shared/record.js';
+import { commandNeedsShell } from './platform.js';
 
 // Starting a site from a starter.
 //
@@ -45,7 +46,7 @@ const run = (cmd: string, args: readonly string[], cwd: string, onLog?: OnLog): 
       proc = spawn(cmd, [...args], {
         cwd,
         // npm is a .cmd shim on Windows, which needs a shell to be found.
-        shell: isWin && /^npm/.test(cmd),
+        shell: commandNeedsShell(cmd),
         env: {
           ...process.env,
           GIT_TERMINAL_PROMPT: '0',

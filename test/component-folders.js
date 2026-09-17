@@ -15,6 +15,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const failures = [];
 let checked = 0;
@@ -116,7 +117,7 @@ const toPosix = (p) => p.split(path.sep).join('/');
     platform: 'node',
     logLevel: 'silent',
   });
-  const { rankInsertItems } = await import(`file://${out}?v=${Date.now()}`);
+  const { rankInsertItems } = await import(`${pathToFileURL(out).href}?v=${Date.now()}`);
   const found = (q) => rankInsertItems(components, q).map((c) => c.name);
 
   check('a component is found by its name', found('combobox').join() === 'Combobox', found('combobox').join());

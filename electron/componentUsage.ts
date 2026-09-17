@@ -14,6 +14,7 @@ import path from 'path';
 
 import { aliasMap, boundNames, resolveSpec } from './cmsRefs.js';
 import type { Alias } from './cmsRefs.js';
+import { sameFilesystemPath } from './platform.js';
 
 const toPosix = (p: string): string => p.split(path.sep).join('/');
 
@@ -127,7 +128,7 @@ function instancesIn(source: unknown, { file, targetPath, name, aliases = [] }: 
     const imports = importsOf(source, file, aliases);
     const local: string[] = [];
     for (const imp of imports) {
-      if ([...imp.candidates].some((c) => path.resolve(c) === target)) {
+      if ([...imp.candidates].some((candidate) => sameFilesystemPath(candidate, target))) {
         local.push(...imp.names);
       }
     }
@@ -190,7 +191,7 @@ function componentUsage({
 
   const files: UsageFile[] = [];
   for (const file of astroFiles(src)) {
-    if (skip && path.resolve(file) === skip) {
+    if (skip && sameFilesystemPath(file, skip)) {
       continue;
     }
     let text: string;

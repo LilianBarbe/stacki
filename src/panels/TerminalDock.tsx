@@ -12,6 +12,7 @@ import { ChevronDownIcon, CloseIcon, PlusIcon } from '../ui/Icons';
 import { usePointerDrag } from '../ui/usePointerDrag';
 import { closeTerminal, onTerminalProcess } from '../terminalBridge';
 import type { TerminalPaneHandle } from './TerminalPane';
+import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel';
 
 const TerminalPane = lazy(() => import('./TerminalPane'));
 
@@ -348,7 +349,11 @@ function TerminalSettings(props: Pick<TerminalBarProps, 'settings' | 'onClose'>)
           storeSetting(MODE_KEY, mode);
         }}
       />
-      <button className="ghost" title="Hide terminal (⌘J)" onClick={props.onClose}>
+      <button
+        className="ghost"
+        title={`Hide terminal (${shortcutLabel('J', 'primary', currentDesktopPlatform())})`}
+        onClick={props.onClose}
+      >
         <ChevronDownIcon size={13} />
       </button>
     </div>
@@ -411,7 +416,7 @@ function shortenPathLike(label: string): string {
   if (/\s/.test(label) || !label.includes('/')) {
     return label;
   }
-  return label.split('/').filter(Boolean).at(-1) ?? label;
+  return label.split(/[\\/]/).filter(Boolean).at(-1) ?? label;
 }
 
 function launchCommand(mode: LaunchMode, custom: string): string {

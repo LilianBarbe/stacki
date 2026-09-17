@@ -4,13 +4,20 @@
 import fs = require('node:fs');
 import path = require('node:path');
 import type { AfterPackContext } from 'app-builder-lib';
+import { Arch } from 'builder-util';
 import { fixNodePtyPermissions } from './fix-node-pty-permissions';
 
-export default function afterPack(context: AfterPackContext): void {
-  if (context.electronPlatformName === 'win32') {
-    return;
+function windowsArchitecture(architecture: Arch): 'arm64' | 'x64' {
+  if (architecture === Arch.arm64) {
+    return 'arm64';
   }
+  if (architecture === Arch.x64) {
+    return 'x64';
+  }
+  throw new Error(`The Windows package architecture ${architecture} is not supported.`);
+}
 
+export default function afterPack(context: AfterPackContext): void {
   const appName = context.packager.appInfo.productFilename;
   const unpacked =
     context.electronPlatformName === 'darwin'
@@ -23,6 +30,21 @@ export default function afterPack(context: AfterPackContext): void {
         )
       : path.join(context.appOutDir, 'resources', 'app.asar.unpacked');
   const nodePtyDirectory = path.join(unpacked, 'node_modules', 'node-pty');
+
+  if (context.electronPlatformName === 'win32') {
+    const architecture = windowsArchitecture(context.arch);
+    const nativeBinding = path.join(
+      nodePtyDirectory,
+      'prebuilds',
+      `win32-${architecture}`,
+      'pty.node',
+    );
+    if (!fs.existsSync(nativeBinding)) {
+      throw new Error(`The packaged Windows app is missing the ${architecture} node-pty binding.`);
+    }
+    console.log('  • afterPack: verified the Windows node-pty native binding');
+    return;
+  }
 
   if (!fs.existsSync(nodePtyDirectory)) {
     console.warn(
