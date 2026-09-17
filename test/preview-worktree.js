@@ -62,6 +62,7 @@ const read = (dir, rel) => {
 async function project() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-preview-'));
   await sh(dir, 'init', '-q', '-b', 'main', '.');
+  await sh(dir, 'config', 'core.autocrlf', 'false');
   await sh(dir, 'config', 'user.email', 'tim@example.com');
   await sh(dir, 'config', 'user.name', 'Tim Ricks');
   write(dir, 'src/pages/index.astro', 'version one\n');

@@ -101,6 +101,7 @@ export function parseSerializePage(input: unknown): ParserPageModel {
     extraFrontmatterSpaced: parseBoolean(record['extraFrontmatterSpaced'] ?? true),
     hadFrontmatter: parseBoolean(record['hadFrontmatter'] ?? true),
     trailingBlank: parseCount(record['trailingBlank'] ?? 0, 'trailingBlank'),
+    eol: parsePageEol(record['eol']),
     nodes: parseSerializeNodes(record['nodes']),
     ...(layout === undefined
       ? {}
@@ -111,6 +112,16 @@ export function parseSerializePage(input: unknown): ParserPageModel {
           },
         }),
   };
+}
+
+function parsePageEol(input: unknown): '\n' | '\r\n' {
+  if (input === undefined || input === '\n') {
+    return '\n';
+  }
+  if (input === '\r\n') {
+    return '\r\n';
+  }
+  throw new Error('SerializePage.eol: expected LF or CRLF');
 }
 
 function parseSerializeImport(input: unknown): ImportMember {

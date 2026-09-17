@@ -46,6 +46,7 @@ const sh = async (dir, ...args) => (await git(dir, args)).stdout.trim();
 async function repo(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `stacki-snap-${name}-`));
   await sh(dir, 'init', '-q', '-b', 'main', '.');
+  await sh(dir, 'config', 'core.autocrlf', 'false');
   await sh(dir, 'config', 'user.email', 'tim@example.com');
   await sh(dir, 'config', 'user.name', 'Tim Ricks');
   return dir;

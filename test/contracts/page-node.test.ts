@@ -154,6 +154,8 @@ test('parsePageModel and parsePageResult: the envelope is data, including not-ed
     nodes: [{ kind: 'element', id: 'n1', name: 'div', children: null }],
   };
   assert.equal(parsePageResult({ editable: true, model }).editable, true);
+  assert.equal(parsePageModel({ ...model, eol: '\r\n' }).eol, '\r\n');
+  assert.throws(() => parsePageModel({ ...model, eol: '\r' }), /model\.eol: expected LF or CRLF/);
   const notEditable = parsePageResult({
     editable: false,
     reason: 'Page contains markup the visual editor cannot represent.',

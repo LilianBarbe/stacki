@@ -153,6 +153,7 @@ export interface PageModel {
   };
   readonly hadFrontmatter: boolean;
   readonly trailingBlank: number;
+  readonly eol?: '\n' | '\r\n';
   readonly nodes: PageNodeList;
   readonly bodyStart?: number;
   readonly format?: 'md' | 'mdx';
@@ -571,6 +572,7 @@ export function parsePageModel(input: unknown): PageModel {
       slots: parseImportSlots(layout['slots']),
     },
     hadFrontmatter: record['hadFrontmatter'] === true,
+    eol: parsePageEol(record['eol']),
     nodes: parsePageTree(record['nodes']),
   };
   if (!Number.isSafeInteger(record['trailingBlank'])) {
@@ -584,6 +586,16 @@ export function parsePageModel(input: unknown): PageModel {
     out['bodyStart'] = record['bodyStart'];
   }
   return out as unknown as PageModel;
+}
+
+function parsePageEol(input: unknown): '\n' | '\r\n' {
+  if (input === undefined || input === '\n') {
+    return '\n';
+  }
+  if (input === '\r\n') {
+    return '\r\n';
+  }
+  fail('model.eol', 'expected LF or CRLF');
 }
 
 function parseMarkdownPageModel(record: Record<string, unknown>): PageModel {

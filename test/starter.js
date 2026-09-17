@@ -67,6 +67,16 @@ console.log('Ready.');
 
 (async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-starter-'));
+  const emptyGitConfig = path.join(root, 'empty-git-config');
+  fs.writeFileSync(emptyGitConfig, '');
+  // Match a first-time Windows installation: Git exists, but no author has
+  // ever been configured. Stacki must still leave the starter with a commit.
+  process.env.GIT_CONFIG_GLOBAL = emptyGitConfig;
+  process.env.GIT_CONFIG_NOSYSTEM = '1';
+  delete process.env.GIT_AUTHOR_NAME;
+  delete process.env.GIT_AUTHOR_EMAIL;
+  delete process.env.GIT_COMMITTER_NAME;
+  delete process.env.GIT_COMMITTER_EMAIL;
   const npm = fakeNpm(root, 'npm-ok', SCAFFOLD);
   const calls = () => fs.readFileSync(path.join(root, 'calls.txt'), 'utf8').trim().split('\n');
 

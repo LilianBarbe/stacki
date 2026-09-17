@@ -126,7 +126,6 @@ const check = (what, condition, detail) => {
        // outside-press that dismisses the popup. Each field is therefore found and
        // measured immediately before it is pressed, with the popup reopened if a
        // previous press closed it.
-       const POPUP_JS = ['Transform origin left', 'Transform origin top', 'Perspective origin left', 'Perspective origin top'];
        const POPUP = ['Transform origin left', 'Transform origin top', 'Perspective origin left', 'Perspective origin top'];
        const LABELS = [...POPUP, 'Position left', 'Position top'];
        for (const label of LABELS) {
@@ -137,6 +136,18 @@ const check = (what, condition, detail) => {
              return null; })()\`);
            await sleep(350);
          }
+         if (!POPUP.includes(label)) {
+           await win.webContents.executeJavaScript(\`(() => {
+             const input = document.querySelector('input[aria-label=' + JSON.stringify(\${JSON.stringify(label)}) + ']');
+             const editor = input?.closest('.embed-editor_varconnect')
+               ?.querySelector('.embed-editor_varconnect-editor');
+             editor?.scrollIntoView({ block: 'center', behavior: 'instant' });
+             return null;
+           })()\`);
+           // Windows delivers the scroll and the resulting popup dismissal
+           // on the next frame, so measure after the layout has settled.
+           await sleep(150);
+         }
          const t = await win.webContents.executeJavaScript(\`(() => {
            const input = document.querySelector('input[aria-label=' + JSON.stringify(\${JSON.stringify(label)}) + ']');
            if (!input) return null;
@@ -144,11 +155,6 @@ const check = (what, condition, detail) => {
            const ed = wrap && wrap.querySelector('.embed-editor_varconnect-editor');
            if (!ed) return { label: \${JSON.stringify(label)}, noEditor: true };
            ed.dataset.probe = 'target';
-           // Bring it on screen first — but never for a popup field: scrolling is
-           // one of the things that dismisses the popover, so the press would land
-           // on nothing. Those are drawn in view already (the popover pins itself
-           // to the window).
-           if (!\${JSON.stringify(POPUP_JS)}.includes(\${JSON.stringify(label)})) ed.scrollIntoView({ block: 'center' });
            const r = ed.getBoundingClientRect();
            return { label: \${JSON.stringify(label)},
                     inView: r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight,

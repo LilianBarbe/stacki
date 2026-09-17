@@ -69,6 +69,7 @@ export type ParsedTemplate =
 export interface ParserPageModel extends FrontmatterModel {
   readonly hadFrontmatter: boolean;
   readonly trailingBlank: number;
+  readonly eol: '\n' | '\r\n';
   readonly nodes: ParserNode[];
   readonly bodyStart?: number;
 }

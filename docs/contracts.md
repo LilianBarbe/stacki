@@ -20,7 +20,7 @@ enforce these invariants:
   Branches, loops, conditions, and chunk groups always carry child arrays.
 - Attribute variants are `string`, `expr`, `bare`, or `spread`. The value field
   exists only on variants that need it.
-- Import slots, attribute order, original tag text, blank lines, Markdown
+- Import slots, attribute order, original tag text, line endings, blank lines, Markdown
   fences, list markers, indentation, and trailing blanks are source-preserving
   data. A parse/write round trip must retain them even when the editor does not
   display them.

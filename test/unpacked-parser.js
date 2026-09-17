@@ -43,11 +43,12 @@ const ENTRIES = ['astroParser.js', 'componentPreview.js'].map((name) =>
 // a bare specifier is a package, which asar handles for the app itself and
 // which this parser deliberately has none of.
 function closureOf(rel, seen = new Set()) {
+  rel = rel.split(path.sep).join('/');
   if (seen.has(rel)) {return seen;}
   seen.add(rel);
   const source = fs.readFileSync(path.join(ROOT, rel), 'utf8');
   for (const m of source.matchAll(/require\(\s*['"](\.[^'"]+)['"]\s*\)/g)) {
-    let next = path.join(path.dirname(rel), m[1]);
+    let next = path.join(path.dirname(rel), m[1]).split(path.sep).join('/');
     if (!fs.existsSync(path.join(ROOT, next))) {next += '.js';}
     if (!fs.existsSync(path.join(ROOT, next))) {
       check(`the require ${JSON.stringify(m[1])} in ${rel} resolves`, false, 'nothing on disk answers to it');

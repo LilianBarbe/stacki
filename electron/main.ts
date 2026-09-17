@@ -3093,6 +3093,7 @@ ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
     extraFrontmatterSpaced: true,
     hadFrontmatter: true,
     trailingBlank: 0,
+    eol: process.platform === 'win32' ? '\r\n' : '\n',
   };
   if (layout) {
     const rel = toPosix(path.relative(path.dirname(pagePath), layout.path));

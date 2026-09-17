@@ -74,6 +74,19 @@ function loopIn(body, what) {
   return loop;
 }
 
+{
+  const src = page('  {items.map((item) => <li>{item}</li>)}').replace(/\n/g, '\r\n');
+  const parsed = parsePage(src);
+  check('a CRLF page remains editable', parsed.editable, parsed.reason);
+  if (parsed.editable) {
+    check(
+      'and keeps its Windows line endings byte for byte',
+      serializePage(parsed.model) === src,
+      'the line endings changed',
+    );
+  }
+}
+
 // --- the page this came from -------------------------------------------------
 {
   const loop = loopIn(

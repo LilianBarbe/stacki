@@ -159,7 +159,22 @@ async function createStarter({ starter = 'lumos', parentPath, name, npm, onLog }
     try {
       await run('git', ['init', '-b', 'main'], dir);
       await run('git', ['add', '-A'], dir);
-      await run('git', ['commit', '-m', `Start ${folder} from ${template.label}`], dir);
+      // A first-time Git installation has no author configured yet. Give only
+      // this generated commit a neutral identity; do not change the user's
+      // repository or global configuration behind their back.
+      await run(
+        'git',
+        [
+          '-c',
+          'user.name=Stacki',
+          '-c',
+          'user.email=stacki@local.invalid',
+          'commit',
+          '-m',
+          `Start ${folder} from ${template.label}`,
+        ],
+        dir,
+      );
     } catch (err) {
       // A site with no git still runs; say so rather than throwing it away.
       onLog?.(`\n(could not start a git history: ${err instanceof Error ? err.message : String(err)})\n`);

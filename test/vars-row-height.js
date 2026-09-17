@@ -187,7 +187,7 @@ const STYLESHEET = `:root {
        if (grab && drop) {
          win.webContents.sendInputEvent({ type: 'mouseDown', x: grab.x, y: grab.y, button: 'left', clickCount: 1 });
          for (let i = 1; i <= 6; i++) {
-           win.webContents.sendInputEvent({ type: 'mouseMove', x: grab.x, y: Math.round(grab.y + ((drop.y - grab.y) * i) / 6) });
+           win.webContents.sendInputEvent({ type: 'mouseMove', x: grab.x, y: Math.round(grab.y + ((drop.y - grab.y) * i) / 6), button: 'left' });
            await new Promise((r) => setTimeout(r, 25));
          }
          win.webContents.sendInputEvent({ type: 'mouseUp', x: drop.x, y: drop.y, button: 'left', clickCount: 1 });
@@ -204,7 +204,7 @@ const STYLESHEET = `:root {
        if (grabHead && dropHead) {
          win.webContents.sendInputEvent({ type: 'mouseDown', x: grabHead.x, y: grabHead.y, button: 'left', clickCount: 1 });
          for (let i = 1; i <= 6; i++) {
-           win.webContents.sendInputEvent({ type: 'mouseMove', x: grabHead.x, y: Math.round(grabHead.y + ((dropHead.y - grabHead.y) * i) / 6) });
+           win.webContents.sendInputEvent({ type: 'mouseMove', x: grabHead.x, y: Math.round(grabHead.y + ((dropHead.y - grabHead.y) * i) / 6), button: 'left' });
            await new Promise((r) => setTimeout(r, 25));
          }
          win.webContents.sendInputEvent({ type: 'mouseUp', x: dropHead.x, y: dropHead.y, button: 'left', clickCount: 1 });

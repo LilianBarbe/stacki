@@ -53,6 +53,7 @@ const sh = async (cwd, ...args) => (await git(cwd, args)).stdout.trim();
 async function repo(name) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `stacki-git-${name}-`));
   await sh(dir, 'init', '-q', '-b', 'main', '.');
+  await sh(dir, 'config', 'core.autocrlf', 'false');
   await sh(dir, 'config', 'user.email', 'test@example.com');
   await sh(dir, 'config', 'user.name', 'Test');
   fs.writeFileSync(path.join(dir, 'a.txt'), 'base\n');

@@ -26,7 +26,7 @@ const check = (what, condition, detail) => {
 };
 
 const root = path.join(__dirname, '..');
-const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8').replace(/\r\n/g, '\n');
 
 // ── What CodeMirror actually renders ────────────────────────────────────────
 // The SearchPanel constructor, straight from the installed package.

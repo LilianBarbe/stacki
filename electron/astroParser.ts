@@ -1175,6 +1175,7 @@ function parsePage(source: string, opts: { readonly locs?: boolean } = {}): Pars
   const hadFrontmatter = !!fm;
   const bodyStart = fm ? fm[0].length : 0;
   const body = source.slice(bodyStart);
+  const eol = source.includes('\r\n') ? '\r\n' : '\n';
 
   const frontmatterModel = readFrontmatter(frontmatter);
   const { imports } = frontmatterModel;
@@ -1248,6 +1249,7 @@ function parsePage(source: string, opts: { readonly locs?: boolean } = {}): Pars
       ...frontmatterModel,
       hadFrontmatter,
       trailingBlank,
+      eol,
       nodes: topNodes,
       // Only when offsets were asked for: it describes the file on disk, and
       // the live model is edited out from under it.
@@ -1288,7 +1290,10 @@ function serializePage(input: unknown): string {
   for (let i = 0; i < (model.trailingBlank || 0); i++) {
     lines.push('');
   }
-  return lines.join('\n') + '\n';
+  const source = lines.join('\n') + '\n';
+  return model.eol === '\r\n'
+    ? source.replace(/\r?\n/g, '\r\n')
+    : source.replace(/\r\n/g, '\n');
 }
 
 // Inline runs (text + simple tags like <strong>/<em>) serialize on a single
