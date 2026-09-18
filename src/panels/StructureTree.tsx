@@ -18,7 +18,6 @@ import {
   ElementComponentIcon,
   FileIcon,
   HideIcon,
-  LayersIcon,
   LayoutIcon,
   PointerEventsNoneIcon,
   RepeatIcon,
@@ -478,7 +477,7 @@ function describeNode(
   live: readonly string[] | undefined,
 ): { readonly icon: React.ReactNode; readonly label: string } {
   if (isFragmentNode(node)) {
-    return { icon: <LayersIcon size={13} />, label: 'Fragment' };
+    return { icon: <CustomElementIcon size={12} />, label: 'Fragment' };
   }
   switch (node.kind) {
     case 'text':

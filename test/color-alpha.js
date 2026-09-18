@@ -55,6 +55,14 @@ const SIZE = 240;
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true });
   global.window = dom.window;
   global.document = dom.window.document;
+  global.Node = dom.window.Node;
+  // Geometry is supplied below; this test does not need a canvas renderer.
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  // JSDOM reports event-handler exceptions without rejecting dispatchEvent.
+  // Count them as failures so a broken drag cannot leave this test green.
+  dom.window.addEventListener('error', (event) => {
+    check('color picker events complete without throwing', false, event.message);
+  });
   global.IS_REACT_ACT_ENVIRONMENT = true;
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
   global.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);

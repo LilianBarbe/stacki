@@ -1,3 +1,4 @@
+import { loadComponentProperties, updateComponentProperties } from './componentProperties';
 import { renderComponentPreviewPage } from './componentPreview.js';
 import { createIpcRegistrar } from './ipc.js';
 import { MAIN_LIMITS, readSource, directoryBudget } from './main.bounds.js';
@@ -3288,8 +3289,13 @@ ipcMain.handle('component:create', async (_e, opts) => {
   return { path: target, rel, name: opts.name };
 });
 
-// Which files hold instances of a component — the list behind the palette's
-// "23 instances".
+// Component property edits validate their revision before updating project sources.
+ipcMain.handle('component:properties', (_event, location) => loadComponentProperties(location));
+ipcMain.handle('component:editProperties', (_event, request) =>
+  updateComponentProperties(request, markSelfWrite),
+);
+
+// Which files hold instances of a component — the palette’s instance count.
 ipcMain.handle('component:usage', async (_e, { projectPath, name, exclude }) =>
   componentUsage(definedFields({ projectPath, name, exclude })),
 );

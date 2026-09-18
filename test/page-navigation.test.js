@@ -93,6 +93,11 @@ test('out-of-order page reads and external reads cannot replace the current edit
   assert.equal(reads[0].path, pages[0].path);
   await act(async () => { reads[0].resolve(pageState('first')); await tick(); });
   assert.equal(__panels.PropsPanel.node.id, nodeId('first'));
+  await act(async () => {
+    __panels.StructurePanel.onHoverNode(nodeId('first'));
+    await tick();
+  });
+  assert.equal(__panels.PreviewPane.navHoverPath, '0');
   // Use the actual page switcher callback through the editor's URL input.
   const navigate = async (route) => {
     const input = document.querySelector('.url-bar input, input[spellcheck="false"]');
@@ -110,6 +115,11 @@ test('out-of-order page reads and external reads cannot replace the current edit
   assert.equal(reads.length, 3);
   await act(async () => { reads[2].resolve(pageState('third')); await tick(); });
   assert.equal(__panels.PropsPanel.node.id, nodeId('third'));
+  assert.equal(
+    __panels.PreviewPane.navHoverPath,
+    null,
+    'Installing a page clears navigator hover so canvas hover can take over',
+  );
   await act(async () => { reads[1].resolve(pageState('stale-second')); await tick(); });
   assert.equal(__panels.PropsPanel.node.id, nodeId('third'));
   assert.equal(__panels.PropsPanel.filePath, pages[2].path);

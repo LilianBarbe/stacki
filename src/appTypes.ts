@@ -93,6 +93,7 @@ export interface ToastMessage {
 export type LeftTab =
   | 'pages'
   | 'navigator'
+  | 'properties'
   | 'components'
   | 'assets'
   | 'cms'

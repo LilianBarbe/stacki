@@ -27,6 +27,16 @@ interface LinkPage {
   readonly route: string;
 }
 
+function linkPageLabel(page: LinkPage): string {
+  const name = page.name.replace(/\.(astro|md)$/i, '');
+  const namePath = name.replace(/^\/+|\/+$/g, '');
+  const routePath = page.route.replace(/^\/+|\/+$/g, '');
+  if (namePath === routePath) {
+    return name;
+  }
+  return `${name}  ·  ${page.route}`;
+}
+
 function detectType(str: string, pages: readonly LinkPage[] | undefined): LinkType {
   if (!str) {
     return 'url';
@@ -129,7 +139,7 @@ function LinkControl({
           placeholder="Choose a page…"
           options={(context.pages || []).map((page) => ({
             value: page.route,
-            label: `${page.name.replace(/\.(astro|md)$/i, '')}  ·  ${page.route}`,
+            label: linkPageLabel(page),
           }))}
           onChange={(value) => commit(value, { immediate: true })}
         />

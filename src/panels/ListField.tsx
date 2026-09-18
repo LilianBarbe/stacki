@@ -31,11 +31,12 @@ interface Position {
 interface ItemEditorProps {
   readonly item: Item;
   readonly pos: Position;
+  readonly trigger: HTMLElement;
   readonly onChange: (item: Item) => void;
   readonly onClose: () => void;
 }
-function ItemEditor({ item, pos, onChange, onClose }: ItemEditorProps) {
-  const ref = useRef<HTMLDivElement>(null);
+function ItemEditor({ item, pos, trigger, onChange, onClose }: ItemEditorProps) {
+  const ref = useListEditorDismiss(trigger, onClose);
   const firstRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -43,34 +44,16 @@ function ItemEditor({ item, pos, onChange, onClose }: ItemEditorProps) {
     firstRef.current?.select();
   }, []);
 
-  useEffect(() => {
-    const onDown = (e: PointerEvent) => {
-      const NodeType = ref.current?.ownerDocument.defaultView?.Node;
-      if (NodeType && e.target instanceof NodeType && !ref.current?.contains(e.target)) {
-        onClose();
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    document.addEventListener('pointerdown', onDown, true);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('pointerdown', onDown, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  }, [onClose]);
-
   // A word is one field called Value; an object is its own fields, named as the
   // file names them. Either way the popup is a list of labelled boxes, so there
   // is one thing to learn rather than two.
   const fields = item.fields || [{ key: 'value', text: item.text, quote: item.quote }];
   const set = (i: number, text: string) => {
     if (item.fields) {
-      onChange({ ...item, fields: item.fields.map((f, at) => (at === i ? { ...f, text } : f)) });
+      onChange({
+        ...item,
+        fields: item.fields.map((f, at) => (at === i ? { ...f, text } : f)),
+      });
       return;
     }
     onChange({ ...item, text });
@@ -111,6 +94,35 @@ function ItemEditor({ item, pos, onChange, onClose }: ItemEditorProps) {
   );
 }
 
+function useListEditorDismiss(trigger: HTMLElement, onClose: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      // The active row handles its own toggle; dismissing here would reopen it on click.
+      if (e.composedPath().includes(trigger)) {
+        return;
+      }
+      const NodeType = ref.current?.ownerDocument.defaultView?.Node;
+      if (NodeType && e.target instanceof NodeType && !ref.current?.contains(e.target)) {
+        onClose();
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [onClose, trigger]);
+  return ref;
+}
+
 // What an empty list has to say for itself, if anything. The Add item button
 // under it already says that the list is empty and what to do about it, so a
 // note is drawn only when it adds something the button doesn't. A declared
@@ -121,18 +133,42 @@ export function emptyNote(placeholder: unknown) {
   return !text || /^\[\s*\]$/.test(text) ? '' : text;
 }
 
+export type ListFieldChange =
+  | { readonly kind: 'edit'; readonly index: number }
+  | { readonly kind: 'add' }
+  | { readonly kind: 'remove'; readonly index: number }
+  | { readonly kind: 'move'; readonly index: number; readonly gap: number };
+
 interface ListFieldProps {
   readonly value?: string | null;
   readonly placeholder?: string | null;
-  readonly onChange: (value: string, immediate: boolean) => void;
+  readonly onChange: (value: string, immediate: boolean, change: ListFieldChange) => void;
+  readonly disabled?: boolean;
+  readonly itemsMin?: number;
+  readonly itemsMax?: number;
+  readonly valueCharsMax?: number;
 }
 type Editor =
   | { readonly kind: 'closed' }
-  | { readonly kind: 'existing'; readonly index: number; readonly pos: Position }
-  | { readonly kind: 'pending'; readonly item: Item; readonly pos: Position };
+  | {
+      readonly kind: 'existing';
+      readonly index: number;
+      readonly pos: Position;
+      readonly trigger: HTMLElement;
+    }
+  | {
+      readonly kind: 'pending';
+      readonly item: Item;
+      readonly pos: Position;
+      readonly trigger: HTMLElement;
+    };
 type Drag =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'dragging'; readonly index: number; readonly gap: number | null };
+  | {
+      readonly kind: 'dragging';
+      readonly index: number;
+      readonly gap: number | null;
+    };
 
 export default function ListField(props: ListFieldProps) {
   const state = useListField(props);
@@ -146,7 +182,14 @@ export default function ListField(props: ListFieldProps) {
       <button
         type="button"
         className="list-field-add"
-        onClick={(event) => state.openAt(event, null, blankLike(state.items))}
+        disabled={state.disabled || state.items.length >= state.itemsMax}
+        onClick={(event) => {
+          if (state.editor.kind === 'pending') {
+            state.closePending();
+          } else {
+            state.openAt(event, null, blankLike(state.items));
+          }
+        }}
       >
         <PlusIcon size={12} />
         Add item
@@ -156,58 +199,126 @@ export default function ListField(props: ListFieldProps) {
   );
 }
 
-function useListField({ value, onChange }: ListFieldProps) {
-  assert((value?.length ?? 0) <= LIMITS.attrCharsMax, 'ListField: value limit exceeded');
+function useListField(props: ListFieldProps) {
+  const {
+    value,
+    onChange,
+    disabled = false,
+    itemsMin = 0,
+    itemsMax = LIMITS.scanEntriesMax,
+    valueCharsMax = LIMITS.attrCharsMax,
+  } = props;
+  assert((value?.length ?? 0) <= valueCharsMax, 'ListField: value limit exceeded');
   const items = arrayItems(value) || [];
+  assert(items.length <= itemsMax, 'ListField: item count limit exceeded');
   const [editor, setEditor] = useState<Editor>({ kind: 'closed' });
-  const [drag, setDrag] = useState<Drag>({ kind: 'idle' });
   const write = (
     next: readonly Item[],
-    options: { readonly immediate: boolean } = { immediate: true },
+    options: { readonly immediate: boolean; readonly change: ListFieldChange }
   ) => {
+    if (disabled) {
+      return;
+    }
     const text = arrayText(next);
-    assert(text.length <= LIMITS.attrCharsMax, 'ListField: output limit exceeded');
-    onChange(text, options.immediate);
+    assert(text.length <= valueCharsMax, 'ListField: output limit exceeded');
+    assert(next.length <= itemsMax, 'ListField: output item count limit exceeded');
+    onChange(text, options.immediate, options.change);
   };
+  const { drag, setDrag, drop } = useListDrag(items, write);
   const openAt = (event: React.MouseEvent<HTMLElement>, index: number | null, item: Item): void => {
-    const row = event.currentTarget.closest('.list-field-row') || event.currentTarget;
-    const rectangle = row.getBoundingClientRect();
-    const width = Math.max(rectangle.width, 220);
-    const pos = {
-      left: Math.max(8, Math.min(rectangle.left, window.innerWidth - width - 8)),
-      top: Math.min(rectangle.bottom + 4, Math.max(60, window.innerHeight - 220)),
-      width,
-    };
-    setEditor(index === null ? { kind: 'pending', item, pos } : { kind: 'existing', index, pos });
+    setEditor(listEditorAt(event.currentTarget, index, item));
   };
   const closePending = (): void => {
     setEditor({ kind: 'closed' });
-    if (editor.kind !== 'pending') {
-      return;
-    }
-    const said = editor.item.fields
-      ? editor.item.fields.some((field) => String(field.text).trim())
-      : String(editor.item.text).trim();
-    if (said) {
-      write([...items, editor.item]);
+    const item = pendingListItem(editor);
+    if (item) {
+      write([...items, item], { immediate: true, change: { kind: 'add' } });
     }
   };
   const remove = (index: number): void => {
+    if (disabled || items.length <= itemsMin) {
+      return;
+    }
     setEditor({ kind: 'closed' });
-    write(items.filter((_, current) => current !== index));
+    write(
+      items.filter((_, current) => current !== index),
+      {
+        immediate: true,
+        change: { kind: 'remove', index },
+      }
+    );
   };
+  return {
+    items,
+    editor,
+    setEditor,
+    drag,
+    setDrag,
+    write,
+    openAt,
+    closePending,
+    remove,
+    drop,
+    disabled,
+    itemsMin,
+    itemsMax,
+  };
+}
+function listEditorAt(trigger: HTMLElement, index: number | null, item: Item): Editor {
+  const pos = listPopupPosition(trigger);
+  return index === null
+    ? { kind: 'pending', item, pos, trigger }
+    : { kind: 'existing', index, pos, trigger };
+}
+
+function pendingListItem(editor: Editor): Item | undefined {
+  if (editor.kind !== 'pending') {
+    return undefined;
+  }
+  const said = editor.item.fields
+    ? editor.item.fields.some((field) => String(field.text).trim())
+    : String(editor.item.text).trim();
+  return said ? editor.item : undefined;
+}
+
+function useListDrag(
+  items: readonly Item[],
+  write: (
+    items: readonly Item[],
+    options: {
+      readonly immediate: boolean;
+      readonly change: ListFieldChange;
+    }
+  ) => void
+) {
+  const [drag, setDrag] = useState<Drag>({ kind: 'idle' });
   const drop = (): void => {
     if (drag.kind === 'dragging' && drag.gap !== null) {
       const next = moveItem(items, drag.index, drag.gap);
       // A drop into the original gap must not create an undo/save operation.
       if (next.some((item, index) => item !== items[index])) {
-        write(next);
+        write(next, {
+          immediate: true,
+          change: { kind: 'move', index: drag.index, gap: drag.gap },
+        });
       }
     }
     setDrag({ kind: 'idle' });
   };
-  return { items, editor, setEditor, drag, setDrag, write, openAt, closePending, remove, drop };
+  return { drag, setDrag, drop };
 }
+
+function listPopupPosition(element: HTMLElement): Position {
+  const row = element.closest('.list-field-row') || element;
+  const rectangle = row.getBoundingClientRect();
+  const width = Math.max(rectangle.width, 220);
+  return {
+    left: Math.max(8, Math.min(rectangle.left, window.innerWidth - width - 8)),
+    top: Math.min(rectangle.bottom + 4, Math.max(60, window.innerHeight - 220)),
+    width,
+  };
+}
+
 type ListState = ReturnType<typeof useListField>;
 
 function ListRow({
@@ -219,7 +330,7 @@ function ListRow({
   readonly index: number;
   readonly state: ListState;
 }) {
-  const { drag, editor, setDrag, setEditor, openAt, remove, drop } = state;
+  const { drag, editor, setDrag, remove, drop } = state;
   const dragging = drag.kind === 'dragging' ? drag.index : null;
   const gap = drag.kind === 'dragging' ? drag.gap : null;
   const open = editor.kind === 'existing' && editor.index === index;
@@ -228,17 +339,8 @@ function ListRow({
       className={`list-field-row ${dragging === index ? 'is-dragging' : ''} ${
         gap === index ? 'is-before' : ''
       } ${gap === index + 1 ? 'is-after' : ''} ${open ? 'is-open' : ''}`}
-      draggable
-      onDragStart={(event) => {
-        setDrag({ kind: 'dragging', index, gap: null });
-        setEditor({ kind: 'closed' });
-        event.dataTransfer.effectAllowed = 'move';
-        try {
-          event.dataTransfer.setData('text/plain', String(index));
-        } catch {
-          /* Optional in Chromium. */
-        }
-      }}
+      draggable={!state.disabled}
+      onDragStart={(event) => startListDrag(event, state, index)}
       onDragEnd={() => setDrag({ kind: 'idle' })}
       onDragOver={(event) => {
         if (drag.kind === 'idle') {
@@ -261,7 +363,9 @@ function ListRow({
       <button
         type="button"
         className="list-field-text"
-        onClick={(event) => openAt(event, index, item)}
+        aria-expanded={open}
+        disabled={state.disabled}
+        onClick={(event) => toggleListRow(event, state, index, item)}
       >
         {itemLabel(item) || <span className="list-field-blank">Empty</span>}
       </button>
@@ -269,12 +373,45 @@ function ListRow({
         type="button"
         className="ghost list-field-remove"
         title="Remove"
+        aria-label={`Remove ${itemLabel(item) || 'item'}`}
+        disabled={state.disabled || state.items.length <= state.itemsMin}
         onClick={() => remove(index)}
       >
         <TrashIcon size={12} />
       </button>
     </div>
   );
+}
+
+function toggleListRow(
+  event: React.MouseEvent<HTMLElement>,
+  state: ListState,
+  index: number,
+  item: Item
+): void {
+  if (state.editor.kind === 'existing' && state.editor.index === index) {
+    state.write(state.items, {
+      immediate: true,
+      change: { kind: 'edit', index },
+    });
+    state.setEditor({ kind: 'closed' });
+    return;
+  }
+  state.openAt(event, index, item);
+}
+
+function startListDrag(event: React.DragEvent<HTMLElement>, state: ListState, index: number): void {
+  if (state.disabled) {
+    return;
+  }
+  state.setDrag({ kind: 'dragging', index, gap: null });
+  state.setEditor({ kind: 'closed' });
+  event.dataTransfer.effectAllowed = 'move';
+  try {
+    event.dataTransfer.setData('text/plain', String(index));
+  } catch {
+    // Drag data is optional because this list keeps its gesture in local state.
+  }
 }
 
 function ListEditor({ state }: { readonly state: ListState }) {
@@ -291,14 +428,21 @@ function ListEditor({ state }: { readonly state: ListState }) {
         <ItemEditor
           item={item}
           pos={editor.pos}
+          trigger={editor.trigger}
           onChange={(next) =>
             write(
               items.map((item, index) => (index === editor.index ? next : item)),
-              { immediate: false },
+              {
+                immediate: false,
+                change: { kind: 'edit', index: editor.index },
+              }
             )
           }
           onClose={() => {
-            write(items, { immediate: true });
+            write(items, {
+              immediate: true,
+              change: { kind: 'edit', index: editor.index },
+            });
             setEditor({ kind: 'closed' });
           }}
         />
@@ -309,6 +453,7 @@ function ListEditor({ state }: { readonly state: ListState }) {
         <ItemEditor
           item={editor.item}
           pos={editor.pos}
+          trigger={editor.trigger}
           onChange={(item) =>
             setEditor((current) => (current.kind === 'pending' ? { ...current, item } : current))
           }

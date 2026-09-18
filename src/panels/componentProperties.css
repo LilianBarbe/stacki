@@ -1,0 +1,272 @@
+.component-properties {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow: auto;
+  min-width: 0;
+  height: 100%;
+}
+.component-properties .panel-heading,
+.property-editor header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.component-properties .panel-heading {
+  font-size: 14px;
+}
+.component-properties .panel-heading button {
+  width: 28px;
+  height: 28px;
+  font-size: 23px;
+}
+.property-component {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 6px;
+  color: var(--component-green);
+  background: var(--component-green-soft);
+  overflow-wrap: anywhere;
+}
+.property-list {
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+.property-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.property-row + .property-row {
+  border-top: 1px solid var(--border);
+}
+.property-row:first-child {
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+.property-row:last-child {
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+.property-row:hover {
+  background: var(--bg-active);
+}
+/* Keep the row highlight continuous, with separate feedback for the delete action. */
+.component-properties .property-row > button:where(:not(.property-remove)):hover:not(:disabled) {
+  background: transparent;
+}
+.property-row-main {
+  flex: 1;
+  justify-content: flex-start;
+  text-align: left;
+  background: transparent;
+  min-width: 0;
+  padding: 10px 7px;
+  gap: 8px;
+}
+.property-type-icon {
+  color: var(--text-dim);
+  width: 18px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.property-row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.property-row-label > span {
+  overflow-wrap: anywhere;
+}
+.property-row-label small {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.property-required {
+  color: var(--collection-purple);
+}
+.component-properties .property-grip,
+.component-properties .property-remove {
+  flex-shrink: 0;
+  width: 24px;
+  min-width: 24px;
+  padding: 3px;
+  align-self: stretch;
+  color: var(--text-dim);
+  background: transparent;
+}
+.component-properties .property-grip {
+  cursor: grab;
+  touch-action: none;
+}
+.component-properties .property-grip:active {
+  cursor: grabbing;
+}
+.component-properties .property-remove {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  margin: 4px;
+  border-radius: 4px;
+}
+.property-grip svg,
+.property-remove svg {
+  opacity: 0;
+}
+.property-row:hover svg,
+.property-row:focus-within svg {
+  opacity: 1;
+}
+.property-row.is-dragging {
+  background: var(--bg-panel-2);
+  opacity: 0.65;
+}
+.property-row.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.property-row.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.component-properties .property-remove:hover:not(:disabled),
+.component-properties .property-remove:focus-visible:not(:disabled) {
+  color: var(--red);
+  background: var(--bg-active);
+}
+.property-help {
+  color: var(--text-dim);
+  line-height: 1.5;
+  font-size: 11px;
+}
+.property-list > .property-help {
+  padding: 12px;
+}
+.property-editor {
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-panel-2);
+}
+.property-editor header {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.property-editor header button {
+  font-size: 18px;
+  padding: 0 6px;
+  background: transparent;
+}
+.property-editor fieldset {
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.property-editor label:not(.list-item-field) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-dim);
+}
+.property-editor input,
+.property-editor textarea {
+  border-color: var(--border-strong);
+}
+.property-editor textarea {
+  resize: vertical;
+}
+.property-editor .property-code {
+  font-family: var(--mono);
+  line-height: 1.5;
+  font-size: 11px;
+}
+.property-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.property-editor .property-flags label {
+  flex-direction: row;
+  align-items: center;
+}
+.property-flags input {
+  width: auto;
+}
+.property-options.props-field {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-dim);
+}
+.property-default-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.property-default-title small {
+  padding-top: 4px;
+}
+.property-default-title > span {
+  margin-bottom: 6px;
+  color: var(--text-dim);
+}
+.property-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.property-error {
+  color: var(--red);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.property-saving-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 20%);
+  color: var(--text);
+  cursor: progress;
+}
+
+.property-add {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 22px;
+  background: transparent;
+  color: var(--text-dim);
+}
+.property-type {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.property-type-heading {
+  display: flex;
+  align-items: center;
+  color: var(--text-dim);
+}
+.property-type:hover .prop-expr-toggle:not(.on) {
+  color: var(--text-dim);
+}
+.property-type .dd-trigger {
+  width: 100%;
+}

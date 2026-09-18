@@ -1,8 +1,12 @@
+import type { ComponentProperties } from './component-properties';
+import type { Result } from './result';
 // Invoke results mirror the handlers' wire shapes, including legacy null sentinels.
 // Main's typed registrar checks every handler against this inventory.
 import type { Data } from './boundary';
 
 export interface IpcResults {
+  readonly 'component:properties': Result<ComponentProperties>;
+  readonly 'component:editProperties': Result<ComponentProperties>;
   readonly 'assets:delete':
     | {
         readonly ok: false;

@@ -53,6 +53,13 @@ const START = 'rgb(1, 2, 3)';
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { pretendToBeVisual: true });
   global.window = dom.window;
   global.document = dom.window.document;
+  global.Node = dom.window.Node;
+  // These interaction checks supply geometry without drawing to a canvas.
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  // JSDOM otherwise logs handler exceptions while the test still reports success.
+  dom.window.addEventListener('error', (event) => {
+    check('live color events complete without throwing', false, event.message);
+  });
   global.navigator = dom.window.navigator;
   global.IS_REACT_ACT_ENVIRONMENT = true;
   global.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);

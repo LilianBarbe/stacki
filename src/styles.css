@@ -148,6 +148,18 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text-dim);
   -webkit-app-region: drag;
 }
+/* This title is navigation, so Electron must deliver clicks instead of window dragging. */
+.titlebar .project-back {
+  padding: 4px 6px;
+  margin-left: -6px;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+.titlebar .project-back:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.project-back svg { flex-shrink: 0; }
 .titlebar .spacer { flex: 1; -webkit-app-region: drag; }
 
 .titlebar .url-group {

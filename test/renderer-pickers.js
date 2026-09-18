@@ -1,5 +1,6 @@
 // Render the real pickers with shared React. Valid data retains selected/missing
-// rows, while oversized and cyclic inputs fail before unbounded traversal.
+// rows and concise page labels, while oversized and cyclic inputs fail before
+// unbounded traversal.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,7 +13,8 @@ const output = path.join(directory, 'renderer-pickers.bundle.cjs');
 buildSync({
   stdin: {
     contents: `export { default as DataPicker } from './src/ui/DataPicker.tsx';
-    export { default as InsertSearch } from './src/ui/InsertSearch.tsx';`,
+    export { default as InsertSearch } from './src/ui/InsertSearch.tsx';
+    export { default as LinkField } from './src/ui/LinkField.tsx';`,
     resolveDir: path.join(__dirname, '..'),
   },
   outfile: output,
@@ -22,7 +24,7 @@ buildSync({
   logLevel: 'silent',
   external: ['react', 'react-dom', 'react/jsx-runtime'],
 });
-const { DataPicker, InsertSearch } = require(output);
+const { DataPicker, InsertSearch, LinkField } = require(output);
 const leaf = { path: 'post', key: 'post', kind: 'object', preview: '', children: null };
 const renderData = (props) =>
   renderToStaticMarkup(
@@ -39,6 +41,24 @@ assert.throws(() => renderData({ current: 'x'.repeat(8193) }), /binding path lim
 const cyclic = { ...leaf, children: [] };
 cyclic.children.push(cyclic);
 assert.throws(() => renderData({ tree: [cyclic] }), /depth limit exceeded/);
+const renderLink = (page) =>
+  renderToStaticMarkup(
+    React.createElement(LinkField, {
+      value: { type: 'string', value: page.route },
+      context: { pages: [page], projectPath: '/project' },
+      onChange() {},
+    }),
+  );
+const repeatedRoute = renderLink({
+  name: 'care/plan-a-visit.astro',
+  route: '/care/plan-a-visit',
+});
+assert.match(repeatedRoute, />care\/plan-a-visit</);
+assert.doesNotMatch(
+  repeatedRoute,
+  /care\/plan-a-visit.*care\/plan-a-visit/,
+);
+assert.match(renderLink({ name: 'index.astro', route: '/' }), />index  ·  \//);
 assert.throws(
   () =>
     renderToStaticMarkup(
@@ -50,4 +70,4 @@ assert.throws(
     ),
   /component limit exceeded/,
 );
-console.log('renderer-pickers: selected/missing rows and traversal bounds passed');
+console.log('renderer-pickers: labels, selected/missing rows, and traversal bounds passed');

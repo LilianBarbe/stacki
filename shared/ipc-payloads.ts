@@ -1,3 +1,4 @@
+import { parsePropertyChange, propertySource } from './component-properties';
 // Complete invoke-channel inventory. Every main-process listener receives the
 // parsed shape below; payload field names retain the existing renderer protocol.
 import {
@@ -93,6 +94,9 @@ export const IPC_PAYLOADS = {
     imports: optional(list(object({ name: optional(text), path: optional(text) }))),
     props: optional(list(data)),
   }),
+  'component:properties': object({ ...project, file: pathText }),
+  'component:editProperties': object({ ...project, file: pathText,
+    source: propertySource, change: parsePropertyChange }),
   'component:usage': object({ ...named, exclude: optional(text) }),
   'content:collections': pathText,
   'content:config': object({ ...project, force: maybeFlag }),

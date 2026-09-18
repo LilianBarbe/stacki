@@ -1,3 +1,4 @@
+import { PropertiesIcon } from './PropertiesIcon';
 import type { MouseEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -13,6 +14,7 @@ import {
 const TABS = [
   { id: 'pages', title: 'Pages', shortcut: 'P', Icon: PagePanelIcon },
   { id: 'navigator', title: 'Navigator', shortcut: 'Z', Icon: NavigatorIcon },
+  { id: 'properties', title: 'Properties', shortcut: 'K', Icon: PropertiesIcon },
   { id: 'components', title: 'Components', shortcut: '⇧A', Icon: ComponentFillIcon },
   { id: 'assets', title: 'Assets', shortcut: 'J', Icon: AssetManagerIcon },
   { id: 'cms', title: 'CMS', shortcut: '⌥C', Icon: CmsIcon },
@@ -28,7 +30,9 @@ const TOOLTIP_DELAY = 500;
 export default function LeftRail({
   active,
   onSelect,
+  componentOpen = false,
 }: {
+  readonly componentOpen?: boolean;
   readonly active?: RailTab | null;
   readonly onSelect: (tab: RailTab) => void;
 }) {
@@ -55,15 +59,18 @@ export default function LeftRail({
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  useRailKeys(onSelect);
+  useRailKeys(onSelect, componentOpen);
+  const tabs = TABS.filter((tab) => tab.id !== 'properties' || componentOpen);
 
-  const tipTab = tip && TABS.find((t) => t.id === tip.id);
+  const tipTab = tip && tabs.find((t) => t.id === tip.id);
 
   return (
     <div className="rail">
-      {TABS.map(({ id, Icon }) => (
+      {tabs.map(({ id, Icon, title, shortcut }) => (
         <button
           key={id}
+          aria-label={`${title} (${shortcut})`}
+          aria-pressed={active === id}
           className={`rail-btn ${active === id ? 'on' : ''}`}
           onMouseEnter={showSoon(id)}
           onMouseLeave={hide}
@@ -84,7 +91,7 @@ export default function LeftRail({
   );
 }
 
-function useRailKeys(onSelect: (tab: RailTab) => void): void {
+function useRailKeys(onSelect: (tab: RailTab) => void, componentOpen: boolean): void {
   // P / Z / ⇧A / J / ⌥C / ⌥H toggle the panels (ignored while typing in a field).
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -121,6 +128,8 @@ function useRailKeys(onSelect: (tab: RailTab) => void): void {
         id = 'navigator';
       } else if (k === 'a' && e.shiftKey) {
         id = 'components';
+      } else if (k === 'k' && !e.shiftKey && componentOpen) {
+        id = 'properties';
       } else if (k === 'j' && !e.shiftKey) {
         id = 'assets';
       }
@@ -131,5 +140,5 @@ function useRailKeys(onSelect: (tab: RailTab) => void): void {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onSelect]);
+  }, [onSelect, componentOpen]);
 }

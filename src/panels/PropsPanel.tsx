@@ -12,6 +12,7 @@ import PropField, { assetImportOf } from './PropField';
 import { AttributesSection } from './propAttributes';
 import { ConditionField, BindHandle, FieldDataPicker } from './propBindings';
 import { createPropRules } from './propRules';
+import { isFragmentNode } from './structureModel';
 import { assert } from '../../shared/assert';
 import { LIMITS } from '../../shared/limits';
 import React, { useEffect, useRef, useState } from 'react';
@@ -26,6 +27,7 @@ import { scopeChips, scopeCompletions } from '../dataSuggest.js';
 import LinkField from '../ui/LinkField.jsx';
 import {
   VariableTextSizeIcon,
+  CustomElementIcon,
   ElementComponentIcon,
   astroAssetIcon,
   CommentIcon,
@@ -249,7 +251,9 @@ function ElementPanelView({ state }: { readonly state: ElementState }) {
         }}
       >
         <div className="props-title">
-          {node.kind === 'element' ? (
+          {isFragmentNode(node) ? (
+            <CustomElementIcon size={16} className="props-title-icon" />
+          ) : node.kind === 'element' ? (
             elementIcon(node.name, 16, 'props-title-icon')
           ) : 'astroAsset' in node && node.astroAsset ? (
             astroAssetIcon(node.name, 16, 'props-title-icon')

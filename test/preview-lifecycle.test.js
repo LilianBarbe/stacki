@@ -1,3 +1,6 @@
+// Goal: preview frames retain their lifecycle and render the paths users interact with.
+// Methodology: mount the real preview, deliver iframe messages, and answer only
+// requested measurements so a missing hover subscription cannot pass unnoticed.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -18,6 +21,87 @@ esbuild.buildSync({
 });
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+test('canvas hover measures and outlines the active copy, then clears on leave', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(dir, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  const props = hoverPreviewProps();
+  const act = (action) => React.act(async () => { await action(); await settle(); });
+  const render = () => act(() => root.render(React.createElement(PreviewPane, props)));
+  try {
+    await render();
+    const frame = document.querySelector('iframe').contentWindow;
+    const tracked = [];
+    frame.postMessage = (message) => {
+      if (message.type === 'avb:track') {tracked.push(message.paths);}
+    };
+    const send = (data, source = frame) => act(() =>
+      window.dispatchEvent(new window.MessageEvent('message', { source, data })),
+    );
+    const boxes = [{ x: 10, y: 30, w: 80, h: 40 }, { x: 10, y: 90, w: 80, h: 40 }];
+    const measure = () => send({
+      type: 'avb:rects', classes: {}, spacing: {},
+      rects: Object.fromEntries(tracked.at(-1).map((nodePath) => [nodePath, boxes])),
+    });
+    await send({ type: 'avb:hover-node', path: '1', occurrence: 1 });
+    assert.deepEqual(tracked.at(-1), ['0', '1', '2'], 'Hover joins selection and focus tracking');
+    await measure();
+    assert.equal(document.querySelectorAll('.node-outline.hover').length, 1);
+    assert.equal(document.querySelector('.node-outline.hover').style.top, '90px');
+    assert.equal(document.querySelectorAll('.node-outline.sel').length, 2);
+    const trackCount = tracked.length;
+    await send({ type: 'avb:hover-node', path: '1', occurrence: 0 });
+    assert.equal(tracked.length, trackCount, 'Moving between copies reuses their measurements');
+    assert.equal(document.querySelector('.node-outline.hover').style.top, '30px');
+    props.navHoverPath = '3';
+    await render();
+    assert.deepEqual(tracked.at(-1), ['0', '3', '2']);
+    await measure();
+    assert.equal(document.querySelectorAll('.node-outline.hover').length, 2);
+    props.navHoverPath = null;
+    await render();
+    assert.deepEqual(tracked.at(-1), ['0', '1', '2'], 'Canvas hover resumes after navigator hover');
+    await measure();
+    await send({ type: 'avb:hover-node', path: null, occurrence: 0 }, window);
+    assert.equal(document.querySelectorAll('.node-outline.hover').length, 1);
+    await send({ type: 'avb:hover-node', path: null, occurrence: 0 });
+    assert.deepEqual(tracked.at(-1), ['0', '2']);
+    assert.equal(document.querySelector('.node-outline.hover'), null);
+    assert.equal(document.querySelectorAll('.node-outline.sel').length, 2);
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+  }
+});
+
+function installHoverDOM() {
+  const dom = new JSDOM('<!doctype html><div id="root"></div>', {
+    url: 'http://localhost/', pretendToBeVisual: true,
+  });
+  for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node']) {
+    global[key] = key === 'window' ? dom.window : dom.window[key];
+  }
+  global.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+  global.cancelAnimationFrame = clearTimeout;
+  global.ResizeObserver = class { observe() {} disconnect() {} };
+  global.IS_REACT_ACT_ENVIRONMENT = true;
+  return dom;
+}
+
+function hoverPreviewProps() {
+  return {
+    devUrl: 'http://localhost:4321', route: '/', devStatus: 'on', device: 'desktop',
+    selPath: '0', navHoverPath: null, focusPath: '2', crumbs: [], onDevice() {},
+    overlayInfo: () => ({
+      label: 'Card', kind: 'element', tag: 'div', nodeKind: 'element',
+      astroAsset: false, dynamicTag: false, isLayout: false, bound: false,
+    }),
+  };
+}
+
 test('preview owns only mounted frames and cleans canceled/unmounted drags', async () => {
   const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true });
   const { window } = dom;

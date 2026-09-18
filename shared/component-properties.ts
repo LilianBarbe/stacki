@@ -1,0 +1,128 @@
+// Source text is the revision token: edits cannot overwrite a newer disk revision.
+import { boolean, list, object, text } from './boundary';
+import { LIMITS } from './limits';
+import { toRecord } from './record';
+import type { Result } from './result';
+
+export const PROPERTY_LIMITS = {
+  fieldsMax: LIMITS.propSchemaFieldsMax,
+  sourceCharsMax: 2 * 1024 * 1024,
+  textCharsMax: 32768,
+  nameCharsMax: 128,
+  filesMax: 10000,
+  totalCharsMax: 32 * 1024 * 1024,
+  nodesMax: 200000,
+} as const;
+
+export interface ComponentProperty {
+  readonly name: string;
+  readonly type: string;
+  readonly required: boolean;
+  readonly readonly: boolean;
+  readonly defaultValue: string;
+  readonly description: string;
+}
+export interface ComponentProperties {
+  readonly source: string;
+  readonly properties: readonly ComponentProperty[];
+  readonly frontmatter: string;
+  readonly advanced: boolean;
+}
+export type PropertyChange =
+  | { readonly kind: 'save'; readonly originalName: string; readonly property: ComponentProperty }
+  | { readonly kind: 'remove'; readonly name: string }
+  | { readonly kind: 'order'; readonly names: readonly string[] }
+  | { readonly kind: 'source'; readonly frontmatter: string };
+
+export function propertyText(input: unknown): string {
+  const value = text(input);
+  if (value.length > PROPERTY_LIMITS.textCharsMax) {
+    throw new Error('Property text exceeds limit');
+  }
+  return value;
+}
+export function propertySource(input: unknown): string {
+  const value = text(input);
+  if (value.length > PROPERTY_LIMITS.sourceCharsMax) {
+    throw new Error('Component source exceeds limit');
+  }
+  return value;
+}
+export function propertyName(input: unknown): string {
+  const value = propertyText(input);
+  if (value.length > PROPERTY_LIMITS.nameCharsMax) {
+    throw new Error('Property name exceeds limit');
+  }
+  if (!/^[A-Za-z_$][\w$]*$/.test(value)) {
+    throw new Error('Use a TypeScript identifier for the property name');
+  }
+  return value;
+}
+export function parseComponentProperty(input: unknown): ComponentProperty {
+  return object({
+    name: propertyLabel,
+    type: propertyText,
+    required: boolean,
+    readonly: boolean,
+    defaultValue: propertyText,
+    description: propertyText,
+  })(input);
+}
+export function propertyList<T>(input: unknown, parse: (input: unknown) => T): readonly T[] {
+  const values = list(parse)(input);
+  if (values.length > PROPERTY_LIMITS.fieldsMax) {
+    throw new Error('Too many component properties');
+  }
+  return values;
+}
+export function parsePropertyChange(input: unknown): PropertyChange {
+  const value = toRecord(input);
+  switch (value?.['kind']) {
+    case 'save':
+      return {
+        kind: 'save',
+        ...object({ originalName: propertyText, property: parseEditableProperty })(input),
+      };
+    case 'remove':
+      return { kind: 'remove', name: propertyName(value['name']) };
+    case 'order':
+      return { kind: 'order', names: propertyList(value['names'], propertyName) };
+    case 'source':
+      return { kind: 'source', frontmatter: propertySource(value['frontmatter']) };
+    default:
+      throw new Error('Unknown component property change');
+  }
+}
+export function parseComponentProperties(input: unknown): ComponentProperties {
+  return object({
+    source: propertySource,
+    frontmatter: propertySource,
+    advanced: boolean,
+    properties: (value) => propertyList(value, parseComponentProperty),
+  })(input);
+}
+export function parsePropertiesResult<T>(input: unknown, parse: (value: unknown) => T): Result<T> {
+  const value = toRecord(input);
+  if (value?.['ok'] === true) {
+    return { ok: true, value: parse(value['value']) };
+  }
+  if (value?.['ok'] === false) {
+    return {
+      ok: false,
+      error: object({ code: propertyText, message: propertyText })(value['error']),
+    };
+  }
+  throw new Error('Invalid component properties result');
+}
+
+function propertyLabel(input: unknown): string {
+  const value = propertyText(input);
+  if (value.length === 0 || value.length > PROPERTY_LIMITS.nameCharsMax) {
+    throw new Error('Property name must be nonempty and within the name limit');
+  }
+  return value;
+}
+function parseEditableProperty(input: unknown): ComponentProperty {
+  const property = parseComponentProperty(input);
+  return { ...property, name: propertyName(property.name) };
+}

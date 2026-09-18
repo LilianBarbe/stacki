@@ -21,6 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const { parsePreviewMessage } = require('./renderer-module')('previewMessages.ts');
 
 const failures = [];
 let checked = 0;
@@ -153,6 +154,22 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     el.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, clientX: 100, clientY: 290 }));
     const msg = sent.filter((m) => m.type === 'avb:click-node').pop();
     check('and a click in that gap selects what a hover showed', msg?.path === '0', JSON.stringify(msg));
+  }
+
+  // The renderer's boundary must accept the actual preload's leave message;
+  // otherwise a correct hit test can still leave an outline stuck on screen.
+  {
+    sent.length = 0;
+    window.document.documentElement.dispatchEvent(new window.MouseEvent('mouseleave'));
+    const message = sent.find((entry) => entry.type === 'avb:hover-node');
+    const parsed = parsePreviewMessage(message);
+    check(
+      'leaving the canvas produces a valid hover-clear message',
+      parsed?.kind === 'hover-node' && parsed.path === null && parsed.occurrence === 0,
+      JSON.stringify(message)
+    );
+    const entered = parsePreviewMessage(pointAt('word', 400));
+    check('re-entering restores canvas hover', entered?.path === '0.1');
   }
 
   // An event with no coordinates — something synthesised — has no point to

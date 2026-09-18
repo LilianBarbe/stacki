@@ -75,6 +75,7 @@ const fields = {
   filePath: '/site/src/styles/site.css',
   spec: '../data/site',
   source: '<h1>Hello</h1>',
+  change: { kind: 'remove', name: 'title' },
   text: 'Text',
   css: 'h1 {color:red}',
   file: 'src/styles/site.css',

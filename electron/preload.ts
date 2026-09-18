@@ -166,7 +166,8 @@ if (!process.isMainFrame) {
         // ⌘Enter jumps to the class field. The canvas is where the selection is
         // usually made, so it has to reach the app from in here too.
         const isClassJump = mod && !e.altKey && !e.shiftKey && e.key === 'Enter';
-        if (isDelete || isDuplicate || isClassJump) {
+        const isProperties = !mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k';
+        if (isDelete || isDuplicate || isClassJump || isProperties) {
           e.preventDefault();
           try {
             window.parent.postMessage(
@@ -1594,12 +1595,7 @@ if (!process.isMainFrame) {
         window.parent.postMessage({ type: 'avb:hover-node', path: p, occurrence }, '*');
       }
     });
-    document.documentElement.addEventListener('mouseleave', () => {
-      if (lastHoverPath !== null) {
-        lastHoverPath = null;
-        window.parent.postMessage({ type: 'avb:hover-node', path: null }, '*');
-      }
-    });
+    document.documentElement.addEventListener('mouseleave', startOutlinesClearHover);
     // Double-clicking a component opens it for editing, the way Webflow
     // drills into one.
     document.addEventListener(
@@ -1644,6 +1640,15 @@ if (!process.isMainFrame) {
       true
     );
   };
+
+  function startOutlinesClearHover(): void {
+    if (lastHoverPath !== null) {
+      lastHoverPath = null;
+      lastHoverOcc = 0;
+      // Clear messages use the same located-message contract as hover hits.
+      window.parent.postMessage({ type: 'avb:hover-node', path: null, occurrence: 0 }, '*');
+    }
+  }
 
   let designMode = false;
 
@@ -2004,6 +2009,8 @@ contextBridge.exposeInMainWorld('avb', {
   importPathFor: invoke('page:importPathFor'),
   rebaseImport: invoke('page:rebaseImport'),
   createComponent: invoke('component:create'),
+  componentProperties: invoke('component:properties'),
+  editComponentProperties: invoke('component:editProperties'),
   componentUsage: invoke('component:usage'),
   dynamicPaths: invoke('page:dynamicPaths'),
   injectedRoutes: invoke('project:injectedRoutes'),

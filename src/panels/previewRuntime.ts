@@ -47,6 +47,7 @@ export function usePreviewRuntime(props: PreviewRuntimeProps, url: string | null
   const [canvasHover, setCanvasHover] = useState<string | null>(null);
   const [selOcc, setSelOcc] = useState<number | null>(null);
   const [hoverOcc, setHoverOcc] = useState(0);
+  const hoverPath = props.navHoverPath ?? canvasHover;
   const refs = useRuntimeRefs(props, selOcc);
   const setters = useMemo(
     () => ({ setRects, setSpacing, setCanvasHover, setSelOcc, setHoverOcc }),
@@ -54,9 +55,11 @@ export function usePreviewRuntime(props: PreviewRuntimeProps, url: string | null
   );
   useOccurrenceSelection(props.selPath, refs, setSelOcc);
   useMessageListener(iframeRef, refs, setters);
+  // The frame measures only tracked paths, so both hover sources must use
+  // the same active path for measurement requests and outline rendering.
   const trackPaths = useMemo(
-    () => trackedPaths(props.selPath, props.navHoverPath, props.focusPath),
-    [props.focusPath, props.navHoverPath, props.selPath],
+    () => trackedPaths(props.selPath, hoverPath, props.focusPath),
+    [props.focusPath, hoverPath, props.selPath],
   );
   const registerFrame = useCallback((): void => {
     setCanvasFrame(iframeRef.current?.contentWindow ?? null);
@@ -81,7 +84,7 @@ export function usePreviewRuntime(props: PreviewRuntimeProps, url: string | null
     rects,
     spacing,
     selOcc,
-    hoverPath: props.navHoverPath ?? canvasHover,
+    hoverPath,
     hoverOcc: props.navHoverPath ? null : hoverOcc,
     registerFrame,
     sendTrack,

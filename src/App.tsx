@@ -1,3 +1,5 @@
+import { usePropertySaveGuard } from './usePropertySaveGuard';
+import ComponentPropertiesPanel from './panels/ComponentPropertiesPanel';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SetStateAction } from 'react';
 import type { Attr, ImportDecl, PageModel, PageNode, PairedNode } from '../shared/page-node';
@@ -7,6 +9,7 @@ import WelcomeScreen from './panels/WelcomeScreen';
 import PagesPanel from './panels/PagesPanel';
 import PalettePanel from './panels/PalettePanel';
 import StructurePanel from './panels/StructurePanel';
+import { isFragmentNode } from './panels/structureModel';
 import { isInlineRun, noteIndexAbove, noteText, noteValue, selectionAfterDelete } from './treeSelection.js';
 import { canvasClickAction } from './canvasClick.js';
 import { liveClassesById as classesByNodeId, rendersOwnElement } from './liveClasses.js';
@@ -471,6 +474,7 @@ function holdsInlineText(node: PageNode | null | undefined): boolean {
 }
 
 export default function App() {
+  const propertySave = usePropertySaveGuard();
   const [project, setProject] = useState<ProjectIdentity | null>(null);
   const [scan, setScan] = useState<ScanResult>({
     pages: [],
@@ -534,6 +538,17 @@ export default function App() {
   const [itemIndex, setItemIndex] = useState<ItemIndexes>({});
   const [dynamicError, setDynamicError] = useState<string | null>(null);
   const [leftTab, setLeftTab] = useState<LeftTab>('navigator');
+  useEffect(() => {
+    if (leftTab !== 'navigator') {
+      setHoverNodeId(null);
+    }
+  }, [leftTab]);
+  const componentPropertiesOpen = currentPage?.kind === 'component';
+  useEffect(() => {
+    if (!componentPropertiesOpen) {
+      setLeftTab((tab) => tab === 'properties' ? 'navigator' : tab);
+    }
+  }, [componentPropertiesOpen]);
   const [cmsRel, setCmsRel] = useState<string | null>(null);
   // Content collection open in the schema-driven editor. Only one of the two
   // is ever open: they edit the same kind of thing in two different ways.
@@ -994,6 +1009,7 @@ export default function App() {
       if (nextStack) {setEditStack(nextStack);}
       setCurrentPage(entry);
       setPageState(nextState);
+      setHoverNodeId(null);
       const start = result.editable
         ? entry.kind === 'component'
           ? openingSelection(result.model.nodes)
@@ -1031,6 +1047,7 @@ export default function App() {
       setCurrentPage({ kind: 'route', name: entry.route, route: entry.route, from: entry.from });
       setPageState(null);
       setSelectedId(null);
+      setHoverNodeId(null);
     },
     [flushSave]
   );
@@ -1099,6 +1116,13 @@ export default function App() {
     }
     setRefreshKey((k) => k + 1); // the preview is showing the old branch too
   }, [rescan, openFile]);
+
+  const completePropertySave = useCallback(async () => {
+    // A floating source window may hold a pre-rename consumer. It was flushed
+    // before the transaction; close it so later typing cannot restore stale source.
+    setCodeWin(null);
+    await reloadFromDisk();
+  }, [reloadFromDisk]);
 
   // Drill into a component: its own file becomes the edited document, and the
   // stack remembers what to come back to (pages and components alike, so
@@ -1363,6 +1387,7 @@ export default function App() {
   const [historyTick, setHistoryTick] = useState(0);
 
   const undo = useCallback(async () => {
+    if (propertySave.saving.current) { return; }
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
     if (!h.past.length) {return;}
@@ -1383,9 +1408,10 @@ export default function App() {
     if (!state) {return;} // its page is gone — nothing to restore onto
     h.future.push(snapshotOf(state));
     applySnapshot(entry);
-  }, [applySnapshot, showToast]);
+  }, [applySnapshot, showToast, propertySave.saving]);
 
   const redo = useCallback(async () => {
+    if (propertySave.saving.current) { return; }
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
     if (!h.future.length) {return;}
@@ -1406,7 +1432,7 @@ export default function App() {
     if (!state) {return;}
     h.past.push(snapshotOf(state));
     applySnapshot(entry);
-  }, [applySnapshot, showToast]);
+  }, [applySnapshot, showToast, propertySave.saving]);
 
   // Discrete edits (dropdown, checkbox, drag, delete) save immediately;
   // typing batches keystrokes for 300 ms so the preview doesn't rebuild
@@ -1438,6 +1464,7 @@ export default function App() {
       immediate: boolean | 'live' = false,
       coalesceKey: string | null = null,
     ) => {
+      if (propertySave.saving.current) { return; }
       pushHistory(coalesceKey);
       setPageState((s) => {
         if (!s || !s.editable) {return s;}
@@ -1446,16 +1473,17 @@ export default function App() {
       });
       scheduleSave(immediate);
     },
-    [scheduleSave, pushHistory]
+    [scheduleSave, pushHistory, propertySave.saving]
   );
 
   const setRawSource = useCallback(
     (source: string) => {
+      if (propertySave.saving.current) { return; }
       pushHistory('raw-source');
       setPageState((s) => (s ? { ...s, source, dirty: true } : s));
       scheduleSave();
     },
-    [scheduleSave, pushHistory]
+    [scheduleSave, pushHistory, propertySave.saving]
   );
 
   // ----------------------------------------------------------------
@@ -3634,7 +3662,7 @@ export default function App() {
       }
     })();
     return () => { dropped = true };
-  }, [focusOf, hostFile?.path, collectionSamples, collections]);
+  }, [focusOf, hostFile?.path, collectionSamples, collections, scan]);
 
   // Link settings (href fields): pages to link to and the ids on this page
   // that anchor links can target.
@@ -4026,14 +4054,16 @@ export default function App() {
     const n = nodeAtPath(model.nodes, trailOf(p));
     if (!n) {return null;}
     const label = n.id === 'layout' ? currentLayoutName || n.name || 'layout' : crumbLabel(n);
-    // A dynamic tag renders an element, so it shouldn't wear the component
-    // colour on the canvas either.
+    // Fragments group inline content rather than referring to another component.
+    // Their outlines use ordinary element styling, as dynamic tags already do.
     const kind =
-      n.kind === 'component' && !n.dynamicTag
-        ? 'component'
-        : n.kind === 'map' || n.kind === 'cond' || n.kind === 'branch'
-          ? 'map'
-          : 'element';
+      isFragmentNode(n)
+        ? 'element'
+        : n.kind === 'component' && !n.dynamicTag
+          ? 'component'
+          : n.kind === 'map' || n.kind === 'cond' || n.kind === 'branch'
+            ? 'map'
+            : 'element';
     // The tag drives the overlay's icon, so it matches the Navigator row.
     const tag = n.kind === 'element' || n.kind === 'raw' ? n.name : null;
     return {
@@ -4152,8 +4182,24 @@ export default function App() {
 
   return (
     <div className="app">
+      {propertySave.phase === 'saving' && (
+        <div className="property-saving-overlay" role="status">Saving component properties…</div>
+      )}
       <div className="titlebar">
-        <span className="app-title">{project.name}</span>
+        <button
+          className="app-title project-back"
+          title="Back to all projects"
+          aria-label="Back to all projects"
+          disabled={propertySave.phase === 'saving'}
+          onClick={() => {
+            void leaveProject(null).catch((error: unknown) => {
+              showToast(`Could not return to projects: ${cleanError(error)}`, 'error');
+            });
+          }}
+        >
+          <ChevronLeftIcon size={13} />
+          <span>{project.name}</span>
+        </button>
         <span className="spacer" />
         {editStack.length > 1 ? (
           <button
@@ -4274,11 +4320,23 @@ export default function App() {
       <div className="main">
         <LeftRail
           active={leftTab}
+          componentOpen={componentPropertiesOpen}
           onSelect={(id) => setLeftTab((t) => (t === id ? null : id))}
         />
 
         {leftTab && (
           <div className="panel left">
+            {leftTab === 'properties' && currentPage?.kind === 'component' && (
+              <ComponentPropertiesPanel
+                key={currentPage.path}
+                projectPath={project.path}
+                file={currentPage.path}
+                name={currentPage.name}
+                flushSave={flushSave}
+                onSavePhase={propertySave.changePhase}
+                onSaved={completePropertySave}
+              />
+            )}
             {leftTab === 'pages' && (
               <PagesPanel
                 scan={scan}

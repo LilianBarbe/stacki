@@ -149,7 +149,8 @@ function outlineIcon(info: OverlayInfo): React.ReactNode {
     return <LayoutIcon size={size} />;
   }
   if (info.nodeKind === 'component') {
-    if (info.dynamicTag) {
+    // Fragments and dynamic tags share element styling and the custom-tag icon.
+    if (info.kind === 'element') {
       return <CustomElementIcon size={size} />;
     }
     return info.astroAsset ? (
