@@ -155,6 +155,22 @@ const settle = (ms = 40) => new Promise((r) => setTimeout(r, ms));
     check('and a click in that gap selects what a hover showed', msg?.path === '0', JSON.stringify(msg));
   }
 
+  // The renderer's boundary must accept the actual preload's leave message;
+  // otherwise a correct hit test can still leave an outline stuck on screen.
+  {
+    sent.length = 0;
+    window.document.documentElement.dispatchEvent(new window.MouseEvent('mouseleave'));
+    const message = sent.find((entry) => entry.type === 'avb:hover-node');
+    const parsed = message;
+    check(
+      'leaving the canvas produces a valid hover-clear message',
+      parsed?.type === 'avb:hover-node' && parsed.path === null && parsed.occurrence === 0,
+      JSON.stringify(message)
+    );
+    const entered = pointAt('word', 400);
+    check('re-entering restores canvas hover', entered?.path === '0.1');
+  }
+
   // An event with no coordinates — something synthesised — has no point to
   // judge, and is answered as before rather than refused.
   {

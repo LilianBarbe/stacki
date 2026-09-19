@@ -273,7 +273,7 @@ const check = (what, condition, detail) => {
   );
   check(
     'and a page can only be written inside src/pages',
-    /startsWith\(pagesDir \+ path\.sep\)/.test(createHandler),
+    /!isPathDescendant\(pagesDir, pagePath\)/.test(createHandler),
     createHandler.slice(0, 400)
   );
 

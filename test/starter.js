@@ -34,9 +34,9 @@ const git = (cwd, args) =>
 // what the real one would leave behind — under the starter's own name, since
 // naming the site after its folder is the app's promise to keep.
 const fakeNpm = (root, name, body) => {
-  const file = path.join(root, name);
+  const script = path.join(root, `${name}.js`);
   fs.writeFileSync(
-    file,
+    script,
     `#!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
@@ -46,18 +46,10 @@ ${body}
 `,
     { mode: 0o755 }
   );
-  // Windows can spawn neither a shebang script nor, without a shell, a .cmd.
-  // The app already asks for a shell when the command looks like npm — that is
-  // how the real one, itself a .cmd shim, is found there — so the stand-in is
-  // put on PATH and handed over by NAME rather than by path. That keeps the
-  // Windows branch of run() under test instead of stepping around it.
-  if (process.platform === 'win32') {
-    fs.writeFileSync(`${file}.cmd`, `@echo off\r\nnode "%~dp0${name}" %*\r\n`);
-  }
-  if (!process.env.PATH.split(path.delimiter).includes(root)) {
-    process.env.PATH = `${root}${path.delimiter}${process.env.PATH}`;
-  }
-  return name;
+  if (process.platform !== 'win32') return script;
+  const command = path.join(root, `${name}.cmd`);
+  fs.writeFileSync(command, `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`);
+  return command;
 };
 
 const SCAFFOLD = `
@@ -73,6 +65,16 @@ console.log('Ready.');
 
 (async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'stacki-starter-'));
+  const emptyGitConfig = path.join(root, 'empty-git-config');
+  fs.writeFileSync(emptyGitConfig, '');
+  // Match a first-time Windows installation: Git exists, but no author has
+  // ever been configured. Stacki must still leave the starter with a commit.
+  process.env.GIT_CONFIG_GLOBAL = emptyGitConfig;
+  process.env.GIT_CONFIG_NOSYSTEM = '1';
+  delete process.env.GIT_AUTHOR_NAME;
+  delete process.env.GIT_AUTHOR_EMAIL;
+  delete process.env.GIT_COMMITTER_NAME;
+  delete process.env.GIT_COMMITTER_EMAIL;
   const npm = fakeNpm(root, 'npm-ok', SCAFFOLD);
   const calls = () => fs.readFileSync(path.join(root, 'calls.txt'), 'utf8').trim().split('\n');
 

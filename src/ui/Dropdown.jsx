@@ -126,9 +126,8 @@ export default function Dropdown({
     if (!open || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     // Measured once it exists; before that, a row's worth per option.
-    const wanted = popupRef.current
-      ? popupRef.current.scrollHeight
-      : visible.length * 30 + 12 + (searchable ? 34 : 0);
+    // Derive intrinsic height: measuring an already constrained menu causes a render loop.
+    const wanted = visible.length * 26 + 8 + (searchable ? 36 : 0);
     const next = { left: rect.left, width: rect.width, ...popupBox(rect, wanted, window.innerHeight) };
     setPos((prev) =>
       prev &&
@@ -140,7 +139,7 @@ export default function Dropdown({
         ? prev
         : next
     );
-  }, [open, visible.length, pos]);
+  }, [open, visible.length, searchable]);
 
   useEffect(() => {
     if (!open) return;

@@ -147,7 +147,7 @@ if (!process.isMainFrame) {
         // ⌘Enter jumps to the class field. The canvas is where the selection is
         // usually made, so it has to reach the app from in here too.
         const isClassJump = mod && !e.altKey && !e.shiftKey && e.key === 'Enter';
-        if (isDelete || isDuplicate || isClassJump) {
+        if (isDelete || isDuplicate || isClassJump || (!mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k')) {
           e.preventDefault();
           try {
             window.parent.postMessage(
@@ -1479,7 +1479,8 @@ if (!process.isMainFrame) {
     document.documentElement.addEventListener('mouseleave', () => {
       if (lastHoverPath !== null) {
         lastHoverPath = null;
-        window.parent.postMessage({ type: 'avb:hover-node', path: null }, '*');
+        lastHoverOcc = 0;
+        window.parent.postMessage({ type: 'avb:hover-node', path: null, occurrence: 0 }, '*');
       }
     });
     // Double-clicking a component opens it for editing, the way Webflow
@@ -1966,6 +1967,8 @@ contextBridge.exposeInMainWorld('avb', {
   rebaseImport: invoke('page:rebaseImport'),
   createComponent: invoke('component:create'),
   inlineComponent: invoke('component:inline'),
+  componentProperties: invoke('component:properties'),
+  editComponentProperties: invoke('component:editProperties'),
   componentUsage: invoke('component:usage'),
   dynamicPaths: invoke('page:dynamicPaths'),
   injectedRoutes: invoke('project:injectedRoutes'),

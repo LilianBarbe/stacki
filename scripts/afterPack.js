@@ -11,7 +11,6 @@ const fs = require('node:fs');
 const { fixNodePtyPermissions } = require('./fix-node-pty-permissions');
 
 exports.default = async function afterPack(context) {
-  if (context.electronPlatformName === 'win32') return;
 
   const appName = context.packager.appInfo.productFilename;
   // node-pty is asarUnpack'd, so it lives beside app.asar as real files.
@@ -27,6 +26,13 @@ exports.default = async function afterPack(context) {
       : path.join(context.appOutDir, 'resources', 'app.asar.unpacked');
 
   const nodePtyDir = path.join(unpacked, 'node_modules', 'node-pty');
+  if (context.electronPlatformName === 'win32') {
+    const architecture = { 0: 'ia32', 1: 'x64', 3: 'arm64' }[context.arch];
+    if (!architecture) throw new Error(`Unsupported Windows architecture: ${context.arch}`);
+    const binding = path.join(nodePtyDir, 'prebuilds', `win32-${architecture}`, 'pty.node');
+    if (!fs.existsSync(binding)) throw new Error(`Missing Windows node-pty binding: ${binding}`);
+    return;
+  }
   if (!fs.existsSync(nodePtyDir)) {
     console.warn('  • afterPack: node-pty not found in the packaged app; the terminal will not start.');
     return;

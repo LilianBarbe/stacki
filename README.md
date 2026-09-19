@@ -21,6 +21,20 @@ MIT licensed — fork it, build on it, ship your own version.
 - **Code fallback** — pages with markup too complex for the visual model open in a code editor instead, still with live preview.
 - **New project** — "New Project…" scaffolds a minimal Astro starter (layout + 5 components + home page) and runs `npm install` for you.
 
+## Upstream integration
+
+This fork includes the component previews and lazy panels from Stacki 0.1.28,
+and the component property editor and runtime fixes from
+[0.1.29–0.1.31](https://github.com/flowtricks/stacki-releases/releases/tag/v0.1.31).
+Open a component or layout, then choose **Properties** in the left rail (K) to
+add, rename, reorder or remove props and edit their types and defaults.
+See [component properties](docs/component-properties.md) for supported contracts
+and safeguards when updating usages across the project.
+
+These changes are adapted to this fork's existing JavaScript runtime; its
+workspace switching, Code/Agent panels, Theme Lab and canvas fixes are retained.
+The upstream TypeScript migration and publishing workflows are not imported.
+
 ## Running in development
 
 ```bash

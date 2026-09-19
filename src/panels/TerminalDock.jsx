@@ -1,3 +1,4 @@
+import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel.js';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import TerminalPane from './TerminalPane.jsx';
 import DevLogPane from './DevLogPane.jsx';
@@ -63,8 +64,8 @@ const stripLoginDash = (name) => (name.startsWith('-') ? name.slice(1) : name);
 // but truncation keeps the head, so collapse it to the basename first. Titles
 // with spaces ("feat: split a/b") are left alone.
 const shortenPathLike = (label) => {
-  if (/\s/.test(label) || !label.includes('/')) return label;
-  const parts = label.split('/').filter(Boolean);
+  if (/\s/.test(label) || !/[\\/]/.test(label)) return label;
+  const parts = label.split(/[\\/]/).filter(Boolean);
   return parts[parts.length - 1] || label;
 };
 
@@ -319,7 +320,7 @@ export default function TerminalDock({
               store(MODE_KEY, v);
             }}
           />
-          <button className="ghost" title="Hide terminal (⌘J)" onClick={onClose}>
+          <button className="ghost" title={`Hide terminal (${shortcutLabel('J', 'primary', currentDesktopPlatform())})`} onClick={onClose}>
             <ChevronDownIcon size={13} />
           </button>
         </div>

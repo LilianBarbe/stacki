@@ -1,0 +1,187 @@
+// Resolve identity before editing: a tag name alone cannot identify a component.
+import fs from 'node:fs';
+import path from 'node:path';
+import ts from 'typescript';
+import { assert } from '../shared/assert.mjs';
+import { PROPERTY_LIMITS } from '../shared/component-properties.mjs';
+import { err, ok } from '../shared/result.mjs';
+import { aliasMap, resolveSpec } from './cmsRefs.js';
+import { importsOf } from './componentUsage.js';
+import { sameFilesystemPath } from './platform.js';
+import { readPropertySyntax, syntaxNodes } from './propertySyntax.mjs';
+export function readPropertyConsumers(location) {
+  const files = projectSources(location.projectPath);
+  if (!files.ok) {
+    return files;
+  }
+  const aliases = aliasMap(location.projectPath);
+  const consumers = [];
+  let total = 0;
+  for (const file of files.value) {
+    const read = readBoundedSource(file);
+    if (!read.ok) {
+      return read;
+    }
+    total += read.value.length;
+    if (total > PROPERTY_LIMITS.totalCharsMax) {
+      return err({
+        code: 'limit',
+        message: 'Project exceeds the prop rename source limit.',
+      });
+    }
+    const names = readConsumerNames(read.value, file, location.file, aliases);
+    if (!names.ok) {
+      return names;
+    }
+    if (names.value.size > 0 || sameFilesystemPath(file, location.file)) {
+      consumers.push({ file, source: read.value, names: names.value });
+    }
+  }
+  assert(
+    consumers.length <= PROPERTY_LIMITS.filesMax,
+    'Consumer collection is bounded',
+  );
+  assert(
+    consumers.some((consumer) =>
+      sameFilesystemPath(consumer.file, location.file),
+    ),
+    'The component is included among project sources',
+  );
+  return ok(consumers);
+}
+export function readBoundedSource(file) {
+  try {
+    if (fs.statSync(file).size > PROPERTY_LIMITS.sourceCharsMax) {
+      return err({
+        code: 'limit',
+        message: `${file} exceeds the component source limit.`,
+      });
+    }
+    return ok(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    return filesystemError(error);
+  }
+}
+export function filesystemError(error) {
+  return err({
+    code: 'filesystem',
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
+function readConsumerNames(source, file, target, aliases) {
+  const names = new Set(
+    importsOf(source, file, aliases)
+      .filter((entry) =>
+        [...entry.candidates].some((candidate) =>
+          sameFilesystemPath(candidate, target),
+        ),
+      )
+      .flatMap((entry) => entry.names),
+  );
+  const syntax = file.endsWith('.astro')
+    ? readPropertySyntax(source).syntax
+    : ts.createSourceFile(
+        file,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+  const resolves = (specifier) =>
+    resolveSpec(specifier, file, aliases).some((candidate) =>
+      sameFilesystemPath(candidate, target),
+    );
+  for (const statement of syntax.statements) {
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.moduleSpecifier &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      resolves(statement.moduleSpecifier.text)
+    ) {
+      return unsupportedConsumer(file, 're-exports this component');
+    }
+    if (ts.isImportDeclaration(statement)) {
+      continue;
+    }
+    if (
+      syntaxNodes(statement).some(
+        (node) => ts.isIdentifier(node) && names.has(node.text),
+      )
+    ) {
+      // Runtime aliases and ComponentProps type queries need a semantic project refactor.
+      // Refuse them rather than silently leave a second API spelling behind.
+      if (!file.endsWith('.mdx')) {
+        return unsupportedConsumer(
+          file,
+          'uses this component in frontmatter or JavaScript',
+        );
+      }
+    }
+  }
+  for (const match of source.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]/g)) {
+    if (match[1] && resolves(match[1])) {
+      return unsupportedConsumer(file, 'imports it dynamically');
+    }
+  }
+  const layout = /^layout:\s*["']?([^\s"']+)/m.exec(source)?.[1];
+  if (/\.mdx?$/.test(file) && layout && resolves(layout)) {
+    return unsupportedConsumer(
+      file,
+      'passes layout props through Markdown frontmatter',
+    );
+  }
+  if (names.size > 0 && !/\.(astro|mdx)$/.test(file)) {
+    return unsupportedConsumer(
+      file,
+      'uses this component outside Astro or MDX',
+    );
+  }
+  return ok(names);
+}
+function unsupportedConsumer(file, reason) {
+  return err({
+    code: 'consumer',
+    message: `${file} ${reason}. Update that consumer explicitly before changing the prop name.`,
+  });
+}
+function projectSources(projectPath) {
+  const pending = [path.join(projectPath, 'src')];
+  const files = [];
+  for (let index = 0; index < pending.length; index += 1) {
+    const directory = pending[index];
+    assert(directory !== undefined, 'Queued directory exists');
+    const entries = readDirectory(directory);
+    if (!entries.ok) {
+      return entries;
+    }
+    for (const entry of entries.value) {
+      if (entry.isSymbolicLink()) {
+        return err({
+          code: 'symlink',
+          message:
+            'Project sources contain a symbolic link. Resolve it before a project-wide rename.',
+        });
+      }
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        pending.push(full);
+      } else if (/\.(astro|mdx?|jsx?|tsx?|svelte|vue)$/.test(entry.name)) {
+        files.push(full);
+      }
+      if (pending.length + files.length > PROPERTY_LIMITS.filesMax) {
+        return err({
+          code: 'limit',
+          message: 'Project exceeds the prop rename file limit.',
+        });
+      }
+    }
+  }
+  return ok(files);
+}
+function readDirectory(directory) {
+  try {
+    return ok(fs.readdirSync(directory, { withFileTypes: true }));
+  } catch (error) {
+    return filesystemError(error);
+  }
+}

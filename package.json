@@ -145,6 +145,7 @@
     "test": "node scripts/test.js"
   },
   "dependencies": {
+    "@astrojs/compiler": "^4.0.0",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-html": "^6.4.12",
@@ -169,10 +170,10 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "smol-toml": "^1.8.0",
+    "typescript": "^5.9.3",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@astrojs/compiler": "^4.0.0",
     "@astrojs/compiler-rs": "^0.4.0",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.0",
@@ -189,6 +190,7 @@
     "afterPack": "./scripts/afterPack.js",
     "files": [
       "electron/**/*",
+      "shared/**/*",
       "dist/**/*",
       "scripts/fix-node-pty-permissions.js",
       "package.json",
@@ -245,6 +247,7 @@
     },
     "win": {
       "icon": "resources/icon.ico",
+      "forceCodeSigning": false,
       "target": [
         {
           "target": "nsis",

@@ -16,7 +16,8 @@ const { ipcMain } = require('electron');
 const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
-const pty = require('node-pty');
+const { commandNeedsShell, isPathDescendant, isPathWithin, mergeToolPaths, pathEnvironmentValue, sameFilesystemPath, setPathEnvironment, staticToolPathGuesses } = require('./platform');
+
 
 const isWin = process.platform === 'win32';
 
@@ -59,7 +60,11 @@ function buildShellEnv() {
   env.TERM_PROGRAM = 'stacki';
   env.COLORTERM = 'truecolor';
 
-  if (isWin) return env;
+  if (isWin) {
+    const guesses = staticToolPathGuesses(os.homedir(), env).filter((candidate) => fs.existsSync(candidate));
+    setPathEnvironment(env, mergeToolPaths(pathEnvironmentValue(env), guesses));
+    return env;
+  }
 
   const home = process.env.HOME || '';
   const extraPaths = [
@@ -151,6 +156,12 @@ const SPAWN_RETRY_DELAY_MS = 150;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function spawnWithRetry(shell, args, options) {
+  let pty;
+  try {
+    pty = require('node-pty');
+  } catch (error) {
+    return { proc: null, error: { message: String(error), code: 'PTY_LOAD_FAILED' } };
+  }
   let lastErr;
   for (let attempt = 0; attempt <= SPAWN_RETRIES; attempt++) {
     try {
@@ -247,7 +258,7 @@ function registerTerminalHandlers({ send, projectRoot }) {
     // one *at* the project it has open — same reach as the asset protocol.
     const root = projectRoot();
     const abs = cwd ? path.resolve(cwd) : null;
-    if (!root || !abs || (abs !== root && !(abs + path.sep).startsWith(root + path.sep))) {
+    if (!root || !abs || !isPathWithin(root, abs)) {
       return { ok: false, error: 'Terminal can only open inside the current project.' };
     }
 

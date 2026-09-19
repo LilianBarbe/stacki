@@ -55,6 +55,7 @@ test('main gives each workspace its own port, reuses warm processes and shuts th
   const section = (from, to) => source.slice(source.indexOf(from), source.indexOf(to, source.indexOf(from)));
   const context = {
     fs, path, net, process, execFile, setTimeout, clearTimeout, URL,
+    commandNeedsShell: require('../electron/platform').commandNeedsShell,
     isWin: process.platform === 'win32',
     spawn: (...args) => { const child = spawn(...args); children.push(child); return child; },
     resolveNodeBin: () => process.execPath,
