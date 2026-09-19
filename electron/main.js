@@ -1,3 +1,4 @@
+const { commandNeedsShell, isPathDescendant, isPathWithin, mergeToolPaths, pathEnvironmentValue, sameFilesystemPath, setPathEnvironment, staticToolPathGuesses } = require('./platform');
 const {
   app,
   BrowserWindow,
@@ -145,7 +146,7 @@ function registerAssetProtocol() {
     abs = path.resolve(abs);
     // Preview iframes run the user's own site; keep the scheme from being a
     // general-purpose file reader by serving only the open project's files.
-    if (!openProjectRoot || !(abs + path.sep).startsWith(openProjectRoot + path.sep)) {
+    if (!openProjectRoot || !isPathDescendant(openProjectRoot, abs)) {
       return new Response(null, { status: 403 });
     }
     return serveFile(abs, request);
@@ -197,9 +198,10 @@ function createWindow() {
     ...bounds,
     title: 'Stacki',
     backgroundColor: '#111111',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : isWin ? 'hidden' : 'default',
+    ...(isWin ? { titleBarOverlay: { color: '#171717', symbolColor: '#a8a8a8', height: 40 } } : {}),
     // Windows/Linux taskbar + window chrome; macOS uses the Dock icon above.
-    icon: resource(process.platform === 'darwin' ? 'icon.icns' : 'icon.png'),
+    icon: resource(process.platform === 'darwin' ? 'icon.icns' : isWin ? 'icon.ico' : 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -809,15 +811,7 @@ const cmpVersion = (a, b) => {
 function nodeDirGuesses() {
   const home = app.getPath('home');
   const dirs = isWin
-    ? [
-        path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs'),
-        path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'nodejs'),
-        path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'npm'),
-        path.join(home, 'AppData', 'Local', 'Volta', 'bin'),
-        path.join(home, 'AppData', 'Roaming', 'fnm'),
-        path.join(home, 'scoop', 'shims'),
-        'C:\\ProgramData\\chocolatey\\bin',
-      ]
+    ? [...staticToolPathGuesses(home, process.env)]
     : [
         '/opt/homebrew/bin', // Homebrew, Apple Silicon
         '/usr/local/bin', // Homebrew on Intel, and the official installer
@@ -864,27 +858,17 @@ function nodeDirGuesses() {
 // child process is about to start.
 let toolPathReady = false;
 function ensureToolPath() {
-  if (toolPathReady || isWin) return;
+  if (toolPathReady) return;
   toolPathReady = true;
-  const parts = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
-  const seen = new Set(parts);
-  const append = (dir) => {
-    if (dir && !seen.has(dir)) {
-      seen.add(dir);
-      parts.push(dir);
-    }
-  };
-  // Appended, not prepended: the system's own resolution order stays intact,
-  // and these directories only ever win for tools the base PATH lacks.
-  for (const dir of shellPathDirs()) append(dir);
-  for (const dir of nodeDirGuesses()) if (fs.existsSync(dir)) append(dir);
-  process.env.PATH = parts.join(path.delimiter);
+  const candidates = isWin ? [] : shellPathDirs();
+  for (const dir of nodeDirGuesses()) if (fs.existsSync(dir)) candidates.push(dir);
+  setPathEnvironment(process.env, mergeToolPaths(pathEnvironmentValue(process.env), candidates));
 }
 
 function resolveNodeBin() {
   ensureToolPath();
   const exe = isWin ? 'node.exe' : 'node';
-  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+  for (const dir of pathEnvironmentValue(process.env).split(path.delimiter)) {
     if (!dir) continue;
     const p = path.join(dir, exe);
     try {
@@ -939,7 +923,7 @@ function run(cmd, args, cwd, opts = {}) {
   ensureToolPath();
   return new Promise((resolve, reject) => {
     const { lowPriority, ...runOptions } = opts;
-    const options = { cwd, timeout: opts.timeout || 60000, ...runOptions };
+    const options = { cwd, timeout: opts.timeout || 60000, shell: commandNeedsShell(cmd), ...runOptions };
     // git is translated, and this app reads what git says.
     //
     // gitBranches.js recognises a refusal by its words — "would be overwritten",
@@ -1291,7 +1275,7 @@ async function withTemporaryServer(projectPath, fn) {
   ]);
   const proc = spawn(cmd, argv, {
     cwd: projectPath,
-    shell: isWin && cmd === localBin,
+    shell: commandNeedsShell(cmd),
     stdio: ['ignore', 'pipe', 'pipe'],
     // Keeps Astro in the foreground, where its output is readable — see
     // electron/devEnv.js.
@@ -1308,7 +1292,7 @@ async function withTemporaryServer(projectPath, fn) {
     // group is killed for the versions that do not fork.
     try {
       const [stopCmd, stopArgv] = nodeCliCommand(localBin, ['dev', 'stop']);
-      execFile(stopCmd, stopArgv, { cwd: projectPath, timeout: 10000 }, () => {});
+      execFile(stopCmd, stopArgv, { cwd: projectPath, timeout: 10000, shell: commandNeedsShell(stopCmd) }, () => {});
     } catch {
       /* best effort */
     }
@@ -1642,7 +1626,7 @@ ipcMain.handle('project:scan', async (_e, projectPath) => {
     comp.instances = allSources.reduce(
       (n, { file, text }) =>
         n +
-        (path.resolve(file) === path.resolve(comp.path)
+        (sameFilesystemPath(file, comp.path)
           ? 0 // a file is not one of its own users
           : instancesIn(text, { file, targetPath: comp.path, name: comp.name, aliases: importAliases })),
       0
@@ -2055,7 +2039,7 @@ function assetAbs(projectPath, rel) {
   if (!ASSET_ROOTS.includes(root)) throw new Error('Invalid asset path');
   const rootAbs = path.resolve(projectPath, root);
   const abs = path.resolve(projectPath, clean);
-  if (abs !== rootAbs && !abs.startsWith(rootAbs + path.sep)) {
+  if (!isPathWithin(rootAbs, abs)) {
     throw new Error('Invalid asset path');
   }
   return abs;
@@ -2185,7 +2169,7 @@ ipcMain.handle('assets:move', async (_e, { projectPath, fromRel, toDirRel }) => 
   }
   if (!fs.existsSync(from)) return { ok: false };
   // Refuse moving a folder into itself/its own subtree.
-  if (fs.statSync(from).isDirectory() && (toDir === from || toDir.startsWith(from + path.sep))) {
+  if (fs.statSync(from).isDirectory() && isPathWithin(from, toDir)) {
     throw new Error('Cannot move a folder into itself.');
   }
   const dest = uniqueDest(toDir, path.basename(from));
@@ -2202,7 +2186,7 @@ ipcMain.handle('assets:rename', async (_e, { projectPath, rel, newName }) => {
   if (!clean) throw new Error('Invalid name');
   const from = assetAbs(projectPath, rel);
   const dest = path.join(path.dirname(from), clean);
-  if (dest === from) return { ok: true };
+  if (sameFilesystemPath(dest, from)) return { ok: true };
   if (fs.existsSync(dest)) throw new Error('Something with that name already exists.');
   markSelfWrite(from);
   markSelfWrite(dest);
@@ -2415,7 +2399,7 @@ function splitCmsRel(rel) {
 function cmsAbs(projectPath, rel) {
   const root = path.resolve(projectPath, 'src');
   const abs = path.resolve(root, rel || '');
-  if (abs !== root && !abs.startsWith(root + path.sep)) throw new Error('Invalid data path');
+  if (!isPathWithin(root, abs)) throw new Error('Invalid data path');
   return abs;
 }
 
@@ -2968,7 +2952,7 @@ ipcMain.handle('page:create', async (_e, { projectPath, name, layout }) => {
   const pagePath = path.join(pagesDir, fileName + '.astro');
   // The name keeps `/` so a page can be made inside a folder, so where it
   // lands is checked rather than assumed.
-  if (!path.resolve(pagePath).startsWith(pagesDir + path.sep)) {
+  if (!isPathDescendant(pagesDir, pagePath)) {
     throw new Error('Invalid page name');
   }
   if (fs.existsSync(pagePath)) throw new Error('A page with that name already exists.');
@@ -2997,15 +2981,15 @@ ipcMain.handle('page:delete', async (_e, pagePath) => {
 ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   const dest = path.resolve(pagesDir, to);
-  if (!dest.startsWith(pagesDir + path.sep)) throw new Error('Invalid destination.');
-  if (path.resolve(from) === dest) return { newPath: dest };
+  if (!isPathDescendant(pagesDir, dest)) throw new Error('Invalid destination.');
+  if (sameFilesystemPath(from, dest)) return { newPath: dest };
   if (fs.existsSync(dest)) throw new Error('A page with that name already exists there.');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
 
   let source = fs.readFileSync(from, 'utf8');
   const fromDir = path.dirname(from);
   const toDir = path.dirname(dest);
-  if (path.resolve(fromDir) !== path.resolve(toDir)) {
+  if (!sameFilesystemPath(fromDir, toDir)) {
     source = source.replace(
       /(import\s[^'"]*?from\s*['"])(\.\.?\/[^'"]+)(['"])/g,
       (m, pre, spec, post) => {
@@ -3028,7 +3012,7 @@ ipcMain.handle('page:move', async (_e, { projectPath, from, to }) => {
 const resolvePagesDir = (projectPath, rel) => {
   const pagesDir = path.join(projectPath, 'src', 'pages');
   const full = path.resolve(pagesDir, rel);
-  if (full !== pagesDir && !full.startsWith(pagesDir + path.sep)) {
+  if (!isPathWithin(pagesDir, full)) {
     throw new Error('Invalid folder.');
   }
   return full;
@@ -3050,7 +3034,7 @@ ipcMain.handle('pagefolder:rename', async (_e, { projectPath, from, to }) => {
 ipcMain.handle('pagefolder:delete', async (_e, { projectPath, dir }) => {
   const full = resolvePagesDir(projectPath, dir);
   const pagesDir = path.join(projectPath, 'src', 'pages');
-  if (full === pagesDir) throw new Error('Invalid folder.');
+  if (sameFilesystemPath(full, pagesDir)) throw new Error('Invalid folder.');
   fs.rmSync(full, { recursive: true, force: true });
   return { ok: true };
 });
@@ -3148,8 +3132,16 @@ ipcMain.handle('component:inline', async (_e, { componentPath, pagePath, instanc
   return inlineComponent({ componentSource: source, componentPath, pagePath, instance });
 });
 
-// Which files hold instances of a component — the list behind the palette's
-// "23 instances".
+// Load ESM property services on demand without changing the fork's CommonJS entrypoint.
+ipcMain.handle('component:properties', async (_event, location) => {
+  const { loadComponentProperties } = await import('./componentProperties.mjs');
+  return loadComponentProperties(location);
+});
+ipcMain.handle('component:editProperties', async (_event, request) => {
+  const { updateComponentProperties } = await import('./componentProperties.mjs');
+  return updateComponentProperties(request, markSelfWrite);
+});
+
 ipcMain.handle('component:usage', async (_e, { projectPath, name, exclude }) =>
   componentUsage({ projectPath, name, exclude })
 );
@@ -3160,7 +3152,7 @@ ipcMain.handle('page:importPathFor', async (_e, { pagePath, targetPath, projectP
   let srcRelative = null;
   if (projectPath) {
     const srcDir = path.join(projectPath, 'src');
-    if (targetPath.startsWith(srcDir + path.sep)) {
+    if (isPathDescendant(srcDir, targetPath)) {
       srcRelative = toPosix(path.relative(srcDir, targetPath));
     }
   }
@@ -3205,7 +3197,7 @@ function locateKey(root, key) {
   if (hash === -1) return null;
   // The key's file half is renderer input; keep it inside the project.
   const abs = path.resolve(root, key.slice(0, hash));
-  if (abs !== root && !abs.startsWith(root + path.sep)) return null;
+  if (!isPathWithin(root, abs)) return null;
   return locateSelection(abs, key.slice(hash + 1));
 }
 
@@ -3273,7 +3265,7 @@ async function stopServerProcess({ proc, daemon, bin, projectPath, external }) {
   if (external) return;
   if (daemon && bin) {
     const [cmd, argv] = nodeCliCommand(bin, ['dev', 'stop']);
-    await new Promise((resolve) => execFile(cmd, argv, { cwd: projectPath, timeout: 10000 }, () => resolve()));
+    await new Promise((resolve) => execFile(cmd, argv, { cwd: projectPath, timeout: 10000, shell: commandNeedsShell(cmd) }, () => resolve()));
     return;
   }
   if (!proc?.pid) return;
@@ -3908,7 +3900,7 @@ async function spawnDevServer(context, localBin, force, bare) {
     // Only the Windows .cmd shim needs a shell to run at all. Going through
     // one when we have a real node.exe path would re-split it on spaces —
     // "C:\Program Files\nodejs\node.exe" is the common case.
-    shell: isWin && cmd === localBin,
+    shell: commandNeedsShell(cmd),
     // No stdin pipe — the daemon child can inherit CLI stdio, and a pipe
     // that closes when the CLI exits has been observed to kill it.
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -3950,7 +3942,7 @@ async function spawnDevServer(context, localBin, force, bare) {
     try {
       const [logCmd, logArgs] = nodeCliCommand(localBin, ['dev', 'logs']);
       const { stdout } = await new Promise((resolve, reject) =>
-        execFile(logCmd, logArgs, { cwd: projectPath, timeout: 10000 }, (err, so) =>
+        execFile(logCmd, logArgs, { cwd: projectPath, timeout: 10000, shell: commandNeedsShell(logCmd) }, (err, so) =>
           err ? reject(err) : resolve({ stdout: so.toString() })
         )
       );
@@ -4016,11 +4008,10 @@ async function doDevStart(context) {
   const { projectPath, pushLog, recentLog } = context;
   // Without this the failure is the shim's "env: node: No such file or
   // directory", which reads like a broken project rather than a missing tool.
-  if (!resolveNodeBin() && !isWin) {
+  if (!resolveNodeBin()) {
     throw new Error(
-      'Node.js could not be found. Stacki launched from the Dock only sees the system PATH, ' +
-        'so a Node installed by Homebrew, nvm, fnm, or volta has to be on it. Install Node, ' +
-        'or launch Stacki from a terminal, and try again.'
+      'Node.js could not be found. Install a current Node.js release, restart Stacki, and ' +
+        'try again. Stacki checks standard installers and common version managers.'
     );
   }
 
@@ -4105,7 +4096,7 @@ async function doDevStart(context) {
 // inside the project that is currently open.
 function assertInProject(filePath) {
   const abs = path.resolve(String(filePath || ""));
-  if (!openProjectRoot || !(abs + path.sep).startsWith(openProjectRoot + path.sep)) {
+  if (!openProjectRoot || !isPathDescendant(openProjectRoot, abs)) {
     throw new Error("Refusing to touch a file outside the open project.");
   }
   return abs;
@@ -4812,7 +4803,7 @@ ipcMain.handle('preview:atCommit', async (_e, { projectPath, ref }) => {
   ]);
   const proc = spawn(cmd, argv, {
     cwd: dir,
-    shell: isWin && cmd === localBin,
+    shell: commandNeedsShell(cmd),
     stdio: ['ignore', 'pipe', 'pipe'],
     // Keeps Astro in the foreground, where its output is readable — see
     // electron/devEnv.js.

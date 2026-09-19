@@ -1,3 +1,4 @@
+import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel.js';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ChevronDownIcon,
@@ -198,7 +199,7 @@ export default function PalettePanel({
           same breath as what the button does. */}
       {tip && (
         <div className="rail-tooltip below" style={{ left: tip.left, top: tip.top }}>
-          {canCreate ? 'New component (⌘⇧A)' : createFrom?.reason || 'New component'}
+          {canCreate ? `New component (${shortcutLabel('A', 'primary-shift', currentDesktopPlatform())})` : createFrom?.reason || 'New component'}
         </div>
       )}
 

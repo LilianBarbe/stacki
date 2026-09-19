@@ -1,3 +1,5 @@
+import { isFragmentNode } from '../fragmentNode.js';
+import { currentDesktopPlatform, shortcutLabel } from '../shortcutLabel.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { canContainTag } from '../elementSchemas.js';
 import { isDataBound } from '../bindings.js';
@@ -430,9 +432,9 @@ function ContextMenu({ pos, canPaste, isComponent, onClose, onAction }) {
 
   return (
     <div ref={ref} className="ctx-menu" style={{ left, top, width }}>
-      <Item action="copy" label="Copy" shortcut="⌘C" />
-      <Item action="paste" label="Paste" shortcut="⌘V" disabled={!canPaste} />
-      <Item action="duplicate" label="Duplicate" shortcut="⌘D" />
+      <Item action="copy" label="Copy" shortcut={shortcutLabel('C', 'primary', currentDesktopPlatform())} />
+      <Item action="paste" label="Paste" shortcut={shortcutLabel('V', 'primary', currentDesktopPlatform())} disabled={!canPaste} />
+      <Item action="duplicate" label="Duplicate" shortcut={shortcutLabel('D', 'primary', currentDesktopPlatform())} />
       {/* Only for a component: it is the one thing on the page that stands for
           markup kept somewhere else, and so the only thing that can be given
           back. Whether THIS one can is answered after the click, because the
@@ -608,7 +610,7 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
       <div
         ref={rowRef}
         data-node-id={node.id}
-        className={`structure-node ${node.kind === 'component' && !node.dynamicTag ? 'is-component' : ''} ${node.kind === 'map' || node.kind === 'cond' || node.kind === 'branch' || (isDataBound(node) && !(node.kind === 'component' && !node.dynamicTag)) ? 'is-map' : ''} ${isLayoutNode ? 'layout-node' : ''} ${isSelected ? 'selected' : ''}`}
+        className={`structure-node ${node.kind === 'component' && !node.dynamicTag && !isFragmentNode(node) ? 'is-component' : ''} ${node.kind === 'map' || node.kind === 'cond' || node.kind === 'branch' || (isDataBound(node) && !(node.kind === 'component' && !node.dynamicTag && !isFragmentNode(node))) ? 'is-map' : ''} ${isLayoutNode ? 'layout-node' : ''} ${isSelected ? 'selected' : ''}`}
         style={{
           paddingLeft: 6 + depth * 16,
           ...(isDropInto ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)' } : {}),
@@ -649,7 +651,7 @@ function TreeNode({ node, note, parentId, index, depth, ...ctx }) {
           // astro:assets components live in Astro, not the project — there is
           // no file to open, so a double-click does nothing rather than
           // hunting for one that can't be found.
-          if (node.kind !== 'component' || node.dynamicTag || node.astroAsset) return;
+          if (node.kind !== 'component' || node.dynamicTag || node.astroAsset || isFragmentNode(node)) return;
           if (!onOpenComponent) return;
           e.stopPropagation();
           onOpenComponent(node.name, node.id);
@@ -746,6 +748,7 @@ function defaultCollapsed(node) {
 // The row's icon already says what kind a node is, so no trailing kind badge
 // ("comment", "loop", …) — it only repeated the icon in words.
 export function describeNode(node, live) {
+  if (isFragmentNode(node)) return { icon: <CustomElementIcon size={12} />, label: 'Fragment' };
   switch (node.kind) {
     case 'text':
       return { icon: <TextIcon size={12} />, label: truncate(node.value, 34) };

@@ -9,6 +9,7 @@ import { restoreSavedEdits } from './theme-lab/edits.js';
 
 // Theme Lab overrides still being tried out, back in place before first paint.
 restoreSavedEdits();
+document.documentElement.dataset.platform = window.avb.platform;
 
 // The last resort behind the per-region boundaries in App: a crash in the
 // chrome they don't cover (title bar, git chip, App's own hooks) lands here

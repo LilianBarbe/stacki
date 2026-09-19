@@ -122,7 +122,7 @@ export default function LinkField({ value, context, onChange }) {
           placeholder="Choose a page…"
           options={(context.pages || []).map((p) => ({
             value: p.route,
-            label: `${p.name.replace(/\.(astro|md)$/i, '')}  ·  ${p.route}`,
+            label: linkPageLabel(p),
           }))}
           onChange={(v) => commit(v, true)}
         />
@@ -189,4 +189,10 @@ export default function LinkField({ value, context, onChange }) {
       )}
     </>
   );
+}
+
+function linkPageLabel(page) {
+  const name = page.name.replace(/\.(astro|md)$/i, '');
+  return name.replace(/^\/+|\/+$/g, '') === page.route.replace(/^\/+|\/+$/g, '')
+    ? name : `${name}  ·  ${page.route}`;
 }

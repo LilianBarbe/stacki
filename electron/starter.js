@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { commandNeedsShell } = require('./platform');
 const { spawn } = require('child_process');
 
 // Starting a site from a starter.
@@ -36,7 +37,7 @@ const run = (cmd, args, cwd, onLog) =>
       proc = spawn(cmd, args, {
         cwd,
         // npm is a .cmd shim on Windows, which needs a shell to be found.
-        shell: isWin && /^npm/.test(cmd),
+        shell: commandNeedsShell(cmd),
         env: {
           ...process.env,
           GIT_TERMINAL_PROMPT: '0',

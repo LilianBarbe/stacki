@@ -11,6 +11,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { sameFilesystemPath } = require('./platform');
 const { aliasMap, boundNames, resolveSpec } = require('./cmsRefs');
 
 const toPosix = (p) => p.split(path.sep).join('/');
@@ -97,7 +98,7 @@ function instancesIn(source, { file, targetPath, name, aliases = [] }) {
     const imports = importsOf(source, file, aliases);
     const local = [];
     for (const imp of imports) {
-      if ([...imp.candidates].some((c) => path.resolve(c) === target)) local.push(...imp.names);
+      if ([...imp.candidates].some((c) => sameFilesystemPath(c, target))) local.push(...imp.names);
     }
     if (local.length) return local.reduce((n, alias) => n + countIn(source, alias), 0);
     // The name is taken by something else here. `import Section from
@@ -133,7 +134,7 @@ function componentUsage({ projectPath, name, exclude }) {
 
   const files = [];
   for (const file of astroFiles(src)) {
-    if (skip && path.resolve(file) === skip) continue;
+    if (skip && sameFilesystemPath(file, skip)) continue;
     let text;
     try {
       text = fs.readFileSync(file, 'utf8');

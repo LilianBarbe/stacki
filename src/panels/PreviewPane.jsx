@@ -33,7 +33,7 @@ function outlineIcon(info) {
   if (info.nodeKind === 'component') {
     // Same order the Navigator uses: a dynamic tag (`const Tag = tag`) is an
     // element with no file behind it, then astro:assets, then real components.
-    if (info.dynamicTag) return <CustomElementIcon size={size} />;
+    if (info.kind === 'element') return <CustomElementIcon size={size} />;
     return info.astroAsset
       ? astroAssetIcon(info.label, size)
       : <ElementComponentIcon size={size} />;

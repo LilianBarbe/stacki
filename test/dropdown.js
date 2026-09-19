@@ -133,6 +133,58 @@ const settle = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
   check('a short list has one too', !!find('.dd-search'));
   check('and still has its glyphs', all('.dd-option .dd-icon svg').length === 3);
 
+  // A searchable popup owns the scrolling list inside it. Simulate the
+  // browser's constrained measurement: the outer popup reports its cap while
+  // capped and its full content height otherwise. The position calculation
+  // must not feed that changing measurement back into the cap and render
+  // forever when a real collection has hundreds of entries.
+  const scrollHeight = Object.getOwnPropertyDescriptor(
+    dom.window.HTMLElement.prototype,
+    'scrollHeight'
+  );
+  Object.defineProperty(dom.window.HTMLElement.prototype, 'scrollHeight', {
+    configurable: true,
+    get() {
+      if (this.classList?.contains('dd-popup')) {
+        return this.style.maxHeight ? Number.parseFloat(this.style.maxHeight) : 9000;
+      }
+      return 0;
+    },
+  });
+  const largeIds = Array.from({ length: 296 }, (_, index) => `sermon-${index}`);
+  function ControlledPicker() {
+    const [index, setIndex] = React.useState(0);
+    return React.createElement(DynamicPicker, {
+      entries: largeIds.map((label) => ({ label })),
+      index,
+      onPick: setIndex,
+      pattern: '/sermons/[slug]',
+    });
+  }
+  await act(async () => {
+    reactRoot.render(React.createElement(ControlledPicker));
+    await settle(20);
+  });
+  await act(async () => {
+    find('.dd-trigger').click();
+    await settle(20);
+  });
+  check('a large collection opens without a render loop', all('.dd-option').length === 296);
+  await act(async () => {
+    all('.dd-option')[295].click();
+    await settle(20);
+  });
+  check(
+    'a large controlled picker switches entries',
+    find('.dd-label')?.textContent === 'sermon-295'
+  );
+  check('and closes after switching', !find('.dd-popup'));
+  if (scrollHeight) {
+    Object.defineProperty(dom.window.HTMLElement.prototype, 'scrollHeight', scrollHeight);
+  } else {
+    Reflect.deleteProperty(dom.window.HTMLElement.prototype, 'scrollHeight');
+  }
+
   await act(async () => reactRoot.unmount());
 
   // --- What a hover costs -------------------------------------------------------

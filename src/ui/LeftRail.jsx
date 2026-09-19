@@ -1,3 +1,4 @@
+import { PropertiesIcon } from './PropertiesIcon.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   PagePanelIcon,
@@ -14,6 +15,7 @@ import {
 const TABS = [
   { id: 'pages', title: 'Pages', shortcut: 'P', Icon: PagePanelIcon },
   { id: 'navigator', title: 'Navigator', shortcut: 'Z', Icon: NavigatorIcon },
+  { id: 'properties', title: 'Properties', shortcut: 'K', Icon: PropertiesIcon },
   { id: 'components', title: 'Components', shortcut: '⇧A', Icon: ComponentFillIcon },
   { id: 'assets', title: 'Assets', shortcut: 'J', Icon: AssetManagerIcon },
   { id: 'cms', title: 'CMS', shortcut: '⌥C', Icon: CmsIcon },
@@ -27,7 +29,8 @@ const TOOLTIP_DELAY = 500;
 
 // Webflow-style icon rail. Clicking the active tab collapses the panel.
 // Hovering a button for a moment shows a tooltip with its keyboard shortcut.
-export default function LeftRail({ active, onSelect }) {
+export default function LeftRail({ active, onSelect, componentOpen = false }) {
+  const tabs = TABS.filter((tab) => tab.id !== 'properties' || componentOpen);
   const [tip, setTip] = useState(null); // {id, left, top}
   const timerRef = useRef(null);
 
@@ -78,7 +81,8 @@ export default function LeftRail({ active, onSelect }) {
       }
       const k = e.key.toLowerCase();
       let id = null;
-      if (k === 'p' && !e.shiftKey) id = 'pages';
+      if (k === 'k' && !e.shiftKey && componentOpen) id = 'properties';
+      else if (k === 'p' && !e.shiftKey) id = 'pages';
       else if (k === 'z' && !e.shiftKey) id = 'navigator';
       else if (k === 'a' && e.shiftKey) id = 'components';
       else if (k === 'j' && !e.shiftKey) id = 'assets';
@@ -89,15 +93,17 @@ export default function LeftRail({ active, onSelect }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onSelect]);
+  }, [onSelect, componentOpen]);
 
-  const tipTab = tip && TABS.find((t) => t.id === tip.id);
+  const tipTab = tip && tabs.find((t) => t.id === tip.id);
 
   return (
     <div className="rail">
-      {TABS.map(({ id, Icon }) => (
+      {tabs.map(({ id, Icon, title, shortcut }) => (
         <button
           key={id}
+          aria-label={`${title} (${shortcut})`}
+          aria-pressed={active === id}
           className={`rail-btn ${active === id ? 'on' : ''}`}
           onMouseEnter={showSoon(id)}
           onMouseLeave={hide}

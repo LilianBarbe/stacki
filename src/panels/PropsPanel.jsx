@@ -1,3 +1,4 @@
+import { isFragmentNode } from '../fragmentNode.js';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HTML_TAGS, VOID_TAGS } from '../elementSchemas.js';
 import { elementIcon } from '../ui/Icons.jsx';
@@ -40,6 +41,7 @@ import {
   FieldNumberIcon,
   ComponentPropertiesIcon,
   VariableTextSizeIcon,
+  CustomElementIcon,
   ElementComponentIcon,
   astroAssetIcon,
   FieldSwitchIcon,
@@ -901,7 +903,7 @@ export default function PropsPanel({
       }}
     >
       <div className="props-title">
-        {node.kind === 'element' ? (
+        {isFragmentNode(node) ? <CustomElementIcon size={16} className="props-title-icon" /> : node.kind === 'element' ? (
           elementIcon(node.name, 16, 'props-title-icon')
         ) : (
           node.astroAsset ? (

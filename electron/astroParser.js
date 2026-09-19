@@ -984,6 +984,7 @@ function parsePage(source, opts = {}) {
   const fm = source.match(/^---\r?\n(?:([\s\S]*?)\r?\n)?---\r?\n?/);
   const frontmatter = fm ? fm[1] || '' : '';
   const hadFrontmatter = !!fm;
+  const eol = source.includes('\r\n') ? '\r\n' : '\n';
   const bodyStart = fm ? fm[0].length : 0;
   const body = source.slice(bodyStart);
 
@@ -1146,6 +1147,7 @@ function parsePage(source, opts = {}) {
       extraFrontmatter,
       extraFrontmatterSpaced,
       hadFrontmatter,
+      eol,
       trailingBlank,
       nodes: topNodes,
       // Only when offsets were asked for: it describes the file on disk, and
@@ -1210,7 +1212,8 @@ function serializePage(model) {
   for (const node of model.nodes) serializeNode(node, '', lines);
   // Blank lines the file ended on.
   for (let i = 0; i < (model.trailingBlank || 0); i++) lines.push('');
-  return lines.join('\n') + '\n';
+  const source = lines.join('\n') + '\n';
+  return model.eol === '\r\n' ? source.replace(/\r?\n/g, '\r\n') : source.replace(/\r\n/g, '\n');
 }
 
 // Inline runs (text + simple tags like <strong>/<em>) serialize on a single

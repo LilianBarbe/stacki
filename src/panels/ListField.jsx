@@ -1,61 +1,38 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { DragIcon, PlusIcon, TrashIcon, CloseIcon } from '../ui/Icons.jsx';
-import { arrayItems, arrayText, blankLike, itemLabel, moveItem } from '../arrayValue.js';
-
-// A prop that takes a list, edited as a list.
-//
-// The value is an array literal in the file — `options={["Designer",
-// "Developer"]}` — and every row here is one item of it. Drag a row to reorder,
-// press the bin to drop it, press the last row to add one, and click a row to
-// open it.
-//
-// Opening is a popup rather than an input in the row, because an item is not
-// always one thing: `{ value: "us", label: "United States" }` is a row with two
-// fields, and there is no room beside the row's own name for either of them.
-// One place to edit an item, whatever the item turns out to be.
-//
-// Every action writes the whole array back, because that is what the file
-// holds: one value, not a list of values. The code editor is still one press of
-// `{}` away, and it is the only field that can hold an array this cannot show —
-// a spread, a call, a name standing for a list elsewhere (see arrayValue.js).
-
-// The fields of one item, in a box anchored to its row.
-function ItemEditor({ item, pos, onChange, onClose }) {
-  const ref = useRef(null);
+import { assert } from '../../shared/assert.mjs';
+import { LIMITS } from '../../shared/limits.mjs';
+import { PlusIcon, CloseIcon } from '../ui/Icons.jsx';
+import ListFieldRow from '../ui/ListFieldRow.jsx';
+import {
+  arrayItems,
+  arrayText,
+  blankLike,
+  itemLabel,
+  moveItem,
+} from '../arrayValue.js';
+function ItemEditor({ item, pos, trigger, onChange, onClose }) {
+  const ref = useListEditorDismiss(trigger, onClose);
   const firstRef = useRef(null);
-
   useEffect(() => {
     firstRef.current?.focus();
     firstRef.current?.select();
   }, []);
-
-  useEffect(() => {
-    const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose();
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose() }
-    };
-    document.addEventListener('pointerdown', onDown, true);
-    document.addEventListener('keydown', onKey, true);
-    return () => {
-      document.removeEventListener('pointerdown', onDown, true);
-      document.removeEventListener('keydown', onKey, true);
-    };
-  }, [onClose]);
-
   // A word is one field called Value; an object is its own fields, named as the
   // file names them. Either way the popup is a list of labelled boxes, so there
   // is one thing to learn rather than two.
-  const fields = item.fields || [{ key: 'value', text: item.text, quote: item.quote }];
+  const fields = item.fields || [
+    { key: 'value', text: item.text, quote: item.quote },
+  ];
   const set = (i, text) => {
     if (item.fields) {
-      onChange({ ...item, fields: item.fields.map((f, at) => (at === i ? { ...f, text } : f)) });
+      onChange({
+        ...item,
+        fields: item.fields.map((f, at) => (at === i ? { ...f, text } : f)),
+      });
       return;
     }
     onChange({ ...item, text });
   };
-
   return (
     <div
       ref={ref}
@@ -76,9 +53,13 @@ function ItemEditor({ item, pos, onChange, onClose }) {
             ref={i === 0 ? firstRef : null}
             value={field.text}
             spellCheck={false}
+            maxLength={LIMITS.attrCharsMax}
             onChange={(e) => set(i, e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); onClose() }
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onClose();
+              }
             }}
           />
         </label>
@@ -86,142 +67,335 @@ function ItemEditor({ item, pos, onChange, onClose }) {
     </div>
   );
 }
-
-export default function ListField({ value, placeholder, onChange }) {
-  const items = arrayItems(value) || [];
-  const [open, setOpen] = useState(null); // {index, pos}
-  const [dragging, setDragging] = useState(null); // the row being dragged
-  const [gap, setGap] = useState(null); // where a drop would land
-  // An item added is not written until it says something: an empty one is not a
-  // value, and `[""]` in the file is an empty option on the page. It lives here
-  // until the popup on it is closed.
-  const [pending, setPending] = useState(null); // {item, pos}
-
-  // `immediate` is the app's own word for "this is the edit, save it" — the
-  // typing in a popup is live so the canvas keeps up, and the edit lands as one
-  // when the popup closes. Without that, an item renamed letter by letter would
-  // be a dozen edits to undo.
-  const write = (next, immediate = true) => onChange(arrayText(next), immediate);
-
-  const openAt = (event, index, item) => {
-    const row = event.currentTarget.closest('.list-field-row') || event.currentTarget;
-    const r = row.getBoundingClientRect();
-    const width = Math.max(r.width, 220);
-    const pos = {
-      left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)),
-      top: Math.min(r.bottom + 4, Math.max(60, window.innerHeight - 220)),
-      width,
+function useListEditorDismiss(trigger, onClose) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const onDown = (e) => {
+      // The active row handles its own toggle; dismissing here would reopen it on click.
+      if (e.composedPath().includes(trigger)) {
+        return;
+      }
+      const NodeType = ref.current?.ownerDocument.defaultView?.Node;
+      if (
+        NodeType &&
+        e.target instanceof NodeType &&
+        !ref.current?.contains(e.target)
+      ) {
+        onClose();
+      }
     };
-    if (index == null) setPending({ item, pos });
-    else setOpen({ index, pos });
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [onClose, trigger]);
+  return ref;
+}
+// What an empty list has to say for itself, if anything. The Add item button
+// under it already says that the list is empty and what to do about it, so a
+// note is drawn only when it adds something the button doesn't. A declared
+// default of `[]` adds nothing: it is the same sentence a second time, written
+// in code, over the button that says it in words.
+export function emptyNote(placeholder) {
+  const text = String(placeholder ?? '').trim();
+  return !text || /^\[\s*\]$/.test(text) ? '' : text;
+}
+export default function ListField({
+  value,
+  placeholder,
+  disabled,
+  itemsMin,
+  itemsMax,
+  valueCharsMax,
+  onChange,
+}) {
+  const props = {
+    value,
+    placeholder,
+    disabled,
+    itemsMin,
+    itemsMax,
+    valueCharsMax,
+    onChange,
   };
-
-  const closePending = () => {
-    const held = pending;
-    setPending(null);
-    if (!held) return;
-    const said = held.item.fields
-      ? held.item.fields.some((f) => String(f.text).trim())
-      : String(held.item.text).trim();
-    if (said) write([...items, held.item]);
-  };
-
-  const remove = (at) => {
-    setOpen(null);
-    write(items.filter((_, i) => i !== at));
-  };
-
-  const drop = () => {
-    if (dragging != null && gap != null) {
-      const next = moveItem(items, dragging, gap);
-      // A row dropped where it already sits has not moved, and writing the same
-      // array back would be an edit — an undo step, a save, a canvas patch —
-      // for a drag that did nothing.
-      if (next.some((it, i) => it !== items[i])) write(next);
-    }
-    setDragging(null);
-    setGap(null);
-  };
-
-  // The gap a pointer is over: the top half of a row means before it, the
-  // bottom half means after.
-  const gapFor = (event, index) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    return event.clientY - box.top < box.height / 2 ? index : index + 1;
-  };
-
+  const state = useListField(props);
+  const note = emptyNote(props.placeholder);
   return (
-    <div className="list-field" onDragOver={(e) => e.preventDefault()} onDrop={drop}>
-      {items.length === 0 ? (
-        <div className="list-field-empty">{placeholder || 'No items yet'}</div>
+    <div
+      className="list-field"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={state.drop}
+    >
+      {state.items.length === 0 && note ? (
+        <div className="list-field-empty">{note}</div>
       ) : null}
-      {items.map((item, i) => (
+      {state.items.length > 0 && (
         <div
-          key={i}
-          className={`list-field-row ${dragging === i ? 'is-dragging' : ''} ${
-            gap === i ? 'is-before' : ''
-          } ${gap === i + 1 ? 'is-after' : ''} ${open?.index === i ? 'is-open' : ''}`}
-          draggable
-          onDragStart={(e) => {
-            setDragging(i);
-            setOpen(null);
-            e.dataTransfer.effectAllowed = 'move';
-            // Firefox refuses to start a drag without one.
-            try { e.dataTransfer.setData('text/plain', String(i)) } catch { /* not needed */ }
-          }}
-          onDragEnd={() => { setDragging(null); setGap(null) }}
-          onDragOver={(e) => {
-            if (dragging == null) return;
-            e.preventDefault();
-            setGap(gapFor(e, i));
-          }}
-          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); drop() }}
+          className="list-field-items"
+          onScroll={() => closeListRowEditor(state)}
         >
-          <span className="list-field-grip" aria-hidden="true">
-            <DragIcon size={12} />
-          </span>
-          <button type="button" className="list-field-text" onClick={(e) => openAt(e, i, item)}>
-            {itemLabel(item) || <span className="list-field-blank">Empty</span>}
-          </button>
-          <button
-            type="button"
-            className="ghost list-field-remove"
-            title="Remove"
-            onClick={() => remove(i)}
-          >
-            <TrashIcon size={12} />
-          </button>
+          {state.items.map((item, index) => (
+            <ListRow key={index} item={item} index={index} state={state} />
+          ))}
         </div>
-      ))}
+      )}
       <button
         type="button"
         className="list-field-add"
-        onClick={(e) => openAt(e, null, blankLike(items))}
+        disabled={state.disabled || state.items.length >= state.itemsMax}
+        onClick={(event) => {
+          if (state.editor.kind === 'pending') {
+            state.closePending();
+          } else {
+            state.openAt(event, null, blankLike(state.items));
+          }
+        }}
       >
         <PlusIcon size={12} />
         Add item
       </button>
-      {open && items[open.index] ? (
-        <ItemEditor
-          item={items[open.index]}
-          pos={open.pos}
-          onChange={(next) => write(items.map((it, i) => (i === open.index ? next : it)), false)}
-          onClose={() => {
-            // The same value again, as the edit: what was live becomes what was
-            // done, in one step.
-            write(items, true);
-            setOpen(null);
-          }}
-        />
-      ) : null}
-      {pending ? (
-        <ItemEditor
-          item={pending.item}
-          pos={pending.pos}
-          onChange={(item) => setPending((p) => ({ ...p, item }))}
-          onClose={closePending}
-        />
-      ) : null}
+      <ListEditor state={state} />
     </div>
   );
+}
+function useListField(props) {
+  const {
+    value,
+    onChange,
+    disabled = false,
+    itemsMin = 0,
+    itemsMax = LIMITS.scanEntriesMax,
+    valueCharsMax = LIMITS.attrCharsMax,
+  } = props;
+  assert(
+    (value?.length ?? 0) <= valueCharsMax,
+    'ListField: value limit exceeded',
+  );
+  const items = arrayItems(value) || [];
+  assert(items.length <= itemsMax, 'ListField: item count limit exceeded');
+  const [editor, setEditor] = useState({ kind: 'closed' });
+  const write = (next, options) => {
+    if (disabled) {
+      return;
+    }
+    const text = arrayText(next);
+    assert(text.length <= valueCharsMax, 'ListField: output limit exceeded');
+    assert(
+      next.length <= itemsMax,
+      'ListField: output item count limit exceeded',
+    );
+    onChange(text, options.immediate, options.change);
+  };
+  const { drag, setDrag, drop } = useListDrag(items, write);
+  const openAt = (event, index, item) => {
+    setEditor(listEditorAt(event.currentTarget, index, item));
+  };
+  const closePending = () => {
+    setEditor({ kind: 'closed' });
+    const item = pendingListItem(editor);
+    if (item) {
+      write([...items, item], { immediate: true, change: { kind: 'add' } });
+    }
+  };
+  const remove = (index) => {
+    if (disabled || items.length <= itemsMin) {
+      return;
+    }
+    setEditor({ kind: 'closed' });
+    write(
+      items.filter((_, current) => current !== index),
+      {
+        immediate: true,
+        change: { kind: 'remove', index },
+      },
+    );
+  };
+  return {
+    items,
+    editor,
+    setEditor,
+    drag,
+    setDrag,
+    write,
+    openAt,
+    closePending,
+    remove,
+    drop,
+    disabled,
+    itemsMin,
+    itemsMax,
+  };
+}
+function listEditorAt(trigger, index, item) {
+  const pos = listPopupPosition(trigger);
+  return index === null
+    ? { kind: 'pending', item, pos, trigger }
+    : { kind: 'existing', index, pos, trigger };
+}
+function pendingListItem(editor) {
+  if (editor.kind !== 'pending') {
+    return undefined;
+  }
+  const said = editor.item.fields
+    ? editor.item.fields.some((field) => String(field.text).trim())
+    : String(editor.item.text).trim();
+  return said ? editor.item : undefined;
+}
+function useListDrag(items, write) {
+  const [drag, setDrag] = useState({ kind: 'idle' });
+  const drop = () => {
+    if (drag.kind === 'dragging' && drag.gap !== null) {
+      const next = moveItem(items, drag.index, drag.gap);
+      // A drop into the original gap must not create an undo/save operation.
+      if (next.some((item, index) => item !== items[index])) {
+        write(next, {
+          immediate: true,
+          change: { kind: 'move', index: drag.index, gap: drag.gap },
+        });
+      }
+    }
+    setDrag({ kind: 'idle' });
+  };
+  return { drag, setDrag, drop };
+}
+function listPopupPosition(element) {
+  const row = element.closest('.list-field-row') || element;
+  const rectangle = row.getBoundingClientRect();
+  const width = Math.max(rectangle.width, 220);
+  return {
+    left: Math.max(8, Math.min(rectangle.left, window.innerWidth - width - 8)),
+    top: Math.min(rectangle.bottom + 4, Math.max(60, window.innerHeight - 220)),
+    width,
+  };
+}
+function ListRow({ item, index, state }) {
+  const { drag, editor, setDrag, remove, drop } = state;
+  const dragging = drag.kind === 'dragging' ? drag.index : null;
+  const gap = drag.kind === 'dragging' ? drag.gap : null;
+  const open = editor.kind === 'existing' && editor.index === index;
+  return (
+    <ListFieldRow
+      className={`${dragging === index ? 'is-dragging' : ''} ${gap === index ? 'is-before' : ''} ${gap === index + 1 ? 'is-after' : ''} ${open ? 'is-open' : ''}`}
+      rowProps={{
+        draggable: !state.disabled,
+        onDragStart: (event) => startListDrag(event, state, index),
+        onDragEnd: () => setDrag({ kind: 'idle' }),
+        onDragOver: (event) => {
+          if (drag.kind === 'idle') {
+            return;
+          }
+          event.preventDefault();
+          const box = event.currentTarget.getBoundingClientRect();
+          const gap =
+            event.clientY - box.top < box.height / 2 ? index : index + 1;
+          setDrag({ ...drag, gap });
+        },
+        onDrop: (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          drop();
+        },
+      }}
+      expanded={open}
+      disabled={state.disabled}
+      removeDisabled={state.disabled || state.items.length <= state.itemsMin}
+      removeLabel={`Remove ${itemLabel(item) || 'item'}`}
+      onOpen={(event) => toggleListRow(event, state, index, item)}
+      onRemove={() => remove(index)}
+    >
+      {itemLabel(item) || <span className="list-field-blank">Empty</span>}
+    </ListFieldRow>
+  );
+}
+function toggleListRow(event, state, index, item) {
+  if (state.editor.kind === 'existing' && state.editor.index === index) {
+    state.write(state.items, {
+      immediate: true,
+      change: { kind: 'edit', index },
+    });
+    state.setEditor({ kind: 'closed' });
+    return;
+  }
+  state.openAt(event, index, item);
+}
+function startListDrag(event, state, index) {
+  if (state.disabled) {
+    return;
+  }
+  state.setDrag({ kind: 'dragging', index, gap: null });
+  state.setEditor({ kind: 'closed' });
+  event.dataTransfer.effectAllowed = 'move';
+  try {
+    event.dataTransfer.setData('text/plain', String(index));
+  } catch {
+    // Drag data is optional because this list keeps its gesture in local state.
+  }
+}
+function ListEditor({ state }) {
+  const { editor, items, write, setEditor, closePending } = state;
+  switch (editor.kind) {
+    case 'closed':
+      return null;
+    case 'existing': {
+      const item = items[editor.index];
+      if (!item) {
+        return null;
+      }
+      return (
+        <ItemEditor
+          item={item}
+          pos={editor.pos}
+          trigger={editor.trigger}
+          onChange={(next) =>
+            write(
+              items.map((item, index) =>
+                index === editor.index ? next : item,
+              ),
+              {
+                immediate: false,
+                change: { kind: 'edit', index: editor.index },
+              },
+            )
+          }
+          onClose={() => closeListRowEditor(state)}
+        />
+      );
+    }
+    case 'pending':
+      return (
+        <ItemEditor
+          item={editor.item}
+          pos={editor.pos}
+          trigger={editor.trigger}
+          onChange={(item) =>
+            setEditor((current) =>
+              current.kind === 'pending' ? { ...current, item } : current,
+            )
+          }
+          onClose={closePending}
+        />
+      );
+    default: {
+      const exhaustive = editor;
+      return exhaustive;
+    }
+  }
+}
+function closeListRowEditor(state) {
+  if (state.editor.kind === 'existing') {
+    // Commit before dismissing so scrolling cannot leave a popup detached from its row.
+    state.write(state.items, {
+      immediate: true,
+      change: { kind: 'edit', index: state.editor.index },
+    });
+    state.setEditor({ kind: 'closed' });
+  }
 }

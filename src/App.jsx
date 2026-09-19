@@ -1,3 +1,8 @@
+import { isFragmentNode } from './fragmentNode.js';
+import { currentDesktopPlatform, shortcutLabel } from './shortcutLabel.js';
+import { projectRelativePath } from './projectPath.js';
+import { usePropertySaveGuard } from './usePropertySaveGuard.js';
+import ComponentPropertiesPanel from './panels/ComponentPropertiesPanel.jsx';
 import React, { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 // The floating token editor over the app's own UI — loaded the first time it opens.
 const ThemeLab = React.lazy(() => import('./theme-lab/ThemeLab.jsx'));
@@ -631,6 +636,7 @@ function holdsInlineText(node) {
 }
 
 export default function App() {
+  const propertySave = usePropertySaveGuard();
   const [project, setProject] = useState(null); // {path, name}
   const [scan, setScan] = useState({ pages: [], layouts: [], components: [] });
   const [projectClasses, setProjectClasses] = useState([]);
@@ -683,7 +689,14 @@ export default function App() {
   const sampleAskedRef = useRef(new Set());
   const [dynamicIndex, setDynamicIndex] = useState(0);
   const [dynamicError, setDynamicError] = useState(null);
-  const [leftTab, setLeftTab] = useState('navigator'); // pages | navigator | components | assets | cms | null
+  const componentPropertiesOpen = currentPage?.kind === 'component';
+  const [leftTab, setLeftTab] = useState('navigator');
+  useEffect(() => {
+    if (leftTab !== 'navigator') setHoverNodeId(null);
+  }, [leftTab]);
+  useEffect(() => {
+    if (!componentPropertiesOpen) setLeftTab((tab) => tab === 'properties' ? 'navigator' : tab);
+  }, [componentPropertiesOpen]);
   // How wide the code panel is. Code is read in lines, not in a column of
   // controls, so the one panel that shows a file gets a drag handle and
   // remembers where it was left — the other tabs keep their fixed width.
@@ -1021,7 +1034,23 @@ export default function App() {
   // Page loading & saving
   // ----------------------------------------------------------------
 
+  const fileSaveTimer = useRef(null);
+  const pendingFileSave = useRef(null);
+  const fileWritePromise = useRef(Promise.resolve());
+  const flushFileSave = useCallback(async () => {
+    clearTimeout(fileSaveTimer.current);
+    const pending = pendingFileSave.current;
+    if (pending) {
+      pendingFileSave.current = null;
+      fileWritePromise.current = fileWritePromise.current.catch(() => {}).then(() =>
+        pending.write(pending.payload)
+      );
+    }
+    await fileWritePromise.current;
+  }, []);
+
   const flushSave = useCallback(async () => {
+    await flushFileSave();
     clearTimeout(saveTimer.current);
     const { currentPage: page, pageState: state } = pageStateRef.current;
     if (!page || !state || !state.dirty) return;
@@ -1042,7 +1071,7 @@ export default function App() {
         .then((c) => setProjectClasses(c || []))
         .catch(() => {});
     }
-  }, []);
+  }, [flushFileSave]);
 
   // Leaving a project. Main releases the editor session and
   // starts the window over — forty pieces of state, an undo stack, a canvas
@@ -1098,6 +1127,7 @@ export default function App() {
   const openFile = useCallback(
     async (entry) => {
       await flushSave();
+      setHoverNodeId(null);
       setCurrentPage(entry);
       setSelectedId(null);
       const result = await window.avb.readPage(entry.path);
@@ -1206,6 +1236,11 @@ export default function App() {
     }
     setRefreshKey((k) => k + 1); // the preview is showing the old branch too
   }, [rescan, openFile]);
+
+  const completePropertySave = useCallback(async () => {
+    setCodeWin(null);
+    await reloadFromDisk();
+  }, [reloadFromDisk]);
 
   // Drill into a component: its own file becomes the edited document, and the
   // stack remembers what to come back to (pages and components alike, so
@@ -1475,6 +1510,7 @@ export default function App() {
   const [historyTick, setHistoryTick] = useState(0);
 
   const undo = useCallback(async () => {
+    if (propertySave.saving.current) return;
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
     if (!h.past.length) return;
@@ -1494,9 +1530,10 @@ export default function App() {
     if (!state) return; // its page is gone — nothing to restore onto
     h.future.push(snapshotOf(state));
     applySnapshot(entry);
-  }, [applySnapshot, showToast]);
+  }, [applySnapshot, showToast, propertySave.saving]);
 
   const redo = useCallback(async () => {
+    if (propertySave.saving.current) return;
     setHistoryTick((n) => n + 1);
     const h = historyRef.current;
     if (!h.future.length) return;
@@ -1516,7 +1553,7 @@ export default function App() {
     if (!state) return;
     h.past.push(snapshotOf(state));
     applySnapshot(entry);
-  }, [applySnapshot, showToast]);
+  }, [applySnapshot, showToast, propertySave.saving]);
 
   // Discrete edits (dropdown, checkbox, drag, delete) save immediately;
   // typing batches keystrokes for 300 ms so the preview doesn't rebuild
@@ -1544,6 +1581,7 @@ export default function App() {
 
   const mutateModel = useCallback(
     (fn, immediate = false, coalesceKey = null) => {
+      if (propertySave.saving.current) return;
       pushHistory(coalesceKey);
       setPageState((s) => {
         if (!s || !s.editable) return s;
@@ -1552,16 +1590,17 @@ export default function App() {
       });
       scheduleSave(immediate);
     },
-    [scheduleSave, pushHistory]
+    [scheduleSave, pushHistory, propertySave.saving]
   );
 
   const setRawSource = useCallback(
     (source) => {
+      if (propertySave.saving.current) return;
       pushHistory('raw-source');
       setPageState((s) => (s ? { ...s, source, dirty: true } : s));
       scheduleSave();
     },
-    [scheduleSave, pushHistory]
+    [scheduleSave, pushHistory, propertySave.saving]
   );
 
   // ----------------------------------------------------------------
@@ -3813,7 +3852,7 @@ export default function App() {
       }
     })();
     return () => { dropped = true };
-  }, [focusOf, hostFile?.path, collectionSamples, collections]);
+  }, [focusOf, hostFile?.path, collectionSamples, collections, scan]);
 
   // Link settings (href fields): pages to link to and the ids on this page
   // that anchor links can target.
@@ -3994,22 +4033,23 @@ export default function App() {
   );
 
   // File edits stream to disk (debounced) — the dev server picks them up.
-  const fileSaveTimer = useRef(null);
   const setAssetFileText = useCallback(
     (text) => {
+      if (propertySave.saving.current) return;
       setFileText(text);
       if (!codeWin || codeWin.kind !== 'file') return;
       const { rel, area } = codeWin;
       // Source files live anywhere in the project; assets are rooted in public/.
       const write = area === 'src' ? window.avb.writeSourceText : window.avb.writeAssetText;
+      pendingFileSave.current = { write, payload: { projectPath: project.path, rel, text } };
       clearTimeout(fileSaveTimer.current);
       fileSaveTimer.current = setTimeout(() => {
-        write({ projectPath: project.path, rel, text }).catch((err) =>
+        flushFileSave().catch((err) =>
           showToast(`Save failed: ${cleanError(err)}`, 'error')
         );
       }, 300);
     },
-    [codeWin, project, showToast]
+    [codeWin, project, showToast, flushFileSave, propertySave.saving]
   );
 
   // Close the window if its target disappears (page switch, node deleted).
@@ -4019,7 +4059,7 @@ export default function App() {
 
   const editedRel =
     editStack.length > 1 && project?.path
-      ? editStack[editStack.length - 1].path.replace(project.path + '/', '')
+      ? projectRelativePath(project.path, editStack[editStack.length - 1].path, window.avb.platform)
       : null;
 
   // The reported classes, keyed by node id — same walk as the render report,
@@ -4037,7 +4077,7 @@ export default function App() {
   const openFileSrcRel = (() => {
     const p = editStack[editStack.length - 1]?.path || currentPage?.path;
     if (!p || !project?.path) return null;
-    const rel = p.startsWith(project.path + '/') ? p.slice(project.path.length + 1) : p;
+    const rel = projectRelativePath(project.path, p, window.avb.platform);
     return rel.startsWith('src/') ? rel.slice(4) : rel;
   })();
 
@@ -4172,7 +4212,7 @@ export default function App() {
   // stack, so it's read from the stack rather than parsed out of the key.
   // Through a ref because the menu handler is bound long before this is in scope.
   const relOf = (abs) =>
-    abs && project?.path ? abs.replace(project.path + '/', '') : null;
+    abs && project?.path ? projectRelativePath(project.path, abs, window.avb.platform) : null;
   const openRel = relOf(currentPage?.path);
   const leafTrail = model && selectedId ? pathOfNode(model.nodes, selectedId) : null;
   const selectionKeys = !openRel
@@ -4226,7 +4266,7 @@ export default function App() {
     // A dynamic tag renders an element, so it shouldn't wear the component
     // colour on the canvas either.
     const kind =
-      n.kind === 'component' && !n.dynamicTag
+      n.kind === 'component' && !n.dynamicTag && !isFragmentNode(n)
         ? 'component'
         : n.kind === 'map' || n.kind === 'cond' || n.kind === 'branch'
           ? 'map'
@@ -4403,6 +4443,9 @@ export default function App() {
 
   return (
     <div className="app">
+      {propertySave.phase === 'saving' && (
+        <div className="property-saving-overlay" role="status">Saving component properties…</div>
+      )}
       {themeLabOpen ? (
         <Suspense fallback={null}>
           <ThemeLab onClose={() => setThemeLabOpen(false)} />
@@ -4479,7 +4522,7 @@ export default function App() {
         <div className="titlebar-actions">
           <button
             className={`titlebar-btn ${termOpen ? 'on' : ''}`}
-            title={termOpen ? 'Hide terminal (⌘J)' : 'Show terminal (⌘J)'}
+            title={`${termOpen ? 'Hide' : 'Show'} terminal (${shortcutLabel('J', 'primary', currentDesktopPlatform())})`}
             onClick={() => setTermOpen((v) => !v)}
           >
             <TerminalIcon size={14} />
@@ -4524,6 +4567,7 @@ export default function App() {
       <div className="main">
         <LeftRail
           active={leftTab}
+          componentOpen={componentPropertiesOpen}
           onSelect={(id) => setLeftTab((t) => (t === id ? null : id))}
         />
 
@@ -4547,6 +4591,17 @@ export default function App() {
               key={leftTab}
               label={`the ${leftTab === 'cms' ? 'CMS' : leftTab} panel`}
             >
+            {leftTab === 'properties' && currentPage?.kind === 'component' && (
+              <ComponentPropertiesPanel
+                key={currentPage.path}
+                projectPath={project.path}
+                file={currentPage.path}
+                name={currentPage.name}
+                flushSave={flushSave}
+                onSavePhase={propertySave.changePhase}
+                onSaved={completePropertySave}
+              />
+            )}
             {leftTab === 'pages' && (
               <PagesPanel
                 scan={scan}
