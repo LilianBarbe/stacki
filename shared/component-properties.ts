@@ -1,5 +1,5 @@
 // Source text is the revision token: edits cannot overwrite a newer disk revision.
-import { boolean, list, object, text } from './boundary';
+import { boolean, count, list, object, optional, text } from './boundary';
 import { LIMITS } from './limits';
 import { toRecord } from './record';
 import type { Result } from './result';
@@ -21,6 +21,21 @@ export interface ComponentProperty {
   readonly readonly: boolean;
   readonly defaultValue: string;
   readonly description: string;
+  readonly origin?: PropertyOrigin;
+  readonly editing?: PropertyEditing;
+  readonly conditions?: readonly string[];
+}
+export type PropertyEditing =
+  | { readonly kind: 'editable' }
+  | { readonly kind: 'restricted'; readonly reason: string };
+export interface PropertySource {
+  readonly label: string;
+  readonly expression: string;
+  readonly line: number;
+}
+export interface PropertyOrigin {
+  readonly declarations: readonly PropertySource[];
+  readonly defaultValue?: PropertySource;
 }
 export interface ComponentProperties {
   readonly source: string;
@@ -66,7 +81,42 @@ export function parseComponentProperty(input: unknown): ComponentProperty {
     readonly: boolean,
     defaultValue: propertyText,
     description: propertyText,
+    origin: optional(parsePropertyOrigin),
+    editing: optional(parsePropertyEditing),
+    conditions: optional((value) => propertyList(value, propertyText)),
   })(input);
+}
+
+function parsePropertyEditing(input: unknown): PropertyEditing {
+  const value = toRecord(input);
+  if (value?.['kind'] === 'editable') {
+    return { kind: 'editable' };
+  }
+  if (value?.['kind'] === 'restricted') {
+    const reason = propertyText(value['reason']);
+    if (reason.trim()) {
+      return { kind: 'restricted', reason };
+    }
+  }
+  throw new Error('Invalid property editing permission');
+}
+
+function parsePropertyOrigin(input: unknown): PropertyOrigin {
+  return object({
+    declarations: (value) => propertyList(value, parsePropertySource),
+    defaultValue: optional(parsePropertySource),
+  })(input);
+}
+
+function parsePropertySource(input: unknown): PropertySource {
+  const source = object({ label: propertyText, expression: propertyText, line: count })(input);
+  if (!source.label.trim()) {
+    throw new Error('Property source label must be nonempty');
+  }
+  if (source.line < 1 || source.line > PROPERTY_LIMITS.sourceCharsMax) {
+    throw new Error('Property source line is out of bounds');
+  }
+  return source;
 }
 export function propertyList<T>(input: unknown, parse: (input: unknown) => T): readonly T[] {
   const values = list(parse)(input);

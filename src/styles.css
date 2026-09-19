@@ -698,12 +698,28 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 .list-field-row.is-after { box-shadow: inset 0 -1px 0 0 var(--accent); }
 .list-field-grip {
   display: flex;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text-faint);
   opacity: 0;
   cursor: grab;
   flex-shrink: 0;
+  touch-action: none;
 }
-.list-field-row:hover .list-field-grip { opacity: 1; }
+.list-field-row:hover .list-field-grip,
+.list-field-row:focus-within .list-field-grip { opacity: 1; }
+.list-field-row .list-field-grip:hover { background: none; }
+.list-field-grip:active { cursor: grabbing; }
+.list-field-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  margin-right: 8px;
+  vertical-align: middle;
+  color: var(--text-dim);
+}
 /* A button, so `justify-content: center` and the filled background come with
    it from the base rule — neither of which a row of text wants. The row draws
    its own hover; a second one inside it reads as a control inside a control. */
@@ -756,7 +772,8 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   border-radius: 4px;
   flex-shrink: 0;
 }
-.list-field-row:hover .list-field-remove { opacity: 1; }
+.list-field-row:hover .list-field-remove,
+.list-field-row:focus-within .list-field-remove { opacity: 1; }
 .list-field-remove:hover { color: var(--red); background: var(--bg-active); }
 /* A button, so it arrives centred from the base rule — which reads as a
    caption under the list rather than the next row of it. It is the row after

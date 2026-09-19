@@ -297,6 +297,272 @@ test('failed writes restore all files already written', () => {
   });
 });
 
+test('composite props trace their own declarations and literal defaults', () => {
+  const composite = `---
+type Unrelated = { element: number };
+type Tag = { /** Render tag. */ element?: "button" } | { element: "link" };
+type Props = { render?: boolean } & Tag;
+type AllProps = { element?: "button" | "link"; extra?: string };
+const { element = "button", render = true, extra } = Astro.props as AllProps;
+---
+<div />`;
+  const data = readComponentProperties(composite);
+  assert.equal(data.advanced, true);
+  const element = data.properties.find((field) => field.name === 'element');
+  assert.equal(element.type, '"button" | "link"');
+  assert.equal(element.defaultValue, '"button"');
+  assert.deepEqual(element.origin.declarations, [
+    { label: 'Tag.element', expression: '"button"', line: 3 },
+    { label: 'Tag.element', expression: '"link"', line: 3 },
+  ]);
+  assert.deepEqual(element.origin.defaultValue, {
+    label: 'Astro.props.element',
+    expression: '"button"',
+    line: 6,
+  });
+  assert.equal(
+    data.properties.find((field) => field.name === 'extra').origin.declarations[0].label,
+    'AllProps.extra'
+  );
+  assert.deepEqual(parseComponentProperties(data), data);
+});
+
+test('source tracing terminates cycles and avoids inventing generic or imported sources', () => {
+  for (const declaration of [
+    'type Props = Props & { title?: string };',
+    'type Base = { title?: number }; type Props = Omit<Base, "title">;',
+    'import type { Props } from "./shared";',
+  ]) {
+    const data = readComponentProperties(
+      `---\n${declaration}\n` + 'const { title = "Hello" } = Astro.props;\n---\n<div />'
+    );
+    const title = data.properties.find((field) => field.name === 'title');
+    assert.equal(title.origin.declarations.length, declaration.startsWith('type Props') ? 1 : 0);
+    assert.equal(title.origin.defaultValue.expression, '"Hello"');
+  }
+});
+
+test('source metadata rejects malformed and oversized inputs at the contract boundary', () => {
+  const data = readComponentProperties(source);
+  const origin = data.properties[0].origin;
+  for (const invalid of [
+    null,
+    {},
+    { declarations: {} },
+    { declarations: Array(PROPERTY_LIMITS.fieldsMax + 1).fill(origin.declarations[0]) },
+    ...[0, -1, 1.5, '2', PROPERTY_LIMITS.sourceCharsMax + 1].map((line) => ({
+      declarations: [{ label: 'Props.title', expression: 'string', line }],
+    })),
+    { declarations: [{ label: '', expression: 'string', line: 1 }] },
+    { declarations: [{ label: 'Props.title', expression: false, line: 1 }] },
+    { declarations: [], defaultValue: { label: 'Astro.props.title', line: 1 } },
+  ]) {
+    assert.throws(() =>
+      parseComponentProperties({
+        ...data,
+        properties: [{ ...data.properties[0], origin: invalid }],
+      })
+    );
+  }
+});
+
+const compositeCard = `---
+import type { HTMLAttributes } from 'astro/types';
+type Theme = "inherit" | "light" | "dark";
+type Base = HTMLAttributes<"div"> & {
+  /** Small text above the heading. */
+  eyebrow?: string;
+  theme?: Theme;
+  variant?: "default" | "cover" | "stacked";
+  unused?: string;
+};
+type Props = Base & (
+  | { variant?: "default"; image?: never }
+  | { variant: "cover"; image?: string }
+  | { variant: "stacked"; image?: string; theme?: never }
+);
+type AllProps = Base & { image?: string };
+type Caption = Base["eyebrow"];
+type RuntimeCaption = AllProps["eyebrow"];
+type Selected = Pick<Base, "eyebrow">;
+type Other = { eyebrow: number };
+type OtherCaption = Other["eyebrow"];
+const { eyebrow, theme = "inherit", variant = "default", image, ...rest } = Astro.props as AllProps;
+---
+<div>{eyebrow} {Astro.props.eyebrow}</div>`;
+
+test('common props remain editable while variant restrictions stay specific to each prop', () => {
+  const data = readComponentProperties(compositeCard);
+  assert.equal(data.advanced, true);
+  const eyebrow = data.properties.find((field) => field.name === 'eyebrow');
+  assert.deepEqual(eyebrow.editing, { kind: 'editable' });
+  assert.equal(eyebrow.description, 'Small text above the heading.');
+  assert.deepEqual(eyebrow.conditions, []);
+  const image = data.properties.find((field) => field.name === 'image');
+  assert.equal(image.editing.kind, 'restricted');
+  assert.deepEqual(image.conditions, [
+    'variant = "default": not allowed',
+    'variant = "cover": optional',
+    'variant = "stacked": optional',
+  ]);
+  const theme = data.properties.find((field) => field.name === 'theme');
+  assert.equal(theme.editing.kind, 'restricted');
+  assert.equal(theme.conditions.at(-1), 'variant = "stacked": not allowed');
+  assert.equal(
+    editPropertyDefinition(compositeCard, {
+      kind: 'save',
+      originalName: 'image',
+      property: { ...image, editing: { kind: 'editable' } },
+    }).ok,
+    false
+  );
+  assert.deepEqual(parseComponentProperties(data), data);
+});
+
+test('common declaration edits preserve variants, runtime assertions and unrelated types', () => {
+  const eyebrow = readComponentProperties(compositeCard).properties.find(
+    (p) => p.name === 'eyebrow'
+  );
+  const changed = value(
+    editPropertyDefinition(compositeCard, {
+      kind: 'save',
+      originalName: 'eyebrow',
+      property: {
+        ...eyebrow,
+        type: '"Small" | "Large"',
+        defaultValue: '"Small"',
+        required: true,
+        readonly: true,
+        description: 'New tooltip',
+      },
+    })
+  );
+  assert.match(changed, /readonly eyebrow: "Small" \| "Large"/);
+  assert.match(changed, /eyebrow = "Small"/);
+  assert.match(changed, /New tooltip/);
+  const variants = (text) => text.slice(text.indexOf('type Props'), text.indexOf('type AllProps'));
+  assert.equal(variants(changed), variants(compositeCard));
+  assert.match(changed, /Astro.props as AllProps/);
+  assert.match(changed, /type Other = \{ eyebrow: number \}/);
+  const reread = readComponentProperties(changed).properties.find((p) => p.name === 'eyebrow');
+  assert.equal(reread.required, true);
+  assert.equal(reread.readonly, true);
+  assert.equal(reread.description, 'New tooltip');
+  assert.equal(reread.editing.kind, 'editable');
+  const removed = value(editPropertyDefinition(compositeCard, { kind: 'remove', name: 'unused' }));
+  assert.doesNotMatch(removed, /unused\?:/);
+  assert.equal(variants(removed), variants(compositeCard));
+});
+
+test('renaming a common prop updates its instances, runtime binding and related type references', () => {
+  project(({ root, component, page }) => {
+    fs.writeFileSync(component, compositeCard);
+    fs.writeFileSync(
+      page,
+      '---\nimport Card from "../components/Card.astro";\n---\n' +
+        '<Card eyebrow="Hello"/><Card eyebrow="Again"/>'
+    );
+    const eyebrow = readComponentProperties(compositeCard).properties.find(
+      (p) => p.name === 'eyebrow'
+    );
+    const updated = value(
+      updateComponentProperties(
+        {
+          projectPath: root,
+          file: component,
+          source: compositeCard,
+          change: {
+            kind: 'save',
+            originalName: 'eyebrow',
+            property: { ...eyebrow, name: 'kicker' },
+          },
+        },
+        () => {}
+      )
+    );
+    assert.equal(updated.properties.find((p) => p.name === 'kicker').editing.kind, 'editable');
+    const after = fs.readFileSync(component, 'utf8');
+    assert.match(after, /kicker: eyebrow/);
+    assert.match(after, /Astro.props.kicker/);
+    assert.match(after, /Base\["kicker"\]/);
+    assert.match(after, /AllProps\["kicker"\]/);
+    assert.match(after, /Pick<Base, "kicker">/);
+    assert.match(after, /Other\["eyebrow"\]/);
+    assert.match(after, /\{eyebrow\}/);
+    assert.equal(fs.readFileSync(page, 'utf8').match(/kicker=/g).length, 2);
+  });
+});
+
+test('ambiguous common declarations remain restricted without flattening their contracts', () => {
+  for (const declaration of [
+    'type Props = { eyebrow?: string } & { eyebrow?: "narrow" };',
+    'type Props = Base; type Base = Props & { eyebrow?: string };',
+    'type Base<T> = { eyebrow?: T }; type Props = Base<string>;',
+    'export type Base = { eyebrow?: string }; type Props = Base;',
+    'import type { Shared } from "./shared"; type Props = Shared & { eyebrow?: string };',
+    'import type { HTMLAttributes } from "./shared"; ' +
+      'type Props = HTMLAttributes & { eyebrow?: string };',
+    'type Props = { eyebrow?: string }; type AllProps = { eyebrow?: string };',
+  ]) {
+    const assertion = declaration.includes('type AllProps') ? ' as AllProps' : '';
+    const source = `---\n${declaration}\nconst { eyebrow } = Astro.props${assertion};\n---\n`;
+    const eyebrow = readComponentProperties(source).properties.find((p) => p.name === 'eyebrow');
+    assert.equal(eyebrow.editing.kind, 'restricted', declaration);
+    assert.equal(
+      editPropertyDefinition(source, {
+        kind: 'save',
+        originalName: 'eyebrow',
+        property: { ...eyebrow, description: 'Changed' },
+      }).ok,
+      false
+    );
+  }
+});
+
+test('common props support aliased Astro attribute imports without changing their aliases', () => {
+  const source = compositeCard
+    .replace('import type { HTMLAttributes }', 'import type { HTMLAttributes as Attributes }')
+    .replace('HTMLAttributes<"div">', 'Attributes<"div">');
+  const eyebrow = readComponentProperties(source).properties.find(
+    (field) => field.name === 'eyebrow'
+  );
+  assert.equal(eyebrow.editing.kind, 'editable');
+  const output = value(
+    editPropertyDefinition(source, {
+      kind: 'save',
+      originalName: 'eyebrow',
+      property: { ...eyebrow, description: 'Changed' },
+    })
+  );
+  assert.match(output, /type Base = Attributes<"div">/);
+  assert.match(output, /Changed/);
+});
+
+test('property permissions and conditions are validated at the boundary', () => {
+  const data = readComponentProperties(compositeCard);
+  const field = data.properties[0];
+  for (const editing of [
+    null,
+    {},
+    { kind: 'restricted' },
+    { kind: 'restricted', reason: '' },
+    { kind: 'restricted', reason: false },
+    { kind: 'other' },
+  ]) {
+    assert.throws(() => parseComponentProperties({ ...data, properties: [{ ...field, editing }] }));
+  }
+  for (const conditions of [
+    'bad',
+    [42],
+    Array(PROPERTY_LIMITS.fieldsMax + 1).fill('rule'),
+    ['x'.repeat(PROPERTY_LIMITS.textCharsMax + 1)],
+  ]) {
+    assert.throws(() =>
+      parseComponentProperties({ ...data, properties: [{ ...field, conditions }] })
+    );
+  }
+});
+
 test('contracts reject malformed payloads and enforce resource bounds', () => {
   assert.deepEqual(
     parseComponentProperties(readComponentProperties(source)),

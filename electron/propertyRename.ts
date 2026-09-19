@@ -3,6 +3,7 @@
 import { parse } from '@astrojs/compiler/sync';
 import type { Node, AttributeNode } from '@astrojs/compiler/types';
 import ts from 'typescript';
+import { readPropertyContracts } from './propertyContracts';
 import { assert } from '../shared/assert';
 import { PROPERTY_LIMITS } from '../shared/component-properties';
 import { err, ok, type Result } from '../shared/result';
@@ -21,7 +22,12 @@ export interface PropertyRename {
 }
 
 type PropertyReferenceEdit =
-  | { readonly kind: 'rename'; readonly from: string; readonly to: string }
+  | {
+      readonly kind: 'rename';
+      readonly from: string;
+      readonly to: string;
+      readonly typeNames: ReadonlySet<string>;
+    }
   | {
       readonly kind: 'default';
       readonly from: string;
@@ -36,7 +42,16 @@ export function renameComponentReferences(
   rename: PropertyRename,
   owner: 'definition' | 'consumer'
 ): Result<string> {
-  return editComponentReferences(source, names, { kind: 'rename', ...rename }, owner);
+  const typeNames =
+    owner === 'definition'
+      ? readPropertyContracts(readPropertySyntax(source)).names
+      : new Set<string>();
+  return editComponentReferences(
+    source,
+    names,
+    { kind: 'rename', ...rename, typeNames: new Set(['Props', ...typeNames]) },
+    owner
+  );
 }
 
 export function bindComponentDefault(
@@ -309,7 +324,7 @@ function renameAstroAccess(
   const edits: SourceEdit[] = [];
   for (const node of syntaxNodes(syntax)) {
     if (rename.kind === 'rename') {
-      const typeEdit = renameIndexedPropType(node, start, rename);
+      const typeEdit = renameIndexedPropType(node, start, rename, rename.typeNames);
       if (typeEdit) {
         edits.push(typeEdit);
       }
@@ -382,7 +397,8 @@ function defaultBindingName(source: string): string {
 function renameIndexedPropType(
   node: ts.Node,
   start: number,
-  rename: PropertyRename
+  rename: PropertyRename,
+  typeNames: ReadonlySet<string>
 ): SourceEdit | undefined {
   if (
     !ts.isLiteralTypeNode(node) ||
@@ -398,11 +414,11 @@ function renameIndexedPropType(
   const indexed =
     ts.isIndexedAccessTypeNode(parent) &&
     ts.isTypeReferenceNode(parent.objectType) &&
-    parent.objectType.typeName.getText() === 'Props';
+    typeNames.has(parent.objectType.typeName.getText());
   const picked =
     ts.isTypeReferenceNode(parent) &&
     ['Pick', 'Omit'].includes(parent.typeName.getText()) &&
-    parent.typeArguments?.[0]?.getText() === 'Props';
+    typeNames.has(parent.typeArguments?.[0]?.getText() ?? '');
   if (!indexed && !picked) {
     return undefined;
   }

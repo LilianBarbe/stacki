@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { ComponentProperty } from '../../shared/component-properties';
 import { PROPERTY_LIMITS } from '../../shared/component-properties';
 import { literalOptions } from '../propertyOptions';
+import Dropdown from '../ui/Dropdown';
+import { BracesIcon } from '../ui/Icons';
 
 interface DefaultProps {
   readonly property: ComponentProperty;
@@ -14,17 +16,22 @@ export function PropertyDefault({ property, onChange }: DefaultProps) {
   const [mode, setMode] = useState<'value' | 'expression'>(
     simple && isLiteralDefault(property) ? 'value' : 'expression'
   );
+  const expression = mode === 'expression';
+  const action = expression ? 'Use the default value control' : 'Write a default expression';
   return (
-    <div className="property-default">
+    <div className="property-default" role="group" aria-label="Default value">
       <div className="property-default-title">
         <span>Default value</span>
         {simple && (
           <button
-            className="ghost"
-            title="Toggle expression editor"
+            type="button"
+            className={`prop-expr-toggle${expression ? ' on' : ''}`}
+            title={action}
+            aria-label={action}
+            aria-pressed={expression}
             onClick={() => setMode((current) => (current === 'value' ? 'expression' : 'value'))}
           >
-            {mode === 'value' ? '{ }' : 'Value'}
+            <BracesIcon size={12} />
           </button>
         )}
       </div>
@@ -42,16 +49,6 @@ export function PropertyDefault({ property, onChange }: DefaultProps) {
           onChange={(event) => onChange(event.target.value)}
         />
       )}
-      <div className="property-default-title">
-        <small className="property-help">
-          {property.defaultValue
-            ? 'Used when a value is omitted or undefined.'
-            : 'No default value.'}
-        </small>
-        <button className="ghost" disabled={!property.defaultValue} onClick={() => onChange('')}>
-          Clear
-        </button>
-      </div>
     </div>
   );
 }
@@ -60,18 +57,20 @@ function DefaultControl({ property, onChange }: DefaultProps) {
   if (options || property.type === 'boolean') {
     const choices = [...new Set(options ?? ['true', 'false'])];
     return (
-      <select
-        aria-label="Default option"
+      <Dropdown
         value={defaultChoice(choices, property.defaultValue)}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">No default</option>
-        {choices.map((choice) => (
-          <option key={choice} value={choice}>
-            {propertyDefaultText(choice) ?? choice}
-          </option>
-        ))}
-      </select>
+        options={[
+          { value: '', label: 'No default' },
+          ...choices.map((choice) => ({
+            value: choice,
+            label: propertyDefaultText(choice) ?? choice,
+          })),
+        ]}
+        onChange={onChange}
+        livePreview={false}
+        searchable
+        searchPlaceholder="Search defaults…"
+      />
     );
   }
   if (property.type === 'number') {

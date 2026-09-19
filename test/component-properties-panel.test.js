@@ -392,15 +392,38 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
       Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, value);
       element.dispatchEvent(new window.Event('input', { bubbles: true }));
     });
+  const pressDown = async (element) =>
+    act(async () => element.dispatchEvent(new window.MouseEvent('mousedown', { bubbles: true })));
   assert.equal(document.querySelector('.property-options input'), null);
   await act(async () => document.querySelector('.property-options .list-field-text').click());
   const firstOption = document.querySelector('.list-item-field input');
   assert.equal(document.activeElement, firstOption);
   assert.equal(firstOption.selectionStart, 0);
   assert.equal(firstOption.selectionEnd, 'small'.length);
+  await pressDown(firstOption);
+  assert.ok(document.querySelector('.property-editor'));
   await setValue(firstOption, 'compact');
   await act(async () => document.querySelector('.list-item-editor [title="Close"]').click());
-  assert.equal(document.querySelector('[aria-label="Default option"]').value, '"compact"');
+  const defaultLabel = () => document.querySelector('.property-default .dd-label').textContent;
+  assert.equal(document.querySelector('.property-default select'), null);
+  assert.equal(defaultLabel(), 'compact');
+  await act(async () => document.querySelector('.property-default .dd-trigger').click());
+  await setValue(document.querySelector('.dd-search'), 'medium');
+  assert.equal(document.querySelectorAll('.dd-option').length, 1);
+  await pressDown(document.querySelector('.dd-option'));
+  assert.ok(document.querySelector('.property-editor'));
+  await act(async () =>
+    document
+      .querySelector('.dd-option')
+      .dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true }))
+  );
+  assert.equal(defaultLabel(), 'compact');
+  await act(async () => document.querySelector('.dd-option').click());
+  assert.equal(defaultLabel(), 'medium');
+  await act(async () => document.querySelector('.property-default .dd-trigger').click());
+  await setValue(document.querySelector('.dd-search'), 'compact');
+  await act(async () => document.querySelector('.dd-option').click());
+  assert.equal(defaultLabel(), 'compact');
   await dragOptions(2, 0);
   assert.equal(optionValues()[0], 'large');
   await setValue(document.querySelector('.property-editor label input'), 'spacing');
@@ -524,16 +547,88 @@ const { gap = 'small', other = 'large', ...rest } = Astro.props;
   await act(async () => document.querySelectorAll('.property-options .list-field-text')[1].click());
   await setValue(document.querySelector('.list-item-field input'), 'false');
   await key('Escape', {}, document.querySelector('.list-item-field input'));
-  assert.equal(document.querySelector('[aria-label="Default option"]').value, 'false');
+  assert.equal(defaultLabel(), 'false');
   assert.equal(document.querySelector('.list-item-editor'), null);
+  // Settings use the shared dismissal behavior for app chrome and canvas clicks.
+  // Nested option popovers and dropdowns above remain inside the settings editor.
+  const editsBeforeDismiss = edits.length;
+  await pressDown(document.querySelector('.property-component'));
+  assert.equal(document.querySelector('.property-editor') === null, true);
+  assert.equal(edits.length, editsBeforeDismiss);
+  await act(async () => document.querySelector('.property-row-main').click());
+  await act(async () =>
+    window.dispatchEvent(
+      new window.MessageEvent('message', {
+        data: { type: 'avb:click-node', path: '0' },
+      })
+    )
+  );
+  assert.equal(document.querySelector('.property-editor') === null, true);
+  assert.equal(edits.length, editsBeforeDismiss);
   // Unsupported contracts still open property settings rather than raw source.
-  data = { ...data, source: 'unsupported contract', advanced: true };
+  data = {
+    ...data,
+    source: 'unsupported contract',
+    advanced: true,
+    properties: data.properties.map((field) => ({
+      ...field,
+      origin: {
+        declarations: [{ label: `Tag.${field.name}`, expression: field.type, line: 3 }],
+        defaultValue: {
+          label: `Astro.props.${field.name}`,
+          expression: field.defaultValue,
+          line: 6,
+        },
+      },
+    })),
+  };
   await notify();
   await act(async () => document.querySelector('.property-row-main').click());
   assert.match(document.body.textContent, /Property settings/);
   assert.equal(document.querySelector('[aria-label="Component TypeScript source"]'), null);
-  assert.equal(document.querySelector('.property-options .list-field-row').draggable, false);
-  assert.equal(document.querySelector('.property-options .list-field-add').disabled, true);
+  assert.equal(document.querySelector('.property-readonly-fields textarea').readOnly, true);
+  assert.equal(document.querySelector('.property-source-tag'), null);
+  assert.match(document.querySelector('.property-declaration-info').title, /Tag\./);
+  assert.match(document.querySelector('.property-declaration-info').title, /line 3/);
+  assert.equal(document.querySelector('[aria-label="Close property settings"]').disabled, false);
+  await pressDown(document.querySelector('.property-declaration-info'));
+  assert.ok(document.querySelector('.property-editor'));
+  await act(async () => document.querySelector('[aria-label="Close property settings"]').click());
+  assert.equal(document.querySelector('.property-editor'), null);
+  await act(async () => document.querySelector('.property-row-main').click());
+  await pressDown(document.querySelector('.property-component'));
+  assert.equal(document.querySelector('.property-editor'), null);
+  assert.equal(edits.length, editsBeforeDismiss);
+  // Common fields in a combined contract use normal editing; only affected props are restricted.
+  data = {
+    ...data,
+    source: 'combined contract',
+    properties: [
+      { ...property, name: 'eyebrow', editing: { kind: 'editable' }, conditions: [] },
+      {
+        ...property,
+        name: 'image',
+        editing: {
+          kind: 'restricted',
+          reason: 'This prop has variant rules. Edit its declaration in source.',
+        },
+        conditions: ['variant = "default": not allowed', 'variant = "cover": optional'],
+      },
+    ],
+  };
+  await notify();
+  assert.equal(document.querySelector('[aria-label="Delete eyebrow"]').disabled, false);
+  assert.equal(document.querySelector('[aria-label="Delete image"]').disabled, true);
+  await act(async () => document.querySelector('.property-row-main').click());
+  assert.equal(document.querySelector('.property-editor fieldset').disabled, false);
+  assert.equal(document.querySelector('.property-readonly-fields'), null);
+  assert.equal(document.querySelector('.property-editor label input').value, 'eyebrow');
+  assert.doesNotMatch(document.body.textContent, /This view is read-only/);
+  await act(async () => document.querySelector('[aria-label="Close property settings"]').click());
+  await act(async () => document.querySelectorAll('.property-row-main')[1].click());
+  assert.match(document.querySelector('.property-conditions').textContent, /default.*not allowed/);
+  assert.match(document.querySelector('.property-readonly-fields').textContent, /variant rules/);
+  assert.equal(document.querySelector('.property-editor fieldset'), null);
   let completeRead;
   readProperties = () =>
     new Promise((resolve) => {
