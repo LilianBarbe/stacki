@@ -162,9 +162,12 @@ test('preview owns only mounted frames and cleans canceled/unmounted drags', asy
   await send(canvasFrame, { type: 'avb:page-height', height: Infinity });
   assert.equal(document.querySelector('.canvas-frame').style.height, '900px');
   await send(canvasFrame, { type: 'avb:page-height', height: 80000 });
-  assert.equal(document.querySelector('.canvas-frame').style.height, '30000px');
+  assert.equal(document.querySelector('.canvas-frame').style.height, '1125px');
   await send(oldFrame, { type: 'avb:page-height', height: 1000 });
-  assert.equal(document.querySelector('.canvas-frame').style.height, '30000px');
+  assert.equal(document.querySelector('.canvas-frame').style.height, '1125px');
+  const phoneFrame = document.querySelectorAll('iframe')[2].contentWindow;
+  await send(phoneFrame, { type: 'avb:page-height', height: 80000 });
+  assert.equal(document.querySelectorAll('.canvas-frame')[2].style.height, '1015px');
   await render({ refreshKey: 1 });
   assert.equal(document.querySelector('.canvas-frame').style.height, '900px');
   await act(async () => { pointer(document.querySelector('.canvas-view'), 'pointerdown'); await settle(); });

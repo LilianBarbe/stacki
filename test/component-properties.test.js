@@ -10,7 +10,10 @@ const {
   readComponentProperties,
   editPropertyDefinition,
 } = require('../dist/electron/propertyDefinitions');
-const { renameComponentReferences } = require('../dist/electron/propertyRename');
+const {
+  renameComponentOptionValues,
+  renameComponentReferences,
+} = require('../dist/electron/propertyRename');
 const {
   loadComponentProperties,
   updateComponentProperties,
@@ -108,7 +111,12 @@ test('adds fields to components with and without a Props type or frontmatter', (
       editPropertyDefinition(original, {
         kind: 'save',
         originalName: '',
-        property: { ...property, name: 'count', type: 'number', defaultValue: '3' },
+        property: {
+          ...property,
+          name: 'count',
+          type: 'number',
+          defaultValue: '3',
+        },
       })
     );
     const fields = readComponentProperties(output).properties;
@@ -122,7 +130,10 @@ test('adds fields to components with and without a Props type or frontmatter', (
 
 test('reorders fields and literal options while preserving their docs and defaults', () => {
   const output = value(
-    editPropertyDefinition(source, { kind: 'order', names: ['image', 'variant', 'title'] })
+    editPropertyDefinition(source, {
+      kind: 'order',
+      names: ['image', 'variant', 'title'],
+    })
   );
   assert.deepEqual(
     readComponentProperties(output).properties.map((field) => field.name),
@@ -131,17 +142,13 @@ test('reorders fields and literal options while preserving their docs and defaul
   assert.match(output, /Title shown above the card/);
   const reordered = value(
     editPropertyDefinition(source, {
-      kind: 'save',
-      originalName: 'variant',
-      property: {
-        ...property,
-        name: 'variant',
-        type: "'outline' | 'solid'",
-        defaultValue: "'solid'",
-      },
+      kind: 'options',
+      name: 'variant',
+      type: "'outline' | 'solid'",
     })
   );
-  assert.match(reordered, /variant\?: 'outline' \| 'solid'/);
+  assert.match(reordered, /readonly variant: 'outline' \| 'solid'/);
+  assert.match(reordered, /variant = 'solid'/);
   assert.equal(
     editPropertyDefinition(source, { kind: 'order', names: ['title', 'title'] }).ok,
     false
@@ -236,10 +243,40 @@ test('rename handles expressions, shorthand, literal spreads, comments and UTF-8
   );
 });
 
+test('option rename updates static values on only the resolved component prop', () => {
+  const original =
+    '<!-- <Card variant="solid"/> -->😀 ' +
+    '<Card variant="solid" other="solid" />' +
+    '<Card variant={ready ? "solid" : "outline"} />' +
+    '<Card {...{variant: `solid`, other: "solid"}} />' +
+    '<Other variant="solid" />';
+  const output = value(
+    renameComponentOptionValues(original, new Set(['Card']), 'variant', [
+      { from: "'solid'", to: "'filled'" },
+    ])
+  );
+  assert.match(output, /<!-- <Card variant="solid"\/> -->/);
+  assert.match(output, /😀 <Card variant="filled" other="solid"/);
+  assert.match(output, /ready \? 'filled' : "outline"/);
+  assert.match(output, /variant: 'filled', other: "solid"/);
+  assert.match(output, /<Other variant="solid"/);
+  assert.equal(
+    renameComponentOptionValues('<Card {...props} />', new Set(['Card']), 'variant', [
+      { from: "'solid'", to: "'filled'" },
+    ]).ok,
+    false
+  );
+});
+
 test('project-wide rename follows import aliases and does not touch unrelated components', () => {
   project(({ root, component, page }) => {
     const result = updateComponentProperties(
-      { projectPath: root, file: component, source, change: save({ name: 'heading' }) },
+      {
+        projectPath: root,
+        file: component,
+        source,
+        change: save({ name: 'heading' }),
+      },
       () => {}
     );
     assert.equal(value(result).properties[0].name, 'heading');
@@ -247,6 +284,94 @@ test('project-wide rename follows import aliases and does not touch unrelated co
     assert.match(content, /<Alias heading=\{title\}/);
     assert.match(content, /<Other title="untouched"/);
     assert.match(content, /<p>title<\/p>/);
+  });
+});
+
+test('project-wide option rename updates every static instance value and the default', () => {
+  project(({ root, component, page }) => {
+    fs.writeFileSync(
+      page,
+      `---\nimport Alias from '../components/Card.astro';\n` +
+        `import Other from '../components/Other.astro';\nconst ready = true;\n---\n` +
+        `<Alias variant="solid"/><Alias variant={ready ? 'solid' : 'outline'}/>` +
+        `<Other variant="solid"/>`
+    );
+    const variant = readComponentProperties(source).properties.find(
+      (field) => field.name === 'variant'
+    );
+    const result = updateComponentProperties(
+      {
+        projectPath: root,
+        file: component,
+        source,
+        change: {
+          kind: 'save',
+          originalName: 'variant',
+          property: {
+            ...variant,
+            type: "'filled' | 'outline'",
+            defaultValue: "'filled'",
+          },
+          optionRenames: [{ from: "'solid'", to: "'filled'" }],
+        },
+      },
+      () => {}
+    );
+    assert.equal(
+      value(result).properties.find((field) => field.name === 'variant').type,
+      "'filled' | 'outline'"
+    );
+    assert.match(fs.readFileSync(component, 'utf8'), /variant = 'filled'/);
+    const content = fs.readFileSync(page, 'utf8');
+    assert.match(content, /<Alias variant="filled"/);
+    assert.match(content, /ready \? 'filled' : 'outline'/);
+    assert.match(content, /<Other variant="solid"/);
+  });
+});
+
+test('failed option rename writes restore the component and its instances', () => {
+  project(({ root, component, page }) => {
+    const beforePage =
+      `---\nimport Alias from '../components/Card.astro';\n---\n` + `<Alias variant="solid"/>`;
+    fs.writeFileSync(page, beforePage);
+    const variant = readComponentProperties(source).properties.find(
+      (field) => field.name === 'variant'
+    );
+    const write = fs.writeFileSync;
+    let writes = 0;
+    fs.writeFileSync = (...argumentsList) => {
+      writes += 1;
+      if (writes === 2) {
+        throw new Error('Simulated option write failure');
+      }
+      return write(...argumentsList);
+    };
+    try {
+      const result = updateComponentProperties(
+        {
+          projectPath: root,
+          file: component,
+          source,
+          change: {
+            kind: 'save',
+            originalName: 'variant',
+            property: {
+              ...variant,
+              type: "'filled' | 'outline'",
+              defaultValue: "'filled'",
+            },
+            optionRenames: [{ from: "'solid'", to: "'filled'" }],
+          },
+        },
+        () => {}
+      );
+      assert.equal(result.ok, false);
+      assert.match(result.error.message, /restored/);
+      assert.equal(fs.readFileSync(component, 'utf8'), source);
+      assert.equal(fs.readFileSync(page, 'utf8'), beforePage);
+    } finally {
+      fs.writeFileSync = write;
+    }
   });
 });
 
@@ -284,7 +409,12 @@ test('failed writes restore all files already written', () => {
     };
     try {
       const result = updateComponentProperties(
-        { projectPath: root, file: component, source, change: save({ name: 'heading' }) },
+        {
+          projectPath: root,
+          file: component,
+          source,
+          change: save({ name: 'heading' }),
+        },
         () => {}
       );
       assert.equal(result.ok, false);
@@ -349,7 +479,9 @@ test('source metadata rejects malformed and oversized inputs at the contract bou
     null,
     {},
     { declarations: {} },
-    { declarations: Array(PROPERTY_LIMITS.fieldsMax + 1).fill(origin.declarations[0]) },
+    {
+      declarations: Array(PROPERTY_LIMITS.fieldsMax + 1).fill(origin.declarations[0]),
+    },
     ...[0, -1, 1.5, '2', PROPERTY_LIMITS.sourceCharsMax + 1].map((line) => ({
       declarations: [{ label: 'Props.title', expression: 'string', line }],
     })),
@@ -502,6 +634,9 @@ test('ambiguous common declarations remain restricted without flattening their c
     'import type { Shared } from "./shared"; type Props = Shared & { eyebrow?: string };',
     'import type { HTMLAttributes } from "./shared"; ' +
       'type Props = HTMLAttributes & { eyebrow?: string };',
+    'import type { Omit } from "./shared"; ' +
+      'import type { HTMLAttributes } from "astro/types"; ' +
+      'type Props = Omit<HTMLAttributes<"div">, "eyebrow"> & { eyebrow?: string };',
     'type Props = { eyebrow?: string }; type AllProps = { eyebrow?: string };',
   ]) {
     const assertion = declaration.includes('type AllProps') ? ' as AllProps' : '';
@@ -538,12 +673,104 @@ test('common props support aliased Astro attribute imports without changing thei
   assert.match(output, /Changed/);
 });
 
+test('inherited Astro attributes can be declared locally and edited', () => {
+  const source = `---
+import type { HTMLAttributes } from "astro/types";
+type Props = HTMLAttributes<"div"> & {
+  render?: boolean;
+};
+const { render = true, class: className, ...rest } = Astro.props;
+---
+<div class={className} {...rest} />`;
+  const inherited = readComponentProperties(source).properties.find(
+    (field) => field.name === 'class'
+  );
+  assert.equal(inherited.editing.kind, 'override');
+  const output = value(
+    editPropertyDefinition(source, {
+      kind: 'save',
+      originalName: 'class',
+      property: {
+        ...inherited,
+        type: 'string',
+        required: true,
+        readonly: true,
+        defaultValue: '"eyebrow"',
+        description: 'Classes for the outer element.',
+      },
+    })
+  );
+  assert.match(output, /readonly class: string/);
+  assert.match(output, /Classes for the outer element\./);
+  assert.match(output, /class: className = "eyebrow"/);
+  const reread = readComponentProperties(output).properties.find(
+    (field) => field.name === 'class'
+  );
+  assert.equal(reread.editing.kind, 'editable');
+  assert.equal(reread.defaultValue, '"eyebrow"');
+  assert.equal(
+    editPropertyDefinition(source, {
+      kind: 'save',
+      originalName: 'class',
+      property: { ...inherited, name: 'className' },
+    }).ok,
+    false
+  );
+  assert.equal(editPropertyDefinition(source, { kind: 'remove', name: 'class' }).ok, false);
+});
+
+test('props remain editable through omitted Astro attribute inheritance', () => {
+  const source = `---
+import type { HTMLAttributes } from "astro/types";
+type Base = Omit<HTMLAttributes<"img">, "src" | "width"> & {
+  /** Original image tooltip. */
+  src: ImageMetadata | string;
+  width?: number;
+};
+type Props = Base & (
+  | { variant?: "default" }
+  | { variant: "cover" }
+);
+type AllProps = Base & { variant?: "default" | "cover" };
+const { src, width, variant = "default", ...rest } = Astro.props as AllProps;
+---
+<img {src} {width} {...rest} />`;
+  const imageSource = readComponentProperties(source).properties.find(
+    (field) => field.name === 'src'
+  );
+  assert.deepEqual(imageSource.editing, { kind: 'editable' });
+  const output = value(
+    editPropertyDefinition(source, {
+      kind: 'save',
+      originalName: 'src',
+      property: {
+        ...imageSource,
+        type: 'ImageMetadata | string | URL',
+        required: false,
+        readonly: true,
+        defaultValue: '"/placeholder.png"',
+        description: 'Updated image tooltip.',
+      },
+    })
+  );
+  assert.match(output, /readonly src\?: ImageMetadata \| string \| URL/);
+  assert.match(output, /src = "\/placeholder\.png"/);
+  assert.match(output, /Updated image tooltip\./);
+  assert.equal(
+    readComponentProperties(output).properties.find((field) => field.name === 'src').editing.kind,
+    'editable'
+  );
+});
+
 test('property permissions and conditions are validated at the boundary', () => {
   const data = readComponentProperties(compositeCard);
   const field = data.properties[0];
   for (const editing of [
     null,
     {},
+    { kind: 'override' },
+    { kind: 'override', reason: '' },
+    { kind: 'override', reason: false },
     { kind: 'restricted' },
     { kind: 'restricted', reason: '' },
     { kind: 'restricted', reason: false },
@@ -558,7 +785,10 @@ test('property permissions and conditions are validated at the boundary', () => 
     ['x'.repeat(PROPERTY_LIMITS.textCharsMax + 1)],
   ]) {
     assert.throws(() =>
-      parseComponentProperties({ ...data, properties: [{ ...field, conditions }] })
+      parseComponentProperties({
+        ...data,
+        properties: [{ ...field, conditions }],
+      })
     );
   }
 });
@@ -569,16 +799,56 @@ test('contracts reject malformed payloads and enforce resource bounds', () => {
     readComponentProperties(source)
   );
   assert.deepEqual(parsePropertyChange(save()), save());
+  assert.deepEqual(
+    parsePropertyChange({
+      ...save(),
+      optionRenames: [{ from: "'solid'", to: "'filled'" }],
+    }),
+    { ...save(), optionRenames: [{ from: "'solid'", to: "'filled'" }] }
+  );
+  assert.deepEqual(
+    parsePropertyChange({
+      kind: 'options',
+      name: 'variant',
+      type: "'outline' | 'solid'",
+    }),
+    { kind: 'options', name: 'variant', type: "'outline' | 'solid'" }
+  );
   for (const input of [
     null,
     {},
     { kind: 'save', originalName: 'title', property: {} },
     { kind: 'order', names: [42] },
+    { kind: 'options', name: 'bad name', type: 'string' },
+    { kind: 'options', name: 'variant', type: 42 },
     { kind: 'remove', name: 'bad name' },
-    { kind: 'source', frontmatter: 'x'.repeat(PROPERTY_LIMITS.sourceCharsMax + 1) },
-    { kind: 'save', originalName: '', property: { ...property, required: 'yes' } },
-    { kind: 'save', originalName: '', property: { ...property, type: 'x'.repeat(32769) } },
-    { kind: 'order', names: Array(PROPERTY_LIMITS.fieldsMax + 1).fill('title') },
+    {
+      kind: 'source',
+      frontmatter: 'x'.repeat(PROPERTY_LIMITS.sourceCharsMax + 1),
+    },
+    {
+      kind: 'save',
+      originalName: '',
+      property: { ...property, required: 'yes' },
+    },
+    {
+      kind: 'save',
+      originalName: '',
+      property: { ...property, type: 'x'.repeat(32769) },
+    },
+    { ...save(), optionRenames: [{ from: '', to: "'filled'" }] },
+    { ...save(), optionRenames: [{ from: "'solid'", to: "'solid'" }] },
+    {
+      ...save(),
+      optionRenames: Array(PROPERTY_LIMITS.fieldsMax + 1).fill({
+        from: '1',
+        to: '2',
+      }),
+    },
+    {
+      kind: 'order',
+      names: Array(PROPERTY_LIMITS.fieldsMax + 1).fill('title'),
+    },
   ]) {
     assert.throws(() => parsePropertyChange(input));
   }
@@ -586,7 +856,10 @@ test('contracts reject malformed payloads and enforce resource bounds', () => {
   assert.throws(() => applySourceEdits('abc', [{ start: 1, end: 4, text: '' }]), /never overlap/);
   project(({ root }) =>
     assert.equal(
-      loadComponentProperties({ projectPath: root, file: path.join(root, 'missing.astro') }).ok,
+      loadComponentProperties({
+        projectPath: root,
+        file: path.join(root, 'missing.astro'),
+      }).ok,
       false
     )
   );
@@ -697,7 +970,12 @@ test('renames resolve tsconfig aliases and MDX instances', () => {
       'import Feature from "@/components/Card.astro";\n\n# Hello\n\n' + '<Feature title="Story" />'
     );
     const result = updateComponentProperties(
-      { projectPath: root, file: component, source, change: save({ name: 'heading' }) },
+      {
+        projectPath: root,
+        file: component,
+        source,
+        change: save({ name: 'heading' }),
+      },
       () => {}
     );
     value(result);
@@ -715,7 +993,12 @@ test('re-exports, runtime aliases, and dynamic imports cannot cause partial rena
       fs.writeFileSync(path.join(root, 'src/index.ts'), contents);
       const before = fs.readFileSync(page, 'utf8');
       const result = updateComponentProperties(
-        { projectPath: root, file: component, source, change: save({ name: 'heading' }) },
+        {
+          projectPath: root,
+          file: component,
+          source,
+          change: save({ name: 'heading' }),
+        },
         () => {}
       );
       assert.equal(result.ok, false);
@@ -837,7 +1120,12 @@ test('renaming a local prop on inherited Props updates website instances', () =>
     fs.writeFileSync(component, input);
     value(
       updateComponentProperties(
-        { projectPath: root, file: component, source: input, change: save({ name: 'heading' }) },
+        {
+          projectPath: root,
+          file: component,
+          source: input,
+          change: save({ name: 'heading' }),
+        },
         () => {}
       )
     );

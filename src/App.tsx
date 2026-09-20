@@ -326,6 +326,31 @@ function outermostNode(nodes: readonly PageNode[] | null | undefined): PageNode 
   return list.find((n) => n.kind === 'element' || n.kind === 'component') || list[0] || null;
 }
 
+interface OpenFileOptions {
+  readonly nextStack: SetStateAction<readonly OpenFile[]>;
+  readonly selectionPath: string | null;
+}
+
+// Returning from a component should land on the instance that opened it. The
+// path is stored with the child stack entry because node ids can change when
+// the parent file is parsed again during the return trip.
+function openFileSelection(
+  entry: OpenFile,
+  result: EditorPageState,
+  selectionPath: string | null,
+): PageNode | null {
+  if (!result.editable) {return null;}
+  if (selectionPath) {
+    const localPath = selectionPath.split('|').at(-1);
+    assert(localPath !== undefined, 'A stored component path must have a local path');
+    const selected = nodeAtPath(result.model.nodes, localPath.split('.').map(Number));
+    if (selected) {return selected;}
+  }
+  return entry.kind === 'component'
+    ? openingSelection(result.model.nodes)
+    : outermostNode(result.model.nodes);
+}
+
 function collectUsedNames(model: PageModel): Set<string> {
   const used = new Set<string>();
   const walk = (list: readonly PageNode[]): void => {
@@ -965,7 +990,7 @@ export default function App() {
   // `currentPage` is simply whatever is being edited, so saving, undo, the
   // navigator, and the props panel all follow without special cases.
   const openFile = useCallback(
-    async (entry: OpenFile, nextStack: SetStateAction<readonly OpenFile[]> | undefined) => {
+    async (entry: OpenFile, options: OpenFileOptions) => {
       const request = ++pageLoadRef.current;
       try {
         await flushSave();
@@ -1006,15 +1031,11 @@ export default function App() {
       // Publish path, model and stack together. Clearing the model first would
       // unmount the inspector and resize the whole preview during every drill.
       pageStateRef.current = { currentPage: entry, pageState: nextState };
-      if (nextStack) {setEditStack(nextStack);}
+      setEditStack(options.nextStack);
       setCurrentPage(entry);
       setPageState(nextState);
       setHoverNodeId(null);
-      const start = result.editable
-        ? entry.kind === 'component'
-          ? openingSelection(result.model.nodes)
-          : outermostNode(result.model.nodes)
-        : null;
+      const start = openFileSelection(entry, result, options.selectionPath);
       setSelectedId(start?.id ?? null);
       dropPageHistory(); // page snapshots don't apply to another page; commands stay
     },
@@ -1030,7 +1051,7 @@ export default function App() {
     async (page: ScanResult['pages'][number]) => {
       // Opening a page from the switcher leaves any component drill-down.
       const entry: OpenFile = { ...page, kind: 'page' };
-      await openFile(entry, [entry]);
+      await openFile(entry, { nextStack: [entry], selectionPath: null });
     },
     [openFile]
   );
@@ -1106,7 +1127,7 @@ export default function App() {
       const next = result.pages[0] || null;
       if (next) {
         const entry: OpenFile = { ...next, kind: 'page' };
-        await openFile(entry, [entry]);
+        await openFile(entry, { nextStack: [entry], selectionPath: null });
       } else {
         setEditStack([]);
         setCurrentPage(null);
@@ -1208,9 +1229,13 @@ export default function App() {
         focusWhole,
         hostKey: hostPath ?? null,
       };
-      await openFile(entry, (s) =>
-        s.some((e) => e.path === comp.path) ? s : [...s, entry]
-      );
+      await openFile(entry, {
+        nextStack: (stackBeforeOpen) =>
+          stackBeforeOpen.some((openEntry) => openEntry.path === comp.path)
+            ? stackBeforeOpen
+            : [...stackBeforeOpen, entry],
+        selectionPath: null,
+      });
     },
     [scan.components, scan.layouts, openFile, showToast]
   );
@@ -1219,10 +1244,15 @@ export default function App() {
   const closeComponent = useCallback(async () => {
     const stack = editStackRef.current;
     if (stack.length < 2) {return;}
+    const closing = stack.at(-1);
+    assert(closing, 'Component stack must contain the component being closed');
     const next = stack.slice(0, -1);
     const parent = next.at(-1);
     assert(parent, 'Component stack must retain its parent');
-    await openFile(parent, next);
+    await openFile(parent, {
+      nextStack: next,
+      selectionPath: closing.hostKey ?? null,
+    });
   }, [openFile]);
 
   // ----------------------------------------------------------------

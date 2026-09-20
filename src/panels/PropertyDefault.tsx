@@ -4,12 +4,14 @@ import { PROPERTY_LIMITS } from '../../shared/component-properties';
 import { literalOptions } from '../propertyOptions';
 import Dropdown from '../ui/Dropdown';
 import { BracesIcon } from '../ui/Icons';
+import { ExpressionBindingField } from './propBindings';
 
 interface DefaultProps {
   readonly property: ComponentProperty;
+  readonly frontmatter: string;
   readonly onChange: (value: string) => void;
 }
-export function PropertyDefault({ property, onChange }: DefaultProps) {
+export function PropertyDefault({ property, frontmatter, onChange }: DefaultProps) {
   const simple =
     ['string', 'number', 'boolean'].includes(property.type) ||
     literalOptions(property.type) !== undefined;
@@ -36,17 +38,17 @@ export function PropertyDefault({ property, onChange }: DefaultProps) {
         )}
       </div>
       {mode === 'value' && simple ? (
-        <DefaultControl property={property} onChange={onChange} />
+        <DefaultControl property={property} frontmatter={frontmatter} onChange={onChange} />
       ) : (
-        <textarea
-          aria-label="Default expression"
-          className="property-code"
+        <ExpressionBindingField
           value={property.defaultValue}
-          spellCheck={false}
-          rows={2}
-          maxLength={PROPERTY_LIMITS.textCharsMax}
+          bindCtx={{ frontmatter }}
           placeholder={'"Hello", 42, true, [], {…}'}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(value) => {
+            if (value.length <= PROPERTY_LIMITS.textCharsMax) {
+              onChange(value);
+            }
+          }}
         />
       )}
     </div>

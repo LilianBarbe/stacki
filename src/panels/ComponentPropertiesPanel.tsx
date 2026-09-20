@@ -128,6 +128,7 @@ function PropertySelectionEditor({
           key={selection.originalName}
           property={selection.value}
           originalName={selection.originalName}
+          frontmatter={data.frontmatter}
           access={
             busy ? 'saving' : propertyIsEditable(selection.value, data) ? 'editable' : 'readonly'
           }
@@ -137,6 +138,7 @@ function PropertySelectionEditor({
               onClose();
             }
           }}
+          onCommit={save}
         />
       )}
     </>
@@ -182,7 +184,7 @@ function PropertyList({ data, busy, onSelect, onChange }: PropertyListProps) {
             />
           }
           disabled={busy}
-          removeDisabled={busy || !propertyIsEditable(property, data)}
+          removeDisabled={busy || !propertyIsRemovable(property, data)}
           removeLabel={`Delete ${property.name}`}
           onOpen={() => onSelect(property)}
           onRemove={() => void onChange({ kind: 'remove', name: property.name })}
@@ -217,5 +219,9 @@ function PropertyTypeIcon({ type }: { readonly type: string }) {
 }
 
 function propertyIsEditable(property: ComponentProperty, data: ComponentProperties): boolean {
+  return property.editing ? property.editing.kind !== 'restricted' : !data.advanced;
+}
+
+function propertyIsRemovable(property: ComponentProperty, data: ComponentProperties): boolean {
   return property.editing ? property.editing.kind === 'editable' : !data.advanced;
 }

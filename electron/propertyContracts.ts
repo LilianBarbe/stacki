@@ -24,6 +24,7 @@ interface Contract {
   readonly names: ReadonlySet<string>;
   readonly branches: readonly (readonly Branch[])[];
   readonly complete: boolean;
+  readonly inheritedAttributes: boolean;
 }
 export interface PropertyContracts {
   readonly names: ReadonlySet<string>;
@@ -48,10 +49,12 @@ export function readPropertyContracts(document: PropertySyntax): PropertyContrac
     .filter(ts.isAsExpression)
     .filter((node) => isAstroProps(node.expression));
   const attributes = htmlAttributeImports(document.syntax);
-  const publicContract = readContract(declarations.get('Props'), declarations, attributes);
+  const imports = importedTypeNames(document.syntax);
+  const publicContract = readContract(declarations.get('Props'), declarations, attributes, imports);
   const runtimeContracts = assertions.map((node) =>
-    readContract(node.type, declarations, attributes)
+    readContract(node.type, declarations, attributes, imports)
   );
+  const contracts = [publicContract, ...runtimeContracts];
   const editable = new Map<string, ts.PropertySignature>();
   const reasons = new Map<string, string>();
   for (const [name, usages] of publicContract.members) {
@@ -67,12 +70,17 @@ export function readPropertyContracts(document: PropertySyntax): PropertyContrac
   assert(editable.size <= PROPERTY_LIMITS.fieldsMax, 'Editable contract fields are bounded');
   return {
     names: new Set(
-      [publicContract, ...runtimeContracts].flatMap((contract) => [...contract.names])
+      contracts.flatMap((contract) => [...contract.names])
     ),
     editable,
     editing: (name) =>
       editable.has(name)
         ? { kind: 'editable' }
+        : inheritedAttributeCanOverride(name, contracts)
+        ? {
+            kind: 'override',
+            reason: 'This HTML attribute will be declared locally when you save it.',
+          }
         : {
             kind: 'restricted',
             reason:
@@ -90,6 +98,16 @@ function unavailableContracts(reason: string): PropertyContracts {
     editing: () => ({ kind: 'restricted', reason }),
     conditions: () => [],
   };
+}
+
+function inheritedAttributeCanOverride(name: string, contracts: readonly Contract[]): boolean {
+  const publicContract = contracts[0];
+  if (!publicContract?.inheritedAttributes) {
+    return false;
+  }
+  return contracts.every(
+    (contract) => contract.inheritedAttributes && !contract.members.has(name)
+  );
 }
 
 function commonMemberRestriction(
@@ -124,16 +142,19 @@ function commonMemberRestriction(
 function readContract(
   root: ts.Node | undefined,
   declarations: ReadonlyMap<string, Declaration>,
-  attributes: ReadonlySet<string>
+  attributes: ReadonlySet<string>,
+  imports: ReadonlySet<string>
 ): Contract {
   const work: Work[] = root ? [{ node: root, conditional: false, path: [] }] : [];
   const members = new Map<string, readonly Usage[]>();
   const names = new Set<string>();
   const branches: (readonly Branch[])[] = [];
   let complete = root !== undefined;
+  let inheritedAttributes = false;
   for (let count = 0; count < PROPERTY_LIMITS.nodesMax && work.length > 0; count++) {
     const item = work.pop();
     assert(item !== undefined, 'Contract traversal has a work item');
+    inheritedAttributes ||= isInheritedAstroAttributes(item.node, declarations, attributes);
     if (ts.isPropertySignature(item.node)) {
       const name = propertyKey(item.node.name);
       if (name) {
@@ -148,7 +169,7 @@ function readContract(
       if (ts.isUnionTypeNode(item.node)) {
         branches.push(unionBranches(item.node));
       }
-      const children = contractChildren(item, declarations, attributes);
+      const children = contractChildren(item, declarations, attributes, imports);
       if (children === undefined) {
         complete = false;
       } else {
@@ -159,13 +180,26 @@ function readContract(
   }
   assert(work.length === 0, 'Contract traversal completes within its budget');
   assert(members.size <= PROPERTY_LIMITS.fieldsMax, 'Contract field count is bounded');
-  return { members, names, branches, complete };
+  return { members, names, branches, complete, inheritedAttributes };
+}
+
+function isInheritedAstroAttributes(
+  node: ts.Node,
+  declarations: ReadonlyMap<string, Declaration>,
+  attributes: ReadonlySet<string>
+): boolean {
+  if (!ts.isTypeReferenceNode(node) && !ts.isExpressionWithTypeArguments(node)) {
+    return false;
+  }
+  const name = ts.isTypeReferenceNode(node) ? node.typeName.getText() : node.expression.getText();
+  return attributes.has(name) && !declarations.has(name);
 }
 
 function contractChildren(
   item: Work,
   declarations: ReadonlyMap<string, Declaration>,
-  attributes: ReadonlySet<string>
+  attributes: ReadonlySet<string>,
+  imports: ReadonlySet<string>
 ): readonly Work[] | undefined {
   const { node } = item;
   if (ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) {
@@ -205,10 +239,47 @@ function contractChildren(
     if (attributes.has(name) && !declarations.has(name)) {
       return [];
     }
+    // Omit only narrows known Astro attributes, so it cannot hide another local declaration.
+    if (
+      ts.isTypeReferenceNode(node) &&
+      isOmittedAstroAttributes(node, declarations, attributes, imports)
+    ) {
+      return [];
+    }
     const declaration = declarations.get(name);
     return declaration && !node.typeArguments ? [{ ...item, node: declaration }] : undefined;
   }
   return undefined;
+}
+
+function isOmittedAstroAttributes(
+  node: ts.TypeReferenceNode,
+  declarations: ReadonlyMap<string, Declaration>,
+  attributes: ReadonlySet<string>,
+  imports: ReadonlySet<string>
+): boolean {
+  if (node.typeName.getText() !== 'Omit') {
+    return false;
+  }
+  if (declarations.has('Omit')) {
+    return false;
+  }
+  if (imports.has('Omit')) {
+    return false;
+  }
+  const argumentsList = node.typeArguments;
+  if (argumentsList?.length !== 2) {
+    return false;
+  }
+  const inherited = argumentsList[0];
+  if (!inherited || !ts.isTypeReferenceNode(inherited)) {
+    return false;
+  }
+  const inheritedName = inherited.typeName.getText();
+  if (!attributes.has(inheritedName)) {
+    return false;
+  }
+  return !declarations.has(inheritedName);
 }
 
 function htmlAttributeImports(syntax: ts.SourceFile): ReadonlySet<string> {
@@ -225,6 +296,27 @@ function htmlAttributeImports(syntax: ts.SourceFile): ReadonlySet<string> {
           if ((specifier.propertyName ?? specifier.name).text === 'HTMLAttributes') {
             names.add(specifier.name.text);
           }
+        }
+      }
+    }
+  }
+  return names;
+}
+
+function importedTypeNames(syntax: ts.SourceFile): ReadonlySet<string> {
+  const names = new Set<string>();
+  for (const statement of syntax.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const clause = statement.importClause;
+      if (clause?.name) {
+        names.add(clause.name.text);
+      }
+      const bindings = clause?.namedBindings;
+      if (bindings && ts.isNamespaceImport(bindings)) {
+        names.add(bindings.name.text);
+      } else if (bindings) {
+        for (const specifier of bindings.elements) {
+          names.add(specifier.name.text);
         }
       }
     }

@@ -171,7 +171,14 @@ function contractEditing(
   if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
     return { kind: 'restricted', reason: 'This prop uses a quoted name. Edit it in source.' };
   }
-  return contracts.editing(name);
+  const editing = contracts.editing(name);
+  if (editing.kind === 'override' && !definitions.container) {
+    return {
+      kind: 'restricted',
+      reason: 'This inherited prop has no unambiguous local declaration to update.',
+    };
+  }
+  return editing;
 }
 
 export function editPropertyDefinition(source: string, change: PropertyChange): Result<string> {
@@ -189,6 +196,9 @@ export function editPropertyDefinition(source: string, change: PropertyChange): 
   if (change.kind === 'order') {
     return reorderDefinitions(definitions, change.names);
   }
+  if (change.kind === 'options') {
+    return saveDefinitionOptions(definitions, change.name, change.type);
+  }
   if (change.kind === 'remove') {
     return removeDefinition(definitions, change.name);
   }
@@ -205,39 +215,46 @@ function editCommonDefinition(
       message: 'Add or reorder declarations in this combined type in source.',
     });
   }
-  const name = change.kind === 'remove' ? change.name : change.originalName;
+  const name = change.kind === 'save' ? change.originalName : change.name;
   // Renderer permissions are descriptive only; every write rechecks the current source.
   const contracts = readPropertyContracts(definitions.document);
   const access = contractEditing(definitions, contracts, name);
   if (access.kind === 'restricted') {
     return err({ code: 'restricted', message: access.reason });
   }
+  if (access.kind === 'override') {
+    if (change.kind === 'remove') {
+      return err({ code: 'inherited', message: 'Inherited HTML attributes cannot be deleted.' });
+    }
+    if (change.kind === 'save' && change.property.name !== name) {
+      return err({ code: 'inherited', message: 'Inherited HTML attributes cannot be renamed.' });
+    }
+    return change.kind === 'options'
+      ? saveDefinitionOptions(definitions, name, change.type)
+      : saveDefinition(definitions, name, change.property);
+  }
   const member = contracts.editable.get(name);
   assert(member !== undefined, 'An editable common property has a declaration');
   assert(propertyKey(member.name) === name, 'The edit targets the requested declaration');
   const common = { ...definitions, members: [member] };
-  return change.kind === 'remove'
-    ? removeDefinition(common, name)
-    : saveDefinition(common, name, change.property);
+  if (change.kind === 'remove') {
+    return removeDefinition(common, name);
+  }
+  if (change.kind === 'options') {
+    return saveDefinitionOptions(common, name, change.type);
+  }
+  return saveDefinition(common, name, change.property);
 }
 
 function readDefinitions(source: string): Definitions {
   const document = readPropertySyntax(source);
-  const declarations = document.syntax.statements.filter((statement) => {
-    if (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) {
-      return statement.name.text === 'Props';
-    }
-    return false;
-  });
+  const declarations = document.syntax.statements.filter(
+    (statement): statement is ts.InterfaceDeclaration | ts.TypeAliasDeclaration =>
+      (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) &&
+      statement.name.text === 'Props'
+  );
   const declaration = declarations[0];
-  const container =
-    declaration && ts.isInterfaceDeclaration(declaration)
-      ? declaration
-      : declaration &&
-        ts.isTypeAliasDeclaration(declaration) &&
-        ts.isTypeLiteralNode(declaration.type)
-      ? declaration.type
-      : undefined;
+  const container = definitionContainer(declaration);
   const members = container?.members.filter(ts.isPropertySignature) ?? [];
   const patterns = syntaxNodes(document.syntax)
     .filter(ts.isVariableDeclaration)
@@ -262,7 +279,9 @@ function readDefinitions(source: string): Definitions {
     (declaration !== undefined &&
       ts.isTypeAliasDeclaration(declaration) &&
       declaration.typeParameters !== undefined) ||
-    (declaration !== undefined && container === undefined) ||
+    (declaration !== undefined &&
+      ts.isTypeAliasDeclaration(declaration) &&
+      !ts.isTypeLiteralNode(declaration.type)) ||
     (container !== undefined && container.members.length !== members.length) ||
     (container !== undefined &&
       ts.isInterfaceDeclaration(container) &&
@@ -279,6 +298,22 @@ function readDefinitions(source: string): Definitions {
     container,
     advanced,
   };
+}
+
+function definitionContainer(
+  declaration: ts.InterfaceDeclaration | ts.TypeAliasDeclaration | undefined
+): ts.InterfaceDeclaration | ts.TypeLiteralNode | undefined {
+  if (!declaration || ts.isInterfaceDeclaration(declaration)) {
+    return declaration;
+  }
+  if (ts.isTypeLiteralNode(declaration.type)) {
+    return declaration.type;
+  }
+  if (!ts.isIntersectionTypeNode(declaration.type)) {
+    return undefined;
+  }
+  const literals = declaration.type.types.filter(ts.isTypeLiteralNode);
+  return literals.length === 1 ? literals[0] : undefined;
 }
 
 function readDescription(member: ts.PropertySignature, source: string): string {
@@ -363,6 +398,22 @@ function saveDefinition(
     return bindComponentDefault(output, originalName || property.name, local);
   }
   return ok(output);
+}
+
+function saveDefinitionOptions(
+  definitions: Definitions,
+  name: string,
+  type: string
+): Result<string> {
+  const property = readComponentProperties(definitions.document.source).properties.find(
+    (field) => field.name === name
+  );
+  if (!property) {
+    return err({ code: 'missing', message: 'This property no longer exists. Reload the panel.' });
+  }
+  assert(property.name === name, 'Option reorder targets the requested property');
+  assert(type.length <= PROPERTY_LIMITS.textCharsMax, 'Option type is bounded');
+  return saveDefinition(definitions, name, { ...property, type });
 }
 
 function renderSavedDefinition(

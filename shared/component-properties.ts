@@ -27,6 +27,7 @@ export interface ComponentProperty {
 }
 export type PropertyEditing =
   | { readonly kind: 'editable' }
+  | { readonly kind: 'override'; readonly reason: string }
   | { readonly kind: 'restricted'; readonly reason: string };
 export interface PropertySource {
   readonly label: string;
@@ -43,10 +44,20 @@ export interface ComponentProperties {
   readonly frontmatter: string;
   readonly advanced: boolean;
 }
+export interface PropertyOptionRename {
+  readonly from: string;
+  readonly to: string;
+}
 export type PropertyChange =
-  | { readonly kind: 'save'; readonly originalName: string; readonly property: ComponentProperty }
+  | {
+      readonly kind: 'save';
+      readonly originalName: string;
+      readonly property: ComponentProperty;
+      readonly optionRenames?: readonly PropertyOptionRename[];
+    }
   | { readonly kind: 'remove'; readonly name: string }
   | { readonly kind: 'order'; readonly names: readonly string[] }
+  | { readonly kind: 'options'; readonly name: string; readonly type: string }
   | { readonly kind: 'source'; readonly frontmatter: string };
 
 export function propertyText(input: unknown): string {
@@ -92,10 +103,10 @@ function parsePropertyEditing(input: unknown): PropertyEditing {
   if (value?.['kind'] === 'editable') {
     return { kind: 'editable' };
   }
-  if (value?.['kind'] === 'restricted') {
+  if (value?.['kind'] === 'override' || value?.['kind'] === 'restricted') {
     const reason = propertyText(value['reason']);
     if (reason.trim()) {
-      return { kind: 'restricted', reason };
+      return { kind: value['kind'], reason };
     }
   }
   throw new Error('Invalid property editing permission');
@@ -109,7 +120,11 @@ function parsePropertyOrigin(input: unknown): PropertyOrigin {
 }
 
 function parsePropertySource(input: unknown): PropertySource {
-  const source = object({ label: propertyText, expression: propertyText, line: count })(input);
+  const source = object({
+    label: propertyText,
+    expression: propertyText,
+    line: count,
+  })(input);
   if (!source.label.trim()) {
     throw new Error('Property source label must be nonempty');
   }
@@ -128,20 +143,51 @@ export function propertyList<T>(input: unknown, parse: (input: unknown) => T): r
 export function parsePropertyChange(input: unknown): PropertyChange {
   const value = toRecord(input);
   switch (value?.['kind']) {
-    case 'save':
-      return {
+    case 'save': {
+      const saved = {
         kind: 'save',
-        ...object({ originalName: propertyText, property: parseEditableProperty })(input),
-      };
+        ...object({
+          originalName: propertyText,
+          property: parseEditableProperty,
+        })(input),
+      } as const;
+      const optionRenames = optional((item) => propertyList(item, parsePropertyOptionRename))(
+        value['optionRenames']
+      );
+      return optionRenames === undefined ? saved : { ...saved, optionRenames };
+    }
     case 'remove':
       return { kind: 'remove', name: propertyName(value['name']) };
     case 'order':
-      return { kind: 'order', names: propertyList(value['names'], propertyName) };
+      return {
+        kind: 'order',
+        names: propertyList(value['names'], propertyName),
+      };
+    case 'options':
+      return {
+        kind: 'options',
+        name: propertyName(value['name']),
+        type: propertyText(value['type']),
+      };
     case 'source':
-      return { kind: 'source', frontmatter: propertySource(value['frontmatter']) };
+      return {
+        kind: 'source',
+        frontmatter: propertySource(value['frontmatter']),
+      };
     default:
       throw new Error('Unknown component property change');
   }
+}
+
+function parsePropertyOptionRename(input: unknown): PropertyOptionRename {
+  const rename = object({ from: propertyText, to: propertyText })(input);
+  if (!rename.from.trim() || !rename.to.trim()) {
+    throw new Error('Property option rename values must be nonempty');
+  }
+  if (rename.from === rename.to) {
+    throw new Error('Property option rename must change the value');
+  }
+  return rename;
 }
 export function parseComponentProperties(input: unknown): ComponentProperties {
   return object({

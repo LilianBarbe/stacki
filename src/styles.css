@@ -608,6 +608,13 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 .attr-row + .attr-row { border-top: 1px solid var(--border); }
 .attr-row:hover, .attr-row.editing { background: var(--bg-hover); }
 .attr-row .attr-name { color: var(--text-dim); flex-shrink: 0; }
+.attr-row.spread .attr-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .attr-row .attr-eq { color: var(--text-faint); flex-shrink: 0; }
 .attr-row .attr-value {
   color: var(--text);
@@ -889,10 +896,12 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
 .attr-editor-row:has(.cm-editor) > span {
   padding-top: 6px;
 }
-.attr-editor-row > .attr-asset-toggle { align-self: flex-start; }
+.attr-editor-row > .attr-asset-toggle,
+.attr-editor-row > .attr-expand-toggle { align-self: flex-start; }
 
-/* Always present, never in the way: switches the value to the file picker. */
-.attr-asset-toggle {
+/* Compact actions beside the value: expand its code or switch it to a file. */
+.attr-asset-toggle,
+.attr-expand-toggle {
   flex-shrink: 0;
   width: 22px;
   height: 26px;
@@ -901,7 +910,8 @@ html[data-platform='win32'] .titlebar { padding-right: 148px; }
   color: var(--text-faint);
   border-radius: 6px;
 }
-.attr-asset-toggle:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.attr-asset-toggle:hover:not(:disabled),
+.attr-expand-toggle:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .attr-asset-toggle.on { color: var(--accent); }
 
 .style-editor {

@@ -1,7 +1,7 @@
 {
   "name": "stacki",
   "productName": "Stacki",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "description": "Stacki — a visual builder for Astro projects — pages, layouts, components, props, live preview, and GitHub publishing.",
   "main": "dist/electron/main.js",
   "author": "Timothy Ricks <hello@timothyricks.com>",
@@ -174,7 +174,7 @@
     "test:vitemodules": "node --experimental-vm-modules --test test/vite-modules.test.ts",
     "performance:report": "npm run build:runtime && node dist/scripts/performance-report.js",
     "integration:dev": "node test/integration/dev-lifecycle.js",
-    "build:clean": "node --experimental-transform-types scripts/clean-build.ts",
+    "build:clean": "node --disable-warning=ExperimentalWarning --experimental-transform-types scripts/clean-build.mts",
     "build:renderer-runtime": "npm run build:morph && npm run build:preload && npm run build:assets",
     "build:morph": "tsc -p electron/tsconfig.morph.json",
     "build:preload": "tsc -p electron/tsconfig.preload.json",
