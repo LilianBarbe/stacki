@@ -25,9 +25,8 @@ test('component navigation keeps the real iframe and inspector mounted while loa
         // Keep both preview components real: a mocked pane cannot reveal frame
         // replacement, navigation, or an inspector vanishing beside the frame.
         if (
-          ['PreviewPane', 'CanvasView', 'DevOffline', 'PreviewOverlays', 'PreviewToolbar'].includes(
-            name,
-          )
+          ['PreviewPane', 'CanvasView', 'DevOffline', 'PreviewOverlays', 'PreviewToolbar',
+            'PreviewSizeControls'].includes(name)
         ) {
           return;
         }
