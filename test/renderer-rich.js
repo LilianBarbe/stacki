@@ -48,5 +48,24 @@ for (let depth = 0; depth < 66; depth++) {
   parent = child;
 }
 assert.throws(() => domToNodes(host), /DOM depth limit exceeded/);
+
+// Text the field emits is the text the parser will hold: whitespace runs
+// squeeze to one space with one space kept at either boundary. The save echo
+// comes back through the parser's own text rule (collapseText in
+// electron/astroParser.ts), so anything looser made the echoed value differ
+// from the last emission and the field's sync reset the caret mid-word.
+host.textContent = 'hello  ';
+assert.deepEqual(domToNodes(host), [{ kind: 'text', value: 'hello ' }]);
+host.textContent = ' hello';
+assert.deepEqual(domToNodes(host), [{ kind: 'text', value: ' hello' }]);
+host.textContent = 'a\n b';
+assert.deepEqual(domToNodes(host), [{ kind: 'text', value: 'a b' }]);
+host.innerHTML = 'hi {x}  there';
+assert.deepEqual(domToNodes(host), [
+  { kind: 'text', value: 'hi ' },
+  { kind: 'expr', value: '{x}' },
+  { kind: 'text', value: ' there' },
+]);
+
 dom.window.close();
 console.log('renderer-rich: inline round trips, invalid shapes, and traversal limits passed');

@@ -3469,7 +3469,16 @@ function serializeNodeElement(
       );
       return;
     }
-    openTag(`>${inlineString(node.children).trim()}${closeTag}`);
+    // The run's boundary spaces are content, not layout. A text node on a
+    // line of its own can trim them — the file's indent hands the boundary
+    // whitespace back on reparse (see serializeNodeText) — but a run written
+    // on one line has nothing but the value itself to hold them, and the
+    // parse keeps exactly one space where the source had any (collapseText).
+    // Trimming here made parse∘serialize lossy, so a word typed followed by
+    // a space came back from the save without it and the Content field,
+    // seeing its own edit echo back different, reset the caret to the start
+    // of the line.
+    openTag(`>${inlineString(node.children)}${closeTag}`);
     return;
   }
   if (node.children.length === 0) {
