@@ -206,6 +206,20 @@ function richReadDOM(element: Element, budget: Budget, depth: number): InlineNod
   }
   return out;
 }
+// The text the model holds is the text the parser will hold: runs of
+// whitespace squeeze to one space, with one space kept at either boundary.
+// The browser renders whitespace runs collapsed anyway, so the field shows
+// the same thing — but every save echoes back through the parser, whose text
+// rule (collapseText in electron/astroParser.ts) is exactly this, and
+// emitting anything else made the echoed value come back different from what
+// the field had emitted, resetting the caret mid-word.
+function canonicalText(raw: string): string {
+  return (
+    (/^\s/.test(raw) ? ' ' : '') +
+    raw.replace(/\s+/g, ' ').trim() +
+    (/\s$/.test(raw) ? ' ' : '')
+  );
+}
 function richReadText(raw: string): InlineNode[] {
   assert(raw.length <= LIMITS.nodeValueCharsMax, 'RichContent: text limit exceeded');
   const out: InlineNode[] = [];
@@ -213,14 +227,14 @@ function richReadText(raw: string): InlineNode[] {
   let last = 0;
   for (const match of raw.matchAll(expression)) {
     if (match.index > last) {
-      out.push({ kind: 'text', value: raw.slice(last, match.index) });
+      out.push({ kind: 'text', value: canonicalText(raw.slice(last, match.index)) });
     }
     out.push({ kind: 'expr', value: match[0] });
     last = match.index + match[0].length;
     assert(out.length <= LIMITS.treeNodesMax, 'RichContent: text expression limit exceeded');
   }
   if (last < raw.length) {
-    out.push({ kind: 'text', value: raw.slice(last) });
+    out.push({ kind: 'text', value: canonicalText(raw.slice(last)) });
   }
   return out;
 }
