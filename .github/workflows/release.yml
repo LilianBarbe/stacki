@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - uses: actions/cache@v4
         with:
@@ -23,7 +23,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-electron-
       - run: npm ci
-      - run: npm run build
+      # The full gate, as on Windows: a release is never built from code that
+      # fails it. npm test builds the app as its first step.
+      - run: npm test
       - name: Validate mac signing secrets
         run: |
           test -n "$MAC_CSC_LINK" || { echo "MAC_CSC_LINK is missing"; exit 1; }
@@ -35,7 +37,7 @@ jobs:
         env:
           DEBUG: electron-osx-sign*,electron-builder
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          CSC_LINK: "data:application/x-pkcs12;base64,${{ secrets.MAC_CSC_LINK }}"
+          CSC_LINK: 'data:application/x-pkcs12;base64,${{ secrets.MAC_CSC_LINK }}'
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -54,7 +56,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
       - uses: actions/cache@v4
         with:

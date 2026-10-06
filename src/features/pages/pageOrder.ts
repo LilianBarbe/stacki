@@ -1,0 +1,43 @@
+// How pages are listed, everywhere they're listed: the Pages panel, its search
+// results, and the switcher in the title bar. `index` is the folder's own page
+// so it leads; a name starting with a digit is a status page or a numbered
+// draft (404, 500, 2024-recap) and belongs at the end rather than jumping the
+// queue alphabetically. Everything else sits between, natural-sorted so
+// page-2 comes before page-10.
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+export function pageRank(name: unknown): 0 | 1 | 2 {
+  const base = String(name || '').replace(/\.(astro|mdx?)$/i, '');
+  if (/^index$/i.test(base)) {
+    return 0;
+  }
+  if (/^\d/.test(base)) {
+    return 2;
+  }
+  return 1;
+}
+
+export function comparePageNames(left: unknown, right: unknown): number {
+  const leftName = String(left || '').replace(/\.(astro|mdx?)$/i, '');
+  const rightName = String(right || '').replace(/\.(astro|mdx?)$/i, '');
+  return pageRank(leftName) - pageRank(rightName) || collator.compare(leftName, rightName);
+}
+
+// Whether a page comes before the folders at its level rather than after
+// them. `index.astro` is not a page inside the folder — it IS the folder:
+// `/about` is that page and `/about/story` is a page beneath it, and the site's
+// home page is the one at the root. Listed after the folders, as everything
+// used to be, a site's front door sat underneath every other page on the
+// site, which is the one place nobody looks for it.
+export function leadsFolders(name: unknown): boolean {
+  return pageRank(name) === 0;
+}
+
+// A route with a bracketed segment — `[id].astro`, `[...slug].astro`, or a
+// page under a `[lang]/` folder — isn't a page someone wrote one of: Astro
+// generates it once per entry from a collection. Listed with the collection
+// icon and colour instead of the plain page one, so a folder of authored
+// pages and a folder of generated ones read differently at a glance.
+export function isCollectionRoute(name: unknown): boolean {
+  return /\[[^\]]*\]/.test(String(name || ''));
+}

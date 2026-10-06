@@ -4,9 +4,7 @@
     "target": "ES2022",
     "module": "CommonJS",
     "moduleResolution": "Node",
-    "lib": [
-      "ES2022"
-    ],
+    "lib": ["ES2022"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -22,45 +20,9 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "files": [
-    "htmlText.ts",
-    "serialQueue.ts",
-    "selfWrites.ts",
-    "windowBounds.ts",
-    "platform.ts",
-    "assetRefs.ts",
-    "frontmatter.ts",
-    "jsCollections.ts",
-    "devProbe.ts",
-    "injectedRoutes.ts",
-    "projectWatcher.ts",
-    "componentFile.ts",
-    "gitSnapshot.ts",
-    "starter.ts",
-    "cmsRefs.ts",
-    "componentUsage.ts",
-    "previewWorktree.ts",
-    "scaffold.ts",
-    "contentRefs.ts",
-    "contentEntries.ts",
-    "thumbs.ts",
-    "contentConfig.ts",
-    "git.ts",
-    "gitBranches.ts",
-    "gitHistory.ts",
-    "conflicts.ts",
-    "node-pty.d.ts",
-    "terminal.ts",
-    "markdownParser.ts",
-    "cssVars.ts",
-    "formats/transplant.ts",
-    "formats/ndjson.ts",
-    "formats/csv.ts",
-    "formats/yaml.ts",
-    "formats/frontmatter.ts",
-    "formats/json.ts",
-    "formats/toml.ts",
-    "astroParser.ts",
-    "main.ts"
-  ]
+  // Every main-process module, in any folder. The preload and the preview
+  // client compile on their own (tsconfig.preload.json, tsconfig.morph.json):
+  // one needs DOM types, the other browser ESM.
+  "include": ["**/*.ts"],
+  "exclude": ["preload/**", "previewClient/**"]
 }

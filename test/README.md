@@ -3,17 +3,47 @@
 ```bash
 npm test                                   # the gate — run this before every commit
 npm run roundtrip:report                   # where the parser stands, and what is left to fix
-node dist/scripts/roundtrip-report.js ~/a-site  # same report against any Astro project
+node dist/scripts/reports/roundtripReport.js ~/a-site  # same report against any Astro project
 STACKI_CORPUS=~/a-site npm test            # crash-sweep a real project as part of the gate
-npm test -- querycache
+npm test -- queryCache                     # one suite, by name (case and dashes do not matter)
+npm test -- simulator/                     # every suite under a folder
+npm test -- --list                         # the suites the gate runs
 npm run performance:report -- d9f9c05      # compare preview diff with the pre-refactor checkpoint
 npm run integration:dev                    # real Electron/Astro lifecycle smoke test
 ```
 
-The gate discovers every `test:*` command in `package.json` and runs the commands
-directly, reporting all failures. Add a new standalone test command there once;
-there is no second list to update. Files named `*.test.js` are already included by
-the Node test runner. Individual `npm run test:...` commands remain available.
+The gate runs every file named `*.test.js` or `*.test.ts` under `test/`
+(`scripts/gate/testDiscovery.ts`), each as `node <file>` in its own process,
+outside `fixtures/`, `corpus/`, `helpers/` and `integration/`. A new test is in
+the gate the moment it exists; there is no list to add it to. The few suites
+that need a different runner, Node flags or to run alone say so in
+`scripts/gate/testSuites.ts`, keyed by path. Suites mirror the source: the
+suites for `src/features/style/` are in `renderer/style/`, for
+`electron/parse/` in `electron/parse/`, and so on (the policy scan holds the
+mirror, and that only suites sit in it). Harnesses live in `helpers/`, and
+`helpers/sources.js` is how a test names a repository file (see
+`sourcePaths.test.js`).
+
+`npm test -- simulator/` runs the editor-core simulator (`simulator/`): seeded runs of
+the step-wise actor over a fake disk, checked against the nine invariants of
+plan §10, plus the oracle scenarios over the hostile corpus in
+`fixtures/editor-core/`, and the step-2 suites (`diff`, `map-span`, `planner`)
+that hold `shared/engine/diff.ts`, `shared/engine/mapSpan.ts` and `shared/engine/planner.ts` to the
+brute-force references in `simulator/reference-diff.ts`.
+`STACKI_SIMULATOR_SEEDS=2000 npm test -- simulator/` is
+the long run. From step 3 the simulator's actor plans `set-attribute` with the
+shipping planner, and every stale plan is judged against the byte origins the
+simulator recorded (`simulator/provenance.ts`, `simulator/remap-judge.ts`); a
+wrong-site plan fails the run. Everything under `simulator/` except its
+entry points (`*.test.ts`, `*.bench.ts`) and the `*.entry.ts` modules only they
+import is lint-fenced: no timers, clocks, promises, `Math.random` or I/O.
+
+`npm run spike:editor-core` (after `npm run fixtures:large`) prints the step-3
+spike report: remap verdicts per fixture over 400 seeds, and intent→applied and
+last keystroke→disk latency on the six large fixtures, on a real disk, against
+the pre-registered thresholds. It measures and asserts no threshold, so it is
+not in the gate. `STACKI_SPIKE_SEEDS`, `STACKI_SPIKE_SAMPLES` and
+`STACKI_SPIKE_KEYSTROKES` change the sample counts.
 
 The optional `integration:dev` test installs a pinned Astro version into a temporary
 project and starts real Electron and Astro processes. It needs network access on
@@ -33,7 +63,7 @@ touched — reformatted markup, reordered imports, lost blank lines. That turns 
 one-prop change into a whole-file diff in their git history, and in the worst case
 changes what the page does.
 
-`roundtrip.test.js` checks five properties against every fixture in `corpus/`:
+`roundtripCorpus.test.js` checks five properties against every fixture in `corpus/`:
 
 | # | Property | Why |
 |---|---|---|

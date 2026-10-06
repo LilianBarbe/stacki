@@ -2,7 +2,7 @@
 
 **Status: living document.** Migration status updated after the Astro parser
 conversion on `main`, following PR #26 and `v0.1.26`. Sections marked
-"migration" describe in-flight work; see `docs/migration-tracker.md` for verification.
+"migration" describe in-flight work; see `docs/archive/migration-tracker.md` for verification.
 
 ## What Stacki is
 
@@ -45,11 +45,13 @@ Stacki solves this the way editors with faithful round trips always do: a
 structured tree for the parts the UI edits, plus **raw-text anchors for
 everything else**. Concretely:
 
-- `electron/astroParser.ts` (emits `astroParser.js`) parses an `.astro` file into a
+- `electron/parse/astroParser.ts` (emits `astroParser.js`) parses an `.astro` file into a
   `PageNode` tree. Nodes carry their **source ranges** (`.at` offsets), and
   anything not modeled (attributes in unusual order, raw `<script>`, unknown
-  constructs) is kept verbatim and re-emitted on write.
-- Frontmatter (`electron/frontmatter.ts`) is _not_ treated as a code blob:
+  constructs) is kept verbatim and re-emitted on write. It is the parser's
+  facade: the scanner, the template parser, the printers, the prop-schema
+  reader and the chunk handling live beside it as `electron/parse/astro*.ts`.
+- Frontmatter (`shared/page/frontmatterSource.ts`) is _not_ treated as a code blob:
   imports become editable records whose **slots** retain the exact source,
   whitespace, and position between them. Edits to the declarations field are
   mapped back to import positions by a line-based diff (`moveOffsets`) that
@@ -75,7 +77,7 @@ Four cooperating processes, each with one job:
                │ contextBridge (typed)     │ spawns
 ┌──────────────┴─────────────┐   ┌─────────▼─────────────┐
 │ Renderer (React + Vite)    │   │ astro dev (the user's │
-│  src/App.tsx + panels      │   │ project, its deps)    │
+│  src/app/App.tsx + features│   │ project, its deps)    │
 │  Edits the PageNode model  │   │ Serves the live page  │
 └──────────────┬─────────────┘   └─────────▲─────────────┘
                │ iframe embed + injected   │ HMR on save
@@ -85,29 +87,35 @@ Four cooperating processes, each with one job:
 ```
 
 - **Main** (`electron/`, Node.js, CommonJS): owns everything that touches the
-  OS. `main.ts` (emits `main.js`, 111 invoke channels) is a registry of
-  capabilities; leaf modules do the work (`astroParser`, `frontmatter`,
-  `htmlText`, `assetRefs`, `cssVars`, `gitBranches`, `gitHistory`,
-  `projectWatcher`, `terminal` via node-pty, `previewWorktree`,
-  `serialQueue`, `selfWrites`, `windowBounds`, content-collection tooling in
-  `electron/content/`, data-format parsers in `electron/formats/`).
-- **Preload** (`electron/preload.js`): a sandboxed bridge exposing an
-  allowlisted `window.avb` API via `contextBridge`. Must stay CommonJS
-  (Electron ≥ 33 sandbox requirement).
-- **Renderer** (`src/`, React 19 + Vite, ESM): `App.tsx` (~4.9k lines) is the
-  application shell and owns the page model; `src/panels/` are the side views
-  (Structure, Props, Style, Pages, Assets, CMS, Git history, terminal…);
-  `src/style-panel/` is the CSS editing surface (mostly TypeScript);
-  `src/ui/` holds shared widgets.
+  OS. `main.ts` (emits `main.js`) owns the window, the menu and the app's
+  lifecycle, and hands the invoke channels to the handler modules in
+  `handlers/`; the area folders do the work — the parsers in `parse/`, the
+  write path in `documents/`, content collections in `content/`, component
+  properties in `properties/`, project services in `project/`, and git, the
+  dev-server preview and the terminal (node-pty) in their own folders. See
+  the directory map below.
+- **Preload** (`electron/preload/`): in the app's window, a sandboxed bridge
+  exposing an allowlisted `window.avb` API via `contextBridge`
+  (`preloadBridge.ts`); in preview frames, the canvas script (`frame*.ts`).
+  The sandbox's `require` reaches only `electron`, so its modules ship as one
+  CommonJS bundle (`scripts/build/bundleClients.ts`; Electron ≥ 33 sandbox
+  requirement).
+- **Renderer** (`src/`, React 19 + Vite, ESM): layered folders under one
+  entry, `src/main.tsx`. `src/app/App.tsx` is the application shell and owns
+  the page model; each side view (structure, props, style, pages, assets,
+  CMS, history, git, terminal…) is a folder in `src/features/`; the editing
+  core every feature builds on is `src/editor/`; `src/ui/` holds the widgets
+  more than one feature draws. See the directory map below.
 - **Astro dev server**: the _user's project's own_ dev server. Stacki renders
   the canvas by embedding it, so the preview is always exactly what Astro
   produces — no re-implementation of Astro semantics. A small injected client
-  script (`electron/morphClient.js` and friends) maps DOM ↔ source nodes for
-  hover/selection and morphs the DOM on edits.
+  script maps DOM ↔ source nodes for hover/selection (the preload's frame
+  half), and the morph client (`electron/previewClient/`, bundled into one
+  module served as `virtual:avb-morph`) morphs the DOM on edits.
 
 ## The rendering pipeline
 
-The path from source to canvas, per REFACTOR.md:
+The path from source to canvas, per the refactor notes (`docs/archive/refactor-notes.md`):
 
 1. **Parse** — the page's own `.astro`, every component it imports, its layout
    chain, and its style sources become one serializable tree. No shared
@@ -129,78 +137,107 @@ The path from source to canvas, per REFACTOR.md:
 
 ## The write path
 
-Editing is a serialized pipeline with explicit convergence:
+Since editor-core step 9 (`docs/editor-core-tracker.md`), an existing file
+changes only by splices, and the file on disk is the only persisted state:
 
 ```
-edit → mutate tree → debounce 300ms → save queue → write .astro
-                                   ↘ morph preview DOM (no reload)
+gesture → edit requests (page:edit) → main: intent → document actor
+        → splices witnessed by the bytes they replace → atomic write
+        → reply: the page as written + its inverse (Undo)
 ```
 
-- `src/pagePersistence.ts` (`createPageSaver` / `createFileSaver`) debounces,
-  serializes writes per file, and **drains edits made while a write is
-  pending**. A successful write acknowledges its exact state — currently by
-  `WeakSet` object identity (see "live model vs boundary", below); drain
-  loops are capped at `LIMITS.saveDrainMax` (each pass past the cap means
-  edits arrive faster than writes can drain — a bug, not a load).
-- `electron/serialQueue.ts` orders file writes in the main process.
-- `electron/selfWrites.ts` keeps the file watcher from treating the app's own
-  saves as external edits (with a shared `fs.watch` mitigation for a known
-  Chokidar/macOS issue).
-- `electron/projectWatcher.ts` detects genuine outside edits (AI assistants,
-  editors, git operations) and triggers a rescan; the renderer re-pulls the
-  file, bounded by `LIMITS.rescanChainMax`.
+- `src/editor/editGestures.ts` states each gesture as edit requests against the
+  page's origin (the bytes of the last reply) and predicts its effect on the
+  shown model; the model is readonly (`src/editor/pageView.ts`), so the prediction
+  is a new model. `electron/documents/editRequests.ts` turns a request into an intent
+  against main's own snapshot of those bytes; the planner
+  (`shared/engine/planner.ts`) and the page's actor (`electron/documents/documentActors.ts`)
+  do the rest.
+- `src/editor/pageEdits.ts` holds the open page's queue — gestures on any page
+  (`.astro`, `.md`, `.mdx`), or typed code (a byte diff,
+  `shared/engine/codePatch.ts`) — and `src/editor/pagePersistence.ts` sends it one entry
+  at a time; a flush
+  sends only the entries present when it starts, so there is no drain loop.
+  `src/editor/pageSender.ts` installs each reply: node handles are carried from the
+  origin through the write's own splices (`src/editor/nodeHandles.ts`), so selection
+  survives every edit. A refused save turns the page conflicted; reviewing it
+  in code shows the queued gestures planned as splices and never written
+  (`page:previewEdit`).
+- Undo is the inverse splices a write returned, submitted as a `revert`.
+- The file watcher tells the app's own saves from outside edits by bytes:
+  a tick is the app's echo only while the file holds exactly what its
+  document actor last wrote (`DocumentActors.echoes`, plan §11.9).
+- `electron/project/projectWatcher.ts` detects genuine outside edits (AI assistants,
+  editors, git operations) and triggers a rescan; each rescan, panel read and
+  panel write is one run of `src/lib/coalescedRun.ts` (one in flight, one
+  waiting), so a burst costs at most two.
+- Printing a whole file is fenced by lint to new files (`componentFile.ts`)
+  and the parsers' own round-trip oracles (`eslint.config.mjs`); no write
+  replaces a file whole — a program's write is the diff it makes
+  (`rewrite-text`, step 10).
 
 ## Data model
 
 The contract layer (`shared/`, introduced by the migration — see below) is
 now the authoritative description:
 
-- `shared/page-node.ts` — the `PageNode` discriminated union (10 kinds:
+- `shared/page/pageNode.ts` — the `PageNode` discriminated union (10 kinds:
   component, element, raw, text, expr, raw-line, comment, map, cond, branch,
   chunk-group), `PropValue` (`string | number | boolean | expr | raw`), the
   `PageModel` envelope (nodes, imports, layout chain, frontmatter slots), and
   hand-rolled parsers. Invariants the types can't express are asserted:
   unique ids, paired nodes own `children`, `children: null` means
-  self-closing. **Idioms the writers depend on:** `props` is always present
-  on paired nodes (possibly `{}`) because writers mutate it in place; branch
-  and map nodes always carry their children arrays (possibly empty).
-- `shared/prop-schema.ts` — the prop-field model the props panel generates
+  self-closing. Branch and map nodes always carry their children arrays
+  (possibly empty). Nothing edits a tree in place (editor-core step 9).
+- `shared/properties/propSchema.ts` — the prop-field model the props panel generates
   from, including `readonly` as a value shape (a `const`-initialized string
   is an exact value, not a default).
-- `shared/scan.ts`, `shared/ipc.ts` — the project scan shape and the typed
+- `shared/properties/projectScan.ts`, `shared/ipc/ipcContract.ts` — the project scan shape and the typed
   IPC contract (`IpcContract`, per-channel request/response pairs, the
   `AvbBridge` surface).
-- `shared/limits.ts` — every runtime bound (parser depth/size, component
-  nesting, save drain, rescan chain) in one importable module, enforced at
-  boundaries.
-- `shared/assert.ts`, `shared/result.ts`, `shared/brand.ts`,
-  `shared/record.ts` — the invariant/Result/branding/unknown-narrowing
+- `shared/core/limits.ts` — every runtime bound (parser depth/size, component
+  nesting, pending intents, retained snapshots) in one importable module,
+  enforced at boundaries.
+- `shared/page/htmlText.ts` — a text node's value: entity decoding and encoding
+  and the whitespace rule (`textValue`). The parser reads text with it, and
+  the Content field emits `textValueCanonical` values so the save echo comes
+  back identical to what it emitted (a differing echo resets its caret).
+- `shared/core/assert.ts`, `shared/core/result.ts`, `shared/core/brand.ts`,
+  `shared/core/record.ts` — the invariant/Result/branding/unknown-narrowing
   primitives.
 
-The renderer consumes contracts through `src/bridge.ts`, a typed, validating
+The renderer consumes contracts through `src/ipc/bridge.ts`, a typed, validating
 wrapper over `window.avb` — the renderer never calls raw `ipcRenderer`.
 
 ## Tests
 
-124 suites under `test/`, run by `scripts/run-tests.ts` (`npm test`):
+Suites under `test/`, found by name and run by `scripts/gate/runTests.ts`
+(`npm test`; suites run in a bounded parallel pool, `--jobs=<n>` to change
+it — see `docs/contracts.md`, Required gate). They mirror the source:
+`test/renderer/<layer or feature>/`, `test/electron/<area>/`,
+`test/shared/<area>/` and `test/scripts/<area>/` hold the suites for that
+folder, with the simulator in `test/simulator/` and the harnesses in
+`test/helpers/`.
 
-- **Round-trip tests** (the majority) parse → mutate → write → re-parse and
-  assert stability, under the runtime's own parsers.
+- **Round-trip tests** parse → mutate → write → re-parse and assert
+  stability, under the runtime's own parsers.
 - **Canvas tests** stub the iframe and run the real modules with esbuild.
-- **Node test-runner suites** (`*.test.js`, `test/contracts/`) exercise pure
+- **Contract suites** (`test/shared/`, much of `test/electron/`) exercise pure
   and contract code directly.
-- `test/unpacked-parser.js` verifies the packaged app: the parser's whole
-  `require` closure must be unpacked from the asar so the Astro dev server
-  can load it.
+- `test/scripts/release/unpackedParser.test.js` verifies the packaged app: the
+  parser's whole `require` closure must be unpacked from the asar so the Astro
+  dev server can load it.
 
 A failing renderer suite fails the run while the others finish (a hung
-window cannot hold the gate hostage). The gate is:
-`build:contracts → build:electron → tsc --noEmit → eslint → ratchet → all
-test suites`, exiting non-zero if any non-quarantined suite fails.
+window cannot hold the gate hostage). The gate is: the builds, then side by
+side `tsc --noEmit` (app and scripts), ESLint with `--max-warnings 0`,
+Prettier, the policy scan, and the adapter-surface ratchet, then every test
+suite; it exits non-zero if any non-quarantined suite fails.
+`docs/enforcement.md` maps each AGENTS.md rule to the check that holds it.
 
 ## The TypeScript migration (completed 2026-09-16)
 
-Continues on `main` after PR #26; plan in `docs/ts-migration-plan.md`.
+Continues on `main` after PR #26; plan in `docs/archive/ts-migration-plan.md`.
 Motivation: the app is built heavily with AI assistance, and plain JS gave
 the model no contract to fulfill — bugs landed at runtime. The migration
 prioritizes **safety, performance, DX** in that order, and is executed
@@ -218,7 +255,7 @@ green at every commit.
   tests (round-trip, negative space, invariant violations). Found and fixed a
   real bug: a lone top-level component was not treated as a layout.
 - **Phase 2 (done)** — `shared/` compiles to `dist/shared` (CJS + `.d.ts`;
-  the Electron runtime artifact; Vite reads the TS sources); the renderer's `src/bridge.ts` validates at the
+  the Electron runtime artifact; Vite reads the TS sources); the renderer's `src/ipc/bridge.ts` validates at the
   boundary; packaging unpacks `shared/dist` for the dev server. A first live
   end-to-end open (a real project, on a user's Windows machine) then exposed a
   wrong wire shape — the scan payload's component schema was contracted as a
@@ -238,59 +275,115 @@ found the architecture fundamentally right — the round-trip design, the
 batching, the zero dead code — with four gaps that account for most measured
 pain, in priority order:
 
-1. **The IPC protocol lives in three places, hand-maintained.** 111 channels
+1. **The IPC protocol lives in three places, hand-maintained.** 113 channels
    in `main.js`, mirrored in `preload.js`'s dispatch, mirrored at every
    renderer call site; co-change data shows renderer files driving preload
    and main edits at 0.8–1.0 confidence with no static link. **Main conversion
-   addressed the inventory:** all 115 invoke channels now have shared payload
+   addressed the inventory:** all 117 invoke channels now have shared payload
    parsers and result types; main, terminal, and preload use those channel types.
    Remaining renderer conversions can adopt those payload/result types directly.
 2. **One mutable tree wears two hats.** The live editor model is mutated in
    place (`loopBindings` even rewrites node `kind`s), while the boundary
-   contract is `readonly`; saves ack by `WeakSet` identity as a workaround
-   for "which version of the file is this?". **Superseded by
-   `docs/diff-mapping-editor-core.md`**: the long-term fix is diff-mapping
-   with edit intents (the file is the only state; identity is a span mapped
-   through a diff at apply time), which removes the ack machinery entirely
-   rather than polishing it. Until that lands, mutating modules convert with
-   minimal-fidelity local mirrors.
+   contract is `readonly`; saves ack by `WeakMap` identity as a workaround
+   for "which version of the file is this?". **Resolved by the editor core**
+   (`docs/stacki-editor-core-plan.md`, step 9 in
+   `docs/editor-core-tracker.md`): edit intents over expected-bytes witnesses,
+   the file the only state, identity a span mapped through a diff. The tree is
+   readonly and the ack machinery is deleted.
 3. **The style-panel sections are one abstraction written six times.**
    Layout/Size/Typography/Grid/Gap/Background/Embed co-change at ~1.0 with no
    static link — parallel hand-rolled field rows over `css.ts` (the clone
    data agrees: 94 clone groups, ~3.7k duplicate LOC). Fix: after converting
    two or three sections, extract the shared field-row pattern; new sections
    become data, not components.
-4. **File size is the DX constraint.** `ClipPath.tsx` (ccx 3,173, 8.8k lines,
-   churn 3) barely changes — splitting it by tool is low-risk. The four
-   hotspots (`App` ccx 1,026, `parsePropSchema` 334, `PropField` 288,
-   `ClipPath` 776) split **after** conversion, never in the same commit.
+4. **File size is the DX constraint.** *Resolved 2026-09-30:* every function
+   is within 70 lines, enforced as an error. The hotspots were split by
+   responsibility during the lint paydown — `App` from a 4,319-line function
+   into staged hooks and shell components, `EmbedEditor`'s 2,253-line
+   component into hooks, `ClipPath`'s path readers into classes that own their
+   state — each proven with the full suite, and `ClipPath` (which has no suite)
+   with HEAD-versus-working-copy interaction harnesses and differential
+   fuzzing. *Closed 2026-10-02:* the files followed. Every source file in
+   `src/`, `electron/`, `shared/` and `scripts/` is within 800 lines,
+   enforced by `max-lines`. `ClipPath` became a folder of pure modules
+   (pinned first by a recorded characterization suite), `EmbedEditor` and
+   `App` became folders of composers and views, `main.ts` hands its IPC to
+   `electron/handlers/`, and `astroParser.ts` is a facade over layered
+   `electron/parse/astro*.ts` modules. The sandboxed preload and the morph
+   client, which the runtime loads as one file each, are modules bundled
+   back into that file by esbuild (`scripts/build/bundleClients.ts`).
 
-Explicit non-changes: no state library (the WeakSet issue is
+Explicit non-changes: no state library (the WeakMap ack issue is
 identity-vs-version, not missing stores), no `.astro` AST dependency (loses
 the text fidelity the slots exist to keep), no churning of the
 batching/queueing write path (already the right shape).
 
 ## Directory map
 
-| Path                | What lives there                                                                  |
-| ------------------- | --------------------------------------------------------------------------------- |
-| `electron/`         | Main process: IPC registry, parsers, git, watcher, terminal, packaging helpers    |
-| `electron/content/` | Astro content-collection introspection + stubs injected into the dev server       |
-| `electron/formats/` | Leaf parsers for data files (JSON/YAML/TOML/CSV/NDJSON/frontmatter)               |
-| `src/`              | Renderer: `App.tsx` shell, tree/persistence/binding logic, `bridge.ts`            |
-| `src/panels/`       | Side panels (Structure, Props, Style, Pages, Assets, CMS, History, Git, terminal) |
-| `src/style-panel/`  | CSS editing surface (TypeScript); `clip-path/`, `lib/`, shared controls           |
-| `src/ui/`           | Shared renderer widgets                                                           |
-| `shared/`           | Contract layer: types, parsers, limits, IPC contract → compiled to `shared/dist`  |
-| `scripts/`          | Dev/CI tooling (test runner, ratchet, packaging hooks)                            |
-| `test/`             | 124 suites: round-trip, canvas-stub, contract, packaging                          |
-| `docs/`             | This file, the migration plan                                                     |
+| Path | What lives there |
+| --- | --- |
+| `electron/main.ts` | The main process's entry: the window, the menu, the lifecycle, settings and recents |
+| `electron/handlers/` | The IPC handler modules main.ts registers, the dev server and thumbnails they drive |
+| `electron/lib/` | Bounds, platform facts, the serial queue, the IPC registrar, runtime paths, Node tools |
+| `electron/parse/` | The Astro and Markdown parsers (unpacked: the dev server loads them) |
+| `electron/documents/` | The write path: document actors, edit requests, atomic writes |
+| `electron/content/` | Content collections and CMS references; `formats/` parsers, `workers/` |
+| `electron/properties/` | Component properties: definitions, consumers, renames |
+| `electron/project/` | Scaffolding, the watcher, thumbnails, assets, CSS variables |
+| `electron/git/`, `preview/`, `terminal/` | Git; the dev server and preview worktree; the terminal |
+| `electron/previewServer/` | Modules the project's own dev server runs (unpacked) |
+| `electron/previewClient/`, `preload/` | The canvas's morph client; the preload (bridge and frame script), each bundled to one file |
+| `electron/app/` | main.ts's payload validation, window bounds and auto update |
+| `src/main.tsx` | The renderer's entry: mounts `src/app/App.tsx` |
+| `src/lib/` | Generic utilities that know nothing of pages or features |
+| `src/ipc/` | The typed bridges to main that more than one feature uses |
+| `src/editor/` | The page-editing core: model and view, edits, persistence, tree, canvas queries |
+| `src/ui/` | Widgets more than one feature draws |
+| `src/features/<feature>/` | One folder per feature: its panel, components, models, bridge and CSS |
+| `src/app/` | The application shell: `App.tsx`, global styles, the rail, shell types |
+| `shared/core/` | The primitives: assert, Result, brands, record and boundary parsers, limits, spans |
+| `shared/page/` | The page model: page nodes, frontmatter, projection, snapshots, capability |
+| `shared/engine/` | The edit engine: intents, the planner, splices, rebase, diffs, patches |
+| `shared/properties/` | Component-property and prop-schema contracts, the project scan |
+| `shared/ipc/` | The IPC contract: channels, payload parsers, results, the preload API |
+| `scripts/build/`, `install/`, `release/` | Build, install-time repairs, packaging and release |
+| `scripts/gate/`, `reports/` | The test runner and its pool, the adapter check; reports and fixtures |
+| `scripts/policy/`, `agent/`, `eslintPlugin/` | The gates: policy scan and git hooks, agent hooks, lint rules |
+| `scripts/lib/`, `move/` | Script helpers; the move tool (`move/moveSources.mts`), which moves files and rewrites every reference to them |
+| `test/` | Suites (round-trip, canvas-stub, contract, packaging); harnesses in `test/helpers/` |
+| `docs/` | This file, the contracts, the enforcement map, the editor-core plan; `archive/` for finished plans |
+
+The contract layer's folders are areas too (`SHARED_AREAS`): `core` is the
+floor, the page model and the property contracts sit on it, the engine on
+the page model, and the IPC contract may name any of them; `shared/`
+imports nothing outside itself.
+
+The main process's folders are areas, each importing only the areas listed
+for it in `eslint.config.mjs` (`ELECTRON_AREAS`): `lib` is the floor, the
+parsers sit on it, the write path on the parsers, and content, project,
+git and properties on the write path. The handler modules reach what
+main.ts reaches, so a channel moves out of main.ts unchanged; they take
+electron's values from main.ts (`handlers/mainHost.ts`) rather than importing
+them. The preview server imports only the parser, and the preview client and
+the preload nothing of main's.
+
+The renderer's folders are layers, lowest first: `lib` → `ipc` → `editor` →
+`ui` → `features` → `app`. A module imports only the layers below its own,
+and a feature imports another feature only along the edges listed in
+`eslint.config.mjs` (`SOURCE_LAYERS`): the variables panel edits values with
+the style panel's editors, component properties use the props panel's
+fields, and history draws with git's widgets. The lint rule
+`stacki/source-layers` holds the order; the policy scan holds the names —
+camelCase folders and modules, PascalCase components, every name unique
+under each of `src/`, `electron/`, `shared/` and `scripts/`.
 
 ## Standing rules
 
 - AGENTS.md is the normative engineering standard (strict TS, parse-don't-
   validate, discriminated unions, branded primitives, bounded everything,
-  ≤70-line functions). The ratchet and lint gate enforce it mechanically.
+  ≤70-line functions). The checks in docs/enforcement.md hold it mechanically
+  — the same code for people and for every coding agent — and CI is the gate
+  no one can skip.
 - Behavior preservation is proven per conversion by parity checks against the
   pre-conversion artifact plus the full suite — conversion review has already
   caught four real hazards (codepoint corruption, a prototype-pollution

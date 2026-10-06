@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { basicSetup, EditorView } from 'codemirror';
 import type { MutableRefObject } from 'react';
 import type { LanguageSupport } from '@codemirror/language';
-import { assert } from '../../shared/assert';
+import { assert } from '../../shared/core/assert';
 import { Annotation, EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
 import { Decoration } from '@codemirror/view';
 import { css } from '@codemirror/lang-css';
@@ -85,7 +85,7 @@ export const appTheme = EditorView.theme(
       backgroundColor: 'var(--accent)',
     },
   },
-  { dark: true }
+  { dark: true },
 );
 
 export const appHighlight = syntaxHighlighting(
@@ -124,16 +124,16 @@ export const appHighlight = syntaxHighlighting(
       { tag: [t.list], color: '#89ddff' },
       { tag: [t.processingInstruction], color: '#616161' },
     ],
-    { themeType: 'dark' }
-  )
+    { themeType: 'dark' },
+  ),
 );
 
 export interface CodeEditorProps {
-  readonly value?: string | null | undefined;
+  readonly value?: string | undefined;
   readonly language?: string | undefined;
   readonly onChange?: ((text: string, position: number) => void) | undefined;
-  readonly revealLine?: number | null | undefined;
-  readonly activeRange?: CodeEditorRange | null | undefined;
+  readonly revealLine?: number | undefined;
+  readonly activeRange?: CodeEditorRange | undefined;
   readonly componentRanges?: readonly CodeEditorComponentRange[] | undefined;
   readonly onPositionChange?: ((position: number) => void) | undefined;
   readonly onOpenComponent?: ((name: string, id: string) => void) | undefined;
@@ -150,7 +150,7 @@ export interface CodeEditorComponentRange extends CodeEditorRange {
 }
 
 interface CodeDecorations {
-  readonly active: CodeEditorRange | null;
+  readonly active: CodeEditorRange | undefined;
   readonly components: readonly CodeEditorComponentRange[];
 }
 
@@ -169,32 +169,37 @@ const codeDecorationField = StateField.define({
 export default function CodeEditor(props: CodeEditorProps) {
   const { value, language, revealLine, activeRange, componentRanges } = props;
   const hostRef = useRef<HTMLDivElement>(null);
-  const viewRef = useRef<EditorView | null>(null);
+  const viewRef = useRef<EditorView | undefined>(undefined);
   // These values change without replacing the editor, preserving history and selection.
   const latest = useRef(props);
   latest.current = props;
-  useEffect(() => {
+  useLayoutEffect(() => {
     const parent = hostRef.current;
     assert(parent !== null, 'CodeEditor: mounted host exists');
-    assert(viewRef.current === null, 'CodeEditor: only one editor owns the host');
+    assert(viewRef.current === undefined, 'CodeEditor: only one editor owns the host');
     const view = codeEditorCreate(parent, language, latest);
     viewRef.current = view;
     return () => {
       view.destroy();
-      viewRef.current = null;
+      viewRef.current = undefined;
     };
   }, [language]);
 
-  // External reloads and app undo must not echo as user edits or enter local history.
-  useEffect(() => {
+  // External reloads, app undo and saved text must not echo as user edits or
+  // enter local history. Only the region that differs is replaced, so an
+  // outside edit merged into the file elsewhere (step 8) leaves the cursor
+  // and selection where the user put them. A layout effect: it runs before
+  // the browser can deliver another keystroke, so no typing lands on a
+  // document the new value has already replaced.
+  useLayoutEffect(() => {
     const view = viewRef.current;
     if (!view) {
       return;
     }
-    const current = view.state.doc.toString();
-    if ((value ?? '') !== current) {
+    const change = externalChange(view.state.doc.toString(), value ?? '');
+    if (change !== undefined) {
       view.dispatch({
-        changes: { from: 0, to: current.length, insert: value ?? '' },
+        changes: change,
         annotations: [externalValue.of(true), Transaction.addToHistory.of(false)],
       });
     }
@@ -216,11 +221,46 @@ export default function CodeEditor(props: CodeEditorProps) {
   return <div ref={hostRef} className="cm-host" />;
 }
 
+/** The one change that turns `current` into `next`: the region between their
+ * common prefix and suffix, or undefined when they are equal. */
+export function externalChange(
+  current: string,
+  next: string,
+): { readonly from: number; readonly to: number; readonly insert: string } | undefined {
+  if (current === next) {
+    return undefined;
+  }
+  const shorter = Math.min(current.length, next.length);
+  let prefix = 0;
+  while (prefix < shorter && current.charCodeAt(prefix) === next.charCodeAt(prefix)) {
+    prefix++;
+  }
+  let suffix = 0;
+  while (
+    suffix < shorter - prefix &&
+    current.charCodeAt(current.length - 1 - suffix) === next.charCodeAt(next.length - 1 - suffix)
+  ) {
+    suffix++;
+  }
+  const change = {
+    from: prefix,
+    to: current.length - suffix,
+    insert: next.slice(prefix, next.length - suffix),
+  };
+  assert(change.from <= change.to, 'The changed region keeps its order');
+  assert(
+    current.slice(0, change.from) + change.insert + current.slice(change.to) === next,
+    'The change turns the document into the value',
+  );
+  return change;
+}
+
 function useCodeDecorations(
-  viewRef: MutableRefObject<EditorView | null>,
-  activeRange: CodeEditorRange | null | undefined,
-  componentRanges: readonly CodeEditorComponentRange[] | undefined
+  viewRef: MutableRefObject<EditorView | undefined>,
+  activeRange: CodeEditorRange | undefined,
+  componentRanges: readonly CodeEditorComponentRange[] | undefined,
 ): void {
+  const initialSelectionPending = useRef(true);
   useEffect(() => {
     const view = viewRef.current;
     if (!view) {
@@ -228,22 +268,62 @@ function useCodeDecorations(
     }
     view.dispatch({
       effects: codeDecorations.of({
-        active: activeRange ?? null,
+        active: activeRange ?? undefined,
         components: componentRanges ?? [],
       }),
     });
-    if (activeRange) {
-      view.dispatch({
-        effects: EditorView.scrollIntoView(activeRange.from, { y: 'nearest' }),
-      });
-    }
   }, [activeRange, componentRanges, viewRef]);
+  useLayoutEffect(() => {
+    const view = viewRef.current;
+    const range = codeEditorRangeWithin(activeRange, view?.state.doc.length ?? 0);
+    if (!view || !range) {
+      return;
+    }
+    if (!initialSelectionPending.current) {
+      view.dispatch({ effects: EditorView.scrollIntoView(range.from, { y: 'nearest' }) });
+      return;
+    }
+    initialSelectionPending.current = false;
+    view.requestMeasure({
+      read: (editor) => {
+        const start = editor.lineBlockAt(range.from);
+        const end = editor.lineBlockAt(Math.max(range.from, range.to - 1));
+        return selectedCodeScrollTop(
+          start.top,
+          end.top + end.height,
+          editor.scrollDOM.clientHeight,
+        );
+      },
+      write: (top, editor) => {
+        if (top !== undefined) {
+          const scrollContainer = editor.scrollDOM;
+          scrollContainer.scrollTop = top;
+        }
+      },
+    });
+  }, [activeRange, viewRef]);
+}
+
+export function selectedCodeScrollTop(
+  startTop: number,
+  endBottom: number,
+  viewportHeight: number,
+): number | undefined {
+  if (viewportHeight <= 0 || !Number.isFinite(viewportHeight)) {
+    return undefined;
+  }
+  assert(Number.isFinite(startTop), 'Selected code start is finite');
+  assert(Number.isFinite(endBottom), 'Selected code end is finite');
+  assert(endBottom >= startTop, 'Selected code range keeps its order');
+  // Center the first line only when the rest of the block still fits below it.
+  const offset = endBottom - startTop <= viewportHeight / 2 ? viewportHeight / 2 : 0;
+  return Math.max(0, startTop - offset);
 }
 
 function codeEditorCreate(
   parent: HTMLDivElement,
   language: string | undefined,
-  latest: MutableRefObject<CodeEditorProps>
+  latest: MutableRefObject<CodeEditorProps>,
 ): EditorView {
   const view = new EditorView({
     parent,
@@ -263,7 +343,7 @@ function codeEditorCreate(
             if (!update.transactions.some((transaction) => transaction.annotation(externalValue))) {
               latest.current.onChange?.(
                 update.state.doc.toString(),
-                update.state.selection.main.head
+                update.state.selection.main.head,
               );
             }
           }
@@ -273,7 +353,7 @@ function codeEditorCreate(
   });
   view.dispatch({
     effects: codeDecorations.of({
-      active: latest.current.activeRange ?? null,
+      active: latest.current.activeRange ?? undefined,
       components: latest.current.componentRanges ?? [],
     }),
   });
@@ -283,24 +363,24 @@ function codeEditorCreate(
 function codeEditorInteractions(latest: MutableRefObject<CodeEditorProps>) {
   return EditorView.domEventHandlers({
     click: (event, view) => codeEditorClick(event, view, latest),
-    keydown: (event, view) => codeEditorModifier(event.metaKey, view),
-    keyup: (event, view) => codeEditorModifier(event.metaKey, view),
-    mousemove: (event, view) => codeEditorModifier(event.metaKey, view),
-    blur: (_event, view) => codeEditorModifier(false, view),
+    keydown: (event, view) => codeEditorModifier(view, { metaHeld: event.metaKey }),
+    keyup: (event, view) => codeEditorModifier(view, { metaHeld: event.metaKey }),
+    mousemove: (event, view) => codeEditorModifier(view, { metaHeld: event.metaKey }),
+    blur: (_event, view) => codeEditorModifier(view, { metaHeld: false }),
   });
 }
 
 function codeEditorClick(
   event: MouseEvent,
   view: EditorView,
-  latest: MutableRefObject<CodeEditorProps>
+  latest: MutableRefObject<CodeEditorProps>,
 ): boolean {
   const position = view.posAtCoords({ x: event.clientX, y: event.clientY });
   if (position === null) {
     return false;
   }
   const component = latest.current.componentRanges?.find(
-    (range) => range.from <= position && position <= range.to
+    (range) => range.from <= position && position <= range.to,
   );
   if (event.metaKey && component) {
     event.preventDefault();
@@ -311,8 +391,8 @@ function codeEditorClick(
   return false;
 }
 
-function codeEditorModifier(active: boolean, view: EditorView): false {
-  view.dom.classList.toggle('cm-meta-held', active);
+function codeEditorModifier(view: EditorView, { metaHeld }: { readonly metaHeld: boolean }): false {
+  view.dom.classList.toggle('cm-meta-held', metaHeld);
   return false;
 }
 
@@ -337,11 +417,11 @@ function codeEditorDecorations(length: number, state: CodeDecorations) {
 }
 
 function codeEditorRangeWithin(
-  range: CodeEditorRange | null,
-  length: number
-): CodeEditorRange | null {
+  range: CodeEditorRange | undefined,
+  length: number,
+): CodeEditorRange | undefined {
   if (!range || range.from < 0 || range.to < range.from || range.to > length) {
-    return null;
+    return undefined;
   }
   return range;
 }

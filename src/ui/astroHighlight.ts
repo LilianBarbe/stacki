@@ -11,7 +11,7 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from '@codemirror/view';
-import { LIMITS } from '../../shared/limits';
+import { LIMITS } from '../../shared/core/limits';
 
 const highlightDelayMs = 60;
 const fontItalic = 1;
@@ -99,18 +99,18 @@ export const astroHighlight: Extension = [
           });
         }, highlightDelayMs);
       }
-    }
+    },
   ),
 ];
 
 async function highlightAstro(
   view: EditorView,
   revision: number,
-  currentRevision: () => number
+  currentRevision: () => number,
 ): Promise<void> {
   const source = view.state.doc.toString();
   if (source.length > LIMITS.syntaxHighlightCharsMax) {
-    replaceHighlight(view, Decoration.none, revision, currentRevision, source);
+    replaceHighlight(view, Decoration.none, revision, source, currentRevision);
     return;
   }
   const instance = await astroHighlighter();
@@ -135,17 +135,17 @@ async function highlightAstro(
           attributes: { style },
         }).range(token.offset, to),
       ];
-    })
+    }),
   );
-  replaceHighlight(view, Decoration.set(ranges, true), revision, currentRevision, source);
+  replaceHighlight(view, Decoration.set(ranges, true), revision, source, currentRevision);
 }
 
 function replaceHighlight(
   view: EditorView,
   decorations: DecorationSet,
   revision: number,
+  source: string,
   currentRevision: () => number,
-  source: string
 ): void {
   if (revision !== currentRevision()) {
     return;
