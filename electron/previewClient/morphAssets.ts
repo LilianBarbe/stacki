@@ -180,28 +180,44 @@ export function loadStyles(page: Document): void {
 // to the page reaches the browser as a reload, which this patch replaces, and
 // nothing else would ever bring the page's new CSS: the canvas kept the
 // stylesheet the page loaded with, whatever the style panel wrote. The
-// rendering just fetched holds every dev stylesheet as the server compiled it
-// for this edit, so a live one whose text differs takes the new text. One
-// whose text is the same is left alone: a rewritten stylesheet restarts every
-// animation it defines, on every keystroke of a text edit.
-export function refreshDevStyles(page: Document): void {
-  const fresh = new Map<string, string>();
-  const served = page.querySelectorAll('style[data-vite-dev-id]');
-  for (let i = 0; i < served.length; i++) {
-    const id = served[i]?.getAttribute('data-vite-dev-id');
-    if (id !== null && id !== undefined) {
-      fresh.set(id, served[i]?.textContent ?? '');
-    }
-  }
+// rendering just fetched holds that stylesheet as the server compiled it for
+// this edit, so a live one takes the text the server has just changed. One the
+// server renders as it did before is left alone, for two reasons. A rewritten
+// stylesheet restarts every animation it defines, on every keystroke of a text
+// edit. And the server's text is not always the newest: a stylesheet that
+// reaches the page through a CSS \`@import\` is rendered from the server's
+// first compile for as long as it runs, while Vite hot-swaps the live one on
+// every write. Comparing against the live text put that first compile back on
+// each patch, and the canvas dropped every style edit made to such a file.
+export function refreshDevStyles(previous: Document, next: Document): void {
+  const before = devStyleTexts(previous);
+  const fresh = devStyleTexts(next);
   const live = document.querySelectorAll('style[data-vite-dev-id]');
   for (let i = 0; i < live.length; i++) {
     const style = live[i];
-    const text = fresh.get(style?.getAttribute('data-vite-dev-id') ?? '');
+    const id = style?.getAttribute('data-vite-dev-id') ?? '';
+    const text = fresh.get(id);
     if (style === undefined || text === undefined) {
       continue; // Not in this rendering: Vite's own, or a component that left.
+    }
+    if (before.get(id) === text) {
+      continue; // The server did not change it: the live text is Vite's to keep.
     }
     if (style.textContent !== text) {
       style.textContent = text;
     }
   }
+}
+
+// Each dev stylesheet of a server rendering, by the id Vite gave it.
+function devStyleTexts(page: Document): Map<string, string> {
+  const texts = new Map<string, string>();
+  const served = page.querySelectorAll('style[data-vite-dev-id]');
+  for (let i = 0; i < served.length; i++) {
+    const id = served[i]?.getAttribute('data-vite-dev-id');
+    if (id !== null && id !== undefined) {
+      texts.set(id, served[i]?.textContent ?? '');
+    }
+  }
+  return texts;
 }

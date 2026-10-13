@@ -554,10 +554,17 @@ const LIVE_TABS = (labels, active) =>
 // A page's <style> is inlined by the server, so its module was never imported
 // and Vite answers an edit to the page with a reload, not a stylesheet update.
 // The patch replaces that reload, so it is the only thing that can bring the new
-// CSS: a live dev stylesheet takes the text the server rendered this time. One
-// whose text did not change is not written at all — a rewritten stylesheet
-// restarts every animation it defines — and Vite's own stylesheets, which the
-// server's rendering does not carry, are left to Vite.
+// CSS: a live dev stylesheet takes the text the server has just changed. One
+// the server renders as it did before is not written at all — a rewritten
+// stylesheet restarts every animation it defines — and Vite's own stylesheets,
+// which the server's rendering does not carry, are left to Vite.
+//
+// "As it did before" is the server's previous rendering, not the live text. A
+// stylesheet reached through a CSS `@import` (global.css importing
+// utilities.css) is rendered from the server's first compile for as long as it
+// runs, while Vite hot-swaps the live one on every write. Compared against the
+// live text, each patch put that first compile back: a padding dragged in the
+// style panel reached the file and never the canvas.
 {
   const head = dom.window.document.head;
   const devStyle = (id, css) => {
@@ -569,21 +576,28 @@ const LIVE_TABS = (labels, active) =>
   const PAGE = '/src/pages/index.astro?astro&type=style&index=0&lang.css';
   const CARD = '/src/components/Card.astro?astro&type=style&index=0&lang.css';
   const OWN = '/src/styles/vite-only.css';
+  const SHEET = '/src/styles/global.css';
   const page = devStyle(PAGE, '.box { color: red; }');
   const card = devStyle(CARD, '.card { gap: 1rem; }');
   const own = devStyle(OWN, '.vite { margin: 0; }');
-  head.append(page, card, own);
-  const served = new dom.window.DOMParser().parseFromString(
-    '<!doctype html><html><head>' +
-      `<style data-vite-dev-id="${PAGE}">.box { color: blue; }</style>` +
-      `<style data-vite-dev-id="${CARD}">.card { gap: 1rem; }</style>` +
-      '</head><body></body></html>',
-    'text/html',
-  );
+  // Vite has hot-swapped this one since the server first compiled it.
+  const sheet = devStyle(SHEET, '.pad { padding: 3rem; }');
+  head.append(page, card, own, sheet);
+  const rendering = (pageCss) =>
+    new dom.window.DOMParser().parseFromString(
+      '<!doctype html><html><head>' +
+        `<style data-vite-dev-id="${PAGE}">${pageCss}</style>` +
+        `<style data-vite-dev-id="${CARD}">.card { gap: 1rem; }</style>` +
+        `<style data-vite-dev-id="${SHEET}">.pad { padding: 1rem; }</style>` +
+        '</head><body></body></html>',
+      'text/html',
+    );
+  const before = rendering('.box { color: red; }');
+  const served = rendering('.box { color: blue; }');
   const writes = [];
   const observer = new dom.window.MutationObserver((records) => writes.push(...records));
   observer.observe(head, { childList: true, subtree: true, characterData: true });
-  refreshDevStyles(served);
+  refreshDevStyles(before, served);
   writes.push(...observer.takeRecords());
   observer.disconnect();
   check(
@@ -601,6 +615,27 @@ const LIVE_TABS = (labels, active) =>
     own.textContent === '.vite { margin: 0; }',
   );
   check(
+    'a stylesheet the server renders stale keeps the text Vite gave it',
+    sheet.textContent === '.pad { padding: 3rem; }',
+    sheet.textContent,
+  );
+  // A stylesheet new to the server's rendering has no earlier text to agree with.
+  const arrived = devStyle(CARD, '.card { gap: 0; }');
+  head.append(arrived);
+  const without = new dom.window.DOMParser().parseFromString(
+    '<!doctype html><html><head></head><body></body></html>',
+    'text/html',
+  );
+  card.remove();
+  refreshDevStyles(without, served);
+  check(
+    'a stylesheet the previous rendering lacked takes the server text',
+    arrived.textContent === '.card { gap: 1rem; }',
+    arrived.textContent,
+  );
+  arrived.remove();
+  head.append(card);
+  check(
     'exactly one stylesheet was written',
     new Set(
       writes.map((record) =>
@@ -612,6 +647,7 @@ const LIVE_TABS = (labels, active) =>
   page.remove();
   card.remove();
   own.remove();
+  sheet.remove();
 }
 
 if (failures.length) {

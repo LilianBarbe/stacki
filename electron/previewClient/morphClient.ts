@@ -148,11 +148,12 @@ async function update(): Promise<void> {
     patchAttrs(liveRoot, previousRoot, nextRoot);
     patchChildren(document.head, previousDocument.head, next.clean.head);
     patchChildren(document.body, previousDocument.body, next.clean.body);
+    const renderedBefore = previousDocument;
     previousDocument = next.clean;
     // After the patch, so a component that has just appeared is styled by the
     // time anything measures it — and running by the time anything clicks it.
     loadStyles(next.clean);
-    refreshDevStyles(next.clean);
+    refreshDevStyles(renderedBefore, next.clean);
     runScripts(added);
     const liveBody = document.body;
     const serverBody = next.withAnchors.body;
