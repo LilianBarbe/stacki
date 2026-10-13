@@ -9,6 +9,7 @@ import { compareCascade } from './cascade';
 import type { MatchedRule, RuleModel } from './cascade';
 import { assert } from '../../../../shared/core/assert';
 import { canonicalCompound, compareSpecificity, normalizePseudoElement } from './selectors';
+import { spacingSides } from './spacingShorthand';
 import type { BreakpointId, ParsedRule, Specificity } from './styleTypes';
 
 export type ContextKey = string; // '' = Base; else the joined atContext
@@ -593,12 +594,7 @@ function foldEmbedRule(matched: MatchedRule, view: ResolveView): FoldedRule | un
   }
   const isSelected = atContext && isSelectedRule(matched, view);
 
-  // One contributor per (rule, prop) — the last decl wins within a rule.
-  const lastByProp = new Map<string, { value: string; important: boolean }>();
-  for (const decl of matched.rule.declarations) {
-    lastByProp.set(decl.prop, { value: decl.value, important: decl.important });
-  }
-  const contributors = [...lastByProp].map(([prop, decl]) => ({
+  const contributors = [...declaredByProp(matched.rule)].map(([prop, decl]) => ({
     prop,
     contributor: {
       selectorText: winner.text,
@@ -618,6 +614,32 @@ function foldEmbedRule(matched: MatchedRule, view: ResolveView): FoldedRule | un
   }));
   return { isSelected, contributors };
 }
+
+// One value per property of a rule: the last declaration wins, unless an earlier
+// one is `!important` and it is not. A box shorthand also counts for each side it
+// sets, which is where the spacing box reads it (`padding: 1rem 2rem` fills the
+// four padding fields). The shorthand stays a property of its own, so it is still
+// edited and cleared whole, and reading never rewrites the source.
+function declaredByProp(rule: ParsedRule): ReadonlyMap<string, Declared> {
+  const declared = new Map<string, Declared>();
+  const declare = (prop: string, value: Declared): void => {
+    if (declared.get(prop)?.important === true && !value.important) {
+      return;
+    }
+    declared.set(prop, value);
+  };
+  for (const decl of rule.declarations) {
+    declare(decl.prop, { value: decl.value, important: decl.important });
+    for (const [side, value] of spacingSides(decl.prop, decl.value)) {
+      declare(side, { value, important: decl.important });
+    }
+  }
+  assert(declared.size >= Math.min(rule.declarations.length, 1), 'declaredByProp: none dropped');
+  return declared;
+}
+
+/** A declaration's value and whether it is `!important`. */
+type Declared = { readonly value: string; readonly important: boolean };
 
 // A rule is "selected" (blue, editable) when it carries a matched selector — in
 // the active state — equal to the active selector (by selector identity: `.a.b`

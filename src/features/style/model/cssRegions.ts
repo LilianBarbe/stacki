@@ -5,6 +5,7 @@
 import postcss, { type Root, type Rule, type AtRule, type Declaration } from 'postcss';
 import type { StyleRegion } from './styleTypes';
 import { selectorKey } from './resolved';
+import { isPaddingProperty, setPaddingDeclaration } from './spacingShorthand';
 
 /** A declaration's value and whether it is `!important` — the two always travel together. */
 export type DeclarationValue = { readonly value: string; readonly important: boolean };
@@ -53,6 +54,10 @@ export function findChildRuleBySelector(
 
 // Update the rule's existing declaration for `prop`, or append it — mirrors onSetProp.
 export function setDeclOnRule(rule: Rule, prop: string, declared: DeclarationValue) {
+  if (isPaddingProperty(prop)) {
+    setPaddingDeclaration(rule, prop, declared);
+    return;
+  }
   const found: Declaration[] = [];
   rule.walkDecls(prop, (declaration) => {
     found.push(declaration);
@@ -184,6 +189,10 @@ export function appendDecl(
 /** Set (update-or-append) a DIRECT declaration on a node — scoped so a nested rule's
  *  declaration of the same prop is never mistaken for this node's own. */
 export function setDeclDirect(node: Rule | AtRule, prop: string, declared: DeclarationValue) {
+  if (isPaddingProperty(prop)) {
+    setPaddingDeclaration(node, prop, declared);
+    return;
+  }
   const key = prop.trim().toLowerCase();
   const existing = directDecls(node).find(
     (declaration) => declaration.prop.trim().toLowerCase() === key,

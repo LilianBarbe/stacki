@@ -16,6 +16,11 @@ import {
   splitRuleSelectorAt,
 } from '../model/css';
 import { canonicalCompound, parseSelectorList } from '../model/selectors';
+import {
+  clearPaddingSides,
+  isPaddingProperty,
+  setPaddingDeclaration,
+} from '../model/spacingShorthand';
 import { getHost, type ClassOutcome } from '../model/host';
 import { type EmbedDocument, navigateToEmbed, writeEmbedDocument } from '../model/webflow';
 import type { ParsedDeclaration, ParsedRule } from '../model/styleTypes';
@@ -208,6 +213,10 @@ export function usePropEdits(
     (rule: ParsedRule, prop: string, value: string, important: boolean) => {
       void applyEdit(rule, () => {
         const { rule: editRule } = splitForEdit(rule);
+        if (isPaddingProperty(prop)) {
+          setPaddingDeclaration(editRule.node, prop, { value, important });
+          return;
+        }
         const target = lastDeclFor(editRule, prop);
         if (target) {
           target.value = value;
@@ -224,13 +233,15 @@ export function usePropEdits(
       const props = Array.isArray(prop) ? prop : [prop];
       void applyEdit(rule, () => {
         const { rule: editRule } = splitForEdit(rule);
+        // A side grouped into `padding` or an axis has no declaration of its own.
+        const clearedPadding = clearPaddingSides(editRule.node, props);
         const targets: Declaration[] = [];
         directDecls(editRule.node).forEach((decl) => {
           if (props.includes(decl.prop)) {
             targets.push(decl);
           }
         });
-        if (!targets.length) {
+        if (!targets.length && !clearedPadding) {
           return false;
         }
         targets.forEach((decl) => decl.remove());

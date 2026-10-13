@@ -87,13 +87,12 @@ export const SECTIONS: readonly SectionDefinition[] = [
   {
     id: 'spacing',
     label: 'Spacing',
-    // The sides only. The box edits one side at a time, so it has a field for
-    // each longhand and none for `padding: a b` — and a property listed in a
-    // section is a property routed to that section's control, which for the
-    // shorthand meant routed to nothing: it rendered in no field at all while
-    // still applying on the page. Left out, it falls through to the catch-all
-    // at the bottom, where every declaration the panel has no control for is
-    // shown and can be edited as written.
+    // The sides only: the box has a field for each longhand. The resolved model
+    // projects `margin` and the padding shorthands onto these sides
+    // (spacingShorthand.ts), so the box shows them. The shorthand itself is left
+    // out, as a property listed in a section is routed to that section's control
+    // and the box has none for it: it falls through to the catch-all at the
+    // bottom, where it can still be edited and cleared whole, as written.
     order: [
       'margin-top',
       'margin-right',
