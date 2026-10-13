@@ -30,6 +30,11 @@ export type SpacingHover = {
   /** Edges for padding and margin; axes for gap. */
   sides: Array<'top' | 'right' | 'bottom' | 'left' | 'row' | 'column'>;
   labels: Record<string, string>;
+  /** The values a drag is writing right now, per side, as authored ("4.8rem"):
+   *  the canvas sizes the band from them on the frame the number changes,
+   *  instead of waiting for the page to lay out and be measured. Absent outside
+   *  a drag; the band is then the measured one. */
+  live?: Record<string, string>;
 };
 
 /** What became of a class added to the page, for the rule that depends on it. */

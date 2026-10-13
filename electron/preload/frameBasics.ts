@@ -12,6 +12,8 @@ export type Spacing = {
   padding: Record<string, number>;
   margin: Record<string, number>;
   gaps: GapBand[];
+  /** What one em, rem, vw and vh is worth in px for the element measured. */
+  units: Record<string, number>;
 };
 export type GapRow = { top: number; bottom: number; items: DOMRect[] };
 

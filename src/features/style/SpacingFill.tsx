@@ -185,6 +185,8 @@ export type FillProps = {
 export type SideDragOptions = {
   propFor: (side: Side) => string;
   inward: boolean;
+  /** The box the drag is drawn in on the canvas — see useSideHover. */
+  kind: 'padding' | 'margin';
   read: Read;
   busy: boolean;
   setProp: SetProp;
@@ -194,9 +196,73 @@ export type SideDragOptions = {
   threshold?: number;
 };
 
+// While a drag is on, the canvas hears its value from the drag (reportDrag) and
+// not from the hover, which would report what the file still says: the band's
+// label stayed on the old value for the whole drag. One drag at a time, so one
+// flag, written only by reportDrag and by a drag that unmounts mid-flight.
+let dragReporting = false;
+
+// Tell the canvas what a drag holds for `sides`: the label to write on each
+// band and, while the drag is live, the value to size it from. Only a real
+// padding or margin side can be sized ahead of the page; an inset (`top` on a
+// positioned element) is labelled but measured. On release the label stays and
+// the size is measured again, which by then is the same number.
+function reportDrag(
+  box: { readonly kind: 'padding' | 'margin'; readonly propFor: (side: Side) => string },
+  sides: readonly Side[],
+  held: { readonly value: string; readonly live: boolean },
+): void {
+  dragReporting = held.live;
+  const labels: Record<string, string> = {};
+  const ahead: Record<string, string> = {};
+  for (const side of sides) {
+    labels[side] = held.value;
+    if (held.live && /^(padding|margin)-/.test(box.propFor(side))) {
+      ahead[side] = held.value;
+    }
+  }
+  getHost().onSpacingHover?.({
+    kind: box.kind,
+    sides: [...sides],
+    labels,
+    ...(Object.keys(ahead).length > 0 ? { live: ahead } : {}),
+  });
+}
+
+// What a drag tells the canvas, from its first frame to its release.
+function useDragReport(
+  dragRef: React.MutableRefObject<SideDrag | undefined>,
+  box: { readonly kind: 'padding' | 'margin'; readonly propFor: (side: Side) => string },
+) {
+  // A drag that goes away mid-flight must not leave the hover silenced.
+  useEffect(
+    () => () => {
+      if (dragRef.current) {
+        dragReporting = false;
+      }
+    },
+    [dragRef],
+  );
+  return {
+    // The canvas, on the same frame as the labels: the band it draws for these
+    // sides is labelled and sized from this value, so it passes through every
+    // number the panel shows rather than the ones the page had time to lay out.
+    live: (drag: SideDrag, display: string): void => {
+      const value = display.replace(/ !important$/, '');
+      reportDrag(box, affectedSides(drag.side, drag), { value, live: true });
+    },
+    // The last value stays on the band; its size goes back to being measured.
+    // The hover takes over from here.
+    release: (drag: SideDrag, value: string): void => {
+      reportDrag(box, affectedSides(drag.side, drag), { value, live: false });
+    },
+  };
+}
+
 export function useSideDrag({
   propFor,
   inward,
+  kind,
   read,
   busy,
   setProp,
@@ -207,7 +273,11 @@ export function useSideDrag({
 }: SideDragOptions) {
   const dragRef = useRef<SideDrag | undefined>(undefined);
   const dragged = useRef(false);
-  const frame = useLiveFrame(dragRef, liveSetProp, onLive);
+  const report = useDragReport(dragRef, { kind, propFor });
+  const frame = useLiveFrame(dragRef, liveSetProp, (props, display, drag) => {
+    onLive(props, display);
+    report.live(drag, display);
+  });
 
   const apply = useDragApply({
     dragRef,
@@ -261,6 +331,7 @@ export function useSideDrag({
       return;
     }
     onLiveEnd();
+    report.release(drag, value);
     drag.props.forEach((prop) => setProp(prop, value, drag.important));
   };
 
@@ -420,7 +491,7 @@ export function followPointer(
 export function useLiveFrame(
   dragRef: React.MutableRefObject<SideDrag | undefined>,
   liveSetProp: LiveSetProp,
-  onLive: (props: string[], display: string) => void,
+  onLive: (props: string[], display: string, drag: SideDrag) => void,
 ) {
   const raf = useRef<number | undefined>(undefined);
   const pending = useRef<string | undefined>(undefined);
@@ -437,7 +508,7 @@ export function useLiveFrame(
     const drag = dragRef.current;
     const value = pending.current;
     if (drag && value !== undefined) {
-      onLive(drag.props, drag.important ? `${value} !important` : value);
+      onLive(drag.props, drag.important ? `${value} !important` : value, drag);
       // Linked sides are one visual edit. Sending them together lets the style
       // writer serialize the shared stylesheet once instead of once per side.
       liveSetProp(drag.props, value, drag.important);
@@ -507,6 +578,9 @@ export function useSideHover({
   const overRef = useRef<HoveredSide | undefined>(undefined);
 
   const report = () => {
+    if (dragReporting) {
+      return; // The drag is saying what the band shows.
+    }
     const hovered = overRef.current;
     if (!hovered) {
       getHost().onSpacingHover?.(undefined);
@@ -626,12 +700,13 @@ export function useHoverModifiers(
 export function SpacingFill({ frame, inward = false, ...dragOptions }: FillProps) {
   const geometry = FRAMES[frame];
   const maskId = 'sp-' + useId().replace(/:/g, '');
-  const { onPointerDown, onPointerMove, onPointerUp } = useSideDrag({ ...dragOptions, inward });
-  const hover = useSideHover({
-    propFor: dragOptions.propFor,
-    kind: inward ? 'padding' : 'margin',
-    read: dragOptions.read,
+  const kind = inward ? 'padding' : 'margin';
+  const { onPointerDown, onPointerMove, onPointerUp } = useSideDrag({
+    ...dragOptions,
+    inward,
+    kind,
   });
+  const hover = useSideHover({ propFor: dragOptions.propFor, kind, read: dragOptions.read });
 
   return (
     <svg

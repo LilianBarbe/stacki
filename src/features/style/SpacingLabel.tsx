@@ -154,9 +154,13 @@ export function useLabelGesture({
   'prop' | 'side' | 'read' | 'busy' | 'setProp' | 'liveSetProp' | 'onLive' | 'onLiveEnd'
 >) {
   const propForSide = (other: Side) => siblingProps(prop, side, [other])[0] ?? prop;
+  // `padding-top` → padding, `margin-top` → margin, a bare inset (`top`) → the
+  // box it is drawn in, which is the margin frame.
+  const kind = prop.startsWith('padding') ? 'padding' : 'margin';
   const drag = useSideDrag({
     propFor: propForSide,
     inward: prop.startsWith('padding'),
+    kind,
     read,
     busy,
     setProp,
@@ -165,13 +169,7 @@ export function useLabelGesture({
     onLiveEnd,
     threshold: 3,
   });
-  // `padding-top` → padding, `margin-top` → margin, a bare inset (`top`) → the
-  // box it is drawn in, which is the margin frame.
-  const hover = useSideHover({
-    propFor: propForSide,
-    kind: prop.startsWith('padding') ? 'padding' : 'margin',
-    read,
-  });
+  const hover = useSideHover({ propFor: propForSide, kind, read });
   return { ...drag, hover };
 }
 

@@ -320,7 +320,18 @@ export const spacingForPath = (nodePath: string): (Spacing | undefined)[] => {
             parseFloat(cs.getPropertyValue(`${kind}-${side}`)) || 0,
           ]),
         );
-      return { padding: box('padding'), margin: box('margin'), gaps: gapBandsFor(element, cs) };
+      // What a length is worth here, so a value being dragged in the panel can
+      // be drawn in pixels before the page has laid it out (withLiveSpacing in
+      // the app): em is this element's font, rem the root's, vw and vh the frame.
+      const rootFont = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+      const units = {
+        em: parseFloat(cs.fontSize) || rootFont,
+        rem: rootFont,
+        vw: window.innerWidth / 100,
+        vh: window.innerHeight / 100,
+      };
+      const gaps = gapBandsFor(element, cs);
+      return { padding: box('padding'), margin: box('margin'), gaps, units };
     } catch {
       // Whatever went wrong measuring one element, the boxes everything else
       // depends on still have to be reported.

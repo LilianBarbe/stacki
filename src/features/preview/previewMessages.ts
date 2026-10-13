@@ -215,10 +215,12 @@ function parseSpacing(input: unknown): Spacing {
   const padding = optional(parseSides)(value['padding']);
   const margin = optional(parseSides)(value['margin']);
   const gaps = optional(list(parseGap))(value['gaps']);
+  const units = optional(dictionary(nonnegativeFinite))(value['units']);
   return {
     ...(padding === undefined ? {} : { padding }),
     ...(margin === undefined ? {} : { margin }),
     ...(gaps === undefined ? {} : { gaps }),
+    ...(units === undefined ? {} : { units }),
   };
 }
 

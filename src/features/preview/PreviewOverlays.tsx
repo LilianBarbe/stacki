@@ -2,7 +2,7 @@ import React from 'react';
 import type { Box } from './outlineBoxes';
 import type { PreviewMessage } from './previewMessages';
 import { hoverIsSelection, onePerPlace, outlineBoxPath } from './outlineBoxes';
-import { spacingBands } from './spacingBands';
+import { spacingBands, withLiveSpacing } from './spacingBands';
 import {
   BranchIcon,
   CodeIcon,
@@ -32,6 +32,8 @@ export interface SpacingHover {
   readonly kind: 'padding' | 'margin' | 'gap';
   readonly sides?: readonly string[];
   readonly labels?: Readonly<Record<string, string>>;
+  /** The values a drag is writing, per side: they size the band ahead of the page. */
+  readonly live?: Readonly<Record<string, string>>;
 }
 
 // The measurements as the canvas frame reports them (src/features/preview/previewMessages.ts): a
@@ -92,19 +94,18 @@ function SpacingOverlays(props: PreviewOverlaysProps) {
   const measurements = props.spacing[selectedPath] ?? [];
   const box = boxes[props.selOcc ?? 0] ?? boxes[0];
   const measurement = measurements[props.selOcc ?? 0] ?? measurements[0] ?? undefined;
-  return spacingBands(box, measurement, spacingHover.kind, spacingHover.sides).map(
-    (band, index) => (
-      <div
-        key={`sp-${band.side}-${index}`}
-        className={`spacing-band is-${spacingHover.kind}`}
-        style={boxStyle(band, props.scale)}
-      >
-        <span className="spacing-band-label">
-          {spacingHover.labels?.[band.side] ?? spacingLabel(band)}
-        </span>
-      </div>
-    ),
-  );
+  const sized = withLiveSpacing(measurement, spacingHover.kind, spacingHover.live);
+  return spacingBands(box, sized, spacingHover.kind, spacingHover.sides).map((band, index) => (
+    <div
+      key={`sp-${band.side}-${index}`}
+      className={`spacing-band is-${spacingHover.kind}`}
+      style={boxStyle(band, props.scale)}
+    >
+      <span className="spacing-band-label">
+        {spacingHover.labels?.[band.side] ?? spacingLabel(band)}
+      </span>
+    </div>
+  ));
 }
 
 function NodeOutlines(props: PreviewOverlaysProps) {

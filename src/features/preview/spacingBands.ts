@@ -10,6 +10,8 @@ export interface Spacing {
   readonly padding?: SpacingSides;
   readonly margin?: SpacingSides;
   readonly gaps?: readonly (Box & { readonly axis: 'row' | 'column' })[];
+  /** What one `em`, `rem`, `vw` and `vh` is worth in px for this element. */
+  readonly units?: Readonly<Record<string, number>>;
 }
 interface Band extends Box {
   readonly side: string;
@@ -108,6 +110,65 @@ export function spacingBands(
       ...bands[side],
     }),
   );
+}
+
+const LENGTH = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|rem|em|vw|vh)?\s*(?:!important)?\s*$/i;
+
+/** A value the panel is dragging, in pixels, or undefined when only the laid-out
+ *  page can say: a percentage, a variable, a calc(). Units come from the page
+ *  with its measurements: em is the element's own font size, rem the root's. */
+export function lengthToPx(
+  value: string,
+  units: Readonly<Record<string, number>> | undefined,
+): number | undefined {
+  const match = LENGTH.exec(value);
+  if (!match) {
+    return undefined;
+  }
+  const amount = parseFloat(match[1] ?? '');
+  const unit = (match[2] ?? '').toLowerCase();
+  if (unit === '') {
+    // A bare number is a length only when it is 0.
+    return amount === 0 ? 0 : undefined;
+  }
+  if (unit === 'px') {
+    return amount;
+  }
+  const perUnit = units?.[unit];
+  if (perUnit === undefined) {
+    return undefined;
+  }
+  return perUnit > 0 ? amount * perUnit : undefined;
+}
+
+/**
+ * `spacing` with the sides a drag is writing replaced by the dragged values, so
+ * the band on the canvas is the number in the panel, on the same frame, rather
+ * than the page as it was last measured. A value that cannot be turned into
+ * pixels here keeps its measurement.
+ */
+export function withLiveSpacing(
+  spacing: Spacing | undefined,
+  kind: string,
+  live: Readonly<Record<string, string>> | undefined,
+): Spacing | undefined {
+  if (!spacing || !live) {
+    return spacing;
+  }
+  if (kind !== 'padding' && kind !== 'margin') {
+    return spacing;
+  }
+  const sizes: { [Key in Side]?: number } = { ...spacing[kind] };
+  let changed = false;
+  for (const side of SIDES) {
+    const value = live[side];
+    const px = value === undefined ? undefined : lengthToPx(value, spacing.units);
+    if (px !== undefined) {
+      sizes[side] = px;
+      changed = true;
+    }
+  }
+  return changed ? { ...spacing, [kind]: sizes } : spacing;
 }
 
 export default spacingBands;

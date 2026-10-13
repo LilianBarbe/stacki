@@ -17,6 +17,7 @@ const spacing = {
   padding: { top: 2, right: 3, bottom: 4, left: 5 },
   margin: { top: 1 },
   gaps: [{ ...box, axis: 'row' }],
+  units: { em: 20, rem: 16, vw: 12.8, vh: 7.2 },
 };
 
 test('preview message parser preserves every supported message variant', () => {
@@ -124,6 +125,9 @@ test('preview message parser ignores unknown and malformed project messages', ()
       classes: {},
       spacing: { 0: [{ gaps: [{ ...box, axis: 'diagonal' }] }] },
     },
+    { type: 'avb:rects', rects: {}, classes: {}, spacing: { 0: [{ units: { rem: -16 } }] } },
+    { type: 'avb:rects', rects: {}, classes: {}, spacing: { 0: [{ units: { rem: '16' } }] } },
+    { type: 'avb:rects', rects: {}, classes: {}, spacing: { 0: [{ units: [16] }] } },
     { type: 'avb:click-node', path: '0', occurrence: -1, outside: false },
     { type: 'avb:modifiers', shiftKey: 'yes', altKey: false },
     { type: 'avb:rendered-nodes', paths: Array(100_001).fill('0') },
