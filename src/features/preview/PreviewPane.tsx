@@ -28,8 +28,10 @@ interface PreviewPaneProps {
   readonly crumbs?: readonly PreviewCrumb[];
   readonly onCrumb?: (id: string | undefined) => void;
   readonly onRefresh?: () => void;
+  readonly onPreviewLoaded?: () => void;
   readonly onRestart?: () => void;
   readonly selPath?: string | undefined;
+  readonly navigatorSelectionTick?: number;
   readonly navHoverPath?: string | undefined;
   readonly overlayInfo?: (path: string) => OverlayInfo | undefined;
   readonly onSelectPath?: (path: string | undefined, info: { readonly outside: boolean }) => void;
@@ -95,7 +97,13 @@ function PreviewContent({
   readonly sizing: Sizing;
 }) {
   if (url && props.device === 'canvas') {
-    return <CanvasView url={url} refreshKey={props.refreshKey ?? 0} />;
+    return (
+      <CanvasView
+        url={url}
+        refreshKey={props.refreshKey ?? 0}
+        {...(props.onPreviewLoaded === undefined ? {} : { onPreviewLoaded: props.onPreviewLoaded })}
+      />
+    );
   }
   if (url) {
     return <DesignPreview props={props} url={url} runtime={runtime} sizing={sizing} />;
@@ -115,31 +123,46 @@ function DesignPreview({
   readonly sizing: Sizing;
 }) {
   const width = sizing.width;
+  const scale = sizing.viewport.scale;
   return (
-    <div
-      ref={sizing.frameRef}
-      className={`frame-sized ${width ? '' : 'full'} ${sizing.resizing ? 'resizing' : ''}`}
-      style={{
-        width: sizing.viewport.width,
-        height: sizing.viewport.height,
-        bottom: 'auto',
-        transform: `translateX(-50%) scale(${sizing.viewport.scale})`,
-      }}
-    >
-      <div className="frame-clip">
-        <iframe
-          key={`${url}-${props.refreshKey ?? ''}`}
-          ref={runtime.iframeRef}
-          src={`${url}#avb-design`}
-          title="Site preview"
-          onLoad={() => {
-            runtime.registerFrame();
-            runtime.sendTrack();
-          }}
-        />
+    <>
+      <div
+        ref={sizing.frameRef}
+        className={`frame-sized ${width ? '' : 'full'} ${sizing.resizing ? 'resizing' : ''}`}
+        style={{
+          width: sizing.viewport.width,
+          height: sizing.viewport.height,
+          bottom: 'auto',
+          transform: `translateX(-50%) scale(${scale})`,
+        }}
+      >
+        <div className="frame-clip">
+          <iframe
+            key={`${url}-${props.refreshKey ?? ''}`}
+            ref={runtime.iframeRef}
+            src={`${url}#avb-design`}
+            title="Site preview"
+            onLoad={() => {
+              runtime.registerFrame();
+              runtime.sendTrack();
+              props.onPreviewLoaded?.();
+            }}
+          />
+        </div>
+        <ResizeHandles sizing={sizing} />
+      </div>
+      <div
+        className={`preview-overlay-layer ${width ? '' : 'full'}`}
+        style={{
+          width: sizing.viewport.width * scale,
+          height: sizing.viewport.height * scale,
+          borderRadius: width ? 10 * scale : 0,
+        }}
+      >
         <PreviewOverlays
           rects={runtime.rects}
           spacing={runtime.spacing}
+          scale={scale}
           {...(props.spacingHover === undefined ? {} : { spacingHover: props.spacingHover })}
           selPath={props.selPath}
           selOcc={runtime.selOcc}
@@ -150,8 +173,7 @@ function DesignPreview({
           {...(props.overlayInfo === undefined ? {} : { overlayInfo: props.overlayInfo })}
         />
       </div>
-      <ResizeHandles sizing={sizing} />
-    </div>
+    </>
   );
 }
 

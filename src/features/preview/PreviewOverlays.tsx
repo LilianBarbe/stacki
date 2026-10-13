@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Box } from './outlineBoxes';
 import type { PreviewMessage } from './previewMessages';
-import { hoverIsSelection, onePerPlace } from './outlineBoxes';
+import { hoverIsSelection, onePerPlace, outlineBoxPath } from './outlineBoxes';
 import { spacingBands } from './spacingBands';
 import {
   BranchIcon,
@@ -43,6 +43,7 @@ export type SpacingMap = RectsMessage['spacing'];
 interface PreviewOverlaysProps {
   readonly rects: RectMap;
   readonly spacing: SpacingMap;
+  readonly scale: number;
   readonly spacingHover?: SpacingHover | undefined;
   readonly selPath: string | undefined;
   readonly selOcc: number | undefined;
@@ -56,7 +57,9 @@ interface PreviewOverlaysProps {
 export function PreviewOverlays(props: PreviewOverlaysProps) {
   return (
     <>
-      {!props.focusWhole && <FocusOverlays path={props.focusPath} rects={props.rects} />}
+      {!props.focusWhole && (
+        <FocusOverlays path={props.focusPath} rects={props.rects} scale={props.scale} />
+      )}
       <SpacingOverlays {...props} />
       <NodeOutlines {...props} />
     </>
@@ -66,15 +69,17 @@ export function PreviewOverlays(props: PreviewOverlaysProps) {
 function FocusOverlays({
   path,
   rects,
+  scale,
 }: {
   readonly path: string | undefined;
   readonly rects: RectMap;
+  readonly scale: number;
 }) {
   if (!path) {
     return undefined;
   }
   return onePerPlace(rects[path] ?? undefined).map((box, index) => (
-    <div key={`focus-${index}`} className="node-focus" style={boxStyle(box)} />
+    <div key={`focus-${index}`} className="node-focus" style={boxStyle(box, scale)} />
   ));
 }
 
@@ -92,7 +97,7 @@ function SpacingOverlays(props: PreviewOverlaysProps) {
       <div
         key={`sp-${band.side}-${index}`}
         className={`spacing-band is-${spacingHover.kind}`}
-        style={boxStyle(band)}
+        style={boxStyle(band, props.scale)}
       >
         <span className="spacing-band-label">
           {spacingHover.labels?.[band.side] ?? spacingLabel(band)}
@@ -105,8 +110,9 @@ function SpacingOverlays(props: PreviewOverlaysProps) {
 function NodeOutlines(props: PreviewOverlaysProps) {
   const outlines = outlineTargets(props);
   return outlines.flatMap((outline) => {
-    const all = props.rects[outline.path];
     const info = props.overlayInfo?.(outline.path);
+    const geometryPath = outlineBoxPath(outline.path, info?.nodeKind);
+    const all = props.rects[geometryPath] ?? props.rects[outline.path];
     if (!all || !info) {
       return [];
     }
@@ -119,9 +125,9 @@ function NodeOutlines(props: PreviewOverlaysProps) {
       <div
         key={`${outline.type}-${index}`}
         className={`node-outline ${outline.type} ${info.kind}${info.bound ? ' bound' : ''}`}
-        style={boxStyle(box)}
+        style={boxStyle(box, props.scale)}
       >
-        <span className={`node-outline-tag ${box.y < 20 ? 'inside' : ''}`}>
+        <span className={`node-outline-tag ${box.y * props.scale < 20 ? 'inside' : ''}`}>
           {outlineIcon(info)}
           {info.label}
         </span>
@@ -188,8 +194,13 @@ function outlineIcon(info: OverlayInfo): React.ReactNode {
   }
 }
 
-function boxStyle(box: Box): React.CSSProperties {
-  return { left: box.x, top: box.y, width: box.w, height: box.h };
+function boxStyle(box: Box, scale: number): React.CSSProperties {
+  return {
+    left: box.x * scale,
+    top: box.y * scale,
+    width: box.w * scale,
+    height: box.h * scale,
+  };
 }
 
 function spacingLabel(box: Box & { readonly side: string }): string {

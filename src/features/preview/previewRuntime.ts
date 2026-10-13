@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import type { RectMap, SpacingMap } from './PreviewOverlays';
+import type { OverlayInfo, RectMap, SpacingMap } from './PreviewOverlays';
 import type { PreviewDevice } from './PreviewToolbar';
 import type { PreviewMessage, PreviewReloadReason } from './previewMessages';
 import { parsePreviewMessage } from './previewMessages';
-import { sameCopy } from './outlineBoxes';
+import { outlineBoxPath, sameCopy } from './outlineBoxes';
 import { setModifiers } from '../../editor/heldModifiers';
 import { noteCanvasReady, receiveCanvasReply, setCanvasFrame } from '../../editor/canvasQuery';
 import type { Digest } from '../../../shared/core/brand';
@@ -25,7 +25,9 @@ export type JudgeCanvasEvent = (
 
 export interface PreviewRuntimeProps {
   readonly selPath: string | undefined;
+  readonly navigatorSelectionTick?: number;
   readonly navHoverPath?: string | undefined;
+  readonly overlayInfo?: ((path: string) => OverlayInfo | undefined) | undefined;
   readonly focusPath?: string | undefined;
   readonly focusOcc?: number | undefined;
   readonly pathScope?: string;
@@ -70,6 +72,12 @@ export function usePreviewRuntime(
   const [selectedOccurrence, setSelectedOccurrence] = useState<number | undefined>(undefined);
   const [hoverOcc, setHoverOcc] = useState(0);
   const hoverPath = props.navHoverPath ?? canvasHover;
+  const selectedBoxPath = props.selPath
+    ? outlineBoxPath(props.selPath, props.overlayInfo?.(props.selPath)?.nodeKind)
+    : undefined;
+  const hoverBoxPath = hoverPath
+    ? outlineBoxPath(hoverPath, props.overlayInfo?.(hoverPath)?.nodeKind)
+    : undefined;
   const refs = useRuntimeRefs(props, selectedOccurrence);
   const setters = useMemo(
     () => ({
@@ -81,16 +89,20 @@ export function usePreviewRuntime(
     }),
     [],
   );
-  useOccurrenceSelection(props.selPath, refs, setSelectedOccurrence);
+  useOccurrenceSelection(props, refs, setSelectedOccurrence);
   useMessageListener(iframeRef, refs, setters);
   // The frame measures only tracked paths, so both hover sources must use
   // the same active path for measurement requests and outline rendering.
   const trackPaths = useMemo(
-    () => trackedPaths(props.selPath, hoverPath, props.focusPath),
-    [props.focusPath, hoverPath, props.selPath],
+    () => trackedPaths(props.selPath, hoverPath, props.focusPath, selectedBoxPath, hoverBoxPath),
+    [props.focusPath, hoverPath, hoverBoxPath, props.selPath, selectedBoxPath],
   );
   const registerFrame = useCallback((): void => {
-    setCanvasFrame(iframeRef.current?.contentWindow ?? undefined);
+    const frame = iframeRef.current?.contentWindow;
+    setCanvasFrame(frame ?? undefined);
+    // The frame may have announced its rendering before this listener mounted.
+    // The load handler repeats this handshake after the preload is ready.
+    frame?.postMessage({ type: 'avb:request-render' }, '*');
   }, []);
   const sendTrack = useCallback((): void => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -113,7 +125,7 @@ export function usePreviewRuntime(
     spacing,
     selOcc: selectedOccurrence,
     hoverPath,
-    hoverOcc: props.navHoverPath ? undefined : hoverOcc,
+    hoverOcc: props.navHoverPath ? 0 : hoverOcc,
     registerFrame,
     sendTrack,
   };
@@ -166,16 +178,30 @@ function useRuntimeRefs(
 }
 
 function useOccurrenceSelection(
-  selectedPath: string | undefined,
+  props: PreviewRuntimeProps,
   refs: RuntimeRefs,
   setSelectedOccurrence: React.Dispatch<React.SetStateAction<number | undefined>>,
 ): void {
+  const previousNavigatorTick = useRef(props.navigatorSelectionTick);
   useEffect(() => {
-    const { cameFrom: cameFromRef, lastClick: lastClickRef } = refs;
+    const selectedPath = props.selPath;
+    const {
+      cameFrom: cameFromRef,
+      lastClick: lastClickRef,
+      selectedOccurrence: selectedOccurrenceRef,
+      selectedClasses: selectedClassesRef,
+    } = refs;
     const previous = cameFromRef.current;
     cameFromRef.current = selectedPath;
     const clicked = lastClickRef.current;
     lastClickRef.current = undefined;
+    if (previousNavigatorTick.current !== props.navigatorSelectionTick) {
+      previousNavigatorTick.current = props.navigatorSelectionTick;
+      selectedOccurrenceRef.current = 0;
+      selectedClassesRef.current = undefined;
+      setSelectedOccurrence(0);
+      return;
+    }
     if (clicked !== undefined) {
       if (clicked.path === selectedPath) {
         return;
@@ -185,7 +211,7 @@ function useOccurrenceSelection(
       return;
     }
     setSelectedOccurrence(undefined);
-  }, [refs, selectedPath, setSelectedOccurrence]);
+  }, [props.navigatorSelectionTick, props.selPath, refs, setSelectedOccurrence]);
 }
 
 interface RuntimeSetters {
@@ -349,7 +375,7 @@ function useFrameRegistration(
   }, [canvasMode, props.refreshKey, registerFrame, url]);
   useEffect(() => {
     sendTrack();
-  }, [props.refreshKey, sendTrack, url]);
+  }, [props.navigatorSelectionTick, props.refreshKey, sendTrack, url]);
 }
 
 function useSelectionScroll(
@@ -357,29 +383,51 @@ function useSelectionScroll(
   iframeRef: React.RefObject<HTMLIFrameElement>,
   refs: RuntimeRefs,
 ): void {
-  const previousContext = useRef({ focusPath: props.focusPath, pathScope: props.pathScope });
+  const previousContext = useRef({
+    focusPath: props.focusPath,
+    pathScope: props.pathScope,
+    navigatorSelectionTick: props.navigatorSelectionTick,
+  });
   useEffect(() => {
     const frame = iframeRef.current?.contentWindow;
     const previous = previousContext.current;
     const contextChanged =
       previous.focusPath !== props.focusPath || previous.pathScope !== props.pathScope;
-    previousContext.current = { focusPath: props.focusPath, pathScope: props.pathScope };
+    const navigatorSelected = previous.navigatorSelectionTick !== props.navigatorSelectionTick;
+    previousContext.current = {
+      focusPath: props.focusPath,
+      pathScope: props.pathScope,
+      navigatorSelectionTick: props.navigatorSelectionTick,
+    };
     if (!frame || !props.selPath) {
       return;
     }
     const { clickPending: clickPendingRef } = refs;
     if (clickPendingRef.current) {
       clickPendingRef.current = false;
-      return;
+      if (!navigatorSelected) {
+        return;
+      }
     }
     if (!contextChanged) {
       // The frame reads a missing occurrence as the first copy.
       frame.postMessage(
-        { type: 'avb:scroll-to', path: props.selPath, occ: refs.selectedOccurrence.current },
+        {
+          type: 'avb:scroll-to',
+          path: props.selPath,
+          occ: navigatorSelected ? 0 : refs.selectedOccurrence.current,
+        },
         '*',
       );
     }
-  }, [iframeRef, props.focusPath, props.pathScope, props.selPath, refs]);
+  }, [
+    iframeRef,
+    props.focusPath,
+    props.navigatorSelectionTick,
+    props.pathScope,
+    props.selPath,
+    refs,
+  ]);
 }
 
 function useResetOnReload(

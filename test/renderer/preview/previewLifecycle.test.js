@@ -32,6 +32,33 @@ esbuild.buildSync({
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
+test('iframe load requests the verified render again after listeners mount', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  try {
+    await React.act(async () => {
+      root.render(React.createElement(PreviewPane, hoverPreviewProps()));
+      await settle();
+    });
+    const iframe = document.querySelector('iframe');
+    assert.ok(iframe);
+    const sent = [];
+    iframe.contentWindow.postMessage = (message) => sent.push(message);
+    await React.act(async () => {
+      iframe.dispatchEvent(new dom.window.Event('load'));
+      await settle();
+    });
+    assert.ok(sent.some((message) => message.type === 'avb:request-render'));
+    assert.ok(sent.some((message) => message.type === 'avb:track'));
+  } finally {
+    await React.act(async () => root.unmount());
+    dom.window.close();
+  }
+});
+
 test('canvas hover measures and outlines the active copy, then clears on leave', async () => {
   const dom = installHoverDOM();
   const React = require('react');
@@ -90,7 +117,8 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
     await render();
     assert.deepEqual(tracked.at(-1), ['0', '3', '2']);
     await measure();
-    assert.equal(document.querySelectorAll('.node-outline.hover').length, 2);
+    assert.equal(document.querySelectorAll('.node-outline.hover').length, 1);
+    assert.equal(document.querySelector('.node-outline.hover').style.top, '30px');
     props.navHoverPath = undefined;
     await render();
     assert.deepEqual(tracked.at(-1), ['0', '1', '2'], 'Canvas hover resumes after navigator hover');
@@ -101,6 +129,230 @@ test('canvas hover measures and outlines the active copy, then clears on leave',
     assert.deepEqual(tracked.at(-1), ['0', '2']);
     assert.ok(document.querySelector('.node-outline.hover') === null);
     assert.equal(document.querySelectorAll('.node-outline.sel').length, 2);
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+  }
+});
+
+test('navigator selection uses the first loop item; canvas clicks keep their item', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  const props = {
+    ...hoverPreviewProps(),
+    selPath: '0.1',
+    focusPath: undefined,
+    navigatorSelectionTick: 0,
+    onSelectPath() {},
+  };
+  const act = (action) =>
+    React.act(async () => {
+      await action();
+      await settle();
+    });
+  const render = () => act(() => root.render(React.createElement(PreviewPane, props)));
+  try {
+    await render();
+    const frame = document.querySelector('iframe').contentWindow;
+    const posted = [];
+    frame.postMessage = (message) => posted.push(message);
+    const send = (data) =>
+      act(() => window.dispatchEvent(new window.MessageEvent('message', { source: frame, data })));
+    const token = 'a'.repeat(64);
+    await send({ type: 'avb:render', token, stamps: [] });
+    await send({
+      type: 'avb:rects',
+      classes: {},
+      spacing: {},
+      rects: {
+        0.1: [
+          { x: 10, y: 30, w: 80, h: 40 },
+          { x: 10, y: 90, w: 80, h: 40 },
+        ],
+        0.2: [
+          { x: 20, y: 40, w: 80, h: 40 },
+          { x: 20, y: 100, w: 80, h: 40 },
+        ],
+      },
+    });
+    await send({ type: 'avb:click-node', path: '0.1', occurrence: 1, outside: false, token });
+    assert.equal(document.querySelector('.node-outline.sel').style.top, '90px');
+    props.navigatorSelectionTick += 1;
+    await render();
+    assert.equal(document.querySelectorAll('.node-outline.sel').length, 1);
+    assert.equal(document.querySelector('.node-outline.sel').style.top, '30px');
+    assert.equal(posted.filter((message) => message.type === 'avb:scroll-to').at(-1)?.occ, 0);
+    await send({ type: 'avb:click-node', path: '0.1', occurrence: 1, outside: false, token });
+    assert.equal(document.querySelector('.node-outline.sel').style.top, '90px');
+    props.selPath = '0.2';
+    props.navigatorSelectionTick += 1;
+    await render();
+    assert.equal(document.querySelector('.node-outline.sel').style.top, '40px');
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+  }
+});
+
+test('a loaded preview frame announces that recovery should be checked', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  let loaded = 0;
+  const props = {
+    ...hoverPreviewProps(),
+    onPreviewLoaded: () => {
+      loaded++;
+    },
+  };
+  try {
+    await React.act(async () => {
+      root.render(React.createElement(PreviewPane, props));
+      await settle();
+    });
+    const designFrame = document.querySelector('iframe');
+    designFrame.dispatchEvent(new window.Event('load'));
+    assert.equal(loaded, 1, 'the design frame starts a recovery check');
+
+    props.device = 'canvas';
+    await React.act(async () => {
+      root.render(React.createElement(PreviewPane, props));
+      await settle();
+    });
+    const canvasFrame = document.querySelector('iframe');
+    canvasFrame.dispatchEvent(new window.Event('load'));
+    assert.equal(loaded, 2, 'a canvas overview frame starts the same recovery check');
+  } finally {
+    await React.act(async () => root.unmount());
+    dom.window.close();
+  }
+});
+
+test('wide preview keeps outline labels outside the scaled frame', async () => {
+  const dom = installHoverDOM();
+  Object.defineProperties(dom.window.HTMLElement.prototype, {
+    clientWidth: {
+      configurable: true,
+      get() {
+        return this.classList.contains('preview-frame-wrap') ? 400 : 0;
+      },
+    },
+    clientHeight: {
+      configurable: true,
+      get() {
+        return this.classList.contains('preview-frame-wrap') ? 600 : 0;
+      },
+    },
+  });
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  const props = { ...hoverPreviewProps(), device: 'tablet', focusPath: undefined };
+  const act = (action) =>
+    React.act(async () => {
+      await action();
+      await settle();
+    });
+  try {
+    await act(() => root.render(React.createElement(PreviewPane, props)));
+    const iframe = document.querySelector('iframe');
+    const frame = document.querySelector('.frame-sized');
+    const layer = document.querySelector('.preview-overlay-layer');
+    assert.equal(frame.parentElement, layer.parentElement);
+    assert.match(frame.style.transform, /scale\(0\.48958/);
+    assert.equal(layer.style.width, '376px');
+    const send = (data) =>
+      act(() =>
+        window.dispatchEvent(
+          new window.MessageEvent('message', { source: iframe.contentWindow, data }),
+        ),
+      );
+    await send({ type: 'avb:render', token: 'a'.repeat(64), stamps: [] });
+    await send({
+      type: 'avb:rects',
+      classes: {},
+      spacing: {},
+      rects: { 0: [{ x: 100, y: 40, w: 300, h: 80 }] },
+    });
+    const outline = layer.querySelector('.node-outline.sel');
+    assert.ok(outline);
+    assert.ok(Math.abs(Number.parseFloat(outline.style.left) - 48.958) < 0.01);
+    assert.ok(Math.abs(Number.parseFloat(outline.style.top) - 19.583) < 0.01);
+    assert.ok(Math.abs(Number.parseFloat(outline.style.width) - 146.875) < 0.01);
+    assert.ok(layer.contains(outline.querySelector('.node-outline-tag')));
+    assert.equal(frame.contains(outline), false);
+  } finally {
+    await act(() => root.unmount());
+    dom.window.close();
+  }
+});
+
+test('hovering or selecting a map outlines its parent box', async () => {
+  const dom = installHoverDOM();
+  const React = require('react');
+  const { createRoot } = require('react-dom/client');
+  const { PreviewPane } = require(path.join(directory, 'preview.js'));
+  const root = createRoot(document.getElementById('root'));
+  const props = {
+    ...hoverPreviewProps(),
+    selPath: '0.1',
+    navHoverPath: undefined,
+    focusPath: undefined,
+    overlayInfo: (nodePath) => ({
+      label: nodePath,
+      kind: 'map',
+      tag: undefined,
+      nodeKind: 'map',
+      astroAsset: false,
+      dynamicTag: false,
+      isLayout: false,
+      bound: false,
+    }),
+  };
+  const act = (action) =>
+    React.act(async () => {
+      await action();
+      await settle();
+    });
+  try {
+    await act(() => root.render(React.createElement(PreviewPane, props)));
+    const frame = document.querySelector('iframe').contentWindow;
+    const tracked = [];
+    frame.postMessage = (message) => {
+      if (message.type === 'avb:track') {
+        tracked.push(message.paths);
+      }
+    };
+    props.navHoverPath = '0.2';
+    await act(() => root.render(React.createElement(PreviewPane, props)));
+    assert.deepEqual(tracked.at(-1), ['0.1', '0.2', '0']);
+    const send = (data) =>
+      act(() => window.dispatchEvent(new window.MessageEvent('message', { source: frame, data })));
+    await send({ type: 'avb:render', token: 'a'.repeat(64), stamps: [] });
+    await send({
+      type: 'avb:rects',
+      classes: {},
+      spacing: {},
+      rects: {
+        0: [{ x: 10, y: 20, w: 400, h: 300 }],
+        0.1: [{ x: 40, y: 50, w: 80, h: 60 }],
+        0.2: [{ x: 200, y: 150, w: 80, h: 60 }],
+      },
+    });
+    for (const kind of ['sel', 'hover']) {
+      const outline = document.querySelector(`.node-outline.${kind}`);
+      assert.ok(outline);
+      assert.deepEqual(
+        [outline.style.left, outline.style.top, outline.style.width, outline.style.height],
+        ['10px', '20px', '400px', '300px'],
+      );
+    }
   } finally {
     await act(() => root.unmount());
     dom.window.close();

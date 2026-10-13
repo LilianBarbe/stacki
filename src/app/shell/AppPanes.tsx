@@ -9,8 +9,6 @@ import { canvasClickAction } from '../../editor/canvasClick';
 import PreviewPane from '../../features/preview/PreviewPane';
 import { relativeTime } from '../../features/history/HistoryPanel';
 import SaveConflictNotice from '../SaveConflictNotice';
-import CapabilityNotice from '../CapabilityNotice';
-import { nodeCapability } from '../../editor/nodeCapability';
 import { nodeAtPath } from '../../editor/editorTree';
 import type { PickedAsset } from '../../ui/AssetField';
 import type { InlineNode } from '../../features/props/RichContent';
@@ -45,12 +43,14 @@ export function CanvasPane({ app }: { readonly app: ShellView }) {
       crumbs={app.crumbs}
       onCrumb={(id) => app.setSelectedId(id)}
       onRefresh={() => app.setRefreshKey((count) => count + 1)}
+      onPreviewLoaded={app.previewLoaded}
       onRestart={() => {
         // Starting the dev server reports its own failure in the preview area.
         void app.startPreview(app.project.path);
       }}
       pathScope={app.editedRel ? `${app.editedRel}|` : ''}
       selPath={app.pathFor(app.selectedId)}
+      navigatorSelectionTick={app.navigatorSelectionTick}
       navHoverPath={app.pathFor(hoverNodeId)}
       overlayInfo={app.overlayInfo}
       focusPath={app.focusPath}
@@ -218,17 +218,9 @@ export function OldVersionCover({ app }: { readonly app: ShellView }) {
 }
 
 export function RightPanel({ app }: { readonly app: ShellView }) {
-  const { model, selectedId } = app;
   return (
     <div className="panel right">
       <RightTabs app={app} />
-      <CapabilityNotice
-        capability={
-          model && selectedId && selectedId !== 'frontmatter'
-            ? nodeCapability(model, selectedId)
-            : undefined
-        }
-      />
       {app.rightTab === 'style' && <StyleTab app={app} />}
       <div style={{ display: app.rightTab === 'settings' ? 'contents' : 'none' }}>
         <PropsPanel {...settingsValues(app)} {...settingsHandlers(app)} />
@@ -292,12 +284,12 @@ export function StyleTab({ app }: { readonly app: ShellView }) {
       onRecordUndo={app.pushCommand}
       onAddClass={(name) =>
         selectedId
-          ? app.addClassToNode(selectedId, name)
+          ? app.addClassToNode(selectedId, name, app.pathFor(selectedId))
           : Promise.resolve({ tag: 'refused', message: 'no element is selected' })
       }
       onSpacingHover={app.setSpacingHover}
       pathOf={app.pathFor}
-      renderedClasses={app.selectedClasses}
+      renderedClasses={app.classesForRef.current === selectedId ? app.selectedClasses : []}
       projectClasses={app.projectClasses}
       historyTick={app.historyTick}
       openFilePath={app.openEditableFile?.path ?? undefined}
@@ -358,10 +350,11 @@ export function settingsHandlers(app: ShellView) {
     },
     onSetProp: (propName: string, value: Attr | undefined, immediate?: boolean) => {
       if (selectedId) {
-        app.setProp(selectedId, propName, value, immediate);
+        app.setProp(selectedId, propName, value, immediate, app.pathFor(selectedId));
       }
     },
-    onSetProps: (nodeId: string, patch: PropValues) => app.setProps(nodeId, patch),
+    onSetProps: (nodeId: string, patch: PropValues) =>
+      app.setProps(nodeId, patch, true, app.pathFor(nodeId)),
     onSetAssetProp: (nodeId: string, propName: string, picked: PickedAsset) => {
       void app.setAssetProp(nodeId, propName, picked).catch(app.reportFailure);
     },
